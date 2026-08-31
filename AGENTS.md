@@ -85,7 +85,7 @@ cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
       - (r"/api/(author|publisher|tag|rating|series|format)/(.*)", MetaBooks),
     - 正确设计：(r"/api/author/(.*)/alias", AuthorAliases),
     - 错误设计：(r"/api/author-aliases/(.*)", AuthorAliases) —— 没有遵守restful设计原则
-    - 错误设计：(r"/api/authors/{id}/aliases", AuthorAliases) —— 不应该使用复数单词 authors 
+    - 错误设计：(r"/api/authors/{id}/aliases", AuthorAliases) —— 不应该使用复数单词 authors
 
 ### Pull Request 提交规范
 

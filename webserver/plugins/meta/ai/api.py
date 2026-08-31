@@ -6,8 +6,10 @@ import re
 
 import requests
 
-from webserver.plugins.meta.douban import str2date
+from webserver.plugins.meta.common import str2date
 
+
+from webserver.plugins.meta.base import MetaSourceMixin, _setting, meta_manifest
 
 KEY = "ai"
 
@@ -197,17 +199,8 @@ Evidence JSON: {evidence}
         return mi
 
     def get_cover(self, cover_url):
-        if not cover_url:
-            return None
-        try:
-            img = requests.get(cover_url, timeout=10).content
-            img_fmt = cover_url.split(".")[-1].lower()
-            if img_fmt not in ["jpg", "jpeg", "png"]:
-                img_fmt = "jpg"
-            return (img_fmt, img)
-        except Exception as e:
-            logging.error(f"Failed to get cover: {e}")
-            return None
+        # AI 元数据只补全文本字段；模型输出不能成为服务端出站请求目标。
+        return None
 
 
 if __name__ == "__main__":
@@ -217,3 +210,64 @@ if __name__ == "__main__":
         api_url="https://api.openai.com/v1/chat/completions", api_key="test-api-key", model="gpt-3.5-turbo", use_thinking=False
     )
     print(api.get_book("百年孤独"))
+
+
+class AIProvider(MetaSourceMixin, AIBookApi):
+    """AI 元数据源：凭据与模型参数按 D-27 双读，connection 优先、回落 CONF。"""
+
+    legacy_sources = ("ai",)
+
+    manifest = meta_manifest(
+        "talebook.meta.ai",
+        "AI 元数据",
+        "调用兼容 OpenAI 接口的模型补全书名、作者、出版与简介。",
+        "mdi-robot",
+        "https://platform.openai.com/",
+        config_schema={
+            "type": "object",
+            "properties": {
+                "api_url": {"type": "string"},
+                "model": {"type": "string"},
+                "use_thinking": {"type": "boolean"},
+            },
+        },
+        auth_schema={
+            "type": "object",
+            "required": ["api_key"],
+            "properties": {"api_key": {"type": "string", "writeOnly": True}},
+        },
+        configuration_mode="form",
+        deprecated=True,
+    )
+
+    def __init__(self):
+        super().__init__("", "", "", False, copy_image=False)
+
+    def _configured(self, context):
+        config = dict((context or {}).get("config") or {})
+        secrets = dict((context or {}).get("secrets") or {})
+        api = AIBookApi(
+            _setting(config, "api_url", "ai_api_url"),
+            _setting({**config, **secrets}, "api_key", "ai_api_key"),
+            _setting(config, "model", "ai_model"),
+            bool(_setting(config, "use_thinking", "ai_use_thinking") or False),
+            copy_image=False,
+        )
+        return api
+
+    def _search(self, query, context):
+        api = self._configured(context)
+        if not api.api_key:
+            return []
+        mi = api.get_book(query.title, query.authors[0] if query.authors else None)
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        api = self._configured(context)
+        return api.get_book(external_id) if api.api_key else None
+
+    def get_cover(self, cover_url, context=None):
+        return self._configured(context).get_cover(cover_url)
+
+
+PROVIDER = AIProvider()

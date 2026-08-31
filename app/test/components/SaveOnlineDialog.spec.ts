@@ -31,4 +31,18 @@ describe('SaveOnlineDialog.vue', () => {
         expect(document.body.textContent).toContain('network.save.format');
         wrapper.unmount();
     });
+
+    it('hides chapter assembly options for a single-file source', async () => {
+        const wrapper = mount(SaveOnlineDialog, {
+            global: { plugins: [vuetify], mocks: { $t: (k: string) => k } },
+            props: { sourceId: 'opds:1', bookUrl: 'urn:book:1', downloadMode: 'single_book' },
+            attachTo: document.body,
+        });
+        (wrapper.vm as unknown as { open: () => void }).open();
+        await wrapper.vm.$nextTick();
+        expect(document.body.textContent).toContain('network.save.title');
+        expect(document.body.textContent).not.toContain('network.save.format');
+        expect(document.body.textContent).not.toContain('network.save.clean');
+        wrapper.unmount();
+    });
 });

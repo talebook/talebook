@@ -50,10 +50,11 @@ class TestNetworkSave(TestWithUserLogin):
         m_session.return_value = self._fake_session()
         m_meta.return_value = mock.MagicMock(cover_data=None)
 
-        body = json.dumps({"source_id": self.sid, "book_url": "/book/1001", "fmt": "txt", "clean": True})
-        d = self.json("/api/network/save", method="POST", body=body)
+        source_key = "legado:%d" % self.sid
+        body = json.dumps({"source_id": source_key, "book_url": "/book/1001", "fmt": "txt", "clean": True})
+        d = self.json("/api/book-sources/save", method="POST", body=body)
         self.assertEqual(d["err"], "ok")
-        self.assertEqual(d["tag"], "online_save:%d:/book/1001" % self.sid)
+        self.assertEqual(d["tag"], "online_save:%s:/book/1001" % source_key)
 
         m_import.assert_called()
         meta = get_db().query(models.OnlineBookMeta).filter(models.OnlineBookMeta.book_id == FAKE_BOOK_ID).first()
@@ -110,3 +111,23 @@ class TestNetworkSave(TestWithUserLogin):
         self.assertEqual(d["status"], "running")
         self.assertEqual(d["done"], 40)
         self.assertEqual(d["total"], 100)
+
+
+def test_chapter_assembly_keeps_partial_content_when_one_chapter_fails(tmp_path):
+    from webserver.plugins.runtime.domains import SourceBookDetail, SourceChapter, SourceContent
+    from webserver.services.booksource.save_service import assemble_from_chapters
+
+    detail = SourceBookDetail(external_id="book", title="测试书", authors=("作者",))
+    chapters = [SourceChapter(external_id="one", title="第一章"), SourceChapter(external_id="two", title="第二章")]
+
+    def get_chapter(chapter):
+        if chapter.external_id == "two":
+            raise RuntimeError("上游暂时失败")
+        return SourceContent(title=chapter.title, content="第一章正文")
+
+    output = tmp_path / "assembled.txt"
+    assemble_from_chapters(detail, chapters, get_chapter, str(output))
+
+    text = output.read_text(encoding="utf-8")
+    assert "第一章正文" in text
+    assert "第二章" in text

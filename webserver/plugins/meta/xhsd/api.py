@@ -5,12 +5,62 @@ import logging
 import re
 import requests
 import json
+import urllib.parse
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+from webserver.plugins.runtime.safe_http import SafeHttpClient
+
 KEY = "xinhua"
 XHSD_ISBN = "0000000000002"
+
+
+def _trusted_cover_url(value):
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+    except (TypeError, ValueError):
+        return None
+    if parsed.scheme.lower() != "https" or parsed.username or parsed.password or port not in (None, 443):
+        return None
+
+    # 显式选择服务端常量 origin，确保外部 URL 只能贡献 CDN 内的路径和查询串。
+    hostname = parsed.hostname
+    if hostname == "img1.xinhuashudian.com":
+        trusted_host = "img1.xinhuashudian.com"
+        trusted_origin = "https://img1.xinhuashudian.com"
+    elif hostname == "img2.xinhuashudian.com":
+        trusted_host = "img2.xinhuashudian.com"
+        trusted_origin = "https://img2.xinhuashudian.com"
+    elif hostname == "img3.xinhuashudian.com":
+        trusted_host = "img3.xinhuashudian.com"
+        trusted_origin = "https://img3.xinhuashudian.com"
+    elif hostname == "img4.xinhuashudian.com":
+        trusted_host = "img4.xinhuashudian.com"
+        trusted_origin = "https://img4.xinhuashudian.com"
+    elif hostname == "img5.xinhuashudian.com":
+        trusted_host = "img5.xinhuashudian.com"
+        trusted_origin = "https://img5.xinhuashudian.com"
+    elif hostname == "img6.xinhuashudian.com":
+        trusted_host = "img6.xinhuashudian.com"
+        trusted_origin = "https://img6.xinhuashudian.com"
+    elif hostname == "img7.xinhuashudian.com":
+        trusted_host = "img7.xinhuashudian.com"
+        trusted_origin = "https://img7.xinhuashudian.com"
+    elif hostname == "img8.xinhuashudian.com":
+        trusted_host = "img8.xinhuashudian.com"
+        trusted_origin = "https://img8.xinhuashudian.com"
+    elif hostname == "img9.xinhuashudian.com":
+        trusted_host = "img9.xinhuashudian.com"
+        trusted_origin = "https://img9.xinhuashudian.com"
+    else:
+        return None
+    suffix = "/" + parsed.path.lstrip("/")
+    if parsed.query:
+        suffix += "?" + parsed.query
+    return trusted_origin + suffix, trusted_host
 
 
 class XhsdBookApi:
@@ -212,9 +262,15 @@ class XhsdBookApi:
         if not self.copy_image or not cover_url:
             return None
         try:
-            img = self.session.get(cover_url, timeout=10).content
-            img_fmt = "jpg" if cover_url.lower().endswith(".jpeg") else "png"
-            if img_fmt == "png" or cover_url.lower().endswith(".png"):
+            trusted_cover = _trusted_cover_url(cover_url)
+            if not trusted_cover:
+                logging.error("Invalid XHSD cover url: %s", cover_url)
+                return None
+            trusted_url, trusted_host = trusted_cover
+            img = SafeHttpClient(allowed_hosts=(trusted_host,), session=self.session).get(trusted_url, timeout=10).content
+            cover_path = urllib.parse.urlsplit(trusted_url).path.lower()
+            img_fmt = "jpg" if cover_path.endswith((".jpg", ".jpeg")) else "png"
+            if img_fmt == "png":
                 # Simple check, real implementation might need PIL to convert if strictly needed
                 # Baike implementation converted PNG to JPEG. Let's assume we might need it too if we want to be safe,
                 # but for now let's just return what we get unless it's strictly required by Calibre to be JPG.
@@ -236,3 +292,36 @@ class XhsdBookApi:
         except Exception as e:
             logging.error(f"Get cover error: {e}")
             return None
+
+
+class XhsdProvider(MetaSourceMixin, XhsdBookApi):
+    legacy_sources = ("xinhua",)
+    """新华书店：仅支持 ISBN 精确查询，标题查询由上游其他源覆盖。"""
+
+    manifest = meta_manifest(
+        "talebook.meta.xhsd",
+        "新华书店",
+        "按 ISBN 从新华书店商品页抓取书名、作者、出版社与封面。",
+        "mdi-store",
+        "https://www.xhsd.com/",
+        brand_icon="/images/plugin-icons/xhsd.ico",
+    )
+
+    def __init__(self):
+        super().__init__(copy_image=False)
+
+    def _search(self, query, context):
+        # get_book 会先校验参数是否为 13 位 ISBN，非 ISBN 的标题直接跳过，
+        # 不要换成 get_book_by_isbn：那会把书名当 ISBN 发给搜索接口。
+        keyword = query.isbn or query.title
+        mi = self.get_book(keyword) if keyword else None
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        return self.get_book_by_isbn(external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return XhsdBookApi(copy_image=True).get_cover(cover_url)
+
+
+PROVIDER = XhsdProvider()

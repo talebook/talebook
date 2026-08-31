@@ -9,9 +9,12 @@ import tornado.escape
 from webserver import demo_mode, loader
 from webserver.handlers.base import ListHandler, auth, js
 from webserver.i18n import _
-from webserver.models import BookSourceModel, OnlineBookMeta
-from webserver.services.booksource import BookSource, BookSourceEngine, JsRuleUnsupported
+from webserver.models import BookSourceModel, OnlineBookMeta, PluginConnection
+from webserver.plugins.runtime import SourceBookDetail, SourceChapter
+from webserver.services.booksource import JsRuleUnsupported
 from webserver.services.booksource_search import SearchTaskService
+from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError
+from webserver.services.source_catalog import SourceCatalogService
 
 
 CONF = loader.get_settings()
@@ -28,31 +31,24 @@ def engine_config():
 
 
 class NetworkBaseHandler(ListHandler):
-    def get_source(self, source_id):
-        if not source_id:
-            return None
-        return (
-            self.session.query(BookSourceModel)
-            .filter(BookSourceModel.id == source_id, BookSourceModel.enabled.is_(True))
-            .first()
-        )
+    def get_catalog(self):
+        return SourceCatalogService(self.session, CONF, self.user_id())
 
-    def get_engine(self, source_model):
-        return BookSourceEngine(BookSource(source_model.raw), config=engine_config())
+    def get_source(self, source_id):
+        try:
+            return self.get_catalog().get(source_id)
+        except PluginRuntimeError:
+            return None
 
 
 class NetworkSources(NetworkBaseHandler):
     @js
     @auth
     def get(self):
-        sources = (
-            self.session.query(BookSourceModel)
-            .filter(BookSourceModel.enabled.is_(True))
-            .order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc())
-            .all()
-        )
-        items = [{"id": s.id, "name": s.name, "group": s.group or ""} for s in sources]
-        return {"err": "ok", "items": items}
+        catalog = self.get_catalog()
+        bindings = catalog.bindings()
+        items = [source.to_public_dict() for source in bindings]
+        return {"err": "ok", "items": items, "availability": catalog.availability(bindings)}
 
 
 class NetworkSearch(NetworkBaseHandler):
@@ -69,28 +65,23 @@ class NetworkSearch(NetworkBaseHandler):
         group = self.get_argument("group", "").strip()
         mode = self.get_argument("mode", "top")
 
-        order = (BookSourceModel.weight.desc(), BookSourceModel.id.asc())
-        query = self.session.query(BookSourceModel).filter(BookSourceModel.enabled.is_(True))
+        catalog = self.get_catalog()
+        bindings = [item for item in catalog.bindings() if "sources.search" in item.capabilities]
         if ids:
-            # 手选：搜指定的书源
-            id_list = [int(i) for i in ids.split(",") if i.strip().isdigit()]
-            sources = query.filter(BookSourceModel.id.in_(id_list)).order_by(*order).all()
+            selected = {item.strip() for item in ids.split(",") if item.strip()}
+            sources = [item for item in bindings if item.key in selected or str(item.legacy_id) in selected]
         elif group:
-            # 按分组搜索
-            sources = query.filter(BookSourceModel.group == group).order_by(*order).all()
+            sources = [item for item in bindings if item.group == group]
         elif mode == "all":
-            # 全部：搜所有启用的书源（前端轮询到全部完成）
-            sources = query.order_by(*order).all()
+            sources = bindings
         else:
-            # 近期可用（默认）：按权重取 TOP K
             top_k = CONF.get("BOOKSOURCE_SEARCH_TOP_K", 50)
-            sources = query.order_by(*order).limit(top_k).all()
+            sources = bindings[:top_k]
 
         if not sources:
             return {"err": "ok", "task_id": "", "total": 0, "mode": mode}
 
-        # 把所需数据先取出来，避免在子线程里使用 SQLAlchemy session
-        source_data = [(s.id, s.name, s.raw) for s in sources]
+        source_data = catalog.prepare_search(sources)
         service = SearchTaskService()
         service.configure(CONF.get("BOOKSOURCE_MAX_WORKERS", 10))
         task = service.create_task(key, page, source_data, engine_config())
@@ -110,6 +101,19 @@ class NetworkSearchStatus(NetworkBaseHandler):
         status = service.get_status(task_id)
         if status is None:
             return {"err": "task.not_found", "msg": _("搜索任务不存在或已过期")}
+        # 后台独立 session 收口失败时，当前请求 session 是
+        # 可靠的重试通道。只有 durable run 持久化成功才标 settled。
+        if status["done"] >= status["total"]:
+            runtime = PluginRuntime(self.session, CONF)
+            for update in service.pop_runtime_updates(task_id):
+                try:
+                    runtime.finish_read_batch(update["batch"], update["outcomes"])
+                except Exception:
+                    service.settle_runtime_update(task_id, update["run_id"], False)
+                    raise
+                else:
+                    service.settle_runtime_update(task_id, update["run_id"], True)
+            status = service.get_status(task_id)
         # 任务完成后给「有结果」的源权重 +1（只结算一次），下次“近期可用”排前面
         if status["finished"]:
             hit_ids = service.pop_weight_updates(task_id)
@@ -118,6 +122,12 @@ class NetworkSearchStatus(NetworkBaseHandler):
                     {BookSourceModel.weight: BookSourceModel.weight + 1}, synchronize_session=False
                 )
                 self.session.commit()
+            for update in service.pop_health_updates(task_id):
+                connection = self.session.get(PluginConnection, update["connection_id"])
+                if connection is not None:
+                    connection.health = "healthy" if update["healthy"] else "degraded"
+                    connection.health_message = update["message"][:500]
+            self.session.commit()
         return {"err": "ok", **status}
 
 
@@ -125,18 +135,18 @@ class NetworkExplore(NetworkBaseHandler):
     @js
     @auth
     def get(self):
-        source = self.get_source(_int(self.get_argument("source_id", "0"), 0))
+        source = self.get_source(self.get_argument("source_id", ""))
         if not source:
             return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
-        url = (self.get_argument("url", "") or "").strip()
-        if not url:
+        category_id = (self.get_argument("url", "") or "").strip()
+        if not category_id:
             return {"err": "params.error", "msg": _("缺少发现页 URL")}
         page = _int(self.get_argument("page", "1"), 1)
         try:
-            books = self.get_engine(source).explore(url, page)
+            result = self.get_catalog().read(source, "browse", category_id, {"page": page})
         except JsRuleUnsupported:
             return {"err": "source.js_unsupported", "msg": _("该书源依赖 JS，暂不支持")}
-        return {"err": "ok", "books": [b.to_dict() for b in books]}
+        return {"err": "ok", "books": [book.to_dict() for book in result.items]}
 
 
 class NetworkCategories(NetworkBaseHandler):
@@ -145,53 +155,56 @@ class NetworkCategories(NetworkBaseHandler):
     @js
     @auth
     def get(self):
-        source = self.get_source(_int(self.get_argument("source_id", "0"), 0))
+        source = self.get_source(self.get_argument("source_id", ""))
         if not source:
             return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
-        categories = BookSource(source.raw).explore_categories()
-        return {"err": "ok", "items": categories}
+        categories = self.get_catalog().read(source, "get_categories")
+        return {"err": "ok", "items": [{"name": item.name, "url": item.id, **item.to_dict()} for item in categories]}
 
 
 class NetworkBook(NetworkBaseHandler):
     @js
     @auth
     def get(self):
-        source = self.get_source(_int(self.get_argument("source_id", "0"), 0))
+        source = self.get_source(self.get_argument("source_id", ""))
         if not source:
             return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
         book_url = (self.get_argument("book_url", "") or "").strip()
         if not book_url:
             return {"err": "params.error", "msg": _("缺少书籍 URL")}
         try:
-            detail = self.get_engine(source).book_info(book_url)
-        except JsRuleUnsupported:
-            return {"err": "source.js_unsupported", "msg": _("该书源依赖 JS，暂不支持")}
-        return {"err": "ok", "book": detail.to_dict(), "toc_url": detail.toc_url}
+            detail = self.get_catalog().read(source, "get_book", book_url)
+        except Exception as exc:
+            return {"err": getattr(exc, "code", "source.fetch_failed"), "msg": str(exc)}
+        return {
+            "err": "ok",
+            "book": detail.to_dict(),
+            "toc_url": detail.toc_ref,
+            "download_mode": source.download_mode,
+        }
 
 
 class NetworkToc(NetworkBaseHandler):
     @js
     @auth
     def get(self):
-        source = self.get_source(_int(self.get_argument("source_id", "0"), 0))
+        source = self.get_source(self.get_argument("source_id", ""))
         if not source:
             return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
-        toc_url = (self.get_argument("toc_url", "") or "").strip()
         book_url = (self.get_argument("book_url", "") or "").strip()
-        engine = self.get_engine(source)
         try:
-            if not toc_url and book_url:
-                detail = engine.book_info(book_url)
-                toc_url = detail.toc_url
-                detail_obj = detail
+            catalog = self.get_catalog()
+            if book_url:
+                detail = catalog.read(source, "get_book", book_url)
             else:
-                detail_obj = None
-            if not toc_url:
-                return {"err": "params.error", "msg": _("缺少目录 URL")}
-            chapters = engine.toc(toc_url)
-            status = engine.detect_serialization(detail_obj, chapters) if detail_obj else "unknown"
-        except JsRuleUnsupported:
-            return {"err": "source.js_unsupported", "msg": _("该书源依赖 JS，暂不支持")}
+                toc_url = (self.get_argument("toc_url", "") or "").strip()
+                if not toc_url:
+                    return {"err": "params.error", "msg": _("缺少目录 URL")}
+                detail = SourceBookDetail(external_id="", title="", toc_ref=toc_url)
+            chapters = catalog.read(source, "get_toc", detail)
+            status = detail.extra.get("serialize_status", "unknown")
+        except Exception as exc:
+            return {"err": getattr(exc, "code", "source.fetch_failed"), "msg": str(exc)}
         return {
             "err": "ok",
             "chapters": [c.to_dict() for c in chapters],
@@ -205,7 +218,7 @@ class NetworkContent(NetworkBaseHandler):
     def get(self):
         if self.current_user and not self.current_user.can_read():
             return {"err": "permission.not_permit", "msg": _("无阅读权限")}
-        source = self.get_source(_int(self.get_argument("source_id", "0"), 0))
+        source = self.get_source(self.get_argument("source_id", ""))
         if not source:
             return {"err": "params.not_found", "msg": _("书源不存在或未启用")}
         chapter_url = (self.get_argument("chapter_url", "") or "").strip()
@@ -214,10 +227,11 @@ class NetworkContent(NetworkBaseHandler):
         title = self.get_argument("title", "")
         clean = self.get_argument("clean", "1") in ("1", "true")
         try:
-            content = self.get_engine(source).content(chapter_url, clean=clean)
-        except JsRuleUnsupported:
-            return {"err": "source.js_unsupported", "msg": _("该书源依赖 JS，暂不支持")}
-        return {"err": "ok", "title": title, "content": content}
+            chapter = SourceChapter(external_id=chapter_url, title=title)
+            content = self.get_catalog().read(source, "get_chapter", chapter, extra_config={"clean": clean})
+        except Exception as exc:
+            return {"err": getattr(exc, "code", "source.fetch_failed"), "msg": str(exc)}
+        return {"err": "ok", "title": content.title or title, "content": content.content}
 
 
 class NetworkSave(NetworkBaseHandler):
@@ -252,10 +266,10 @@ class NetworkSave(NetworkBaseHandler):
             return {"err": "ok", "tag": tag, "msg": _("该书籍正在保存中")}
 
         # 在请求线程里同步创建任务，保证前端随后轮询时任务已存在（消除注册竞态）
-        title = (source.raw.get("bookSourceName") or "")[:20]
+        title = source.name[:20]
         task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_ONLINE_SAVE, "[online]%s" % title, tag=tag)
         SaveOnlineBookService().save_online_book(
-            self.user_id(), source.raw, book_url, fmt, clean, task_id=task.id if task else None
+            self.user_id(), source.key, book_url, fmt, clean, task_id=task.id if task else None
         )
         return {"err": "ok", "tag": tag, "msg": _("已开始后台保存，完成后将通知您")}
 
@@ -350,6 +364,17 @@ def _int(value, default=0):
 
 def routes():
     return [
+        # 标准书源入口；/api/network/* 在 D-14 的一版过渡期内保留兼容别名。
+        (r"/api/book-sources", NetworkSources),
+        (r"/api/book-sources/search/status", NetworkSearchStatus),
+        (r"/api/book-sources/search", NetworkSearch),
+        (r"/api/book-sources/browse", NetworkExplore),
+        (r"/api/book-sources/categories", NetworkCategories),
+        (r"/api/book-sources/book", NetworkBook),
+        (r"/api/book-sources/toc", NetworkToc),
+        (r"/api/book-sources/content", NetworkContent),
+        (r"/api/book-sources/save/status", NetworkSaveStatus),
+        (r"/api/book-sources/save", NetworkSave),
         (r"/api/network/sources", NetworkSources),
         (r"/api/network/search/status", NetworkSearchStatus),
         (r"/api/network/search", NetworkSearch),

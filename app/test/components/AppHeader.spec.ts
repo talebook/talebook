@@ -6,15 +6,6 @@ import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('vue-i18n', () => ({
-    useI18n: () => ({
-        locale: { value: 'zh-CN' },
-        locales: { value: [{ code: 'zh-CN', name: '简体中文' }] },
-        setLocale: vi.fn(),
-        t: (key: string) => key,
-    }),
-}));
-
 vi.mock('#i18n', () => ({
     useI18n: () => ({
         locale: { value: 'zh-CN' },
@@ -24,8 +15,9 @@ vi.mock('#i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { pushMock, routeState, storeState } = vi.hoisted(() => ({
     pushMock: vi.fn(),
+    routeState: { path: '/' },
     storeState: {
         theme: 'light',
         sys: {
@@ -55,7 +47,7 @@ mockNuxtImport('useRouter', () => {
 });
 
 mockNuxtImport('useRoute', () => {
-    return () => ({ path: '/' });
+    return () => routeState;
 });
 
 const vuetify = createVuetify({ components, directives });
@@ -76,6 +68,7 @@ describe('AppHeader.vue', () => {
         storeState.sys.show_network_library = true;
         storeState.user.is_login = false;
         storeState.user.is_admin = false;
+        routeState.path = '/';
     });
 
     it('only wraps the site title text in the clickable/pointer area, not the whole title bar', () => {
@@ -103,20 +96,55 @@ describe('AppHeader.vue', () => {
         wrapper.unmount();
     });
 
-    it('shows the network library link by default', () => {
+    it('shows one consolidated library entry regardless of the legacy visibility setting', () => {
         const wrapper = mountHeader();
 
-        expect(wrapper.text()).toContain('navigation.networkLibrary');
+        expect(wrapper.text()).toContain('navigation.libraryBrowse');
+        expect(wrapper.text()).not.toContain('navigation.localLibrary');
+        expect(wrapper.text()).not.toContain('navigation.networkLibrary');
+        storeState.sys.show_network_library = false;
+        expect(wrapper.text()).toContain('navigation.libraryBrowse');
 
         wrapper.unmount();
     });
 
-    it('hides the network library link when disabled', () => {
-        storeState.sys.show_network_library = false;
+    it('puts My Reading immediately after Home for signed-in users', () => {
+        storeState.user.is_login = true;
         const wrapper = mountHeader();
+        const labels = wrapper.findAll('.v-list-item-title').map(item => item.text());
 
-        expect(wrapper.text()).not.toContain('navigation.networkLibrary');
+        expect(labels.indexOf('navigation.myReading')).toBe(labels.indexOf('navigation.home') + 1);
+        expect(labels).not.toContain('navigation.readBooks');
 
+        wrapper.unmount();
+    });
+
+    it('keeps plugin and theme management inside System Settings', () => {
+        storeState.user.is_admin = true;
+        const wrapper = mountHeader();
+        const links = wrapper.findAllComponents({ name: 'VListItem' }).map(item => item.props('to'));
+
+        expect(links).toContain('/admin/settings/general');
+        expect(links).not.toContain('/admin/plugins');
+        expect(links).not.toContain('/admin/themes');
+
+        wrapper.unmount();
+    });
+
+    it.each([
+        ['/library/network', 'navigation.libraryBrowse'],
+        ['/library/apps', 'navigation.libraryBrowse'],
+        ['/me/plugins', 'navigation.myReading'],
+        ['/admin/settings/themes', 'navigation.settings'],
+    ])('keeps the aggregate navigation entry active on %s', (path, label) => {
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        routeState.path = path;
+        const wrapper = mountHeader();
+        const item = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(candidate => candidate.text().includes(label));
+
+        expect(item?.props('active')).toBe(true);
         wrapper.unmount();
     });
 

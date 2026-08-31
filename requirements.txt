@@ -6,6 +6,7 @@ tornado==6.5
 bs4
 chardet
 lxml
+zhconv>=1.4.3
 jsonpath-ng
 quickjs
 rarfile==4.2
@@ -16,6 +17,7 @@ txt2epub-next==1.0.0
 # build-in support for MYSQL
 pymysql
 bcrypt
+cryptography>=38.0.0
 psutil
 requests-toolbelt
 

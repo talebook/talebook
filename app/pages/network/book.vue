@@ -19,7 +19,10 @@
                 <h2>{{ book.name }}</h2>
                 <div class="text-body-2 mt-2">
                     <span class="mr-4">{{ $t('network.author') }}：{{ book.author || '-' }}</span>
-                    <SerializeStatusBadge :status="serializeStatus" />
+                    <SerializeStatusBadge
+                        v-if="downloadMode === 'by_chapters'"
+                        :status="serializeStatus"
+                    />
                 </div>
                 <div
                     v-if="book.last_chapter"
@@ -32,6 +35,7 @@
                 </div>
                 <div class="mt-4">
                     <v-btn
+                        v-if="downloadMode === 'by_chapters'"
                         color="primary"
                         class="mr-2"
                         :disabled="chapters.length === 0"
@@ -40,10 +44,21 @@
                         {{ $t('network.readOnline') }}
                     </v-btn>
                     <v-btn
+                        v-if="downloadMode !== 'none' && book.downloadable"
                         color="success"
                         @click="saveDialog?.open()"
                     >
                         {{ $t('network.saveToLocal') }}
+                    </v-btn>
+                    <v-btn
+                        v-else-if="book.source_url"
+                        color="primary"
+                        variant="outlined"
+                        :href="book.source_url"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {{ $t('network.openExternal') }}
                     </v-btn>
                 </div>
 
@@ -102,7 +117,10 @@
                 </div>
             </v-col>
 
-            <v-col cols="12">
+            <v-col
+                v-if="downloadMode === 'by_chapters'"
+                cols="12"
+            >
                 <v-divider class="my-3" />
                 <h3 class="text-subtitle-1 mb-2">
                     {{ $t('network.chapters') }}（{{ chapters.length }}）
@@ -139,6 +157,7 @@
             ref="saveDialog"
             :source-id="sourceId"
             :book-url="bookUrl"
+            :download-mode="downloadMode"
             @started="onSaveStarted"
         />
     </div>
@@ -163,6 +182,7 @@ const sourceId = ref(route.query.source_id);
 const bookUrl = ref(route.query.book_url || '');
 const book = ref(null);
 const chapters = ref([]);
+const downloadMode = ref('none');
 const tocUrl = ref('');
 const serializeStatus = ref('unknown');
 const tocLoading = ref(true);
@@ -183,7 +203,7 @@ const clearSaveFlag = () => process.client && sessionStorage.removeItem(saveFlag
 
 const fetchSaveStatus = async () => {
     const rsp = await $backend(
-        `/network/save/status?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
+        `/book-sources/save/status?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
     );
     return rsp && rsp.err === 'ok' ? rsp : null;
 };
@@ -278,7 +298,7 @@ const loadToc = async () => {
     tocLoading.value = true;
     try {
         const rsp = await $backend(
-            `/network/toc?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
+            `/book-sources/toc?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
         );
         if (rsp.err === 'ok') {
             chapters.value = rsp.chapters || [];
@@ -293,12 +313,14 @@ const loadToc = async () => {
 
 onMounted(async () => {
     const rsp = await $backend(
-        `/network/book?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
+        `/book-sources/book?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
     );
     if (rsp.err === 'ok') {
         book.value = rsp.book;
         tocUrl.value = rsp.toc_url;
-        await loadToc();
+        downloadMode.value = rsp.download_mode || 'none';
+        if (downloadMode.value === 'by_chapters') await loadToc();
+        else tocLoading.value = false;
     } else if ($alert) {
         $alert('error', rsp.msg || rsp.err);
     }

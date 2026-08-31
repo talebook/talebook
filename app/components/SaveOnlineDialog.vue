@@ -6,10 +6,14 @@
         <v-card>
             <v-card-title>{{ $t('network.save.title') }}</v-card-title>
             <v-card-text>
-                <div class="mb-2">
+                <div
+                    v-if="downloadMode === 'by_chapters'"
+                    class="mb-2"
+                >
                     {{ $t('network.save.format') }}
                 </div>
                 <v-radio-group
+                    v-if="downloadMode === 'by_chapters'"
                     v-model="fmt"
                     inline
                     hide-details
@@ -24,6 +28,7 @@
                     />
                 </v-radio-group>
                 <v-switch
+                    v-if="downloadMode === 'by_chapters'"
                     v-model="clean"
                     :label="$t('network.save.clean')"
                     color="primary"
@@ -56,6 +61,7 @@ import { ref } from 'vue';
 const props = defineProps({
     sourceId: { type: [Number, String], default: 0 },
     bookUrl: { type: String, default: '' },
+    downloadMode: { type: String, default: 'by_chapters' },
 });
 
 const emit = defineEmits(['started']);
@@ -75,7 +81,7 @@ const save = async () => {
     const { $backend, $alert } = useNuxtApp();
     loading.value = true;
     try {
-        const rsp = await $backend('/network/save', {
+        const rsp = await $backend('/book-sources/save', {
             method: 'POST',
             body: JSON.stringify({
                 source_id: props.sourceId,

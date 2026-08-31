@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 发送到设备默认策略、书籍页分步交互与插件能力显隐方案。" />
+    <link rel="icon" href="data:," />
+    <title>统一发送到设备与书籍页插件能力 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f5f7fb; --panel:#fff; --ink:#202938; --muted:#5d6878; --line:#d8e0ea; --accent:#1769aa; --soft:#eaf4ff; --warn:#fff7e7; --good:#e8f6ef; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(180deg,#fbfdff,var(--bg)); font-family:var(--sans); line-height:1.65; }
+      .skip { position:absolute; top:-60px; left:12px; padding:8px 12px; color:#fff; background:#111827; }
+      .skip:focus { top:12px; }
+      .page { width:min(1000px,calc(100vw - 28px)); margin:auto; padding:24px 0 48px; }
+      header,section { margin-bottom:16px; padding:24px 28px; background:var(--panel); border:1px solid var(--line); border-radius:16px; }
+      header { background:linear-gradient(135deg,#fff,var(--soft)); }
+      h1 { margin:0 0 8px; font-size:clamp(28px,4vw,42px); line-height:1.15; }
+      h2 { margin:0 0 12px; font-size:21px; }
+      h3 { margin:0 0 8px; font-size:16px; }
+      p,li,td,th { font-size:14px; }
+      p { margin:8px 0; }
+      ul,ol { margin:8px 0 0; padding-left:22px; }
+      .muted { color:var(--muted); }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+      .chip { padding:4px 10px; color:#405168; background:#edf1f6; border-radius:999px; font-size:12px; font-weight:700; }
+      .chip.active { color:#17623b; background:#dff5e8; }
+      .chip.wip { color:#8a5700; background:#fff0cf; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box,.callout { padding:14px 16px; border:1px solid var(--line); border-radius:12px; }
+      .callout { background:var(--warn); }
+      .good { background:var(--good); }
+      .flow { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:14px; }
+      .flow div { padding:14px; background:#f8fafc; border:1px solid var(--line); border-radius:12px; }
+      .table { overflow-x:auto; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; min-width:680px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      tr:last-child td { border-bottom:0; }
+      th { color:#526174; background:#f7f9fc; }
+      code { padding:2px 5px; background:#eef2f7; border-radius:4px; overflow-wrap:anywhere; }
+      .pending { color:#946000; font-weight:700; }
+      footer { color:var(--muted); font-size:12px; text-align:center; }
+      @media (max-width:680px) { .page{width:calc(100vw - 18px);padding-top:9px} header,section{padding:20px 18px;border-radius:13px}.grid,.flow{grid-template-columns:1fr} }
+      @media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }
+      @media print { body{background:#fff} .page{width:100%} header,section{break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header>
+        <h1>统一发送到设备与书籍页插件能力</h1>
+        <p class="muted">让默认启用策略、设备发送流程和原生划线笔记共同服从清晰的本地优先模型；外部插件只负责可选同步，不拥有本地阅读能力。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-30</span><span class="chip">所属模块：app</span><span class="chip">影响范围：app、webserver、tests</span><span class="chip">需求来源：当前连续体验反馈与 PR #1022 评审</span>
+        </div>
+      </header>
+      <main id="main">
+        <section>
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“brs 默认启用。推送设备也默认全部启用。”<br />“推送设备 → 发送到设备。”<br />“书籍页面，推送设备的弹窗……先选择设备类型，然后再针对性弹出其他设置框。”<br />“转换书籍 → 转换格式。”<br />“关闭了微信读书插件后，书籍页面里仍然还有微信读书笔记与高亮的框？”<br />“划线笔记是本次插件版本引入的功能……candle-reader 选中文字后出现划线和笔记工具栏；笔记记录在 Talebook 本地，开启 BRS 后同步；详情页有公开动态和我的笔记两个 tab；阅读器加载章节笔记并渲染划线、章评数量。”</div>
+          <p>最新反馈澄清了所有权：划线笔记是 Talebook 原生能力，微信读书仅是导入来源，BRS 仅是可选同步端。因此不能以微信读书启停控制整个笔记面板。</p>
+          <p>PR #1022 评审追加四项要求：公共写接口不得信任客户端作者名；详情页的空数据显隐不能影响阅读器独立面板；同一次选区必须使用稳定幂等键并阻止重复提交；完成仓库指定的 <code>interface-review full</code> 与真实浏览器验收前，方案不得保持 ACTIVE。</p>
+        </section>
+        <section>
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>BRS 与所有发送设备插件首次建库默认启用。</li><li>发送弹窗先选类型，再显示 Kindle 邮箱或局域网地址字段。</li><li>candle-reader 选区可创建本地划线/笔记，并渲染当前章节可见批注。</li><li>书籍详情仅在有数据时显示“公开动态 / 我的笔记”双视图。</li><li>公开本地笔记在 BRS 连接启用时经插件协议同步。</li><li>统一“发送到设备”“转换格式”用户文案。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不覆盖管理员已有启停选择。</li><li>不迁移或删除历史笔记与设备。</li><li>不改变 <code>/send_to_device</code> 请求契约。</li><li>不让微信读书或 BRS 决定本地笔记是否可用。</li><li>不在本轮实现远端删除回滚。</li></ul></article>
+          </div>
+        </section>
+        <section>
+          <h2>3. 现状与根因</h2>
+          <div class="table"><table><thead><tr><th>现象</th><th>证据</th><th>根因</th></tr></thead><tbody>
+            <tr><td>停用微信读书仍显示笔记框</td><td><code>app/pages/book/[bid]/index.vue</code></td><td>这不是显隐 bug，而是产品归属被误解；面板是原生能力，但应在该书无任何可见笔记时自行隐藏。</td></tr>
+            <tr><td>选区没有划线/笔记工具栏</td><td><code>candle-reader.es.js</code> 与 <code>creader.html</code></td><td>现有选区处理仍是 BRS“发段评”工具栏，且段落/目录定位异常会阻止工具栏显示；没有调用 Talebook 批注 API。</td></tr>
+            <tr><td>来源写入可伪造公开作者</td><td><code>webserver/handlers/annotations.py</code></td><td>POST 只要携带非空 <code>source_name</code> 就信任客户端 <code>author_name</code>，没有可信来源边界。</td></tr>
+            <tr><td>阅读器空面板消失</td><td><code>app/components/AnnotationPanel.vue</code></td><td>详情摘要的“空数据隐藏”被放在共享组件根节点，连同独立页的加载、空态、刷新和反馈一起卸载。</td></tr>
+            <tr><td>快速点击产生重复划线</td><td><code>webserver/resources/book/creader.html</code></td><td>每次保存才生成新 UUID，且请求前没有同步防重入；同一选区的并发请求具有不同幂等键。</td></tr>
+            <tr><td>本地笔记未回写 BRS</td><td><code>annotation_sync.py</code>、<code>brs.py</code></td><td>平台已有公开批注扇出机制，但 BRS 未声明 <code>annotations.push</code>，也未实现 <code>push_annotation</code>。</td></tr>
+            <tr><td>设备字段同时出现</td><td>同页发送弹窗</td><td>先选保存设备/临时设备，临时表单固定为 IP 与端口，Kindle 只能报不支持。</td></tr>
+            <tr><td>默认状态不完整</td><td><code>plugin_runtime.py</code> 与 provider</td><td>初始化读取 provider 的 <code>initial_enabled</code>，BRS 和网络设备基类未声明。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section>
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>结论：</strong>provider 负责首次默认状态；Talebook 的 <code>Annotation</code> 表是划线、笔记和本地章评的权威存储；微信读书只导入，BRS 只同步公开记录。设备发送在同一弹窗内渐进展开，不新增嵌套弹窗。</div>
+          <div class="flow" aria-label="发送到设备流程"><div><strong>1. 选择类型</strong><p>弹窗打开后不预选，也不展示目标字段。</p></div><div><strong>2. 选择或填写目标</strong><p>有同类型保存设备时可复用；Kindle 显示邮箱，其他设备显示 IP 与端口。</p></div><div><strong>3. 发送</strong><p>校验类型专属字段，沿用现有后端请求体。</p></div></div>
+          <h3>本地批注链路</h3><p>candle-reader wrapper 监听 EPUB.js 的 <code>selected</code> 与章节变化事件。每次选区创建一次稳定 <code>client_id</code>；保存开始即同步隐藏工具栏并设置 in-flight 锁，重入请求直接返回。写入 <code>/api/book/{id}/annotations</code> 后立即渲染 CFI 高亮。公共 POST 始终从已认证 Reader 生成作者名，不接受客户端作者身份。章节变化按 <code>chapter</code> 查询可见批注并去重渲染。详情组件从同一接口得到“其他用户公开 + 自己全部”的安全集合，再在前端切成“公开动态”和“我的笔记”。仅书籍详情调用点启用“空数据隐藏”；阅读器 iframe 与 TXT 抽屉始终保留加载、空态、刷新和操作反馈。</p>
+          <h3>BRS 同步</h3><p>公开记录由既有 <code>AnnotationSyncService</code> 查找当前用户已启用的 <code>annotations.push</code> 连接。BRS provider 用独立会话登录配置的服务，根据书名解析远端书籍后写入章评；私有记录不进入同步队列。远端失败只更新来源同步状态，不回滚本地保存。BRS 当前写接口是追加式能力，没有远端更新、删除或幂等键，因此本地笔记后续编辑可能形成新的远端章评，本轮不把它描述为双向同步。</p>
+        </section>
+        <section>
+          <h2>5. 影响、风险与回滚</h2>
+          <div class="grid"><article class="box"><h3>影响范围</h3><p>插件 provider 默认值、书籍详情页、双语文案、mock API 与针对性测试。</p></article><article class="box"><h3>保持不变</h3><p>数据库结构、插件 ID、设备推送 API、已存在安装状态及历史笔记数据。</p></article></div>
+          <div class="callout"><strong>风险：</strong>设备切换残留字段会误发，必须切换时清空并按同类型预填。阅读器重复章节事件会重复添加 EPUB.js 标注，必须按 annotation id 去重；同一选区的重复保存必须复用 client id 并由前端提交锁和后端唯一约束共同兜底。公共 HTTP 写入不得把来源字段升级为可信作者身份。BRS 登录 cookie 不得跨用户共享，每次同步使用独立安全 HTTP 会话。CFI 无效时跳过单条渲染，不能阻断章节正文。BRS 远端仅支持追加写入；本地编辑/删除不会覆盖或删除已经同步的章评。</div>
+          <p><strong>回滚：</strong>代码级回滚即可，不涉及数据迁移。</p>
+        </section>
+        <section>
+          <h2>6. 测试计划与结果</h2>
+          <div class="table"><table><thead><tr><th>验证层</th><th>命令或页面</th><th>验收口径</th><th>结果</th></tr></thead><tbody>
+            <tr><td>后端单元</td><td><code>docker run --rm -v $PWD:/workspace -w /workspace talebook/test pytest tests/test_annotations.py -q</code></td><td>来源写入也只能使用已认证 Reader 作者；选区契约包含稳定 client id 与同步防重入。</td><td>21 项通过（2.34 秒）。本机直接运行因缺少 Calibre 无法收集用例，改用项目测试镜像完成权威验证；<code>py_compile</code> 同时通过。</td></tr>
+            <tr><td>前端组件</td><td><code>npx vitest run test/components/AnnotationPanel.spec.ts</code></td><td>详情空数据可隐藏；独立面板仍显示加载、空态、刷新和删除最后一条后的反馈。</td><td>11 项通过，覆盖 standalone loading、empty 与删除最后一条后的反馈。</td></tr>
+            <tr><td>前端 E2E</td><td><code>npx playwright test test/e2e/book-detail.spec.ts:&lt;8 个目标行&gt;</code></td><td>设备字段互斥、转换文案、双视图、删除/撤销、无数据隐藏。</td><td>Chromium 8 项通过；测试服务已停止。</td></tr>
+            <tr><td>界面截图</td><td><code>app/test/e2e/screenshots/20260830-*.png</code></td><td>书籍详情公开笔记、发送弹窗初始态及 Kindle 专属字段。</td><td>使用 Playwright 对隔离渲染结果截图并人工检查；未作为真实后端体验环境。</td></tr>
+            <tr><td>真实浏览器渲染</td><td>隔离 Docker 后端 <code>18080</code> + Nuxt <code>13000</code>，以官方 <code>chrome-devtools-mcp</code> 1.6.0 驱动 Chrome</td><td>真实后端页面行为正确，无 mock 冒充体验环境。</td><td>通过。书籍详情在 0 条记录时不挂载面板；独立页保留 1280×900 空态与刷新入口；390×844 下无水平溢出。EPUB 真实选区出现“划线 / 笔记”浮动工具栏，快速双击只新增 1 条高亮，保存时工具栏同步隐藏，作者为已登录的 <code>admin</code>。临时记录随后删除。</td></tr>
+            <tr><td>界面审查</td><td><code>interface-review full</code>：<code>git merge-base origin/master HEAD</code>、全量 diff、删除信号与交互模式扫描，并展开 <code>AnnotationPanel</code>、书籍详情、candle-reader、共享 route tabs / toolbar / sidebar 消费面</td><td>当前分支相对默认分支 76 个提交、271 个排除生成物后的文件，另有本轮未提交评审修复；六个界面领域均完成源代码与实际渲染审查。</td><td>Approve：没有 HIGH / MEDIUM 问题。桌面与移动截图的层级、空态、工具栏位置、无障碍名称和水平布局均符合既定方案。Dev 模式控制台仍报告仓库既有的通用 hydration mismatch，以及搜索表单 autocomplete 提示；本轮页面没有可见错位或功能损坏，判定为不阻断的 LOW 后续项。</td></tr>
+            <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、<code>git diff --check</code>、<code>make check-design</code></td><td>无相关格式或 lint error，ACTIVE 方案通过仓库校验。</td><td>通过。Python 检查无错误；前端 0 error、466 个仓库既有 warning；补丁与 ACTIVE 单文件方案校验通过。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section>
+          <h2>7. 决策记录</h2>
+          <ol><li><strong>2026-08-30：</strong>同一弹窗渐进披露，不用嵌套弹窗。</li><li><strong>2026-08-30：</strong>默认启用只作用于首次创建安装记录，尊重管理员之后的关闭选择。</li><li><strong>2026-08-30：</strong>撤销“微信读书停用即隐藏笔记面板”的方向；原生批注不依附外部插件，详情空数据才隐藏。</li><li><strong>2026-08-30：</strong>Talebook 本地库是权威源，BRS 只接收公开记录的可选同步，失败不影响本地保存。</li><li><strong>2026-08-30：</strong>GitHub 评审确认此前验收记录无效：<code>interface-review</code> 实际存在，且真实浏览器门禁未完成；方案退回 WIP。</li><li><strong>2026-08-30：</strong>公共批注写入的作者身份归服务端登录态所有；来源同步若需保留远端作者，应继续走内部 writer 服务而非信任公共请求体。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · app · ACTIVE · 2026-08-30</footer>
+    </div>
+  </body>
+</html>

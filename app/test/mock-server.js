@@ -16,13 +16,23 @@ let inviteMode = false;
 let isInvited = true;
 let demoMode = false;
 let showNetworkLibrary = true;
+let networkSourceState = 'ready';
 let users = [];
 let saveStarted = false;
 let saveStatusPolls = 0;
 let booksourceCheckRunning = false;
 let booksourceCheckPolls = 0;
+let pluginRuns = [];
 let shelfBookIds = new Set();
 let readingStateByBookId = new Map();
+let annotationsByBookId = new Map();
+let annotationPermissionDenied = false;
+let annotationPartialRollback = false;
+let wereadRunId = 500;
+let wereadConfigured = false;
+let wereadRuns = new Map();
+let brsConfigured = false;
+let brsConfig = {};
 let comicProgressByBookId = new Map();
 let mediaTypeOverrides = new Map();
 let activeThemeName = '';
@@ -161,14 +171,29 @@ router.post('/_test/reset', eventHandler(async (event) => {
   isInvited = body?.invited !== false;
   demoMode = !!(body && body.demoMode);
   showNetworkLibrary = body?.showNetworkLibrary !== false;
+  networkSourceState = body?.networkSourceState || 'ready';
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
   saveStarted = false;
   saveStatusPolls = 0;
   booksourceCheckRunning = false;
   booksourceCheckPolls = 0;
+  pluginRuns = [];
+  opdsServiceEnabled = true;
+  pluginInstallations = pluginInstallations.map(item => ({ ...item, enabled: true }));
+  pluginConnections = pluginInstallations
+    .filter(item => item.definition.connection_owners.includes('instance'))
+    .map(installation => mockPluginConnection(installation));
   shelfBookIds = new Set();
   readingStateByBookId = new Map();
+  annotationsByBookId = body?.annotationsEmpty ? new Map() : new Map([[1, mockAnnotations(1)]]);
+  annotationPermissionDenied = !!body?.annotationPermissionDenied;
+  annotationPartialRollback = !!body?.annotationPartialRollback;
+  wereadRunId = 500;
+  wereadConfigured = false;
+  wereadRuns = new Map();
+  brsConfigured = false;
+  brsConfig = {};
   comicProgressByBookId = new Map([
     [14, { kind: 'comic', version: 1, pageId: 'mock-revision:1', pageIndex: 1, percent: 66.67, completed: false }]
   ]);
@@ -252,6 +277,65 @@ const readJson = (filename) => {
   }
   return null;
 };
+
+const mockAnnotations = (bookId) => [
+  {
+    id: 101,
+    book_id: Number(bookId),
+    annotation_type: 'highlight',
+    is_private: true,
+    can_edit: true,
+    cfi: null,
+    chapter: '第一章 雾中的来客',
+    quote_text: '雾把远处的灯塔藏进了清晨。',
+    content: '这是从微信读书导入的章节级笔记。',
+    created_at: '2026-08-14T10:00:00',
+    updated_at: '2026-08-15T11:30:00',
+    sources: [{
+      source_name: 'weread',
+      source_connection_id: 'mock-account',
+      source_annotation_id: 'weread-101',
+      source_run_id: 'sample-run-1',
+      source_position: 'chapter:1',
+      source_sync_status: 'synced',
+    }],
+  },
+  {
+    id: 102,
+    book_id: Number(bookId),
+    annotation_type: 'note',
+    is_private: true,
+    can_edit: true,
+    cfi: 'epubcfi(/6/4!/4/2/2)',
+    chapter: '第二章 灯塔来信',
+    quote_text: '信纸边缘留下了一圈盐粒。',
+    content: 'Talebook 原生笔记，拥有精确定位。',
+    created_at: '2026-08-15T09:00:00',
+    updated_at: '2026-08-15T09:00:00',
+    sources: [],
+  },
+  {
+    id: 103,
+    book_id: Number(bookId),
+    annotation_type: 'chapter_comment',
+    is_private: false,
+    can_edit: false,
+    cfi: null,
+    chapter: '第一章 雾中的来客',
+    quote_text: '',
+    content: '另一位读者留下的公开章评。',
+    author_name: '读者甲',
+    created_at: '2026-08-15T12:00:00',
+    updated_at: '2026-08-15T12:00:00',
+    sources: [{
+      source_name: 'readest',
+      source_connection_id: 'public-feed',
+      source_annotation_id: 'readest-103',
+      source_run_id: 'public-run',
+      source_sync_status: 'synced',
+    }],
+  },
+];
 
 const audiobookChapters = [
   {
@@ -784,7 +868,11 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
     users: 5,
     friends: [],
     show_network_library: showNetworkLibrary,
-    allow: { register: true, download: true, push: true, read: true },
+    opds_enabled: true,
+    webdav_enabled: true,
+    FEEDBACK_URL: 'https://github.com/talebook/talebook/issues',
+    sidebar_extra_html: '<img class="ma-auto footer-logo" style="max-width: 130px; height: auto;" src="/logo/link.png">',
+    allow: { register: true, download: true, push: true, read: true, FEEDBACK: true },
     upload: { chunk_enabled: true, chunk_threshold: 8 * 1024 * 1024, chunk_size: 4 * 1024 * 1024 },
     demo_mode: demoMode
   },
@@ -865,8 +953,6 @@ router.get('/api/admin/settings', eventHandler(() => ({
     smtp_password: 'password',
     smtp_encryption: 'SSL',
     AUDIOBOOK_BACKUP_RETENTION: 3,
-    META_ALL_SOURCES: ['douban', 'baidu', 'xinhua', 'booksource', 'ai'],
-    META_SELECTED_SOURCES: ['douban', 'baidu', 'booksource']
   }
 })));
 
@@ -1036,6 +1122,7 @@ router.post('/api/book/:id/edit', eventHandler(() => ({
 router.get('/api/book/:id/refer', eventHandler(() => {
   const frames = [
     { err: 'ok' },
+    { event: 'progress', failures: [], total: 2, completed: 0 },
     {
       title: 'Mock Metadata Result',
       author: 'Mock Author',
@@ -1046,6 +1133,12 @@ router.get('/api/book/:id/refer', eventHandler(() => {
       provider_key: 'BookSource',
       provider_value: 'signed-token',
       comments: 'Mock metadata introduction'
+    },
+    {
+      event: 'progress',
+      failures: [{ source: 'Online Source B', code: 'timeout', message: '查询超时' }],
+      total: 2,
+      completed: 1
     },
     {
       event: 'summary',
@@ -1350,6 +1443,22 @@ router.post('/api/book/:id/readstate', eventHandler(async (event) => {
   };
 }));
 
+router.get('/api/user/devices', eventHandler(() => {
+  const defaultPorts = { boox: 8085 };
+  const deviceTypes = pluginInstallations
+    .filter(installation => installation.enabled && installation.status === 'active')
+    .filter(installation => installation.definition.capabilities.includes('integrations.push'))
+    .map((installation) => {
+      const value = installation.definition.ui.device_type;
+      return {
+        text: installation.definition.name,
+        value,
+        default_port: defaultPorts[value] || 12121,
+      };
+    });
+  return { err: 'ok', devices: [], device_types: deviceTypes };
+}));
+
 router.get('/read-comic/:id', eventHandler((event) => {
   const id = Number(getRouterParam(event, 'id'));
   if (!isLoggedIn) {
@@ -1424,11 +1533,6 @@ router.post('/api/book/:id/comic/progress', eventHandler(async (event) => {
   return { err: 'ok', progress: body.progress };
 }));
 
-router.get('/api/user/devices', eventHandler(() => ({
-  err: 'ok',
-  devices: [],
-  device_types: [],
-})));
 
 // The book detail page probes TXT parsing state for every format. Keep the
 // mock response successful so that this background probe does not open the
@@ -1437,6 +1541,250 @@ router.get('/api/book/txt/init', eventHandler(() => ({
   err: 'ok',
   msg: '未解析',
 })));
+
+router.get('/api/book/:id/annotations', eventHandler((event) => {
+  if (annotationPermissionDenied) return { err: 'params.book.invalid', msg: '无权访问' };
+  const bookId = Number(getRouterParam(event, 'id'));
+  const query = getQuery(event);
+  let annotations = annotationsByBookId.get(bookId) || [];
+  if (query.scope === 'public') annotations = annotations.filter(annotation => !annotation.is_private);
+  if (query.scope === 'mine') annotations = annotations.filter(annotation => annotation.can_edit);
+  if (query.chapter !== undefined) annotations = annotations.filter(annotation => annotation.chapter === query.chapter);
+  if (query.source_name) {
+    annotations = annotations.filter(annotation => {
+      if (query.source_name === 'talebook') return !annotation.sources.length;
+      return annotation.sources.some(source => source.source_name === query.source_name);
+    });
+  }
+  return { err: 'ok', annotations };
+}));
+
+router.post('/api/book/:id/annotations', eventHandler(async (event) => {
+  const bookId = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  if (!body?.client_id || !['highlight', 'note', 'bookmark', 'chapter_comment'].includes(body.annotation_type)) {
+    return { err: 'params.invalid', msg: '笔记参数错误' };
+  }
+  const annotations = annotationsByBookId.get(bookId) || [];
+  const existing = annotations.find(item => item.client_id === body.client_id);
+  const annotation = {
+    ...(existing || {}),
+    id: existing?.id || Math.max(100, ...annotations.map(item => item.id)) + 1,
+    book_id: bookId,
+    client_id: body.client_id,
+    annotation_type: body.annotation_type,
+    is_private: body.is_private !== false,
+    can_edit: true,
+    cfi: body.cfi || null,
+    chapter: body.chapter || '',
+    quote_text: body.quote_text || '',
+    content: body.content || '',
+    color: body.color || '',
+    created_at: existing?.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    sources: existing?.sources || [],
+  };
+  annotationsByBookId.set(bookId, [...annotations.filter(item => item !== existing), annotation]);
+  return { err: 'ok', annotation, created: !existing, sync_enqueued: !annotation.is_private };
+}));
+
+router.delete('/api/book/:id/annotations/:annotationId', eventHandler((event) => {
+  const bookId = Number(getRouterParam(event, 'id'));
+  const annotationId = Number(getRouterParam(event, 'annotationId'));
+  const annotations = annotationsByBookId.get(bookId) || [];
+  const annotation = annotations.find(item => item.id === annotationId);
+  if (!annotation?.can_edit) return { err: 'annotation.not_found', msg: '笔记不存在' };
+  annotationsByBookId.set(bookId, annotations.filter(item => item.id !== annotationId));
+  return { err: 'ok', deleted: 1 };
+}));
+
+router.delete('/api/annotations', eventHandler((event) => {
+  const query = getQuery(event);
+  const bookId = Number(query.book_id);
+  const annotations = annotationsByBookId.get(bookId) || [];
+  let deleted = 0;
+  for (const annotation of annotations) {
+    annotation.sources = annotation.sources.filter(source => {
+      const matches = source.source_name === query.source_name
+        && source.source_connection_id === String(query.source_connection_id || '')
+        && (!query.source_run_id || source.source_run_id === query.source_run_id);
+      if (matches && (!annotationPartialRollback || deleted === 0)) {
+        deleted += 1;
+        return false;
+      }
+      return true;
+    });
+  }
+  return { err: 'ok', sources_deleted: deleted, annotations_deleted: 0 };
+}));
+
+const wereadConnection = () => ({
+  id: 88,
+  installation_id: 6,
+  owner_type: 'user',
+  owner_id: 1,
+  role: 'default',
+  name: '微信读书',
+  enabled: true,
+  secret: { configured: wereadConfigured, mask: wereadConfigured ? '••••test' : '' },
+});
+
+router.post('/api/plugins/connections', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.plugin_key === 'talebook.combo.weread') {
+    if (body?.credentials?.api_key) wereadConfigured = true;
+    return { err: 'ok', connection: wereadConnection() };
+  }
+  if (body?.plugin_key === 'talebook.annotation.brs') {
+    if (body?.credentials?.email && body?.credentials?.password) brsConfigured = true;
+    brsConfig = body?.config || {};
+    return { err: 'ok', connection: brsConnection() };
+  }
+  return { err: 'plugin.not_found', msg: 'plugin not found' };
+}));
+
+router.get('/api/plugins/talebook.combo.weread', eventHandler(() => ({
+  err: 'ok',
+  plugin: { plugin_key: 'talebook.combo.weread', extra_features: {} },
+  connections: wereadConfigured ? [wereadConnection()] : [],
+  runs: [...wereadRuns.values()].map(value => value.run),
+})));
+
+const brsConnection = () => ({
+  id: 89,
+  installation_id: pluginInstallations.find(item => item.plugin_key === 'talebook.annotation.brs')?.id,
+  owner_type: 'user',
+  owner_id: 1,
+  role: 'default',
+  name: 'talebook-brs',
+  enabled: true,
+  health: 'unknown',
+  config: { ...brsConfig },
+  secret: { configured: brsConfigured, mask: brsConfigured ? '••••mail' : '' },
+});
+
+router.get('/api/plugins/talebook.annotation.brs', eventHandler(() => {
+  const installation = pluginInstallations.find(item => item.plugin_key === 'talebook.annotation.brs');
+  return {
+    err: 'ok',
+    plugin: pluginDefinitions.find(item => item.plugin_key === 'talebook.annotation.brs'),
+    installation,
+    connections: brsConfigured ? [brsConnection()] : [],
+    runs: [],
+  };
+}));
+
+router.get('/api/plugins/tools/books', eventHandler(() => ({
+  err: 'ok',
+  books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
+})));
+
+router.post('/api/plugins/tools/text-replace/preview', eventHandler(() => ({
+  err: 'ok',
+  matches: 1,
+  truncated: false,
+  samples: [{ pre: '开始', match: '测试', post: '结束' }],
+})));
+
+router.get('/api/plugins/tools/book-actions', eventHandler((event) => {
+  const bookId = Number(getQuery(event).book_id || 0);
+  const installation = pluginInstallations.find(item => item.plugin_key === 'talebook.tool.txt-fixer');
+  const actions = installation?.enabled && installation.status === 'active' && bookId === 1
+    ? [{
+        plugin_key: 'talebook.tool.txt-fixer',
+        name: 'TXT 编码修复',
+        icon: 'mdi-file-restore-outline',
+        route: '/plugins/txt-fixer',
+      }]
+    : [];
+  return { err: 'ok', actions };
+}));
+
+router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
+  const pluginKey = getRouterParam(event, 'pluginKey');
+  const action = getRouterParam(event, 'action');
+  if (pluginKey !== 'talebook.combo.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
+  const body = await readBody(event);
+  if (body?.credentials?.api_key) wereadConfigured = true;
+  const data = {
+    search: {
+      hasMore: 0,
+      results: [{ title: '电子书', books: [{ bookInfo: { bookId: '3300045871', title: '活着', author: '余华', newRating: 920, deepLink: 'weread://bookDetail?bookId=3300045871' } }] }],
+    },
+    shelf: {
+      books: [{ bookId: '3300045871', title: '活着', author: '余华', finishReading: 1, secret: 0 }],
+      albums: [{ albumInfo: { albumId: 'audio-1', name: '三体广播剧', authorName: '刘慈欣', finishStatus: '已完结' }, albumInfoExtra: { secret: 1 } }],
+      mp: { show: 1 },
+    },
+    statistics: { totalReadTime: 7260, readDays: 4, dayAverageReadTime: 1815, readStat: [{ stat: '读过', counts: '3本' }] },
+    notebooks: { totalBookCount: 1, totalNoteCount: 3, books: [{ bookId: '3300045871', book: { title: '活着', author: '余华' }, noteCount: 1, reviewCount: 1, bookmarkCount: 1 }] },
+    book_info: { bookId: '3300045871', title: '活着', author: '余华', publisher: '作家出版社', intro: '关于活着本身的故事。' },
+    chapters: { chapters: [{ chapterUid: 12, title: '第一章' }] },
+    progress: { book: { progress: 68, recordReadingTime: 3600 } },
+    highlights: { updated: [{ bookmarkId: 'b1', markText: '人是为活着本身而活着的' }] },
+    my_reviews: { reviews: [{ reviewId: 'r1', review: { content: '这句话值得反复读' } }] },
+    popular_highlights: { items: [{ bookmarkId: 'p1', chapterUid: 12, range: '10-20', markText: '最初我们来到这个世界', totalCount: 128 }] },
+    underline_stats: { underlines: [{ range: '10-20', count: 128, score: 99 }] },
+    highlight_reviews: { reviews: [{ range: '10-20', pageReviews: [{ reviewId: 'thought-1', review: { content: '这句话很有力量', author: { name: '读者乙' } } }] }] },
+    review_detail: { reviewId: 'thought-1', review: { content: '这句话很有力量', author: { name: '读者乙' } } },
+    public_reviews: { reviews: [{ review: { reviewId: 'pr1', review: { content: '很有力量的一本书', author: { name: '读者甲' } } } }] },
+    recommendations: { books: [{ bookId: 'book-2', title: '许三观卖血记', author: '余华', reason: '相似主题' }] },
+    similar: { booksimilar: { books: [{ book: { bookInfo: { bookId: 'book-3', title: '兄弟', author: '余华' } } }] } },
+    friends_reading: { items: [{ book: { bookId: 'book-4', title: '三体', author: '刘慈欣' } }] },
+  }[action];
+  if (!data) return { err: 'feature.not_found', msg: 'feature not found' };
+  return {
+    err: 'ok',
+    connection: wereadConnection(),
+    data,
+  };
+}));
+
+router.post('/api/plugins/connections/:id/:action', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const action = getRouterParam(event, 'action');
+  wereadRunId += 1;
+  let run = { id: wereadRunId, connection_id: 88, action, status: 'succeeded', counts: { fetched: 0 } };
+  let items = [];
+  if (action === 'preview') {
+    run = { ...run, status: 'failed', counts: { fetched: 2, conflicts: 2 } };
+    items = [{
+        external_id: 'weread:3300045871:bookmark:b1',
+        entity_type: 'annotation',
+        status: 'conflict',
+        data: {
+          source_book_id: '3300045871',
+          book: { provider_id: '3300045871', title: '活着', author: '余华' },
+          match_status: 'confirmation_required',
+          candidates: [{ book_id: 1, title: '活着', author: '余华', confidence: 0.94 }],
+        },
+      }];
+  } else if (action === 'run') {
+    const imported = {
+      id: 102,
+      book_id: 1,
+      annotation_type: 'highlight',
+      is_private: true,
+      can_edit: true,
+      cfi: null,
+      chapter: '第一章',
+      quote_text: '人是为活着本身而活着的',
+      content: '',
+      created_at: '2026-08-17T12:00:00',
+      updated_at: '2026-08-17T12:00:00',
+      sources: [{ source_name: 'weread', source_connection_id: '88', source_run_id: String(wereadRunId) }],
+    };
+    annotationsByBookId.set(1, [...(annotationsByBookId.get(1) || []).filter(item => item.id !== 102), imported]);
+    run = { ...run, counts: { fetched: 2, written: 2, updated: 0, skipped: 0, failed: 0, conflicts: 0 } };
+  }
+  wereadRuns.set(run.id, { run, items, inputData: body?.input_data || {} });
+  return { err: 'ok', run };
+}));
+
+router.get('/api/plugins/runs/:id', eventHandler((event) => {
+  const value = wereadRuns.get(Number(getRouterParam(event, 'id')));
+  return value ? { err: 'ok', run: value.run, items: value.items } : { err: 'plugin.run_missing', msg: 'Run not found' };
+}));
 
 // Book Detail
 router.post('/api/book/:id/media_type', eventHandler(async (event) => {
@@ -1475,6 +1823,435 @@ router.get('/api/book/:id', eventHandler((event) => {
   return { err: 'ok', msg: 'mock action' };
 }));
 
+const pluginDefinitions = [
+  {
+    id: 2,
+    plugin_key: 'talebook.source.opds',
+    name: 'Generic OPDS',
+    description: '管理已保存的 OPDS 目录，并浏览、搜索与批量导入。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
+    actions: ['test'],
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-rss-box', manage_dialog: 'opds', configuration_mode: 'manager', primary_action: 'browse', service_toggle: 'opds' },
+  },
+  {
+    id: 3,
+    plugin_key: 'talebook.source.legado',
+    name: 'Legado 在线书源',
+    description: '管理、导入、搜索、阅读并使用兼容 Legado 的在线书源补全书籍信息。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['sources', 'metadata'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire', 'metadata.lookup'],
+    actions: ['test'],
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-book-cog-outline', manage_route: '/plugins/legado', configuration_mode: 'manager', primary_action: 'open' },
+  },
+  {
+    id: 4,
+    plugin_key: 'talebook.source.watch-folder',
+    name: 'Watch Folder',
+    description: '扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。',
+    version: '1.0.0',
+    runtime_kind: 'file',
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    permissions: ['books.read', 'books.write'],
+    connection_owners: ['instance'],
+    config_schema: {
+      type: 'object',
+      required: ['path'],
+      properties: {
+        target_library: { type: 'string', default: 'main' },
+        formats: { type: 'array', default: ['epub', 'pdf'] },
+        path: { type: 'string' },
+        recursive: { type: 'boolean', default: true },
+      },
+    },
+    auth_schema: { type: 'object', properties: {} },
+    ui: { icon: 'mdi-folder-eye-outline', manage_kind: 'book_source', configuration_mode: 'form', primary_action: 'configure' },
+  },
+  {
+    id: 11,
+    plugin_key: 'talebook.source.standard-ebooks',
+    name: 'Standard Ebooks · 最新上架',
+    description: '浏览 Standard Ebooks 官方开放的最新公共版权电子书。',
+    version: '1.0.0',
+    runtime_kind: 'http',
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-bookshelf', manage_kind: 'book_source', configuration_mode: 'none', primary_action: 'preview', catalog_access: 'public_free' },
+  },
+  {
+    id: 12,
+    plugin_key: 'talebook.source.gutenberg',
+    name: 'Project Gutenberg',
+    description: '检索 Project Gutenberg 的合法开放电子书。',
+    version: '1.0.0',
+    runtime_kind: 'http',
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-bookshelf', manage_kind: 'book_source', configuration_mode: 'none', primary_action: 'preview', catalog_access: 'public_free' },
+  },
+  {
+    id: 13,
+    plugin_key: 'talebook.source.internet-archive',
+    name: 'Internet Archive',
+    description: '检索 Internet Archive；仅明确开放文件可进入待审取得。',
+    version: '1.0.0',
+    runtime_kind: 'http',
+    categories: ['sources'],
+    capabilities: ['sources.browse', 'sources.search', 'sources.acquire'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'books.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-archive-outline', manage_kind: 'book_source', configuration_mode: 'none', primary_action: 'details', catalog_access: 'rights_vary' },
+  },
+  {
+    id: 5,
+    plugin_key: 'talebook.combo.open-library',
+    name: 'Open Library',
+    description: '按 ISBN 获取元数据与可用评分，并生成逐字段安全候选。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata', 'reviews'],
+    capabilities: ['metadata.lookup', 'reviews.lookup'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: { queries: { type: 'array' } } },
+    permissions: ['books.read', 'plugin_records.write', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-library-outline', brand_icon: '/images/plugin-icons/open-library.png', configuration_mode: 'none', primary_action: 'details' },
+  },
+  {
+    id: 6,
+    plugin_key: 'talebook.combo.weread',
+    name: '微信读书',
+    description: '搜索、书架、统计、笔记、社区与推荐，并可将个人笔记导入 Talebook。',
+    version: '1.2.0',
+    runtime_kind: 'builtin',
+    categories: ['integrations', 'metadata', 'annotations'],
+    capabilities: ['integrations.search', 'integrations.books', 'integrations.shelf', 'integrations.statistics', 'integrations.community', 'integrations.recommendations', 'metadata.lookup', 'annotations.import'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    permissions: ['books.read', 'books.write', 'profile.read', 'annotations.write'],
+    connection_owners: ['user'],
+    ui: { icon: 'mdi-book-open-page-variant', brand_icon: '/images/plugin-icons/weread.png', manage_route: '/plugins/weread' },
+  },
+  {
+    id: 7,
+    plugin_key: 'talebook.meta.calibre',
+    name: 'Calibre 元数据',
+    description: '书籍信息检索默认启用 Google Books（Google）、Amazon.com 与 Edelweiss；Calibre 运行时同时启用 Big Book Search、Google Images 与 Open Library 封面来源。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['metadata'],
+    capabilities: ['metadata.lookup'],
+    actions: ['test'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'network.read'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-google', brand_icon: '/images/plugin-icons/calibre.svg', configuration_mode: 'none', primary_action: 'details' },
+  },
+  {
+    id: 8,
+    plugin_key: 'talebook.tool.txt-fixer',
+    name: 'TXT 编码修复',
+    description: '检测并修复 TXT 编码问题。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['integrations'],
+    capabilities: ['integrations.tool'],
+    actions: ['test'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: { trigger: { type: 'string', enum: ['manual', 'auto'] } } },
+    permissions: ['books.read', 'books.write'],
+    connection_owners: ['instance'],
+    ui: { icon: 'mdi-file-restore-outline', manage_route: '/plugins/txt-fixer' },
+  },
+  {
+    id: 9,
+    plugin_key: 'talebook.push.boox',
+    name: 'BOOX',
+    description: '通过局域网把书籍推送到 BOOX 设备。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['integrations'],
+    capabilities: ['integrations.push'],
+    actions: ['test'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: { device_url: { type: 'string' } } },
+    permissions: ['books.read', 'network.write'],
+    connection_owners: ['user'],
+    ui: { icon: 'mdi-tablet-android', manage_route: '/me/devices', primary_action: 'configure', device_type: 'boox', default_port: 8085 },
+  },
+  {
+    id: 16,
+    plugin_key: 'talebook.push.kindle',
+    name: 'Kindle 邮箱推送',
+    description: '通过 Talebook 配置的 SMTP 服务把书籍发送到 Kindle 邮箱。',
+    version: '1.0.0',
+    runtime_kind: 'builtin',
+    categories: ['integrations'],
+    capabilities: ['integrations.push'],
+    actions: ['test'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: { type: 'object', properties: {} },
+    permissions: ['books.read', 'network.write'],
+    connection_owners: ['user'],
+    ui: { icon: 'mdi-email-fast-outline', brand_icon: '/images/plugin-icons/kindle.png', manage_route: '/me/devices', primary_action: 'configure', device_type: 'kindle', default_port: 0 },
+  },
+  {
+    id: 10,
+    plugin_key: 'talebook.annotation.brs',
+    name: 'talebook-brs 章评服务器',
+    description: '连接一个 talebook-brs 实例，导入公开章评，并同步 Talebook 中的公开笔记。',
+    version: '1.1.0',
+    runtime_kind: 'builtin',
+    categories: ['annotations'],
+    capabilities: ['annotations.chapter_reviews', 'annotations.push'],
+    actions: ['test', 'preview', 'run', 'retry', 'rollback'],
+    auth_schema: {
+      type: 'object',
+      required: ['email', 'password'],
+      properties: { email: { type: 'string', writeOnly: true }, password: { type: 'string', writeOnly: true } },
+    },
+    config_schema: {
+      type: 'object',
+      properties: { endpoint: { type: 'string', default: 'https://brs.talebook.org' }, book_map: { type: 'object' }, chapter_map: { type: 'object' }, segment_map: { type: 'object' } },
+    },
+    permissions: ['books.read', 'plugin_records.write', 'network.read', 'network.write', 'annotations.write'],
+    connection_owners: ['user'],
+    ui: { icon: 'mdi-comment-text-multiple-outline', manage_route: '/plugins/brs' },
+  },
+];
+let pluginInstallations = pluginDefinitions.map((definition, index) => ({
+  id: index + 1,
+  plugin_key: definition.plugin_key,
+  version: definition.version,
+  enabled: true,
+  status: 'active',
+  definition,
+}));
+const mockPluginConnection = installation => ({
+  id: installation.id,
+  installation_id: installation.id,
+  owner_type: 'instance',
+  owner_id: 0,
+  role: '__builtin__',
+  name: '内置连接',
+  enabled: true,
+  health: 'unknown',
+  health_message: '',
+  secret: { configured: false, mask: '' },
+  config: {},
+});
+let pluginConnections = pluginInstallations
+  .filter(installation => installation.definition.connection_owners.includes('instance'))
+  .map(installation => mockPluginConnection(installation));
+let opdsServiceEnabled = true;
+let pluginMetadataPreferences = { auto_fill_meta: false, auto_fill_keep_cover: false };
+let globalPluginDevices = [];
+
+router.get('/api/admin/plugins', eventHandler(() => ({
+  err: 'ok',
+  definitions: pluginDefinitions,
+  installations: pluginInstallations,
+  builtin_state: {
+    'talebook.source.opds': { configured: 1, enabled: 1, service_enabled: opdsServiceEnabled },
+    'talebook.source.legado': { configured: 1, enabled: 1 },
+  },
+})));
+
+router.get('/api/admin/plugins/connections', eventHandler(() => ({
+  err: 'ok', connections: pluginConnections, user_connection_health: [],
+})));
+
+router.get('/api/plugins', eventHandler(() => ({
+  err: 'ok',
+  plugins: pluginDefinitions
+    .filter(definition => definition.connection_owners.includes('user'))
+    .map((definition) => {
+      const installation = pluginInstallations.find(item => item.plugin_key === definition.plugin_key);
+      const connections = definition.plugin_key === 'talebook.combo.weread'
+        ? (wereadConfigured ? [wereadConnection()] : [])
+        : definition.plugin_key === 'talebook.annotation.brs' && brsConfigured
+          ? [brsConnection()]
+          : [];
+      return { ...definition, installation, connections, latest_run: null };
+    }),
+})));
+
+router.post('/api/admin/plugins/connections', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const installation = pluginInstallations.find(item => item.id === Number(body.installation_id));
+  const existing = pluginConnections.find(item => item.installation_id === installation.id && item.role === (body.role || 'default'));
+  const connection = {
+    ...(existing || mockPluginConnection(installation)),
+    id: existing?.id || Math.max(0, ...pluginConnections.map(item => item.id)) + 1,
+    name: body.name || 'default',
+    role: body.role || 'default',
+    config: body.config || {},
+    scopes: body.scopes || [],
+    secret: { configured: Object.keys(body.credentials || {}).length > 0, mask: '' },
+  };
+  pluginConnections = [...pluginConnections.filter(item => item.id !== connection.id), connection];
+  return { err: 'ok', connection };
+}));
+
+router.post('/api/admin/plugins/installations/:id/state', eventHandler(async (event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  pluginInstallations = pluginInstallations.map(item => item.id === id ? { ...item, enabled: Boolean(body.enabled) } : item);
+  return { err: 'ok', installation: pluginInstallations.find(item => item.id === id) };
+}));
+
+router.post('/api/admin/plugins/opds-service', eventHandler(async (event) => {
+  const body = await readBody(event);
+  opdsServiceEnabled = Boolean(body.enabled);
+  return { err: 'ok', enabled: opdsServiceEnabled };
+}));
+
+router.get('/api/admin/plugins/preferences', eventHandler(() => ({
+  err: 'ok', metadata: pluginMetadataPreferences, devices: globalPluginDevices,
+})));
+
+router.post('/api/admin/plugins/preferences', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body.metadata) pluginMetadataPreferences = { ...pluginMetadataPreferences, ...body.metadata };
+  if (body.devices) globalPluginDevices = body.devices;
+  return { err: 'ok', metadata: pluginMetadataPreferences, DEVICES: globalPluginDevices };
+}));
+
+router.post('/api/admin/plugins/:pluginKey/metadata/search', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const query = body?.query || {};
+  return {
+    err: 'ok',
+    capability: 'metadata.lookup',
+    items: [{
+      title: query.title || '活着',
+      authors: query.authors?.length ? query.authors : ['余华'],
+      publisher: query.publisher || '作家出版社',
+      isbn: query.isbn || '9787506365437',
+      rating: 8.8,
+      provider_value: 'mock-metadata-result',
+    }],
+  };
+}));
+
+router.post('/api/admin/plugins/:pluginKey/source/search', eventHandler(async (event) => {
+  const body = await readBody(event);
+  return {
+    err: 'ok',
+    capability: 'sources.search',
+    items: [{
+      external_id: 'standard-ebooks:pride-and-prejudice',
+      title: `${body?.query || 'Pride'} and Prejudice`,
+      authors: ['Jane Austen'],
+      format: 'epub',
+      access: 'download',
+    }],
+    failures: [],
+    has_more: false,
+  };
+}));
+
+router.post('/api/admin/plugins/:pluginKey/reviews/lookup', eventHandler(async (event) => {
+  const body = await readBody(event);
+  return {
+    err: 'ok',
+    capability: 'reviews.lookup',
+    items: [{
+      source: 'Google Books',
+      external_id: `google-books:${body?.query?.isbn || 'unknown'}`,
+      rating: { value: 4.5, scale: 5, sample_count: 120 },
+    }],
+    failures: [],
+    has_more: false,
+  };
+}));
+
+router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));
+
+router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const previewFixture = id === 99 ? {
+    id,
+    connection_id: 1,
+    action: 'preview',
+    status: 'succeeded',
+    counts: { written: 0, updated: 0, skipped: 0, failed: 0, conflicts: 0 },
+    duration_ms: 12,
+    created_at: '2026-08-30T12:00:00Z',
+  } : null;
+  const run = pluginRuns.find(item => item.id === id) || previewFixture;
+  const items = run?.action === 'preview'
+    ? [{
+        id: 1,
+        run_id: run.id,
+        external_id: 'watch-folder-book',
+        entity_type: 'book_source',
+        status: 'previewed',
+        operation: 'preview',
+        error_code: '',
+        data: {
+          format: 'epub',
+          source: 'Watch Folder',
+          access: 'download',
+          license: '本地文件；许可由管理员确认',
+          target_library: 'main',
+          fields: id === 99 ? [
+            { field: 'title', current: '现有标题', candidate: '候选标题', decision: 'locked' },
+            { field: 'publisher', current: '', candidate: '候选出版社', decision: 'fill_empty' },
+            { field: 'authors', current: '旧作者', candidate: '新作者', decision: 'replace' },
+          ] : undefined,
+        },
+      }]
+    : [];
+  return run ? { err: 'ok', run, items } : { err: 'plugin.run_missing', msg: 'Run not found' };
+}));
+
+router.post('/api/admin/plugins/connections/:id/:action', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const action = getRouterParam(event, 'action');
+  const run = {
+    id: pluginRuns.length + 1,
+    connection_id: id,
+    action,
+    status: 'succeeded',
+    counts: { written: 0, updated: 0, skipped: 0, failed: 0, conflicts: 0 },
+    duration_ms: 12,
+    created_at: new Date().toISOString(),
+  };
+  pluginRuns = [run, ...pluginRuns];
+  return { err: 'ok', run };
+}));
+
+router.get('/api/admin/opds/sources', eventHandler(() => ({
+  err: 'ok',
+  count: 1,
+  items: [{ id: 1, name: '测试 OPDS', url: 'https://example.com/opds', description: '', active: true }],
+})));
+
 // Admin book sources
 router.get('/api/admin/booksource/list', eventHandler(() => ({
   err: 'ok',
@@ -1486,8 +2263,8 @@ router.get('/api/admin/booksource/list', eventHandler(() => ({
       url: 'http://x.com',
       group: '测试',
       enabled: true,
-      check_status: 'ok',
-      check_message: '',
+      check_status: 'error',
+      check_message: '连接失败：远端书源返回了无法识别的响应，请检查地址和访问权限后重试。',
       check_tags: [],
     },
   ],
@@ -1510,11 +2287,22 @@ router.get('/api/admin/booksource/check/status', eventHandler(() => {
 }));
 
 // Network library (book sources)
-router.get('/api/network/sources', eventHandler(() => {
-  return { err: 'ok', items: [{ id: 1, name: '测试书源', group: '测试' }] };
+router.get('/api/book-sources', eventHandler(() => {
+  const items = networkSourceState === 'ready'
+    ? [{ id: 1, source_key: 'legado:1', name: '测试书源', group: '测试' }]
+    : [];
+  return {
+    err: 'ok',
+    items,
+    availability: {
+      state: networkSourceState,
+      enabled_plugins: networkSourceState === 'no_enabled_plugins' ? 0 : 1,
+      configured_sources: items.length,
+    },
+  };
 }));
 
-router.get('/api/network/categories', eventHandler(() => {
+router.get('/api/book-sources/categories', eventHandler(() => {
   return {
     err: 'ok',
     items: [
@@ -1526,13 +2314,13 @@ router.get('/api/network/categories', eventHandler(() => {
 
 // 网络书库搜索改为任务化：创建任务返回 task_id，前端轮询 status 拿结果
 let lastSearchKey = '';
-router.get('/api/network/search', eventHandler((event) => {
+router.get('/api/book-sources/search', eventHandler((event) => {
   const query = getQuery(event);
   lastSearchKey = query.key || '';
   return { err: 'ok', task_id: 'mock-task', total: 1 };
 }));
 
-router.get('/api/network/search/status', eventHandler(() => {
+router.get('/api/book-sources/search/status', eventHandler(() => {
   return {
     err: 'ok',
     task_id: 'mock-task',
@@ -1543,7 +2331,7 @@ router.get('/api/network/search/status', eventHandler(() => {
     partial: [],
     results: [
       {
-        source_id: 1,
+        source_id: 'legado:1',
         source_name: '测试书源',
         books: [
           {
@@ -1559,7 +2347,7 @@ router.get('/api/network/search/status', eventHandler(() => {
   };
 }));
 
-router.get('/api/network/book', eventHandler(() => {
+router.get('/api/book-sources/book', eventHandler(() => {
   return {
     err: 'ok',
     book: {
@@ -1570,12 +2358,14 @@ router.get('/api/network/book', eventHandler(() => {
       intro: '这是一本用于测试的网络小说。',
       cover_url: '',
       book_url: 'http://x.com/book/1',
+      downloadable: true,
     },
     toc_url: 'http://x.com/book/1/toc',
+    download_mode: 'by_chapters',
   };
 }));
 
-router.get('/api/network/toc', eventHandler(() => {
+router.get('/api/book-sources/toc', eventHandler(() => {
   return {
     err: 'ok',
     serialize_status: 'finished',
@@ -1587,18 +2377,18 @@ router.get('/api/network/toc', eventHandler(() => {
   };
 }));
 
-router.get('/api/network/content', eventHandler(() => {
+router.get('/api/book-sources/content', eventHandler(() => {
   return { err: 'ok', title: '第1章 惊蛰', content: '这是正文第一段。\n这是正文第二段。' };
 }));
 
 // 保存到本地：返回 tag，前端按 tag 轮询；状态先 running（含 done/total）后 completed
-router.post('/api/network/save', eventHandler(() => {
+router.post('/api/book-sources/save', eventHandler(() => {
   saveStarted = true;
   saveStatusPolls = 0;
   return { err: 'ok', tag: 'online_save:1:http://x.com/book/1', msg: '已开始后台保存，完成后将通知您' };
 }));
 
-router.get('/api/network/save/status', eventHandler(() => {
+router.get('/api/book-sources/save/status', eventHandler(() => {
   if (!saveStarted) {
     return { err: 'ok', found: false };
   }

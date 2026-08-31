@@ -21,9 +21,18 @@ def _candidate(nuxt_env_path):
 
 
 def test_legacy_metadata_sources_migrate_to_booksource_without_removing_baidu():
-    value = admin.normalize_meta_sources(["baidu", "youshu", "biquge", "booksource", "douban"])
+    value = admin.normalize_meta_sources(["baidu", "youshu", "biquge", "booksource"])
 
-    assert value == ["baidu", "booksource", "douban"]
+    assert value == ["baidu", "booksource"]
+
+
+def test_deprecated_douban_v1_falls_back_to_v2_without_dropping_the_source():
+    """豆瓣 V1 依赖已停止发放的官方 apikey，存量选择自动改用 V2 而不是被丢弃。"""
+    assert admin.normalize_meta_sources(["baidu", "douban"]) == ["baidu", "douban_v2"]
+    # 两者同时存在时不产生重复项
+    assert admin.normalize_meta_sources(["douban", "douban_v2"]) == ["douban_v2"]
+    assert "douban" not in admin.META_ALL_SOURCES
+    assert "douban" not in admin.DEFAULT_META_SOURCES
 
 
 def test_settings_saver_persists_complete_candidate(tmp_path):

@@ -192,6 +192,50 @@ class TestBaiduBaikeApi(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_card_info_strips_markup_without_losing_malformed_text(self):
+        """百科卡片可能含标签或大量未闭合尖括号，解析必须保持线性且不丢正文。"""
+        malformed = "<" * 4096 + "正文"
+        info = BaiduBaikeApi._card_info(
+            {
+                "card": [
+                    {"name": "作者", "value": "<b>冯梦龙</b> &amp; 蔡元放"},
+                    {"name": "备注", "value": malformed},
+                ]
+            }
+        )
+
+        self.assertEqual(info["作者"], "冯梦龙 & 蔡元放")
+        self.assertEqual(info["备注"], malformed)
+
+    @mock.patch("webserver.plugins.meta.baike.api.requests.get")
+    def test_cover_download_rejects_loopback_url_before_request(self, get):
+        """远端元数据中的封面 URL 不得访问本机或内网地址。"""
+        result = BaiduBaikeApi.get_cover("https://127.0.0.1/private-cover.jpg")
+
+        self.assertIsNone(result)
+        get.assert_not_called()
+
+    @mock.patch("webserver.plugins.meta.baike.api.SafeHttpClient")
+    def test_cover_download_rebuilds_url_on_trusted_baike_cdn(self, client_class):
+        """合法封面只保留 CDN 内路径与查询串，主机必须来自服务端常量。"""
+        client_class.return_value.get.return_value.content = b"jpeg"
+
+        result = BaiduBaikeApi.get_cover("https://bkimg.cdn.bcebos.com/pic/book.jpeg?resize=1#fragment")
+
+        self.assertEqual(result, ("jpg", b"jpeg"))
+        client_class.assert_called_once_with(allowed_hosts=("bkimg.cdn.bcebos.com",))
+        self.assertEqual(
+            client_class.return_value.get.call_args.args[0],
+            "https://bkimg.cdn.bcebos.com/pic/book.jpeg?resize=1",
+        )
+
+    @mock.patch("webserver.plugins.meta.baike.api.SafeHttpClient")
+    def test_cover_download_rejects_baike_cdn_lookalike(self, client_class):
+        result = BaiduBaikeApi.get_cover("https://bkimg.cdn.bcebos.com.attacker.example/book.jpeg")
+
+        self.assertIsNone(result)
+        client_class.assert_not_called()
+
 
 class TestBaikePage(unittest.TestCase):
     """百度百科 Page 类测试"""

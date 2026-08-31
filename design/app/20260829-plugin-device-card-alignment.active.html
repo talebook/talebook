@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Talebook 插件设备类型联动与插件卡片布局优化方案。" />
+  <title>插件设备类型联动与卡片布局优化 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f4f6fa; --panel:#fff; --ink:#172033; --muted:#657086; --line:#d8deea; --accent:#315f91; --soft:#edf4fb; --warn:#a35a00; --shadow:0 10px 28px rgba(20,35,60,.11); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+    * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:var(--bg); line-height:1.65; }
+    main { width:min(980px,calc(100vw - 28px)); margin:24px auto 56px; } header,section { margin-bottom:18px; padding:24px 28px; background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+    h1 { margin:0 0 8px; font-size:clamp(28px,5vw,44px); line-height:1.15; } h2 { margin:0 0 12px; font-size:21px; } h3 { margin:0 0 8px; font-size:15px; } p { margin:0 0 10px; } ul { margin:8px 0 0 20px; padding:0; } li+li { margin-top:6px; }
+    .meta,.grid { display:grid; gap:12px; } .meta { grid-template-columns:repeat(4,minmax(0,1fr)); margin-top:18px; } .meta span,.tag { padding:7px 10px; border-radius:999px; background:var(--soft); color:var(--accent); font-size:12px; font-weight:700; text-align:center; }
+    .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .box { padding:16px; border:1px solid var(--line); border-radius:14px; } .quote { padding:14px 16px; border-left:4px solid var(--warn); background:#fff7e8; color:#5d3b10; }
+    pre { margin:12px 0 0; padding:16px; overflow:auto; border-radius:14px; color:#eef5ff; background:#223047; font:13px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    table { width:100%; border-collapse:collapse; font-size:13px; } th,td { padding:10px; border:1px solid var(--line); text-align:left; vertical-align:top; } th { background:var(--soft); } .pending { color:var(--warn); font-weight:700; } .pass { color:#24743b; font-weight:700; }
+    @media (prefers-color-scheme:dark) { :root { --bg:#111722; --panel:#1b2432; --ink:#edf3fb; --muted:#a7b2c4; --line:#354156; --soft:#25364a; --shadow:0 12px 30px rgba(0,0,0,.32); } .quote { background:#382c18; color:#ffdca5; } }
+    @media (max-width:700px) { main { margin-top:10px; } header,section { padding:20px; border-radius:14px; } .meta,.grid { grid-template-columns:1fr; } }
+    @media print { body { background:#fff; } header,section { box-shadow:none; break-inside:avoid; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>插件设备类型联动与卡片布局优化</h1>
+    <p>让阅读设备配置严格跟随已启用推送插件，并重排插件卡片的信息与操作层级。</p>
+    <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-29</span><span>所属模块：app</span><span>影响：app + webserver</span></div>
+  </header>
+
+  <section>
+    <h2>1. 原始诉求</h2>
+    <div class="quote">“插件-设备里面的激活列表，跟用户-阅读设备里的类型列表不匹配。用户能配置的类型列表应当跟插件里启动状态保持一致。”</div>
+    <div class="quote" style="margin-top:10px">“插件列表的卡片样式应当有卡片阴影。状态标签放在插件名称右侧；名称下方的‘内置’换成 taglist；操作按钮放置在右上角；停用按钮放置在配置页里面右上角。”</div>
+    <div class="quote" style="margin-top:10px">体验反馈：“状态 tag 的样式缩小，要比卡片主标题的字体小一点。”状态 tag 使用 12px 紧凑规格，仍明显小于 15px 标题，同时守住小字可读性下限。</div>
+    <div class="quote" style="margin-top:10px">体验反馈：“【详情】还是要放在卡片的右下角。”因此右上角只放主操作，详情作为次级入口固定在卡片右下角。</div>
+    <div class="quote" style="margin-top:10px">体验反馈：“卡片左下角是执行记录，右下角是详情按钮。现在这两个错位了，没有同一行。”执行摘要与详情改为同一个不换行 footer，按垂直中心对齐；长摘要省略显示并保留 title。</div>
+    <div class="quote" style="margin-top:10px">体验缺陷：“元数据的插件，点击【配置】按钮怎么没反应？”根因是插件目录 API 序列化时遗漏 <code>connection_owners</code>，前端将实例级插件误判为不支持配置并静默返回。目录响应补回该 manifest 字段。</div>
+    <div class="quote" style="margin-top:10px">产品重规划：Talebook 是多用户实例，插件安装与全局策略属于管理员；微信读书、BRS 账号和阅读设备等连接属于当前用户。用户确认采用“双控制面”方案，并选择 A「设置清单」视觉：管理员页面使用紧凑分组列表，不再使用插件卡片。</div>
+    <div class="quote" style="margin-top:10px">最终交互确认：插件页面提供“插件管理”和“个人配置”两个 Tab。前者只供管理员启停内置插件和维护实例配置；后者始终配置当前登录账号。普通用户复用同一套个人配置内容，但不显示管理 Tab。</div>
+    <div class="quote" style="margin-top:10px">BRS 个人配置参考 candle-reader 的“快速登录/注册”：提供登录、快速注册和忘记密码。用户进一步明确，三项账号操作均由浏览器直接调用所填 BRS 服务器 API，不经过 Talebook 内部 handler；仅在登录成功后用现有通用插件连接接口保存已验证的 endpoint 与个人凭证。</div>
+    <div class="quote" style="margin-top:10px">设置归并：原“互联网书籍信息源”和“全局设备管理”从系统设置移入插件中心。元数据插件的启停直接决定是否参与查询，不再维护第二份“选择启用的元数据源”列表。</div>
+    <div class="quote" style="margin-top:10px">文案与信息降噪：“尚未建立个人连接”改为“需要绑定账号”；删除列表行中“实例配置 / 尚未测试”等无操作价值的技术信息，只保留名称、状态、简介和操作。</div>
+    <div class="quote" style="margin-top:10px">列表密度反馈：插件行上下留白过多。桌面端单行基准高度从 96px 收紧至 72px，缩短标题与简介间距，同时保留状态标签、图标和操作按钮的可读性。</div>
+    <div class="quote" style="margin-top:10px">配置模型反馈：免配置的豆瓣、Calibre 和 Open Library 不得显示“连接名称 / 公开配置（JSON）”通用框。只有 manifest 明确声明 <code>configuration_mode=form</code> 的插件才展示字段化设置；定制管理器和免配置插件分别进入专用入口或详情。</div>
+    <div class="quote" style="margin-top:10px">公开书源反馈：书源 Tab 提供无需账号的公开站点用于体验。首批提供 Project Gutenberg 与 Standard Ebooks·最新上架的一键预览；Standard Ebooks 完整 OPDS 已需授权，因此改用官方匿名 Atom feed。Internet Archive 权利状态混合，只标示风险而不冒充公开免费来源。</div>
+    <div class="quote" style="margin-top:10px">Legado 交互反馈：“Legado 书源插件，应该跟微信读书一样有自己的工作台页面。”插件中心不再内嵌整个书源管理页，改为声明式跳转 <code>/plugins/legado</code> 。</div>
+    <div class="quote" style="margin-top:10px">协议测试反馈：插件状态“已停用”统一改为“未启用”；详情页删除连接模型遗留的“测试连接 / 预览 / 立即执行”。管理员测试插件时必须调用具体能力协议，例如元数据走 <code>MetadataProvider.search_books()</code>，书源走 <code>SourceProvider.search()</code>，评价走 <code>ReviewProvider.get_reviews()</code>。</div>
+    <div class="quote" style="margin-top:10px">详情信息层级反馈：“权限与数据范围”属于低频审计信息，默认折叠；能力测试和插件设置保持直接可见。</div>
+    <div class="quote" style="margin-top:10px">插件边界反馈：“嵌入文件元数据”是 EPUB 导入的默认解析能力，不是管理员可启停的外部插件。移除其 Provider 与注册项；解析器迁入平台 service，历史定义仅从目录隐藏，不破坏性删除旧记录。</div>
+    <div class="quote" style="margin-top:10px">折叠区视觉反馈：“权限与数据范围”改为透明、无阴影的细分隔线样式，标题字号与强调度低于主要设置和能力测试。</div>
+    <div class="quote" style="margin-top:10px">导航反馈：插件管理页右侧增加与系统设置页一致的粘性分类导航；点击分类平滑定位，页面滚动同步高亮，窄屏隐藏以保留列表宽度。</div>
+    <div class="quote" style="margin-top:10px">粘性定位复验反馈：导航虽然声明了 <code>position: sticky</code>，但祖先 <code>v-window</code> 的 <code>overflow:hidden</code> 建立了错误的滚动容器，导致页面向下滚动时不吸顶。插件页仅在该管理窗口覆写为可见溢出，并增加滚动后实际坐标断言。</div>
+    <div class="quote" style="margin-top:10px">分类跳转反馈：点击“书源”等分类时不能把分组标题对齐到视口零点并藏在固定头部后；分组使用与系统设置页一致的滚动留白，验收以标题实际可见位置为准。</div>
+    <div class="quote" style="margin-top:10px">元数据同步弹窗反馈：隐藏弹窗内部滚动条但保留鼠标滚轮与触摸滚动；顶部大块失败警告替换为紧凑的书源完成进度条，持续展示完成数、总数和失败来源。</div>
+    <div class="quote" style="margin-top:10px">品牌识别反馈：面向第三方外部服务的插件应展示对应服务的官方图标，例如微信读书。固定品牌资源从官网、官方仓库或官方应用目录核验后本地托管，由 Provider manifest 的 <code>ui.brand_icon</code> 声明；插件列表前端只做通用渲染与 MDI 降级，不得按插件 ID 硬编码品牌映射。</div>
+    <div class="quote" style="margin-top:10px">元数据运行时反馈：未启用的七猫不得出现在书籍元数据候选中；每个启用来源最多返回 5 条候选。排查确认在线书源聚合器会无条件追加内置七猫快照，绕过独立七猫插件状态；现改为仅查询用户显式启用的数据库书源。Calibre 标题搜索原先只查询 Amazon，且首条结果后的 30 秒等待与外层超时相撞；现同时查询 Google 与 Amazon，并以进程内可恢复方式把等待上限缩短至 2 秒。</div>
+    <div class="quote" style="margin-top:10px">异常状态排查：豆瓣的“异常”来自旧通用“立即执行”误调用类型化 Provider 后留下的失败健康记录，并非豆瓣查询失败；新详情页已删除该入口。七猫则是底层站点搜索与 <code>MetadataProvider.search_books()</code> 同名，在多继承 MRO 下调用错方法；底层搜索改名为 <code>search_catalog()</code> 并保留兼容包装。</div>
+    <div class="quote" style="margin-top:10px">Provider 边界调整：独立“在线书源元数据”并不是新的外部服务，而是 Legado 已启用书源的派生能力。删除 <code>talebook.meta.book-source</code> 的注册项，将 <code>metadata.lookup</code> 并入 <code>talebook.source.legado</code>；Legado 总开关同时控制书源与元数据能力，工作台内单个书源的启停决定它是否参与两类查询。</div>
+    <div class="quote" style="margin-top:10px">Calibre 插件边界反馈：<code>talebook.meta.calibre-provider-bridge</code> 只枚举 Calibre 运行时中的 identify Provider，不提供书籍查询，不应成为管理员可启停插件。删除该桥接 Provider；保留真正按 ISBN、书名和作者查询 Google Books / Amazon 的 <code>talebook.meta.calibre</code>。</div>
+    <div class="quote" style="margin-top:10px">配置入口与书籍工具反馈：插件中心原有“打开工作台 / 设置 / 管理账号 / 管理设备”等按钮按配置归属统一为“全局配置 / 个人设置”。三个正文 Tool 属于实例级全局能力；插件中心负责启停与全局策略，针对某一本书的处理入口由已启用 Tool 动态出现在书籍详情页“处理”菜单中。</div>
+    <div class="quote" style="margin-top:10px">目录清理反馈：<code>Talebook Mock Multi-tab Provider</code> 只用于验证跨类别、重试与回滚，不是用户插件；从生产注册表与插件目录彻底移除，测试改用独立 Registry。历史数据库里的未注册或隐藏定义也不得从个人插件接口重新暴露。</div>
+    <div class="quote" style="margin-top:10px">命名与默认值反馈：插件名称由“talebook-brs 章评”调整为“talebook-brs 章评服务器”，默认服务器地址为 <code>https://brs.talebook.org</code>；插件 ID 与能力协议保持不变，已有连接保存的地址优先。</div>
+    <div class="quote" style="margin-top:10px">生命周期与导航反馈：AI 元数据保留现有能力与启停状态，但 manifest 明确标记为“已废弃”，等待后续重构；左侧管理菜单“插件”改为“插件中心”，页面内部标题暂不扩大调整。</div>
+    <div class="quote" style="margin-top:10px">Calibre 来源与分类说明反馈：明确列出 Calibre 内置来源并尽量默认启用；插件管理每个分类标题下补充面向用户的用途和入口说明。实际运行时中 Google Books（插件名 Google）、Amazon.com 与 Edelweiss 支持书籍信息检索，Big Book Search、Google Images 与 Open Library 仅支持封面下载，两组必须分别表述。</div>
+    <div class="quote" style="margin-top:10px">AI 元数据后续反馈：不再只标记“已废弃”，先从插件列表和运行时注册表移除，待后续重构后再重新接入；实现源码与历史安装记录暂时保留。</div>
+    <div class="quote" style="margin-top:10px">元数据默认状态反馈：元数据主分类中的插件除 NeoDB 外首次全部启用；NeoDB 默认关闭。该规则只用于首次物化，已有管理员启停选择不得被升级或旧配置重算覆盖。</div>
+  </section>
+
+  <section>
+    <h2>2. 目标与边界</h2>
+    <div class="grid">
+      <div class="box"><h3>目标</h3><ul><li><code>/api/user/devices</code> 返回已启用且状态为 active 的推送插件类型。</li><li>新增设备默认使用第一个可用类型；无可用插件时禁止新增并给出方向。</li><li>全部系统内置插件由平台幂等物化，管理员只启停，不再执行“安装”。</li><li>管理员采用 A 风格分组列表；停用操作只出现在详情/配置抽屉右上角。</li><li>插件页分为实例级“插件管理”和当前账号“个人配置”；普通用户只进入个人配置。</li><li>元数据查询只读取插件安装启停状态；免配置插件不暴露平台连接或 JSON 实现细节。</li><li>生产注册表不包含测试 Provider；用户目录只返回当前注册且非隐藏的插件。</li><li>插件 manifest 可声明废弃状态，目录在不改变启停事实的前提下单独展示。</li><li>书源 Tab 提供可直接预览的公开免费目录，并区分“公开免费”与“权利状态混合”。</li><li>系统设置不再重复呈现互联网来源和全局设备管理入口。</li><li>BRS 提供独立个人账号页，直接连接 BRS 完成登录、注册与密码重置。</li></ul></div>
+      <div class="box"><h3>非目标</h3><ul><li>不引入组织/租户、插件商店、第三方包下载或用户代配能力。</li><li>不改推送协议和设备数据库结构，不删除历史设备记录。</li><li>不让管理员读取用户 Secret、私人配置或执行内容；管理员只看匿名健康汇总。</li><li>不跑完整后端和全量 E2E；按用户要求只做聚焦验证。</li></ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>3. 方案</h2>
+    <h3>设备类型单一事实源</h3>
+    <p><code>PluginRuntime.enabled_providers(capability)</code> 聚合安装状态；用户设备 handler 将推送 Provider 的 <code>ui.device_type</code>、名称与默认端口返回为 <code>device_types</code>。Vue 页面只消费该字段，不维护插件名或类型表。</p>
+    <h3>列表信息层级</h3>
+    <pre>图标  插件名称 [状态]                      [启用/配置] [详情]
+      一句话简介</pre>
+    <p>管理员管理面采用紧凑分组列表，不再展示“实例配置”“尚未测试”等内部模型与低价值摘要。状态只描述管理员可行动的结果；账号型个人插件未绑定时统一提示“需要绑定账号”。</p>
+    <h3>2026-08-29 体验迭代：双 Tab 与 A 风格列表</h3>
+    <pre>插件
+├─ 插件管理（仅管理员）
+│  ├─ 按插件类别分组的设置清单
+│  ├─ 已停用行直接“启用”
+│  └─ 已启用行进入详情后“停用”/维护实例配置
+└─ 个人配置（当前登录账号）
+   ├─ 仅列出 connection_owners 含 user 的插件
+   ├─ 专用入口：微信读书工作台、阅读设备
+   └─ 通用表单：按 manifest schema 保存当前用户连接</pre>
+    <p>普通用户通过 <code>/plugins</code> 进入个人配置；管理员在 <code>/admin/plugins</code> 内切换两个 Tab。两处复用同一个个人配置组件和普通用户 API。管理员 Tab 不再出现“管理个人配置”跳转，避免把管理员身份与管理员自己的用户身份混为一谈。</p>
+    <p>新增普通用户目录 <code>GET /api/plugins</code>，只返回支持用户连接的内置插件、实例启停状态、当前用户自己的连接和运行摘要。停用插件保留连接并显示“管理员已停用”；用户 A 永远不能读取用户 B 的连接、Secret 或执行记录。</p>
+    <p>现有五个自动物化插件扩展为全部内置 provider：已有安装状态保持不变；首次物化时，原有具备初始状态策略的插件沿用该策略，其余插件默认停用，避免升级后意外打开网络访问或写权限。只为声明实例连接的插件创建内置连接，用户插件不创建伪造的实例连接。</p>
+    <h3>系统设置归并与迁移</h3>
+    <p>系统设置页删除“互联网书籍信息源”和“全局设备管理”两节。元数据主分类首次物化时，除 NeoDB 外默认全部启用；NeoDB 默认关闭，但旧 <code>META_SELECTED_SOURCES</code> 曾显式选择 NeoDB 时仍承接该选择。安装记录一旦存在，搜索与自动补全只查询启用且 active 的 <code>metadata.lookup</code> 插件，后续启动不得重算或覆盖管理员选择。Calibre 插件启用后固定查询 Google、Amazon.com 与 Edelweiss，不再维护第二份上游选择；只有真正需要 API 参数的插件保留字段化实例设置。</p>
+    <p>每个分类标题下显示一段简短的用户说明，解释插件能力会在什么业务入口生效。元数据分类同时指向书籍管理中的“从互联网同步书籍信息”和“自动补全设置”；不使用“右侧”等会在窄屏失真的空间方位词。其余分类分别说明综合服务、划线笔记、评价、书源、书籍工具与推送设备的用途。说明属于分类级帮助，不在每个插件行重复。</p>
+    <h3>配置能力与公开书源</h3>
+    <pre>configuration_mode
+├─ none     免配置：启停 + 详情（公开书源可直接“体验”）
+├─ form     字段化设置：例如 AI API、Watch Folder、WebDAV
+└─ manager  专用管理器：例如 OPDS 与 Legado</pre>
+    <p>前端不根据 <code>connection_owners</code> 猜测是否显示配置，而是严格消费插件的 UI 声明。平台可继续为免配置插件维护隐藏内置连接，但不向普通管理员暴露连接名、role 或原始 JSON。公开来源调研证据记录于 <code>research/public-free-book-sources-20260829/findings.md</code> 。</p>
+    <h3>按能力协议测试</h3>
+    <pre>插件详情
+├─ metadata.lookup   ── POST /metadata/search ── MetadataProvider.search_books
+├─ book_sources.*   ── POST /source/search   ── SourceProvider.search
+├─ reviews.lookup   ── POST /reviews/lookup  ── ReviewProvider.get_reviews
+└─ 工作台 / 推送 / 同步类插件 ── 进入各自业务页面，不显示伪通用动作</pre>
+    <p>能力测试使用结构化业务输入并直接返回有限数量的领域对象摘要；它不再创建“preview/run”式通用任务。运行时仍负责安装状态、连接配置、权限、凭据解密、超时、审计与脱敏。元数据输入保留标题、ISBN、作者与出版社的结构，不压缩成一段 JSON 或“连接测试”。详情中的“权限与数据范围”默认折叠，避免低频协议字段抢占主要操作空间。</p>
+    <p>EPUB 嵌入元数据解析属于导入基础设施，保留为 <code>webserver/services/epub_metadata.py</code> 的内部函数，不再声明 <code>talebook.meta.embedded-file</code>。插件目录只返回当前注册表中的定义，因此升级前已经物化的旧内置定义不会继续显示，也不会删除其历史记录。</p>
+    <h3>Legado 独立工作台</h3>
+    <pre>插件中心·Legado [打开工作台]
+                    │
+                    └── /plugins/legado
+                        ├─ 导入书源
+                        ├─ 批量启停 / 删除
+                        ├─ 有效性检测
+                        └─ 单书源测试</pre>
+    <p>Legado 仍是管理员管理的实例级书源，不进入普通用户的“个人配置”。Provider 通过 <code>ui.manage_route</code> 声明工作台入口，插件中心不按 plugin id 写特例。旧 <code>/admin/booksources</code> 保留为兼容跳转，书签与历史链接不会失效。</p>
+    <h3>Legado 多能力收敛</h3>
+    <pre>talebook.source.legado（唯一生命周期）
+├─ book_sources.browse / search / acquire
+└─ metadata.lookup
+   └─ 只查询 Legado 工作台中 enabled=true 的文本书源</pre>
+    <p>删除独立 <code>talebook.meta.book-source</code> Provider，历史定义、安装和运行记录不做破坏性删除，但因不再注册而从插件目录与调度器隐藏。升级时不读取旧元数据插件状态反向开启 Legado；Legado 当前安装状态是唯一总开关。旧内置七猫快照只保留为历史候选 token 的解析材料，不进入新查询。</p>
+    <h3>Calibre Provider 收敛</h3>
+    <pre>talebook.meta.calibre（保留）
+├─ metadata.lookup ── Google / Amazon.com / Edelweiss（默认全部查询）
+└─ Calibre 封面源 ── Big Book Search / Google Images / Open Library
+
+talebook.meta.calibre-provider-bridge（删除）
+└─ metadata.discover ── 仅枚举运行时 Provider，无用户业务结果</pre>
+    <p>Calibre identify 注册、可用性检测和调用细节属于 <code>talebook.meta.calibre</code> 的内部实现，不再以独立插件暴露。插件启用后，三个 identify Provider 都参与 ISBN、书名和作者查询，并共享单次查询总超时预算，避免来源增加后线性放大等待时间；三个 cover-only Provider 一并注册到 Calibre 运行时，但不冒充可返回作者、出版社和简介的书籍信息源。Calibre 上游默认停用的 Edelweiss、Big Book Search 与 Google Images 由 Talebook 显式启用，因为管理员只使用 Talebook 插件总开关，不再维护第二套子来源状态。历史 Bridge 定义与运行记录不做破坏性删除，但注册表、插件目录和新调度均不再包含该 ID。</p>
+    <h3>配置归属与书籍工具入口</h3>
+    <pre>插件中心管理入口
+├─ connection_owners 含 instance ── 全局配置
+└─ connection_owners 仅含 user   ── 个人设置
+
+书籍详情 · 处理菜单
+└─ GET /api/plugins/tools/book-actions?book_id={id}
+   └─ enabled + active + integrations.tool + 支持当前格式
+      └─ Provider name / icon / manage_route</pre>
+    <p>“全局配置 / 个人设置”只表达配置与数据归属，不再由各插件自由提供按钮文案。书籍页不读取完整插件目录、不识别插件 ID，也不复制格式兼容表；后端在 Tool Provider seam 上根据安装状态、<code>supported_formats</code> 与当前书籍格式返回可执行动作。三个现有工作台接受 <code>book_id</code> 查询参数并自动选中当前书，同一路由参数变化时重新加载，仍保留书籍搜索作为兼容入口。</p>
+    <h3>测试 Provider 与待重构插件隔离</h3>
+    <p><code>talebook.mock.multi-tab</code> 迁至 <code>tests/</code> 的 fixture，只注册到测试专用 <code>PluginRegistry</code>；生产 <code>ALL_BUILTIN_PROVIDERS</code>、自动物化和两类目录接口均不再包含它。个人目录额外按当前 Registry 与 <code>ui.hidden</code> 过滤，使升级前遗留定义自然隐藏而无需破坏性删库。<code>talebook.meta.ai</code> 同样先从生产装配表移除，源码与历史数据保留，当前不显示、不自动物化，也不参与元数据调度。</p>
+    <p>全局共享设备的管理入口迁至插件中心，并按推送插件能力展示；个人设备仍由当前账号在“个人配置”维护。设备类型可选项继续完全由已启用推送插件声明，旧记录不因插件停用被删除。</p>
+    <h3>BRS 快速账号页</h3>
+    <pre>浏览器
+  ├─ 登录 ───── POST {endpoint}/api/user/sign_in ── 成功 ── 保存 Talebook 个人连接
+  ├─ 快速注册 ─ POST {endpoint}/api/user/sign_up  ── 邮件接收随机密码
+  └─ 忘记密码 ─ POST {endpoint}/api/user/reset    ── 邮件接收重置密码</pre>
+    <p><code>/plugins/brs</code> 复用 candle-reader 的三态交互，但使用 Composition API 和 Talebook 视觉体系。BRS endpoint 始终由用户明确填写；页面解析 BRS 的 JSON 错误信封并原样显示安全文案。登录失败不得保存或覆盖 Talebook 连接；登录成功后才调用现有 <code>POST /api/plugins/connections</code>，将 endpoint 写入公开配置，并把邮箱、密码作为加密 Secret 保存。注册与重置不在 Talebook 留存密码。</p>
+  </section>
+
+  <section>
+    <h2>4. 风险与兼容性</h2>
+    <ul><li>已保存但插件已停用的设备仍展示，类型以不可选状态标记；用户可删除或改为当前启用类型。</li><li>Kindle 邮件推送目前不是推送插件，因此不再出现在新增设备类型中；既有 Kindle 记录不被迁移或删除。</li><li>普通用户无法启用插件；空列表文案引导联系管理员，而不是跳转到无权限页面。</li></ul>
+  </section>
+
+  <section>
+    <h2>5. 测试结果</h2>
+    <table><thead><tr><th>范围</th><th>验证</th><th>状态</th></tr></thead><tbody>
+      <tr><td>后端</td><td><code>pytest -q tests/test_plugin_runtime.py -k enabled_providers</code> 与 <code>pytest -q tests/test_main.py::TestUser::test_devices_get</code>（现有 Docker 测试镜像）。</td><td class="pass">2 条通过</td></tr>
+      <tr><td>前端</td><td>Playwright 验证 BOOX 启用时可新增且只有 BOOX；停用后新增按钮禁用并显示空状态。</td><td class="pass">1 条通过</td></tr>
+      <tr><td>卡片</td><td>Playwright 验证名称旁状态、taglist、右上主操作、底部执行摘要与详情同一行、常驻阴影、详情页右上停用，并断言状态 tag 字号小于标题。</td><td class="pass">复验通过</td></tr>
+      <tr><td>元数据配置</td><td>豆瓣、Calibre、Open Library 等免配置插件不展示“配置”，详情中不存在连接名或 JSON 框；待重构的 AI 元数据已从目录移除。</td><td class="pass">Playwright + manifest 回归通过</td></tr>
+      <tr><td>公开书源</td><td>Project Gutenberg 与 Standard Ebooks·最新上架无配置直接预览；Standard Ebooks Atom <code>enclosure</code> 解析为可下载 EPUB；Internet Archive 显示权利混合提示且不提供一键体验。真实 Docker 后端直接运行 Provider，分别返回 118 和 15 个可预览条目。</td><td class="pass">3 条 E2E；73 条后端聚焦测试通过</td></tr>
+      <tr><td>Legado 工作台</td><td>Playwright 验证插件列表“打开工作台”、独立页书源检测交互与旧路由兼容跳转；后端清单测试验证 <code>ui.manage_route</code> 声明。</td><td class="pass">3 条 E2E + 2 条 pytest 通过</td></tr>
+      <tr><td>协议能力测试</td><td>详情页不再出现通用动作，元数据、书源与评价分别调用类型化 Provider 接口并展示领域结果；“已停用”文案统一为“未启用”；权限区默认折叠且无阴影。</td><td class="pass">6 条 Playwright + 4 条 pytest 通过</td></tr>
+      <tr><td>插件边界与异常修复</td><td>“嵌入文件元数据”从注册目录移除，EPUB 解析器保留为平台 service，历史目录记录自动隐藏；七猫底层搜索与元数据协议分离并保留旧 API 兼容。</td><td class="pass">12 条聚焦 pytest 通过</td></tr>
+      <tr><td>元数据启停与候选上限</td><td>禁用七猫时在线书源聚合器不再追加内置七猫快照；每个启用的元数据插件最多输出 5 条候选；真实 Docker 中以“西游记 / 吴承恩”查询 Calibre 聚合源，Amazon 返回 0 条，Google 在约 6.6 秒返回《西游记》（ISBN 9787570402083）。</td><td class="pass">3 条针对性 pytest 通过；真实上游探测通过</td></tr>
+      <tr><td>Legado 多能力收敛</td><td>注册表只保留 <code>talebook.source.legado</code>，同时满足 SourceProvider 与 MetadataProvider 接口；启停状态共同控制两类能力，元数据只读取工作台中已启用书源，旧 <code>talebook.meta.book-source</code> 从目录隐藏。</td><td class="pass">6 条聚焦 pytest + 1 条 Playwright 通过</td></tr>
+      <tr><td>Calibre Provider 收敛</td><td>插件目录不再注册只能枚举运行时 identify Provider 的 <code>talebook.meta.calibre-provider-bridge</code>；保留 <code>talebook.meta.calibre</code> 的 Google Books / Amazon 查询、去重、候选限制与封面能力。</td><td class="pass">5 条聚焦 pytest 通过</td></tr>
+      <tr><td>Calibre 来源与分类说明</td><td>默认注册并查询 Google、Amazon.com、Edelweiss 三个 identify 来源；显式启用并注册 Big Book Search、Google Images、Open Library 三个仅封面来源；管理页所有实际显示分类均有用途说明，元数据说明指向手动同步与自动补全入口。桌面与 390px 窄屏均验证说明可见、按钮可达且无横向溢出。</td><td class="pass">61 条聚焦 pytest + 3 条 Chromium Playwright 通过；Ruff、ESLint、locale JSON 与 diff check 通过</td></tr>
+      <tr><td>AI 元数据暂时下线</td><td><code>talebook.meta.ai</code> 不再进入生产注册表、管理员目录、自动物化或元数据调度；实现源码与历史安装数据不删除。目录 API 与实际 Chromium 均确认列表中不存在该项。</td><td class="pass">契约、目录 API 与 Playwright 已纳入上述聚焦验证</td></tr>
+      <tr><td>元数据默认启用策略</td><td>元数据主分类首次物化时，豆瓣、百度百科、Calibre、新华书店、番茄小说和七猫小说默认启用；NeoDB 默认关闭，旧配置显式选择时可承接；已存在的启停状态在重复物化和配置变化后保持不变。</td><td class="pass">3 条聚焦运行时与 Provider pytest 通过；Ruff 与 diff check 通过</td></tr>
+      <tr><td>配置入口与书籍工具</td><td>插件中心管理动作统一为“全局配置 / 个人设置”，并删除旧按钮文案；书籍详情按已启用 Tool 与当前格式动态展示处理入口，工作台通过 <code>book_id</code> 自动选书并响应同路由参数变化。后端覆盖启停、格式过滤、管理员权限与单书解析；Chromium 覆盖插件中心两类入口和“文件处理 → 插件工具 → TXT 编码修复”的带书跳转。</td><td class="pass">7 条聚焦 pytest + 2 条 Playwright 通过</td></tr>
+      <tr><td>目录清理、状态与命名</td><td>生产注册表与目录不再出现任何 <code>talebook.mock.*</code> 或待重构的 <code>talebook.meta.ai</code>；测试 Provider 使用独立 Registry；个人目录过滤历史未注册/隐藏定义；两套左侧导航显示“插件中心”；BRS 插件显示“talebook-brs 章评服务器”，无既有连接时默认地址为 <code>https://brs.talebook.org</code>。深色模式下状态标签文字统一使用主题前景色，修复固定深色文字仅约 <code>2.39:1</code> 的对比度回归。</td><td class="pass">本轮 61 条契约/协议/目录聚焦 pytest；既有 5 条 BRS Vitest 与 3 条 Chromium Playwright 通过；Ruff 与聚焦 ESLint 通过</td></tr>
+      <tr><td>品牌图标</td><td>26 份第一方品牌资源本地托管并记录来源与 SHA；27 个固定外部品牌插件声明站内图标路径，通用组件在图片失败时回落 MDI。Chromium 实际渲染确认 Calibre、Open Library 与微信读书使用 Provider 声明的本地图标。</td><td class="pass">2 条组件测试 + 2 条契约测试 + 1 条 Playwright 通过</td></tr>
+      <tr><td>右侧分类导航</td><td>1280×900 Chromium 验证导航位于内容右侧、滚动后保持吸顶；点击“书源”后分组标题对齐动态读取的 sticky top，不被站点头部遮挡。</td><td class="pass">聚焦 Playwright 复验通过</td></tr>
+      <tr><td>元数据同步弹窗</td><td>Chromium 验证流式结果可先于其余来源展示，紧凑进度显示 1/2 与未完成来源，移除大块警告，弹窗滚动容器隐藏垂直滚动条。</td><td class="pass">1 条 Playwright 通过</td></tr>
+      <tr><td>双控制面</td><td>管理员双 Tab、A 风格分组列表、无安装按钮；普通用户个人配置入口与当前用户连接隔离。</td><td class="pass">聚焦验证通过</td></tr>
+      <tr><td>设置归并</td><td>后端聚焦测试覆盖插件偏好接口、元数据安装迁移与运行时分发；系统设置页 E2E 断言旧入口已移除。</td><td class="pass">36 条后端测试通过</td></tr>
+      <tr><td>文案降噪</td><td>Playwright 断言管理列表不再出现“管理员配置”和“尚未测试”，个人连接空状态显示“需要绑定账号”。</td><td class="pass">1 条 E2E 通过</td></tr>
+      <tr><td>列表密度</td><td>Playwright 读取桌面端插件行实际高度并断言不超过 76px，避免上下留白回退；同时完成 1280×900 实际渲染截图核对。</td><td class="pass">1 条 E2E 通过</td></tr>
+      <tr><td>内置插件生命周期</td><td>全部内置插件幂等物化；首次状态安全；用户插件不创建实例连接；停用保留个人配置。</td><td class="pass">聚焦验证通过</td></tr>
+      <tr><td>BRS 快速账号页</td><td>直接请求 BRS 登录、注册、重置 API；仅成功登录保存连接；错误与停用状态可恢复。</td><td class="pass">组件与后端聚焦验证通过</td></tr>
+      <tr><td>完整界面审查</td><td>以 <code>origin/master</code> 为默认分支，对当前分支 69 个已提交改动（208 个文件）以及 82 个已跟踪、43 个未跟踪的本地文件重新执行 <code>interface-review full</code>；排除锁文件、测试产物、字典与二进制资源 44 项后，共 213 个文件。因分支范围过大，按规则聚焦完整“插件中心控制面”流程并展开管理员插件中心、个人配置、BRS、书籍详情工具入口及两套头部消费者，检查 Vue 删除侧信号、键盘、窄屏、深浅主题、空状态与失败状态。本轮唯一新增 HIGH 是 12px 彩色状态标签在深色表面的固定文字色对比度不足（约 <code>2.39:1</code>）；已改为主题前景色，并以实际 Chromium 重跑浅色主流程、深色标签和 BRS 默认地址。Chrome DevTools MCP 在当前会话不可用，使用项目 Playwright 的实际 Chromium 渲染作为替代。分支基线既有的头部图标按钮标签问题不计入本次回归，保留为后续技术债。</td><td class="pass">复验：HIGH / MEDIUM 均已清零，Approve</td></tr>
+      <tr><td>本轮完整界面复审</td><td>再次以 <code>origin/master</code>（merge-base <code>767647c</code>）为基线执行 <code>interface-review full</code>：69 个提交、85 个已跟踪本地修改、43 个未跟踪文件；锁文件、测试产物、截图、字典配置、编译资源与二进制品牌/调研图片共排除 57 项，审查范围 197 个文件。按大范围门禁聚焦完整插件中心控制面，并展开管理员插件列表/详情、自动补全设置、书籍详情元数据同步、自动补全服务和 Provider 运行时五个消费者。Accessibility、Layout、Writing、Typography、Colors、UI 六域均无新增或回归问题；复审中将“右侧自动补全设置”改为无空间方位依赖的“通过自动补全设置”，随后重跑 1280×900 与 390×844 Chromium。保留 12px 紧凑说明、分类级单段说明和“信息源 / 仅封面源”分组，分别因为符合既有密度、避免重复堆高列表、避免误导来源能力。Chrome DevTools MCP 未暴露，按现有项目流程使用 Playwright 实际 Chromium 替代。</td><td class="pass">Introduced / Regression 均为 0，Approve</td></tr>
+      <tr><td>静态检查</td><td><code>make lint-py</code> 与 <code>cd app &amp;&amp; npm run lint -- --quiet</code> 均退出码 0；<code>git diff --check</code> 通过。</td><td class="pass">Python 及前端 0 error</td></tr>
+      <tr><td>方案门禁</td><td>连续体验修改、聚焦验证与完整界面复审均已收口；本方案与插件能力方案一并转为 ACTIVE。</td><td class="pass">完成</td></tr>
+      <tr><td>方案校验</td><td><code>make check-design</code> 在 ACTIVE 文件名、HTML 结构与单文件资源约束下通过。</td><td class="pass">通过</td></tr>
+      <tr><td>体验环境</td><td>Docker 真实后端 <code>/api/welcome</code>、Nuxt 插件中心页面及前端代理后的 welcome 接口均返回 200。</td><td class="pass">可体验</td></tr>
+      <tr><td>未执行</td><td>按用户要求不执行完整 pytest、全量 E2E 和生产构建；以已记录的后端聚焦回归、组件测试、实际 Chromium 流程和静态检查收口。剩余风险是未覆盖功能的偶发集成回归。</td><td class="pending">风险已记录</td></tr>
+    </tbody></table>
+  </section>
+</main>
+</body>
+</html>

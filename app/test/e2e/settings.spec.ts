@@ -10,19 +10,20 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         });
     });
 
-    test('顶部悬浮标题栏含标题与保存按钮', async ({ page }) => {
+    test('路径页签与保存栏在滚动时保持可见', async ({ page }) => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();
 
         const bar = page.locator('.settings-titlebar');
-        await expect(bar.locator('.settings-page-title')).toBeVisible();
+        await expect(page.getByRole('heading', { name: '系统设置', exact: true })).toHaveCount(0);
+        await expect(page.getByRole('tab', { name: '系统设置' })).toHaveAttribute('aria-selected', 'true');
         await expect(bar.getByRole('button', { name: '保存配置' })).toBeVisible();
 
-        // 悬浮固定：向下滚动后标题栏仍停在顶部（贴应用顶栏下方）
+        // 路径页签贴在应用顶栏下方，保存栏继续贴在页签下方。
         await page.evaluate(() => window.scrollTo({ top: 1200 }));
         await expect.poll(async () => {
             return await bar.evaluate(el => Math.round(el.getBoundingClientRect().top));
-        }, { timeout: 3000 }).toBeLessThanOrEqual(56);
+        }, { timeout: 3000 }).toBeLessThanOrEqual(104);
     });
 
     test('左侧分组导航与全部分类渲染', async ({ page }) => {
@@ -34,8 +35,10 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
             await expect(page.locator('.settings-nav-group', { hasText: g })).toBeVisible();
         }
 
-        // 所有分类都渲染为 section（17 个）
-        await expect(page.locator('.settings-section')).toHaveCount(17);
+        // 元数据来源和全局设备已迁入插件中心，系统设置保留 14 个分类。
+        await expect(page.locator('.settings-section')).toHaveCount(14);
+        await expect(page.locator('.settings-nav-item', { hasText: '互联网书籍信息源' })).toHaveCount(0);
+        await expect(page.locator('.settings-nav-item', { hasText: '全局设备管理' })).toHaveCount(0);
 
         // 首个导航项默认高亮
         await expect(page.locator('.settings-nav-item.active')).toHaveText('基础信息');
@@ -49,19 +52,14 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await expect(page.getByLabel('每本有声书保留的历史版本数')).toHaveValue('3');
     });
 
-    test('基础信息中默认启用并可保存关闭网络书库展示开关', async ({ page }) => {
+    test('旧网络书库展示开关不再隐藏聚合入口', async ({ page }) => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();
 
-        const checkbox = page.getByRole('checkbox', { name: '显示网络书库入口与连载状态筛选' });
-        await expect(checkbox).toBeVisible();
-        await expect(checkbox).toBeChecked();
-
-        await checkbox.uncheck();
-        await page.locator('.settings-titlebar').getByRole('button', { name: '保存配置' }).click();
-        await expect(checkbox).not.toBeChecked();
+        await expect(page.getByRole('checkbox', { name: '显示网络书库入口与连载状态筛选' })).toHaveCount(0);
 
         await page.goto('/');
+        await expect(page.locator('nav').getByRole('link', { name: '书库浏览' })).toBeVisible();
         await expect(page.locator('nav').getByRole('link', { name: '网络书库' })).toHaveCount(0);
     });
 
@@ -69,25 +67,14 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();
 
-        await page.locator('.settings-nav-item', { hasText: '互联网书籍信息源' }).click();
+        await page.locator('.settings-nav-item', { hasText: '邮件服务' }).click();
 
         // 对应 section 滚动到视口顶部附近
         await expect.poll(async () => {
-            return await page.locator('#sec-bookInfoSources').evaluate(el => Math.round(el.getBoundingClientRect().top));
-        }, { timeout: 4000 }).toBeLessThan(120);
+            return await page.locator('#sec-emailService').evaluate(el => Math.round(el.getBoundingClientRect().top));
+        }, { timeout: 4000 }).toBeLessThan(180);
 
-        await expect(page.locator('.settings-nav-item.active')).toHaveText('互联网书籍信息源');
-    });
-
-    test('元数据来源保留百度百科并使用在线书源替代固定站点', async ({ page }) => {
-        await page.goto('/admin/settings');
-        await expect(page.locator('.loading-page')).toBeHidden();
-
-        await page.locator('#sec-bookInfoSources .v-select').click();
-
-        await expect(page.getByRole('option', { name: '百度百科' })).toBeVisible();
-        await expect(page.getByRole('option', { name: '在线书源' })).toBeVisible();
-        await expect(page.getByRole('option', { name: '笔趣阁' })).toHaveCount(0);
+        await expect(page.locator('.settings-nav-item.active')).toHaveText('邮件服务');
     });
 
     test('滚动内容时菜单自动选中对应分类（scroll-spy）', async ({ page }) => {
