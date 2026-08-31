@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="TB-196 Legado 全局配置、私网检测开关、搜索限流以及分章并发重试方案。" />
+  <meta name="description" content="TB-196 Legado 示例书源、全局配置、私网检测开关、搜索限流以及分章并发重试方案。" />
   <link rel="icon" href="data:," />
   <title>Legado 并发与失败重试优化 · ACTIVE</title>
   <style>
@@ -15,18 +15,18 @@
 <div class="page">
   <header class="hero">
     <h1>Legado 并发与失败重试优化</h1>
-    <p class="sub">让管理员在 Legado 书源工作台控制结果上限、搜索并发、保存并发与私网地址保护，并把分章保存改为有界并发、失败判定和排队重试。</p>
+    <p class="sub">让管理员从用户可见入口导入指定示例书源，控制结果上限、搜索并发、保存并发与私网地址保护，并把分章保存改为有界并发、失败判定和排队重试。</p>
     <div class="chips" aria-label="方案元信息"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-31</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-196</span></div>
   </header>
   <nav aria-label="章节目录"><a href="#request">原始诉求</a><a href="#goals">目标边界</a><a href="#evidence">现状根因</a><a href="#design">方案</a><a href="#risk">风险回滚</a><a href="#tests">测试</a><a href="#decisions">决策</a></nav>
   <main id="main">
     <section id="request" class="card">
       <h2>1. 原始诉求</h2>
-      <div class="callout warn">“Legado 插件全局配置增加：每个书源搜索结果数（默认 5）、搜索并发数（默认 20）、保存书籍并发数（默认 10）、是否开启防内网穿透检测；关闭时不拦截 ‘Endpoint resolves to a non-public address’。保存书籍到本地时进行错误判断和排队重试。”</div>
+      <div class="callout warn">“Legado 插件全局配置增加：每个书源搜索结果数（默认 5）、搜索并发数（默认 20）、保存书籍并发数（默认 10）、是否开启防内网穿透检测；关闭时不拦截 ‘Endpoint resolves to a non-public address’。保存书籍到本地时进行错误判断和排队重试。内置书源列表增加 <code>https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json</code>。”</div>
     </section>
     <section id="goals" class="card">
       <h2>2. 目标与边界</h2>
-      <div class="grid"><article class="box"><h3>目标</h3><ul><li>四项配置由管理员在 Legado 工作台读取、校验、保存，旧安装缺项时使用需求默认值。</li><li>网络搜索与元数据搜索按单书源裁剪结果；网络搜索线程池按全局并发配置运行。</li><li>分章下载保持章节原序，以有界线程池并发；异常、缺失或空正文进入下一轮重试队列。</li><li>私网保护默认开启；关闭仅跳过非公网 IP 拒绝，仍校验协议、URL 凭据、跨域重定向和响应大小。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不允许单个导入书源自行关闭安全策略，开关只属于管理员实例连接。</li><li>不改变保存任务 API、后台任务定位键、TXT/EPUB 导入和去重契约。</li><li>不新增数据库字段或迁移；配置继续存入现有 <code>PluginConnection.config</code>。</li><li>不承诺所有章节最终成功；重试耗尽时保留其他成功章节，全部失败则终止导入。</li></ul></article></div>
+      <div class="grid"><article class="box"><h3>目标</h3><ul><li>指定 miaogongzi URL 出现在“导入示例书源”的用户入口，选择后复用远程 URL 导入 API。</li><li>四项配置由管理员在 Legado 工作台读取、校验、保存，旧安装缺项时使用需求默认值。</li><li>网络搜索与元数据搜索按单书源裁剪结果；网络搜索线程池按全局并发配置运行。</li><li>分章下载保持章节原序，以有界线程池并发；异常、缺失或空正文进入下一轮重试队列。</li><li>私网保护默认开启；关闭仅跳过非公网 IP 拒绝，仍校验协议、URL 凭据、跨域重定向和响应大小。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不允许单个导入书源自行关闭安全策略，开关只属于管理员实例连接。</li><li>不改变保存任务 API、后台任务定位键、TXT/EPUB 导入和去重契约。</li><li>不新增数据库字段或迁移；配置继续存入现有 <code>PluginConnection.config</code>。</li><li>不承诺所有章节最终成功；重试耗尽时保留其他成功章节，全部失败则终止导入。</li></ul></article></div>
     </section>
     <section id="evidence" class="card">
       <h2>3. 现状、根因与证据</h2>
@@ -35,11 +35,12 @@
         <tr><td>搜索并发配置不能热切换</td><td><code>SearchTaskService.configure()</code> 只改数字，已经创建的 executor 不会重建。</td><td>即使保存配置，进程首次搜索后也可能继续使用旧并发。</td></tr>
         <tr><td>保存串行且吞错</td><td><code>assemble_from_chapters()</code> 顺序请求；任一异常直接写空正文且不重试。</td><td>长篇保存慢，瞬时错误造成不可恢复的缺章；全部失败仍可能导入空书。</td></tr>
         <tr><td>私网拦截无实例开关</td><td><code>SafeHttpClient</code> 每跳固定调用公网地址校验。</td><td>代理把目标解析为私网 IP 时无法按管理员意图放行。</td></tr>
+        <tr><td>指定示例源不可见</td><td><code>BookSourceImportDialog.vue</code> 的远程选项只有 tickmao 与 shidahuilang；后端 seed 是演示规则 JSON，并非远程示例列表的数据源。</td><td>应在真实前端入口增加 miaogongzi 选项，不向 seed 重复写入远程订阅。</td></tr>
       </tbody></table></div>
     </section>
     <section id="design" class="card">
       <h2>4. 方案</h2>
-      <div class="callout good"><strong>方案结论：</strong>配置所有权放在 Legado 的 instance connection；运行时从同一连接读取并发、裁剪与安全开关。保存阶段先并发抓取，失败项按轮次重新入队，成功正文最后按目录顺序组装。</div>
+      <div class="callout good"><strong>方案结论：</strong>指定 URL 直接加入工作台“导入示例书源”的远程选项并复用 <code>/api/admin/booksource/import</code>；配置所有权放在 Legado 的 instance connection；运行时从同一连接读取并发、裁剪与安全开关。保存阶段先并发抓取，失败项按轮次重新入队，成功正文最后按目录顺序组装。</div>
       <div class="flow" aria-label="保存处理流程"><article class="step"><b>准备</b><span>解析详情与目录，生成不持有 SQLAlchemy session 的章节 reader。</span></article><article class="step"><b>首轮并发</b><span>最多按保存并发数请求，每项校验结构与非空正文。</span></article><article class="step"><b>排队重试</b><span>仅失败项进入下一轮，最多追加两轮，并记录最终失败。</span></article><article class="step"><b>顺序组装</b><span>按目录索引写文件；部分成功可导入，全部失败明确报错。</span></article></div>
       <h3>配置契约</h3>
       <div class="table" role="region" aria-label="配置契约" tabindex="0"><table><thead><tr><th>键</th><th>类型 / 默认</th><th>消费位置</th><th>边界</th></tr></thead><tbody>
@@ -53,7 +54,7 @@
     </section>
     <section id="risk" class="card">
       <h2>5. 影响范围、风险与回滚</h2>
-      <div class="grid"><article class="box"><h3>影响范围</h3><p>插件 manifest/config 校验、网络搜索 executor、Legado HTTP 客户端、元数据结果裁剪、保存抓取与工作台配置区；无数据迁移。</p></article><article class="box"><h3>保持不变</h3><p>默认仍阻止非公网地址；章节输出顺序、保存 API 和进度结构不变；重试耗尽后的单章仍按历史兼容写标题与空正文。</p></article></div>
+      <div class="grid"><article class="box"><h3>影响范围</h3><p>插件 manifest/config 校验、示例书源导入选项、网络搜索 executor、Legado HTTP 客户端、元数据结果裁剪、保存抓取与工作台配置区；无数据迁移。</p></article><article class="box"><h3>保持不变</h3><p>默认仍阻止非公网地址；章节输出顺序、保存 API 和进度结构不变；重试耗尽后的单章仍按历史兼容写标题与空正文。</p></article></div>
       <div class="callout danger"><strong>主要风险：</strong>管理员关闭保护后，恶意或失陷书源可访问本机及内网 HTTP 服务。界面必须直接说明风险，默认开启，后端只允许管理员实例连接保存此值。并发提高也可能触发网站限流，因此设置范围受控且可回调。</div>
       <div class="callout"><strong>回滚：</strong>可整体 revert 代码；现有连接中的新增 config 键在旧版本中会被忽略，无数据库清理。若只需紧急止损，可把保护重新开启并把并发降为 1。</div>
     </section>
@@ -62,13 +63,13 @@
       <div class="table" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>实际命令 / 页面</th><th>关键验收</th><th>结果</th></tr></thead><tbody>
         <tr><td>后端全量</td><td><code>make test</code></td><td>重建包含当前依赖的测试镜像并运行完整后端套件。</td><td class="verified">1247 passed，20 skipped，26 warnings</td></tr>
         <tr><td>后端定向</td><td><code>docker run … pytest -q tests/test_book_source_plugins.py tests/test_booksource_metadata.py</code>；分别运行 <code>test_network_save.py</code>、<code>test_network_library.py</code>、<code>test_plugins_api.py</code></td><td>配置默认与校验、结果裁剪、私网开关、executor 热切换、保存并发、空正文重试、全部失败终止与 API 兼容。</td><td class="verified">32 + 10 + 23 + 35 passed</td></tr>
-        <tr><td>前端 E2E / 渲染</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:38124 MOCK_API_URL=http://127.0.0.1:38123 npx playwright test test/e2e/booksources.spec.ts</code></td><td>桌面及 320px 读取默认值、阻止越界输入、保存四项设置、重载持久化、关闭保护风险提示且无横向溢出。</td><td class="verified">Chromium 4 passed；桌面与 320px 截图见 <code>document/screenshots/tb-196/</code></td></tr>
-        <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>审查工作区相对 <code>origin/master</code> 的完整本地改动及 Legado 工作台、网络书库入口、旧管理重定向三个消费者。</td><td class="verified">Approve；无 Introduced / Regression finding。审查中修正移动端提示重叠和 warning tonal 低对比后复验</td></tr>
-        <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、booksource locale key 对齐、<code>git diff --check</code>、<code>make check-design</code></td><td>格式、lint、i18n 与单文件方案通过。</td><td class="verified">Python 通过；ESLint 0 errors / 465 个存量 warnings；booksource 中英各 79 key 且完全对齐；diff 与设计门禁通过</td></tr>
+        <tr><td>前端 E2E / 渲染</td><td><code>PLAYWRIGHT_BASE_URL=http://127.0.0.1:38124 MOCK_API_URL=http://127.0.0.1:38123 npx playwright test test/e2e/booksources.spec.ts</code></td><td>桌面及 320px 展示 miaogongzi 示例选项；选择后向远程导入 API 提交精确 URL 并显示成功结果；同时覆盖配置默认值、越界输入、保存持久化、风险提示和横向溢出。</td><td class="verified">Chromium 4 passed；桌面与 320px 截图见 <code>document/screenshots/tb-196/</code></td></tr>
+        <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>审查工作区相对 <code>origin/master</code> 的完整本地改动及 Legado 工作台、网络书库入口、旧管理重定向三个消费者。</td><td class="verified">Full + 示例选项 delta 均 Approve；无 Introduced / Regression finding。审查中修正移动端提示重叠和 warning tonal 低对比后复验</td></tr>
+        <tr><td>质量门禁</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>cd app &amp;&amp; npm run lint</code>、booksource locale key 对齐、<code>git diff --check</code>、<code>make check-design</code></td><td>格式、lint、i18n 与单文件方案通过。</td><td class="verified">Python 通过；ESLint 0 errors / 465 个存量 warnings；booksource 中英各 80 key 且完全对齐；diff 与设计门禁通过</td></tr>
       </tbody></table></div>
-      <div class="callout good"><strong>验证结论：</strong>需求四项配置、默认值、运行时消费、安全开关以及章节并发重试均有自动化覆盖。项目要求的 Chrome DevTools MCP 在本运行环境未提供，使用真实 Chromium Playwright 完成等价的桌面、320px、表单状态、持久化与截图验证。</div>
+      <div class="callout good"><strong>验证结论：</strong>指定示例源的展示和真实导入请求，以及需求四项配置、默认值、运行时消费、安全开关、章节并发重试均有自动化覆盖。项目要求的 Chrome DevTools MCP 在本运行环境未提供，使用真实 Chromium Playwright 完成等价的桌面、320px、表单状态、持久化与截图验证。</div>
     </section>
-    <section id="decisions" class="card"><h2>7. 决策记录</h2><ol><li><strong>2026-08-31：</strong>在没有 grill 工具的运行环境中按原始需求明确边界：失败重试采用总计三次的分轮队列；部分失败保持兼容，全部失败终止。</li><li><strong>2026-08-31：</strong>安全开关只控制非公网地址拒绝，不关闭其余 URL、重定向与大小防护；这是满足代理劫持场景的最小放宽。</li><li><strong>2026-08-31：</strong>配置继续复用插件 instance connection，不复制到全局 settings 或书源 JSON。</li><li><strong>2026-09-01：</strong>完整界面审查发现移动端 persistent hint 会压到下一字段，且 Vuetify warning tonal 的橙色正文对比不足；改为字段外自然流提示，并仅把 warning 内容与图标切到 on-surface 色，保留 warning 背景。复验后结论为 Approve。</li></ol></section>
+    <section id="decisions" class="card"><h2>7. 决策记录</h2><ol><li><strong>2026-08-31：</strong>在没有 grill 工具的运行环境中按原始需求明确边界：失败重试采用总计三次的分轮队列；部分失败保持兼容，全部失败终止。</li><li><strong>2026-08-31：</strong>安全开关只控制非公网地址拒绝，不关闭其余 URL、重定向与大小防护；这是满足代理劫持场景的最小放宽。</li><li><strong>2026-08-31：</strong>配置继续复用插件 instance connection，不复制到全局 settings 或书源 JSON。</li><li><strong>2026-09-01：</strong>完整界面审查发现移动端 persistent hint 会压到下一字段，且 Vuetify warning tonal 的橙色正文对比不足；改为字段外自然流提示，并仅把 warning 内容与图标切到 on-surface 色，保留 warning 背景。复验后结论为 Approve。</li><li><strong>2026-09-01：</strong>后端 seed 是离线演示规则，不驱动前端远程示例列表；因此只在真实的 <code>BookSourceImportDialog</code> 入口增加 miaogongzi URL，避免把远程订阅误当作 seed 数据重复维护。</li></ol></section>
   </main>
   <footer>Talebook internal design · webserver · ACTIVE · 2026-08-31</footer>
 </div>

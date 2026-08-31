@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+const miaogongziSampleUrl = 'https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json';
 
 test.describe('Legado Source Workbench', () => {
     test.beforeEach(async ({ request }) => {
@@ -39,10 +40,26 @@ test.describe('Legado Source Workbench', () => {
         await page.getByRole('tab', { name: '导入示例书源' }).click();
         await page.locator('.v-dialog .v-select').click();
         await expect(page.getByRole('option', { name: '内置示例书源' })).toBeVisible();
+        const miaogongziOption = page.getByRole('option', { name: /喵公子 \/ 阅读书源/ });
+        await expect(miaogongziOption).toBeVisible();
         await expect(page.getByRole('option', { name: /tickmao \/ Novel 完整书源/ })).toBeVisible();
         await expect(page.getByRole('option', { name: /shidahuilang \/ shuyuan-bak 优选书源/ })).toBeVisible();
+        await expect(page.getByText(miaogongziSampleUrl)).toBeVisible();
         await expect(page.getByText('https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json')).toBeVisible();
         await expect(page.getByText('https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json')).toBeVisible();
+
+        await miaogongziOption.click();
+        const importDialog = page.getByRole('dialog').filter({
+            has: page.getByRole('tab', { name: '导入示例书源' })
+        });
+        const importRequest = page.waitForRequest(request => (
+            request.method() === 'POST' && request.url().includes('/api/admin/booksource/import')
+        ));
+        await importDialog.getByRole('button', { name: '确认' }).click();
+        const request = await importRequest;
+        expect(JSON.parse(request.postData() || '{}')).toEqual({ url: miaogongziSampleUrl });
+        await expect(importDialog).toBeHidden();
+        await expect(page.getByText(/新增 1，更新 0，跳过 0/)).toBeVisible();
     });
 
     test('loads and saves Legado global concurrency and network protection settings', async ({ page }) => {
@@ -95,6 +112,7 @@ test.describe('Legado Source Workbench', () => {
         const samplePicker = page.getByRole('combobox', { name: '选择示例书源' });
         await samplePicker.focus();
         await page.keyboard.press('Enter');
+        await expect(page.getByRole('option', { name: /喵公子 \/ 阅读书源/ })).toBeVisible();
         await expect(page.getByRole('option', { name: /tickmao \/ Novel 完整书源/ })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     });

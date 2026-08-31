@@ -90,12 +90,13 @@ describe('BookSourceImportDialog.vue', () => {
         wrapper.unmount();
     });
 
-    it('offers the built-in and two remote sample sources', () => {
+    it('offers the built-in and three remote sample sources', () => {
         const wrapper = mountDialog();
         const vm = wrapper.vm as unknown as DialogVm;
         expect(vm.sampleSource).toBe('builtin');
         expect(vm.sampleOptions.map(item => item.value)).toEqual([
             'builtin',
+            'https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json',
             'https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json',
             'https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json',
         ]);
@@ -119,7 +120,7 @@ describe('BookSourceImportDialog.vue', () => {
         const wrapper = mountDialog();
         backendMock.mockResolvedValue({ err: 'ok' });
         const vm = wrapper.vm as unknown as DialogVm;
-        const sampleUrl = 'https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json';
+        const sampleUrl = 'https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json';
         vm.tab = 'seed';
         vm.sampleSource = sampleUrl;
 

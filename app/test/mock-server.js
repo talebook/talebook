@@ -2276,6 +2276,19 @@ router.get('/api/admin/booksource/export', eventHandler(() => ({
   }],
 })));
 
+router.post('/api/admin/booksource/import', eventHandler(async (event) => {
+  const body = await readBody(event);
+  return {
+    err: 'ok',
+    added: body?.url ? 1 : 0,
+    updated: 0,
+    skipped: 0,
+    disabled: 0,
+    failed: [],
+    checking: body?.url ? 1 : 0,
+  };
+}));
+
 router.get('/api/admin/booksource/list', eventHandler(() => ({
   err: 'ok',
   count: 1,
