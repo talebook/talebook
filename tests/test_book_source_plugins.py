@@ -309,7 +309,7 @@ def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
         ).request("GET", "https://books.example/opds")
 
 
-def test_legado_provider_does_not_auto_allowlist_source_target():
+def test_legado_provider_does_not_allow_config_to_bypass_private_target_policy():
     raw = {
         "bookSourceName": "private target",
         "bookSourceUrl": "http://127.0.0.1",
@@ -318,18 +318,49 @@ def test_legado_provider_does_not_auto_allowlist_source_target():
     }
 
     with pytest.raises(SourceHttpError) as exc:
-        LEGADO_PROVIDER.search("probe", {}, context(config={"source_raw": raw, "engine_config": {}}))
+        LEGADO_PROVIDER.search(
+            "probe",
+            {},
+            context(
+                config={
+                    "source_raw": raw,
+                    "engine_config": {"BOOKSOURCE_ALLOWED_HOSTS": ["127.0.0.1"]},
+                }
+            ),
+        )
 
     assert "non-public" in str(exc.value)
 
 
-def test_private_self_hosted_endpoint_requires_exact_allowlist():
+def test_private_self_hosted_endpoint_requires_exact_platform_allowlist():
     def private(*args, **kwargs):
         return [(2, 1, 6, "", ("192.168.1.8", 443))]
 
     with pytest.raises(EndpointPolicyError):
         validate_remote_endpoint("https://kavita.lan/opds", resolver=private)
     assert validate_remote_endpoint("https://kavita.lan/opds", allowed_hosts=["kavita.lan"], resolver=private)
+
+
+def test_configurable_source_endpoints_ignore_connection_private_allowlists():
+    endpoint = "https://catalog.example/opds"
+    opds_http = FakeHttp({endpoint: response({"publications": []})})
+    opds = OPDSProvider(
+        "test.dynamic.opds",
+        "Dynamic OPDS",
+        "test provider",
+        "https://example.com",
+        http=opds_http,
+    )
+    opds.discover(context(config={"endpoint": endpoint, "allowed_hosts": ["catalog.example"]}))
+
+    webdav_http = FakeHttp({endpoint: response('<multistatus xmlns="DAV:"/>', "application/xml")})
+    webdav = WebDAVProvider(webdav_http)
+    webdav.discover(context(config={"endpoint": endpoint, "allowed_hosts": ["catalog.example"]}))
+
+    assert "allowed_hosts" not in opds.manifest["config_schema"]["properties"]
+    assert "allowed_hosts" not in webdav.manifest["config_schema"]["properties"]
+    assert "allowed_hosts" not in opds_http.calls[0][2]
+    assert "allowed_hosts" not in webdav_http.calls[0][2]
 
 
 def test_opds2_keeps_download_and_external_link_distinct():

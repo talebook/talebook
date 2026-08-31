@@ -165,7 +165,7 @@ class TestNetworkLibrary(TestWithUserLogin):
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_search_groups_multiple_bindings_into_one_runtime_run(self, m_session):
         """Legado 多个事实书源共用一条 connection，也只占用一个 lease/run。"""
-        m_session.return_value = self._fake()
+        m_session.side_effect = lambda *_args, **_kwargs: self._fake()
         session = get_db()
         second = models.BookSourceModel(CSS_SOURCE)
         second.name = "备用书源"
@@ -198,6 +198,16 @@ class TestNetworkLibrary(TestWithUserLogin):
     def test_search_audit_finalizes_without_status_polling(self, m_session):
         """客户端离开页面也不得把 durable PluginRun 永久留在 running。"""
         m_session.return_value = self._fake()
+        session = get_db()
+        previous_run = (
+            session.query(models.PluginRun)
+            .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .order_by(models.PluginRun.id.desc())
+            .first()
+        )
+        previous_run_id = previous_run.id if previous_run is not None else 0
         created = self.json("/api/network/search?key=%s" % Q("剑来"))
         self.assertTrue(created["task_id"])
 
@@ -209,7 +219,10 @@ class TestNetworkLibrary(TestWithUserLogin):
                 session.query(models.PluginRun)
                 .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
                 .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
-                .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+                .filter(
+                    models.PluginInstallation.plugin_key == "talebook.source.legado",
+                    models.PluginRun.id > previous_run_id,
+                )
                 .order_by(models.PluginRun.id.desc())
                 .first()
             )

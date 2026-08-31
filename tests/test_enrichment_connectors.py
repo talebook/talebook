@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from webserver.models import Annotation, Base, PluginConnection, PluginDefinition, PluginRunItem, PluginSourceRecord
+from webserver.plugins.annotation import brs
 from webserver.plugins.annotation.brs import BRSProvider
 from webserver.plugins.combo.open_library import OpenLibraryProvider
 from webserver.plugins.meta.base import build_field_decisions
@@ -21,7 +22,7 @@ from webserver.plugins.review.neodb import NeoDBReviewProvider
 from webserver.plugins.runtime.domains import Annotation as PluginAnnotation
 from webserver.plugins.runtime.domains import PushReceipt, SourceState
 from webserver.plugins.runtime.protocol import PluginManifest, UpstreamRateLimitError
-from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient
+from webserver.plugins.runtime.safe_http import EndpointPolicyError, EndpointResponseTooLarge, SafeHttpClient
 from webserver.services.epub_metadata import extract_epub_metadata
 from webserver.services.plugin_runtime import (
     PluginRegistry,
@@ -473,15 +474,39 @@ def _ok_session():
 
 
 def test_brs_endpoint_pointing_at_private_network_is_blocked():
-    """BRS endpoint 由管理员自由填写，必须挡住指向内网与云元数据服务的地址。"""
+    """BRS endpoint 由用户自由填写，不能由同一连接配置放行内网或云元数据地址。"""
     for address in ("127.0.0.1", "169.254.169.254", "192.168.1.10", "10.0.0.5"):
         client = SafeHttpClient(session=_ok_session(), resolver=_resolver(address))
         with pytest.raises(EndpointPolicyError):
             client.request("GET", "https://brs.internal/api/v1/comments")
 
-    # 管理员为自托管实例显式配置白名单后才放行
-    client = SafeHttpClient(session=_ok_session(), resolver=_resolver("192.168.1.10"))
-    client.request("GET", "https://brs.lan/api/v1/comments", allowed_hosts=["brs.lan"])
+
+def test_brs_connection_config_cannot_bypass_private_endpoint_policy(monkeypatch):
+    request = SimpleNamespace(request=lambda *args, **kwargs: pytest.fail("blocked endpoint was requested"))
+    monkeypatch.setattr(
+        brs,
+        "_CLIENT",
+        SafeHttpClient(session=request, resolver=_resolver("192.168.1.10")),
+    )
+
+    with pytest.raises(EndpointPolicyError):
+        BRSProvider().execute(
+            {
+                "action": "test",
+                "config": {"endpoint": "https://brs.lan", "allowed_hosts": ["brs.lan"]},
+                "secrets": {"email": "reader@example.com", "password": "unit-test-password"},
+                "cursor": {},
+            }
+        )
+
+
+def test_connector_http_layer_limits_response_size():
+    oversized = SimpleNamespace(status_code=200, headers={}, content=b"0123456789")
+    session = SimpleNamespace(request=lambda *args, **kwargs: oversized)
+    client = SafeHttpClient(session=session, resolver=_resolver("93.184.216.34"), max_bytes=4)
+
+    with pytest.raises(EndpointResponseTooLarge):
+        client.request("GET", "https://brs.example/api/v1/comments")
 
 
 def test_connector_http_layer_rejects_embedded_credentials():
@@ -490,7 +515,7 @@ def test_connector_http_layer_rejects_embedded_credentials():
         client.request("GET", "https://user:pass@brs.example/api/v1/comments")
 
 
-def test_brs_provider_forwards_configured_allowlist_to_http_layer():
+def test_brs_provider_does_not_forward_configured_allowlist_to_http_layer():
     captured = {}
 
     def transport(method, url, **kwargs):
@@ -507,6 +532,7 @@ def test_brs_provider_forwards_configured_allowlist_to_http_layer():
         }
     )
     assert captured["url"] == "https://brs.lan/api/v1/comments"
-    assert captured["allowed_hosts"] == ["brs.lan"]
+    assert "allowed_hosts" not in captured
+    assert "allowed_hosts" not in BRSProvider.manifest["config_schema"]["properties"]
     assert captured["headers"]["Authorization"].startswith("Basic ")
     assert "unit-test-password" not in captured["headers"]["Authorization"]

@@ -351,6 +351,36 @@ def materialize_annotation(session, run, connection, record, data, payload_hash,
     return annotation
 
 
+def materialized_annotation_is_locally_modified(session, record):
+    """Detect local edits, source unlinking, or deletion of a materialized annotation."""
+    if record.local_modified:
+        return True
+    try:
+        annotation_id = int(record.entity_id)
+    except (TypeError, ValueError):
+        return False
+    annotation = session.get(Annotation, annotation_id)
+    if annotation is None:
+        return True
+    connection = session.get(PluginConnection, record.connection_id)
+    if connection is None:
+        return True
+    source_name = source_name_for(session, connection)
+    source_id = _source_identity(record.external_id)
+    sources = [
+        source
+        for source in annotation.sources
+        if source.source_name == source_name
+        and source.source_connection_id == str(record.connection_id)
+        and source.source_annotation_id == source_id
+    ]
+    if not sources:
+        return True
+    if annotation.user_modified_at is None:
+        return False
+    return all(source.source_updated_at != annotation.user_modified_at for source in sources)
+
+
 def rollback_materialized_annotation(session, record):
     try:
         annotation_id = int(record.entity_id)

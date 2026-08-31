@@ -75,7 +75,6 @@ class LegadoSourcePlugin:
         source = self._source(context)
         transport = SafeHttpClient(
             session=booksource_engine.build_session(source),
-            allowed_hosts=engine_config.get("BOOKSOURCE_ALLOWED_HOSTS") or (),
             max_bytes=int(engine_config.get("BOOKSOURCE_MAX_RESPONSE_BYTES") or 8 * 1024 * 1024),
         )
         return BookSourceEngine(source, session=transport, config=engine_config)

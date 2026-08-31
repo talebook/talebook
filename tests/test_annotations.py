@@ -105,6 +105,10 @@ class TestAnnotations(TestWithUserLogin):
             for (annotation_id,) in session.query(models.Annotation.id).filter(models.Annotation.book_id == BID_EPUB).all()
         ]
         if annotation_ids:
+            session.query(models.PluginSourceRecord).filter(
+                models.PluginSourceRecord.entity_type == "annotation",
+                models.PluginSourceRecord.entity_id.in_([str(value) for value in annotation_ids]),
+            ).delete(synchronize_session=False)
             session.query(models.AnnotationSource).filter(models.AnnotationSource.annotation_id.in_(annotation_ids)).delete(
                 synchronize_session=False
             )
@@ -364,6 +368,72 @@ class TestAnnotations(TestWithUserLogin):
         self.assertTrue(imported["conflict_protected"])
         self.assertEqual(imported["annotation"]["content"], "我的手工修订")
         self.assertEqual(imported["annotation"]["sources"][0]["source_run_id"], "run-new")
+
+    def test_manual_update_and_delete_mark_materialized_plugin_records_as_local(self):
+        updated = self._post_source(source_annotation_id="plugin-update")
+        deleted = self._post_source(source_annotation_id="plugin-delete")
+        self.json("/api/admin/plugins")
+        session = get_db()
+        installation = session.query(models.PluginInstallation).filter_by(plugin_key="talebook.combo.weread").one()
+        connection = models.PluginConnection(
+            installation_id=installation.id,
+            owner_type="user",
+            owner_id=1,
+            role="annotation-local-protection",
+            name="annotation local protection",
+            config={},
+            scopes=[],
+        )
+        session.add(connection)
+        session.flush()
+        run = models.PluginRun(connection_id=connection.id, action="run", status="succeeded", requested_by=1)
+        session.add(run)
+        session.flush()
+        records = []
+        for value, external_id in ((updated, "weread:update"), (deleted, "weread:delete")):
+            record = models.PluginSourceRecord(
+                connection_id=connection.id,
+                source="talebook.combo.weread",
+                external_id=external_id,
+                entity_type="annotation",
+                entity_id=str(value["annotation"]["id"]),
+                run_id=run.id,
+                raw_hash="remote-hash",
+                local_modified=False,
+                status="active",
+                data={},
+            )
+            session.add(record)
+            records.append(record)
+        session.commit()
+        connection_id, run_id = connection.id, run.id
+        record_ids = [record.id for record in records]
+
+        def cleanup():
+            cleanup_session = get_db()
+            cleanup_session.query(models.PluginSourceRecord).filter(
+                models.PluginSourceRecord.id.in_(record_ids)
+            ).delete(synchronize_session=False)
+            cleanup_session.query(models.PluginRun).filter(models.PluginRun.id == run_id).delete()
+            cleanup_session.query(models.PluginConnection).filter(models.PluginConnection.id == connection_id).delete()
+            cleanup_session.commit()
+
+        self.addCleanup(cleanup)
+        changed = self.json(
+            "/api/book/%d/annotations/%d" % (BID_EPUB, updated["annotation"]["id"]),
+            method="PUT",
+            body=json.dumps({"content": "manual edit"}),
+        )
+        removed = self.json(
+            "/api/book/%d/annotations/%d" % (BID_EPUB, deleted["annotation"]["id"]),
+            method="DELETE",
+        )
+        session.expire_all()
+
+        self.assertEqual(changed["annotation"]["content"], "manual edit")
+        self.assertEqual(removed["err"], "ok")
+        self.assertTrue(session.get(models.PluginSourceRecord, record_ids[0]).local_modified)
+        self.assertTrue(session.get(models.PluginSourceRecord, record_ids[1]).local_modified)
 
     def test_older_source_event_is_ignored(self):
         self._post_source(content="new content")
