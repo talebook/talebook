@@ -493,6 +493,22 @@ def import_sources(session, data, overwrite=False):
     }
 
 
+def _export_source_raw(source):
+    """返回可再次导入 Legado 的原始对象，并同步管理端当前状态。"""
+    raw = dict(source.raw or {})
+    raw.update(
+        {
+            "bookSourceName": source.name,
+            "bookSourceUrl": source.url,
+            "bookSourceGroup": source.group or "",
+            "bookSourceType": int(source.source_type or 0),
+            "enabled": bool(source.enabled),
+            "weight": int(source.weight or 0),
+        }
+    )
+    return raw
+
+
 def _engine_config():
     return {
         "BOOKSOURCE_HTTP_TIMEOUT": CONF.get("BOOKSOURCE_HTTP_TIMEOUT", 20),
@@ -540,6 +556,16 @@ class BookSourceList(BaseHandler):
             "groups": groups,
             "check_task": BookSourceCheckService().status(),
         }
+
+
+class BookSourceExport(BaseHandler):
+    """导出全部书源为可供 Legado 导入的 JSON 数组。"""
+
+    @js
+    @is_admin
+    def get(self):
+        sources = self.session.query(BookSourceModel).order_by(BookSourceModel.weight.desc(), BookSourceModel.id.asc()).all()
+        return {"err": "ok", "sources": [_export_source_raw(source) for source in sources]}
 
 
 class BookSourceCRUD(BaseHandler):
@@ -772,6 +798,7 @@ class BookSourceTest(BaseHandler):
 def routes():
     return [
         (r"/api/admin/booksource/list", BookSourceList),
+        (r"/api/admin/booksource/export", BookSourceExport),
         (r"/api/admin/booksource/import", BookSourceImport),
         (r"/api/admin/booksource/seed", BookSourceSeed),
         (r"/api/admin/booksource/toggle", BookSourceToggle),

@@ -80,6 +80,26 @@
             </v-btn>
             <v-btn
                 variant="outlined"
+                color="primary"
+                :disabled="exporting"
+                @click="exportSources"
+            >
+                <v-progress-circular
+                    v-if="exporting"
+                    indeterminate
+                    size="16"
+                    width="2"
+                    class="me-2"
+                />
+                <v-icon
+                    v-else
+                    start
+                >
+                    mdi-download
+                </v-icon>{{ $t('booksource.export') }}
+            </v-btn>
+            <v-btn
+                variant="outlined"
                 color="warning"
                 :disabled="checkingSources"
                 @click="checkSourceValidity"
@@ -371,6 +391,7 @@ const page = ref(1);
 const pageSize = 50;
 const total = ref(0);
 const loading = ref(false);
+const exporting = ref(false);
 const checkingSources = ref(false);
 const checkPollTimer = ref(null);
 const allSelected = computed(() => items.value.length > 0 && selected.value.length === items.value.length);
@@ -441,6 +462,28 @@ const doSearch = () => {
     page.value = 1;
     selected.value = [];
     load();
+};
+
+const exportSources = async () => {
+    exporting.value = true;
+    try {
+        const rsp = await $backend('/admin/booksource/export');
+        if (rsp.err !== 'ok') {
+            if ($alert) $alert('error', rsp.msg || rsp.err);
+            return;
+        }
+        const blob = new Blob([JSON.stringify(rsp.sources || [], null, 2)], { type: 'application/json;charset=utf-8' });
+        const href = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = `talebook-legado-sources-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(href);
+    } finally {
+        exporting.value = false;
+    }
 };
 
 const changePage = (n) => {

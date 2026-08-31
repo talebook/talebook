@@ -39,6 +39,7 @@ test.describe('Route-backed navigation sections', () => {
         await expect(page).toHaveURL('/library/network');
         await expect(page.getByRole('tab', { name: '网络书库' })).toHaveAttribute('aria-selected', 'true');
         await expect(page.getByText('搜索和浏览已启用书源插件提供的在线书籍。')).toBeVisible();
+        await expect(page.getByRole('link', { name: '管理书源' })).toHaveAttribute('href', '/plugins/legado');
 
         await page.goto('/network');
         await expect(page).toHaveURL('/library/network');

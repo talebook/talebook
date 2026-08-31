@@ -9,6 +9,60 @@ test.describe('Legado Source Workbench', () => {
         });
     });
 
+    test('exports Legado JSON and lists all sample sources', async ({ page }) => {
+        const listPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/booksource/list'));
+        await page.goto('/plugins/legado');
+        await listPromise;
+        await expect(page.locator('.loading-page')).toBeHidden();
+
+        await page.route('**/api/admin/booksource/export', async (route) => {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            await route.continue();
+        });
+        const exportButton = page.getByRole('button', { name: '导出' });
+        const downloadPromise = page.waitForEvent('download');
+        await exportButton.click();
+        await expect(exportButton).toBeDisabled();
+        await expect(exportButton.locator('.v-progress-circular')).toBeVisible();
+        await expect(exportButton).toContainText('导出');
+        const download = await downloadPromise;
+        expect(download.suggestedFilename()).toMatch(/^talebook-legado-sources-\d{4}-\d{2}-\d{2}\.json$/);
+        const stream = await download.createReadStream();
+        const chunks: Buffer[] = [];
+        for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+        const exported = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        expect(exported).toEqual(expect.arrayContaining([
+            expect.objectContaining({ bookSourceName: '测试书源', bookSourceUrl: 'http://x.com' }),
+        ]));
+
+        await page.getByRole('button', { name: '导入书源' }).click();
+        await page.getByRole('tab', { name: '导入示例书源' }).click();
+        await page.locator('.v-dialog .v-select').click();
+        await expect(page.getByRole('option', { name: '内置示例书源' })).toBeVisible();
+        await expect(page.getByRole('option', { name: /tickmao \/ Novel 完整书源/ })).toBeVisible();
+        await expect(page.getByRole('option', { name: /shidahuilang \/ shuyuan-bak 优选书源/ })).toBeVisible();
+        await expect(page.getByText('https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json')).toBeVisible();
+        await expect(page.getByText('https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json')).toBeVisible();
+    });
+
+    test('admin entry and sample picker remain reachable at 320px', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 640 });
+        await page.goto('/library/network');
+        const manageSources = page.getByRole('link', { name: '管理书源' });
+        await expect(manageSources).toBeVisible();
+        await manageSources.click();
+        await expect(page).toHaveURL('/plugins/legado');
+        await expect(page.getByRole('button', { name: '导出' })).toBeVisible();
+
+        await page.getByRole('button', { name: '导入书源' }).click();
+        await page.getByRole('tab', { name: '导入示例书源' }).click();
+        const samplePicker = page.getByRole('combobox', { name: '选择示例书源' });
+        await samplePicker.focus();
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('option', { name: /tickmao \/ Novel 完整书源/ })).toBeVisible();
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+
     test('check validity button keeps text visible while checking', async ({ page }) => {
         const listPromise = page.waitForResponse(resp => resp.url().includes('/api/admin/booksource/list'));
         await page.goto('/plugins/legado');
