@@ -51,3 +51,17 @@ class TestAIBookApi(TestCase):
 
         self.assertIsNone(result)
         post.assert_not_called()
+
+    @mock.patch("webserver.plugins.meta.ai.api.requests.get")
+    def test_ai_metadata_never_downloads_model_supplied_cover_urls(self, get):
+        """AI 结果只补全文本字段，不能让模型控制服务端网络请求。"""
+        api = AIBookApi(
+            api_url="https://api.deepseek.com/chat/completions",
+            api_key="test-key",
+            model="deepseek-chat",
+            use_thinking=False,
+            copy_image=True,
+        )
+
+        self.assertIsNone(api.get_cover("https://example.com/model-cover.jpg"))
+        get.assert_not_called()

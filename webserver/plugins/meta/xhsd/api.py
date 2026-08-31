@@ -10,6 +10,7 @@ from urllib.parse import urljoin
 
 
 from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+from webserver.plugins.runtime.safe_http import SafeHttpClient
 
 KEY = "xinhua"
 XHSD_ISBN = "0000000000002"
@@ -214,7 +215,7 @@ class XhsdBookApi:
         if not self.copy_image or not cover_url:
             return None
         try:
-            img = self.session.get(cover_url, timeout=10).content
+            img = SafeHttpClient(session=self.session).get(cover_url, timeout=10).content
             img_fmt = "jpg" if cover_url.lower().endswith(".jpeg") else "png"
             if img_fmt == "png" or cover_url.lower().endswith(".png"):
                 # Simple check, real implementation might need PIL to convert if strictly needed

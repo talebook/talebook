@@ -2,13 +2,15 @@
 # -*- coding: UTF-8 -*-
 import logging
 import re
-from html import unescape
+import urllib.parse
+from html.parser import HTMLParser
 
 import requests
 
 from webserver.constants import CHROME_MOBILE_HEADERS
 from webserver.i18n import _
 from webserver.plugins.meta.common import str2date
+from webserver.plugins.runtime.safe_http import SafeHttpClient
 
 BAIKE_ISBN = "0000000000001"
 from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
@@ -29,6 +31,24 @@ _BOOK_CARD_FIELDS = {
     "首版时间",
     "文学体裁",
 }
+
+
+class _CardTextParser(HTMLParser):
+    """线性提取百科卡片中的文本，避免在远端 HTML 上运行回溯正则。"""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def _strip_card_markup(value):
+    parser = _CardTextParser()
+    parser.feed(str(value))
+    parser.close()
+    return "".join(parser.parts)
 
 
 class BaiduBaikeApi:
@@ -89,7 +109,7 @@ class BaiduBaikeApi:
                 values = value if isinstance(value, list) else [value]
                 clean_values = []
                 for raw_value in values:
-                    text = unescape(re.sub(r"<[^>]+>", "", str(raw_value))).strip()
+                    text = _strip_card_markup(raw_value).strip()
                     if text:
                         clean_values.append(text)
                 if clean_values:
@@ -162,11 +182,14 @@ class BaiduBaikeApi:
     def get_cover(cover_url, normal_cover=True):
         if not cover_url:
             return None
-        # 检测 cover_url 的有效性，只支持 https 协议
-        if not cover_url.lower().startswith("https://"):
+        if urllib.parse.urlsplit(cover_url).scheme.lower() != "https":
             logging.error("Invalid cover url: %s", cover_url)
             return None
-        img = requests.get(cover_url, timeout=10, headers=CHROME_MOBILE_HEADERS).content
+        try:
+            img = SafeHttpClient().get(cover_url, timeout=10, headers=CHROME_MOBILE_HEADERS).content
+        except Exception as err:
+            logging.error("Failed to download Baidu Baike cover: %s", err)
+            return None
         img_fmt = "jpg" if cover_url.lower().endswith(".jpeg") else "png"
         # Convert PNG to JPEG if necessary
         if img_fmt == "png":

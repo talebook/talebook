@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 
 from webserver.plugins.meta.ai.api import PROVIDER as AI_PROVIDER
+from webserver.plugins.meta.xhsd.api import XhsdBookApi
 from webserver.plugins.meta.base import to_book_metadata, to_calibre_metadata
 from webserver.plugins.register import PROVIDER_GROUPS
 from webserver.plugins.runtime import PluginManifest, contract_violations
@@ -194,6 +195,14 @@ def test_xhsd_only_queries_upstream_for_real_isbn():
         m.return_value = _FakeMetadata(title="百年孤独")
         assert len(provider._search(MetadataQuery(isbn="9787544253994"), {})) == 1
         m.assert_called_once_with("9787544253994")
+
+
+def test_xhsd_cover_download_rejects_loopback_url_before_request():
+    """新华书店返回的封面 URL 必须经过统一出站策略，不能访问本机。"""
+    api = XhsdBookApi(copy_image=True)
+    with mock.patch.object(api.session, "get") as get:
+        assert api.get_cover("https://127.0.0.1/private-cover.jpg") is None
+    get.assert_not_called()
 
 
 def test_failure_summary_uses_display_names_not_plugin_ids():

@@ -199,17 +199,8 @@ Evidence JSON: {evidence}
         return mi
 
     def get_cover(self, cover_url):
-        if not cover_url:
-            return None
-        try:
-            img = requests.get(cover_url, timeout=10).content
-            img_fmt = cover_url.split(".")[-1].lower()
-            if img_fmt not in ["jpg", "jpeg", "png"]:
-                img_fmt = "jpg"
-            return (img_fmt, img)
-        except Exception as e:
-            logging.error(f"Failed to get cover: {e}")
-            return None
+        # AI 元数据只补全文本字段；模型输出不能成为服务端出站请求目标。
+        return None
 
 
 if __name__ == "__main__":
