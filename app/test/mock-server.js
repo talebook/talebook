@@ -33,6 +33,8 @@ let wereadConfigured = false;
 let wereadRuns = new Map();
 let brsConfigured = false;
 let brsConfig = {};
+let comicProgressByBookId = new Map();
+let mediaTypeOverrides = new Map();
 let activeThemeName = '';
 let audiobookPublishedEdition = null;
 let audiobookJobs = [];
@@ -42,6 +44,7 @@ let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
 let audiobookWorkspace = null;
 let podcastTokenHint = '';
+let trashBooks = [];
 let importSettings = {
   scan_upload_path: '/mock/scan/dir',
   import_mode: 'copy',
@@ -191,6 +194,10 @@ router.post('/_test/reset', eventHandler(async (event) => {
   wereadRuns = new Map();
   brsConfigured = false;
   brsConfig = {};
+  comicProgressByBookId = new Map([
+    [14, { kind: 'comic', version: 1, pageId: 'mock-revision:1', pageIndex: 1, percent: 66.67, completed: false }]
+  ]);
+  mediaTypeOverrides = new Map();
   activeThemeName = builtinThemes.some(theme => theme.name === body?.activeTheme)
     ? body.activeTheme
     : '';
@@ -237,6 +244,24 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookWorkspace = workspacePayload();
   audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
+  trashBooks = [
+    {
+      id: 91,
+      title: '被删除的普通书',
+      author: '测试作者',
+      deleted_at: '2026-08-29T10:00:00Z',
+      size: 1572864,
+      formats: ['EPUB'],
+    },
+    {
+      id: 92,
+      title: '待永久删除的书',
+      author: '另一位作者',
+      deleted_at: '2026-08-28T09:30:00Z',
+      size: 524288,
+      formats: ['PDF', 'MOBI'],
+    },
+  ];
   return { status: 'ok' };
 }));
 
@@ -506,6 +531,9 @@ router.get('/api/audios/home', eventHandler(() => {
 router.get('/api/book/:bookId/audios', eventHandler((event) => {
   const bookId = Number(getRouterParam(event, 'bookId'));
   const book = audiobookBook(bookId);
+  if (book.media_type === 'comic') {
+    return { err: 'media_type.not_supported', msg: '漫画不支持生成有声书' };
+  }
   const compatible = ['EPUB', 'TXT'].some(format => audiobookBookFormats(book).has(format));
   const publishedEdition = audiobookPublishedEdition && Number(audiobookPublishedEdition.book_id) === bookId
     ? audiobookPublishedEdition
@@ -562,6 +590,9 @@ router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
   const body = await readBody(event);
   const bookId = Number(getRouterParam(event, 'bookId'));
   const book = audiobookBook(bookId);
+  if (book.media_type === 'comic') {
+    return { err: 'media_type.not_supported', msg: '漫画不支持生成有声书' };
+  }
   if (!['EPUB', 'TXT'].some(format => audiobookBookFormats(book).has(format))) {
     return { err: 'format.not_supported', msg: '生成有声书需要 EPUB 或 TXT 格式' };
   }
@@ -954,11 +985,33 @@ router.get('/api/admin/log', eventHandler((event) => {
   };
 }));
 
+router.get('/api/admin/trash', eventHandler(() => ({
+  err: 'ok',
+  items: trashBooks,
+  total: trashBooks.length,
+  total_size: trashBooks.reduce((total, item) => total + item.size, 0),
+})));
+
+router.patch('/api/admin/trash', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const ids = new Set(body?.idlist || []);
+  const restored = trashBooks.filter(item => ids.has(item.id)).map(item => item.id);
+  trashBooks = trashBooks.filter(item => !ids.has(item.id));
+  return { err: 'ok', restored, failures: [], msg: `${restored.length} restored` };
+}));
+
+router.delete('/api/admin/trash', eventHandler(async (event) => {
+  const body = await readBody(event);
+  if (body?.confirm !== true) return { err: 'params.confirm', msg: 'Confirmation required' };
+  const ids = new Set(body?.idlist || []);
+  const deleted = trashBooks.filter(item => ids.has(item.id)).map(item => item.id);
+  trashBooks = trashBooks.filter(item => !ids.has(item.id));
+  return { err: 'ok', deleted, failures: [], msg: `${deleted.length} deleted` };
+}));
+
 router.get('/api/admin/trash/size', eventHandler(() => ({
   err: 'ok',
   sizes: { trash: 0, upload: 0 },
-  trash_path: '/tmp/trash',
-  upload_path: '/tmp/upload'
 })));
 
 router.get('/api/admin/update', eventHandler(() => ({
@@ -1406,6 +1459,81 @@ router.get('/api/user/devices', eventHandler(() => {
   return { err: 'ok', devices: [], device_types: deviceTypes };
 }));
 
+router.get('/read-comic/:id', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  if (!isLoggedIn) {
+    return new Response('', { status: 302, headers: { Location: '/login' } });
+  }
+  if (id !== 14) return new Response('书籍不存在', { status: 404 });
+  return new Response(`<!doctype html><html><body><main id="comic-reader-host" data-book-id="${id}">Mock comic reader</main></body></html>`, {
+    headers: { 'Content-Type': 'text/html; charset=UTF-8' },
+  });
+}));
+
+router.get('/api/book/:id/comic/pages', eventHandler((event) => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
+  const id = Number(getRouterParam(event, 'id'));
+  if (id !== 14) return { err: 'comic.book_not_found', msg: '书籍不存在' };
+  return {
+    err: 'ok',
+    contract_version: 1,
+    book_id: id,
+    title: '图片漫画样例',
+    format: 'CBZ',
+    revision: 'mock-revision',
+    pages_count: 3,
+    pages: [0, 1, 2].map(index => ({
+      id: `mock-revision:${index}`,
+      index,
+      url: `/api/book/${id}/comic/pages/${index}?revision=mock-revision`,
+      width: index === 2 ? 1400 : 900,
+      height: index === 2 ? 900 : 1300,
+      mime_type: 'image/svg+xml'
+    }))
+  };
+}));
+
+router.get('/api/book/:id/comic/pages/:index', eventHandler((event) => {
+  if (!isLoggedIn) return new Response('请先登录', { status: 401 });
+  const id = Number(getRouterParam(event, 'id'));
+  const index = Number(getRouterParam(event, 'index'));
+  const revision = getQuery(event).revision;
+  if (id !== 14 || ![0, 1, 2].includes(index)) return new Response('漫画页码超出范围', { status: 404 });
+  if (revision !== 'mock-revision') return new Response('漫画页面列表已更新', { status: 409 });
+  const palettes = [
+    ['#1f2937', '#d97706'],
+    ['#172554', '#0ea5e9'],
+    ['#3f0d2c', '#ec4899']
+  ];
+  const [start, end] = palettes[index];
+  const width = index === 2 ? 1400 : 900;
+  const height = index === 2 ? 900 : 1300;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="${width * .72}" cy="${height * .3}" r="${Math.min(width, height) * .18}" fill="#fff" opacity=".12"/><text x="50%" y="47%" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="96" font-weight="700">TALEBOOK</text><text x="50%" y="57%" text-anchor="middle" fill="#fff" font-family="sans-serif" font-size="48">漫画页 ${index + 1}</text></svg>`;
+  return new Response(svg, {
+    headers: {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'private, max-age=3600, immutable',
+      'X-Content-Type-Options': 'nosniff'
+    }
+  });
+}));
+
+router.get('/api/book/:id/comic/progress', eventHandler((event) => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
+  const id = Number(getRouterParam(event, 'id'));
+  return { err: 'ok', progress: comicProgressByBookId.get(id) || {}, update_time: null };
+}));
+
+router.post('/api/book/:id/comic/progress', eventHandler(async (event) => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  if (!body?.progress || body.progress.kind !== 'comic') return { err: 'comic.progress_invalid', msg: '漫画阅读进度参数错误' };
+  comicProgressByBookId.set(id, body.progress);
+  return { err: 'ok', progress: body.progress };
+}));
+
+
 // The book detail page probes TXT parsing state for every format. Keep the
 // mock response successful so that this background probe does not open the
 // application's global error dialog during unrelated browser flows.
@@ -1551,6 +1679,13 @@ router.get('/api/plugins/tools/books', eventHandler(() => ({
   books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
 })));
 
+router.post('/api/plugins/tools/text-replace/preview', eventHandler(() => ({
+  err: 'ok',
+  matches: 1,
+  truncated: false,
+  samples: [{ pre: '开始', match: '测试', post: '结束' }],
+})));
+
 router.get('/api/plugins/tools/book-actions', eventHandler((event) => {
   const bookId = Number(getQuery(event).book_id || 0);
   const installation = pluginInstallations.find(item => item.plugin_key === 'talebook.tool.txt-fixer');
@@ -1652,6 +1787,21 @@ router.get('/api/plugins/runs/:id', eventHandler((event) => {
 }));
 
 // Book Detail
+router.post('/api/book/:id/media_type', eventHandler(async (event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  const body = await readBody(event);
+  if (id !== 14 || !['comic', 'ebook'].includes(body?.media_type)) {
+    return { err: 'media_type.not_mixed', msg: '只有混合格式书籍可以手动设置类型' };
+  }
+  mediaTypeOverrides.set(id, body.media_type);
+  return {
+    err: 'ok',
+    msg: body.media_type === 'comic' ? '已将书籍设置为漫画' : '已将书籍设置为电子书',
+    media_type: body.media_type,
+    media_type_locked: true,
+  };
+}));
+
 router.get('/api/book/:id', eventHandler((event) => {
   const id = getRouterParam(event, 'id');
   console.log(`[Mock] Book request id: ${id}`);
@@ -1659,7 +1809,14 @@ router.get('/api/book/:id', eventHandler((event) => {
   // Check if it is a detail request (number)
   if (/^\d+$/.test(id)) {
     const data = readJson(`api_book_${id}.json`);
-    if (data) return data;
+    if (data) {
+      const override = mediaTypeOverrides.get(Number(id));
+      if (override) {
+        data.book.media_type = override;
+        data.book.media_type_locked = true;
+      }
+      return data;
+    }
     return { err: 'not_found', msg: 'Book not found' };
   }
     
@@ -2037,7 +2194,16 @@ router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: plu
 
 router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
   const id = Number(getRouterParam(event, 'id'));
-  const run = pluginRuns.find(item => item.id === id);
+  const previewFixture = id === 99 ? {
+    id,
+    connection_id: 1,
+    action: 'preview',
+    status: 'succeeded',
+    counts: { written: 0, updated: 0, skipped: 0, failed: 0, conflicts: 0 },
+    duration_ms: 12,
+    created_at: '2026-08-30T12:00:00Z',
+  } : null;
+  const run = pluginRuns.find(item => item.id === id) || previewFixture;
   const items = run?.action === 'preview'
     ? [{
         id: 1,
@@ -2053,6 +2219,11 @@ router.get('/api/admin/plugins/runs/:id', eventHandler((event) => {
           access: 'download',
           license: '本地文件；许可由管理员确认',
           target_library: 'main',
+          fields: id === 99 ? [
+            { field: 'title', current: '现有标题', candidate: '候选标题', decision: 'locked' },
+            { field: 'publisher', current: '', candidate: '候选出版社', decision: 'fill_empty' },
+            { field: 'authors', current: '旧作者', candidate: '新作者', decision: 'replace' },
+          ] : undefined,
         },
       }]
     : [];
@@ -2092,8 +2263,8 @@ router.get('/api/admin/booksource/list', eventHandler(() => ({
       url: 'http://x.com',
       group: '测试',
       enabled: true,
-      check_status: 'ok',
-      check_message: '',
+      check_status: 'error',
+      check_message: '连接失败：远端书源返回了无法识别的响应，请检查地址和访问权限后重试。',
       check_tags: [],
     },
   ],

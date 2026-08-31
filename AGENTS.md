@@ -75,8 +75,21 @@ cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
 
 自然语言中输出文件路径、目录路径或 URL 时，路径与后续中英文标点之间必须留一个空格。例如“请查看 `design/project/example.active.html` 。”代码块、命令、HTML 属性和 Markdown 链接语法内部不插入额外空格。
 
+### API 设计规范
+
+- HTTP 接口应当遵守 RESTFUL 的 API 设计原则:
+  - 例如，设计 作者 的 别名 功能是，应当设计为：
+    - 已有接口：
+      - (r"/api/author/(.*)/update", AuthorBooksUpdate),
+      - (r"/api/(author|publisher|tag|rating|series|format)", MetaList),
+      - (r"/api/(author|publisher|tag|rating|series|format)/(.*)", MetaBooks),
+    - 正确设计：(r"/api/author/(.*)/alias", AuthorAliases),
+    - 错误设计：(r"/api/author-aliases/(.*)", AuthorAliases) —— 没有遵守restful设计原则
+    - 错误设计：(r"/api/authors/{id}/aliases", AuthorAliases) —— 不应该使用复数单词 authors
+
 ### Pull Request 提交规范
 
+- PR 时使用中文描述。
 - PR 标题应准确概括改动，正文不得为空或只重复提交消息。正文至少包含：背景或目标、关键改动、实际验证结果、风险或兼容性，以及方案路径或豁免原因。
 - 测试结果必须列出实际执行的命令与结果；未执行的项目应说明原因和风险，不得写成已通过。
 - 涉及界面、布局、交互或其他可视结果时必须附带截图；其他改动在截图有助于评审理解时也应优先附带。无法截图时在正文说明原因。

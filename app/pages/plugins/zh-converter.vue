@@ -80,16 +80,11 @@ const success = ref('');
 const isA5Direction = computed(() => ['t2s', 'tw2s'].includes(direction.value));
 watch(direction, (v) => { if (!['t2s', 'tw2s'].includes(v)) useA5.value = false; });
 
-const directions = computed(() => [
-    { title: '繁体 -> 简体 (t2s)', value: 't2s' },
-    { title: '台湾繁体 -> 简体 (tw2s)', value: 'tw2s' },
-    { title: '台湾繁体含台湾用词 -> 简体 (tw2sp)', value: 'tw2sp' },
-    { title: '简体 -> 繁体 (s2t)', value: 's2t' },
-    { title: '简体 -> 台湾繁体 (s2tw)', value: 's2tw' },
-    { title: '简体 -> 台湾繁体含台湾用词 (s2twp)', value: 's2twp' },
-    { title: '繁体 -> 台湾繁体 (t2tw)', value: 't2tw' },
-    { title: '台湾繁体 -> 繁体 (tw2t)', value: 'tw2t' },
-]);
+const directionCodes = ['t2s', 'tw2s', 'tw2sp', 's2t', 's2tw', 's2twp', 't2tw', 'tw2t'];
+const directions = computed(() => directionCodes.map(value => ({
+    title: t(`bookTools.zhConverter.directions.${value}`),
+    value,
+})));
 
 watch(bookId, () => { error.value = ''; success.value = ''; });
 

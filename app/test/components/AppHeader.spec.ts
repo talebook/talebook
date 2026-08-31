@@ -147,4 +147,19 @@ describe('AppHeader.vue', () => {
         expect(item?.props('active')).toBe(true);
         wrapper.unmount();
     });
+
+    it('shows the trash management link only to administrators', () => {
+        let wrapper = mountHeader();
+        expect(wrapper.text()).not.toContain('navigation.trash');
+        wrapper.unmount();
+
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        wrapper = mountHeader();
+        const link = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(item => item.text().includes('navigation.trash'));
+
+        expect(link?.props('to')).toBe('/admin/trash');
+        wrapper.unmount();
+    });
 });

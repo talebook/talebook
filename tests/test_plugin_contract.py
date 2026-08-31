@@ -207,8 +207,9 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "safe_http.py",
         "triggers.py",
     }
-    assert not (plugins_dir / "texttools").exists()
-    assert not (plugins_dir / "meta" / "weread").exists()
+    # 旧源码不得回流；本地切换分支后残留的忽略项 __pycache__ 不属于平台实现。
+    assert not list((plugins_dir / "texttools").glob("*.py"))
+    assert not list((plugins_dir / "meta" / "weread").glob("*.py"))
     assert not (plugins_dir / "meta" / "open_library.py").exists()
     for legacy_module in (
         "builtin_capabilities.py",

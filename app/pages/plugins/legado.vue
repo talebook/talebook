@@ -42,7 +42,7 @@
                     <v-icon
                         size="small"
                         icon="mdi-github"
-                        class="mr-1"
+                        class="me-1"
                     />{{ $t('booksource.refLegado') }}
                 </a>
                 <a
@@ -54,7 +54,7 @@
                     <v-icon
                         size="small"
                         icon="mdi-book-open-variant"
-                        class="mr-1"
+                        class="me-1"
                     />{{ $t('booksource.refRules') }}
                 </a>
             </div>
@@ -89,7 +89,7 @@
                     indeterminate
                     size="16"
                     width="2"
-                    class="mr-2"
+                    class="me-2"
                 />
                 <v-icon
                     v-else
@@ -100,7 +100,7 @@
             </v-btn>
             <v-spacer />
             <template v-if="items.length > 0">
-                <span class="text-caption text-medium-emphasis mr-2">
+                <span class="text-caption text-medium-emphasis me-2">
                     {{ $t('booksource.selectedCount', { n: selected.length }) }}
                 </span>
                 <v-btn
@@ -210,7 +210,7 @@
                                 :key="tag"
                                 size="x-small"
                                 variant="outlined"
-                                class="mr-1 mb-1"
+                                class="me-1 mb-1"
                             >
                                 {{ tag }}
                             </v-chip>
@@ -302,7 +302,7 @@
                         <v-progress-circular
                             indeterminate
                             size="22"
-                            class="mr-2"
+                            class="me-2"
                         />
                         {{ $t('network.searching') }}
                     </div>
@@ -579,10 +579,9 @@ useHead(() => ({ title: t('booksource.workbenchTitle') }));
     min-width: 180px;
 }
 .check-message {
-    max-width: 200px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    max-width: 220px;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 .check-tags {
     line-height: 1.5;

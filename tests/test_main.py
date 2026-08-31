@@ -979,6 +979,48 @@ class TestRefer(TestWithUserLogin):
                 self.assertEqual(r["err"], "ok")
 
 
+class TestReferCoverUpdate(TestWithUserLogin):
+    def test_only_cover_refreshes_timestamp_without_replacing_other_metadata(self):
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        db = self._app.settings["legacy"]
+        original_mi = db.get_metadata(BID_EPUB, index_is_id=True)
+
+        refer_mi = Metadata("不应写入的标题", ["不应写入的作者"])
+        refer_mi.cover_data = ("jpeg", db.cover(BID_TXT, index_is_id=True))
+
+        with mock.patch("webserver.handlers.book.set_metadata_preserving_external_paths") as save_metadata:
+            with mock.patch.object(webserver.handlers.book.BookRefer, "plugin_get_book_meta", return_value=refer_mi):
+                result = self.json(
+                    f"/api/book/{BID_EPUB}/refer",
+                    method="POST",
+                    body="provider_key=Test&provider_value=cover&only_cover=yes",
+                )
+
+        self.assertEqual(result["err"], "ok")
+        save_metadata.assert_called_once()
+        saved_mi = save_metadata.call_args.args[3]
+        self.assertEqual(saved_mi.cover_data, refer_mi.cover_data)
+        self.assertNotEqual(saved_mi.timestamp.strftime("%s"), original_mi.timestamp.strftime("%s"))
+        self.assertEqual(saved_mi.title, original_mi.title)
+        self.assertEqual(saved_mi.authors, original_mi.authors)
+
+    def test_only_cover_rejects_metadata_without_image_bytes(self):
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        refer_mi = Metadata("无封面结果")
+        refer_mi.cover_data = (None, None)
+
+        with mock.patch.object(webserver.handlers.book.BookRefer, "plugin_get_book_meta", return_value=refer_mi):
+            result = self.json(
+                f"/api/book/{BID_EPUB}/refer",
+                method="POST",
+                body="provider_key=Test&provider_value=empty&only_cover=yes",
+            )
+
+        self.assertEqual(result["err"], "cover.empty")
+
+
 class TestReferFailureSummary(TestWithUserLogin):
     malicious_failure = {
         "source": '<img src=x onerror="alert(1)">',

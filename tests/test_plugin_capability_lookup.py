@@ -602,6 +602,12 @@ def test_metadata_stream_close_keeps_lease_for_uncancellable_provider(db_session
 
     async def read_one_then_close():
         stream = handler.plugin_search_books_stream(object())
+        assert await stream.__anext__() == {
+            "event": "progress",
+            "failures": [],
+            "total": 2,
+            "completed": 0,
+        }
         assert await stream.__anext__() == {"title": "先返回的结果"}
         await stream.aclose()
 

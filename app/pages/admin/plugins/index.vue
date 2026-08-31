@@ -64,7 +64,7 @@
                         {{ t('pluginManagement.loadError') }}
                         <v-btn
                             variant="text"
-                            class="ml-2"
+                            class="ms-2"
                             @click="load"
                         >
                             {{ t('common.retry') }}

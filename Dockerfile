@@ -58,7 +58,7 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
     fi
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get install -y --no-install-recommends ffmpeg unar && \
     rm -rf /var/lib/apt/lists/*
 
 # 针对 ARM32 架构的特殊处理

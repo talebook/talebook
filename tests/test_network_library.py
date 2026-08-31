@@ -134,7 +134,9 @@ class TestNetworkLibrary(TestWithUserLogin):
     def test_search(self, m_session):
         m_session.return_value = self._fake()
         # 创建任务：立即返回 task_id，不阻塞
-        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        # 默认搜索还会覆盖启用的公共书源插件；这里显式选中 Legado，
+        # 让本用例只验证其任务进度与 runtime lease/run 收口。
+        d = self.json("/api/network/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
         self.assertEqual(d["err"], "ok")
         self.assertTrue(d["task_id"])
         self.assertEqual(d["total"], 1)

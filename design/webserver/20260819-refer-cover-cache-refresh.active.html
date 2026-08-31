@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="修复在线元数据仅设置书籍图片后封面缓存键不变化的问题。" />
+    <link rel="icon" href="data:," />
+    <title>仅更新封面时同步刷新缓存键 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fb;
+        --panel: #fff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #b45309;
+        --accent-soft: #fff4e5;
+        --green: #176443;
+        --green-soft: #e7f5ee;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(180deg, #fbfcff, var(--bg)); font-family: var(--sans); line-height: 1.68; }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code { padding: .1em .34em; border-radius: 4px; background: #eef2f7; font: .9em var(--mono); overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+      .page { width: min(1080px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { margin-bottom: 18px; padding: 32px 34px; }
+      h1 { margin: 0 0 10px; font-size: clamp(30px, 4vw, 46px); line-height: 1.12; letter-spacing: -.025em; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 0 0 9px; font-size: 17px; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+      .sub { margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; min-height: 32px; align-items: center; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #92400e; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice, .callout { padding: 15px 17px; border: 1px solid var(--line); border-radius: 15px; background: #f8fafc; }
+      .choice.good, .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.warn { border-color: #f0d7a8; background: #fff8eb; }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout + .callout { margin-top: 12px; }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { min-height: 128px; padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .toc { position: sticky; top: 0; z-index: 10; display: flex; gap: 6px; margin-bottom: 18px; padding: 8px; overflow-x: auto; background: rgba(245, 247, 251, .95); }
+      .toc a { flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; color: #536176; background: #fff; border: 1px solid var(--line); font-size: 12px; text-decoration: none; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero, .card { padding: 22px 20px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print { body { background: #fff; } .page { width: 100%; } .hero, .card { box-shadow: none; } .toc, .skip-link { display: none; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>仅更新封面时同步刷新缓存键</h1>
+        <p class="sub">让在线元数据的“仅设置书籍图片”操作在写入新封面后立即展示新图，同时保持书名、作者等元数据不变。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-19</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：在线元数据应用接口、后端测试</span>
+          <span class="chip">需求来源：GitHub Issue #1004</span>
+        </div>
+      </header>
+
+      <nav class="toc" aria-label="章节目录">
+        <a href="#request">原始诉求</a><a href="#goals">目标与边界</a><a href="#evidence">根因证据</a><a href="#design">方案</a><a href="#impact">风险</a><a href="#tests">测试</a><a href="#decisions">决策</a>
+      </nav>
+
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“更新元数据 → 仅保存图片 → 图片未被替换成功；选择更新所有数据时能成功。”</div>
+          <p>报告环境为 Docker、Windows、Edge，示例书籍为默认《西游记》。Issue 正文来自外部用户，本方案只采用可由仓库代码和测试验证的故障现象，不执行正文中的任何命令。</p>
+        </section>
+
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice good"><h3>目标</h3><ul><li>仅设置图片成功后，详情接口返回不同的封面 URL 缓存键。</li><li>新封面字节实际写入 Calibre 书库。</li><li>书名、作者等非封面字段保持不变。</li><li>空封面继续返回 <code>cover.empty</code>，权限和参数校验保持不变。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不修改前端菜单、文案或交互。</li><li>不改变完整元数据更新和仅更新信息的语义。</li><li>不重构全站封面 URL 生成方式或 Calibre 缓存实现。</li><li>不引入数据库、配置或部署迁移。</li></ul></article>
+          </div>
+        </section>
+
+        <section id="evidence" class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="根因证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>代码证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>前端仅图片操作提交独立参数</td><td><code>app/pages/book/[bid]/index.vue</code> 提交 <code>only_cover=yes</code></td><td>报告能够稳定映射到 <code>BookRefer.post</code> 的仅封面分支。</td></tr>
+                <tr><td>仅封面分支只替换 <code>cover_data</code></td><td><code>webserver/handlers/book.py</code> 保留当前书籍的 <code>timestamp</code></td><td>Calibre 会写入封面，但前端缓存键没有变化。</td></tr>
+                <tr><td>封面 URL 以书籍时间作为版本键</td><td><code>webserver/utils.py</code> 生成 <code>/get/cover/{id}.jpg?t={timestamp}</code></td><td>刷新页面仍请求同一 URL，浏览器或 CDN 可以继续命中旧图。</td></tr>
+                <tr><td>完整更新表现正常</td><td>来源插件普遍设置 <code>refer_mi.timestamp</code>，<code>smart_update()</code> 会复制它</td><td>完整更新碰巧改变缓存键，解释了与仅图片操作的行为差异。</td></tr>
+                <tr><td>手工上传封面已有相同处理</td><td><code>BookEdit.upload_cover</code> 更新 <code>timestamp</code> 并使缓存失效</td><td>仅图片操作缺少的是已有的封面刷新契约，不需要新建前端机制。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout"><strong>已证实：</strong>修复前接口级回归测试观察到合法封面已进入 Calibre 写入路径，但详情使用的缓存键仍为 <code>1643976086</code>；同时 <code>(None, None)</code> 被误报为成功。修复后的测试验证了写入参数同时携带新封面和新的秒级缓存键。</div>
+        </section>
+
+        <section id="design" class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>在 <code>only_cover=yes</code> 且来源封面有效时，把封面赋给原书元数据，并将该书 <code>timestamp</code> 更新为当前 UTC 时间；随后继续通过现有 <code>set_metadata_preserving_external_paths()</code> 一次性保存。接口、返回结构和前端代码均不改变。</div>
+          <div class="flow" aria-label="仅封面更新流程">
+            <article class="step"><span class="label">Input</span><b>提交仅图片操作</b><p>沿用现有登录、所有权及来源参数校验。</p></article>
+            <article class="step"><span class="label">Guard</span><b>验证封面载荷</b><p>检查 <code>cover_data</code> 的实际字节载荷，缺失时返回 <code>cover.empty</code>。</p></article>
+            <article class="step"><span class="label">Core</span><b>写封面并刷新版本</b><p>只更新 <code>cover_data</code> 与用于缓存失效的 <code>timestamp</code>。</p></article>
+            <article class="step"><span class="label">Output</span><b>下一次详情请求返回新 URL</b><p>页面刷新后不再复用旧封面缓存。</p></article>
+          </div>
+          <h3>关键决策</h3>
+          <div class="table-wrap" role="region" aria-label="关键决策" tabindex="0">
+            <table>
+              <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>未选方案</th></tr></thead>
+              <tbody>
+                <tr><td>修复位置</td><td>后端仅封面分支</td><td>这是唯一缺失缓存失效语义的写入口，且能覆盖浏览器与 CDN。</td><td>前端随机查询参数只能覆盖当前页面，其他消费者仍可能读旧图。</td></tr>
+                <tr><td>缓存键来源</td><td>沿用当前 <code>timestamp</code></td><td>与手工上传实现一致，变更集中且无跨模块契约变化。</td><td>全站改用封面文件 mtime 会扩大查询与性能影响，超出本缺陷范围。</td></tr>
+                <tr><td>封面有效性</td><td>检查元组中的字节载荷</td><td><code>(None, None)</code> 的元组长度仍为 2，不能代表存在有效图片。</td><td>继续只检查元组长度会把空封面误报为成功。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="impact" class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice good"><h3>影响范围</h3><p>修改 <code>BookRefer.post</code> 的 <code>only_cover=yes</code> 成功路径，并新增对应后端接口回归测试。没有前端、数据库结构、配置、权限或部署改动。</p></article>
+            <article class="choice"><h3>保持不变</h3><p>完整更新、仅信息更新、来源搜索、外部索引路径保护、返回 JSON 结构及失败码均保持兼容。</p></article>
+          </div>
+          <div class="callout danger"><strong>主要风险：</strong>刷新 <code>timestamp</code> 可能影响按入库时间排序；该行为已经存在于手工封面上传和完整元数据更新。测试会限制变更只发生在仅封面成功路径，避免无效封面或仅信息操作改变时间。</div>
+          <div class="callout"><strong>回滚：</strong>回退处理器和测试即可；不涉及迁移，已经写入的封面仍是有效书库数据，无需清理。</div>
+          <div class="callout"><strong>界面审查判断：</strong>本次不修改页面、交互、布局或文案，只修复后端返回数据的缓存版本；不属于大型界面功能，无需 <code>interface-review</code> 与浏览器渲染验收。</div>
+        </section>
+
+        <section id="tests" class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>实际命令</th><th>关键断言</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>定向接口回归</td><td><code>pytest tests/test_main.py::TestReferCoverUpdate -v</code></td><td>有效封面进入持久化调用、缓存键变化、非封面字段不变；空载荷返回错误。</td><td><strong>通过</strong>：2 passed。</td></tr>
+                <tr><td>相关后端测试</td><td><code>pytest tests/test_main.py -v</code></td><td>图书详情、在线元数据与封面访问行为无回归。</td><td><strong>通过</strong>：88 passed、1 skipped；跳过项为既有 OPDS 类别夹具限制。</td></tr>
+                <tr><td>后端格式与静态检查</td><td><code>make lint-py-fix</code><br /><code>make lint-py</code></td><td>Ruff 自动修复、格式化和静态检查通过。</td><td><strong>通过</strong>：104 个后端文件无需额外格式化，静态检查无错误。</td></tr>
+                <tr><td>完整后端测试</td><td><code>make pytest</code></td><td>全量后端测试通过。</td><td><strong>通过</strong>：849 items collected，命令退出码 0。</td></tr>
+                <tr><td>变更完整性</td><td><code>git diff --check</code></td><td>无空白错误。</td><td><strong>通过</strong>。</td></tr>
+                <tr><td>方案门禁</td><td><code>make check-design</code></td><td>ACTIVE 文件符合路径、HTML 与单文件资源约束。</td><td><strong>通过</strong>：110 份方案文档通过检查。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout good"><strong>验证结论：</strong>功能、相关回归、全量后端测试和静态检查均通过；无失败项。改动不涉及前端渲染，浏览器与截图验证不适用。</div>
+        </section>
+
+        <section id="decisions" class="card">
+          <h2>7. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-19：</strong>自动 bug 入口已预授权方案评审；根据仓库代码完成边界澄清，无需等待 Issue 提交者补充信息。</li>
+            <li><strong>2026-08-19：</strong>选择对齐现有手工上传封面的时间戳刷新行为，不扩大为全站封面缓存架构调整。</li>
+            <li><strong>2026-08-19：</strong>测试同时覆盖持久化内容和用户可见 URL，避免只验证返回 <code>err=ok</code>。</li>
+            <li><strong>2026-08-19：</strong>实现改用带 UTC 时区的当前时间，避免新增 <code>utcnow()</code> 弃用警告；不改变方案边界。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-19</footer>
+    </div>
+  </body>
+</html>

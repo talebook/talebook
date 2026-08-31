@@ -65,6 +65,12 @@ export TALEBOOK_PASSWORD="your-password"
 
 Skill 会在写入前确认目标与权限，对管理员写入、删除和批量操作先展示影响并请求确认，执行后再查询状态进行核验。完整说明与源码见 [talebook/skills](https://github.com/talebook/skills)。
 
+DeepSeek Harness（DSH）用户可安装社区插件 [dsh-talebook-plugin](https://github.com/hehetoshang/dsh-talebook-plugin)，在 DSH 中通过 12 个强类型工具搜索、下载、上传和管理书籍与有声书，管理 Legado 书源并执行管理员操作。写入前同样需要确认，密码只保存在 DSH 凭据存储中：
+
+```bash
+dsh plugin --profile web add github:hehetoshang/dsh-talebook-plugin
+```
+
 ## 近一年更新亮点
 
 * **网络书库与书源**：新增 Legado 风格书源解析引擎，可在线搜索、阅读网络小说并保存为 txt/epub 入库；配套书源管理界面（批量启停/删除、有效性体检、分页搜索）。
@@ -105,6 +111,33 @@ Skill 会在写入前确认目标与权限，对管理员写入、删除和批�
 * **本地书架**：可添加本地文件夹，阅读 EPUB、PDF 和 TXT 文件；
 * **阅读辅助**：支持阅读进度、书签、笔记、全文搜索、目录跳转和 TTS 朗读；
 * **多服务器与备份**：支持切换多个 Talebook 服务器，并可导入、导出阅读数据；
+
+## 手表客户端 — 氢电子书（H2read）
+
+**H2read（氢电子书）** 是专为 Android Wear OS / 智能手表定制的小说阅读与听书客户端，支持 OLED 纯黑省电模式与多种 TTS 语音听书。
+
+* **OLED 纯黑模式**：`#000000` 像素级黑底，0 发光超省电；
+* **全矩阵听书（TTS）（付费）**：支持 Edge-TTS 网络语音、Sherpa-ONNX 离线语音与系统 TTS，句子级高亮跟随，0 秒无缝连播；
+* **多源聚合阅读**：在线阅读与全本离线，支持导出 EPUB / TXT；
+* **智能分包**：自动适配 32 位（armeabi-v7a）与 64 位（arm64-v8a）设备；
+* **Talebook 集成**：「导入书籍」功能支持配置 Talebook 服务器地址（可填写访问码或账号密码），直接从 Talebook 书库浏览、搜索并导入书籍到手表阅读/听书。
+
+## 有声书命令行客户端 — Talebook Audio CLI
+
+**[Talebook Audio CLI](https://github.com/hehetoshang/talebook-audio-cli)** 是独立安装的 Talebook 有声书终端客户端：使用账号密码直接登录（不依赖浏览器 Cookie），列出当前账号可访问的已发布有声书，通过本机 `mpv` 播放，或经 OpenXiaoAI Bridge 在小爱音箱上播放。
+
+* **账号密码登录**：`talebook-audio configure --server https://books.example.com --username alice` 保存服务地址与账号，`talebook-audio login` 以隐藏输入读取密码；客户端只保存服务地址、用户名和登录 Cookie，不保存密码；
+* **浏览与播放**：`talebook-audio books` 列出可访问的已发布有声书，`talebook-audio play --book-id 42 --chapter 3` 按书籍或有声版本播放并指定起始章节，也支持交互选择与单键控制（暂停/继续、上一章/下一章）；
+* **小爱音箱播放**：经 OpenXiaoAI Bridge 的鉴权 StreamPlayer API 播放，支持进度、暂停/继续与切章；
+* **MCP 集成**：`talebook-audio mcp` 提供 9 个浏览、播放与状态控制工具，可像 neteasecli 一样以 stdio 方式接入 OpenXiaoAI Bridge。
+
+安装（PyPI，Python ≥ 3.11；本机播放需要 `mpv`）：
+
+```bash
+python3 -m pip install talebook-audio-cli
+```
+
+源码与发布：[talebook-audio-cli](https://github.com/hehetoshang/talebook-audio-cli) · [PyPI](https://pypi.org/project/talebook-audio-cli/)
 
 ## Docker ![Docker Pulls](https://img.shields.io/docker/pulls/talebook/talebook.svg)
 

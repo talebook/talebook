@@ -42,7 +42,7 @@
             <v-alert v-if="previewResult && previewResult.regex_error" type="error" variant="tonal" density="compact" class="mt-3">{{ previewResult.regex_error }}</v-alert>
             <div v-if="previewResult && previewResult.samples && previewResult.samples.length" class="mt-3">
                 <div class="text-subtitle-2 mb-2">{{ t('bookTools.textReplace.samples') }}</div>
-                <div v-for="(s, i) in previewResult.samples" :key="i" class="booktool-sample pa-2 mb-2 rounded border text-body-2" style="word-break: break-all; white-space: pre-wrap"><span>{{ s.pre }}</span><mark class="px-1 rounded" style="background: rgb(var(--v-theme-warning)); color: #fff">{{ s.match }}</mark><span>{{ s.post }}</span></div>
+                <div v-for="(s, i) in previewResult.samples" :key="i" class="booktool-sample pa-2 mb-2 rounded border text-body-2" style="word-break: break-all; white-space: pre-wrap"><span>{{ s.pre }}</span><mark class="booktool-match px-1 rounded">{{ s.match }}</mark><span>{{ s.post }}</span></div>
             </div>
 
             <v-divider class="my-4" />
@@ -161,5 +161,6 @@ useHead(() => ({ title: t('bookTools.textReplace.title') }));
 <style scoped>
 .booktool-field { flex: 1 1 280px; max-width: 520px; }
 .booktool-sample { background: rgba(var(--v-theme-surface-variant), 0.5); }
+.booktool-match { color: rgb(var(--v-theme-on-surface)); background: rgba(var(--v-theme-warning), 0.16); font-weight: 600; }
 @media (max-width: 600px) { .booktool-field { max-width: none; flex-basis: 100%; } }
 </style>

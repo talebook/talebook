@@ -1,6 +1,49 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator } from '@playwright/test';
 
 const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
+const renderedContrast = (locator: Locator) => locator.evaluate((element) => {
+    type Color = { red: number; green: number; blue: number; alpha: number };
+    const parse = (value: string): Color => {
+        const channels = value.match(/[\d.]+/g)?.map(Number) || [];
+        return {
+            red: channels[0] || 0,
+            green: channels[1] || 0,
+            blue: channels[2] || 0,
+            alpha: channels[3] ?? 1,
+        };
+    };
+    const composite = (foreground: Color, background: Color): Color => {
+        const alpha = foreground.alpha + background.alpha * (1 - foreground.alpha);
+        const channel = (foregroundValue: number, backgroundValue: number) => (
+            (foregroundValue * foreground.alpha + backgroundValue * background.alpha * (1 - foreground.alpha)) / alpha
+        );
+        return {
+            red: channel(foreground.red, background.red),
+            green: channel(foreground.green, background.green),
+            blue: channel(foreground.blue, background.blue),
+            alpha,
+        };
+    };
+    const luminance = (color: Color) => {
+        const channels = [color.red, color.green, color.blue].map(channel => {
+            const normalized = channel / 255;
+            return normalized <= 0.04045
+                ? normalized / 12.92
+                : ((normalized + 0.055) / 1.055) ** 2.4;
+        });
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    };
+    const ancestors: Element[] = [];
+    for (let current: Element | null = element; current; current = current.parentElement) ancestors.push(current);
+    let background: Color = { red: 255, green: 255, blue: 255, alpha: 1 };
+    for (const current of ancestors.reverse()) {
+        background = composite(parse(getComputedStyle(current).backgroundColor), background);
+    }
+    const foreground = luminance(composite(parse(getComputedStyle(element).color), background));
+    const backgroundLuminance = luminance(background);
+    return (Math.max(foreground, backgroundLuminance) + 0.05) / (Math.min(foreground, backgroundLuminance) + 0.05);
+});
 
 test.describe('Plugin management', () => {
     test.beforeEach(async ({ request }) => {
@@ -24,7 +67,13 @@ test.describe('Plugin management', () => {
         await expect(page.getByText('AI 元数据')).toHaveCount(0);
         const calibreIcon = page.locator('.management-row').filter({ hasText: 'Calibre 元数据' }).locator('.plugin-brand-icon');
         await expect(calibreIcon.locator('img[src="/images/plugin-icons/calibre.svg"]')).toBeVisible();
-        expect(await calibreIcon.evaluate(element => getComputedStyle(element, '::after').boxShadow)).not.toBe('none');
+        const lightOutline = await calibreIcon.evaluate(element => getComputedStyle(element, '::after').boxShadow);
+        expect(lightOutline).not.toBe('none');
+        const themeRoot = page.locator('.v-theme--light').first();
+        await themeRoot.evaluate(element => element.classList.replace('v-theme--light', 'v-theme--dark'));
+        const darkOutline = await calibreIcon.evaluate(element => getComputedStyle(element, '::after').boxShadow);
+        expect(darkOutline).not.toBe(lightOutline);
+        await themeRoot.evaluate(element => element.classList.replace('v-theme--dark', 'v-theme--light'));
         await expect(page.locator('.management-row').filter({ hasText: 'Open Library' }).locator('img[src="/images/plugin-icons/open-library.png"]')).toBeVisible();
         const kindleRow = page.locator('.management-row').filter({ hasText: 'Kindle 邮箱推送' });
         await kindleRow.scrollIntoViewIfNeeded();
@@ -430,5 +479,39 @@ test.describe('Plugin management', () => {
         expect(dialog.message()).toContain('《测试书》');
         await dialog.dismiss();
         await overwrite;
+    });
+
+    test('keeps text replacement preview highlights readable', async ({ page }) => {
+        await page.goto('/plugins/text-replace');
+        const bookSelect = page.getByRole('combobox', { name: '选择书籍' });
+        await bookSelect.click();
+        await page.getByRole('option', { name: /测试书/ }).click();
+        await page.getByRole('textbox', { name: '查找内容' }).fill('测试');
+        await page.getByRole('button', { name: '预览' }).click();
+
+        const highlight = page.locator('mark', { hasText: '测试' });
+        await expect(highlight).toBeVisible();
+        await expect.poll(() => renderedContrast(highlight)).toBeGreaterThanOrEqual(4.5);
+
+        await page.locator('.v-theme--light').first().evaluate(element => {
+            element.classList.replace('v-theme--light', 'v-theme--dark');
+        });
+        await expect.poll(() => renderedContrast(highlight)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    test('keeps plugin run decision badges readable in both themes', async ({ page }) => {
+        await page.goto('/admin/plugins/runs/99');
+        const decisions = page.locator('.plugin-item-preview__decision');
+        await expect(decisions).toHaveCount(3);
+        for (const decision of await decisions.all()) {
+            expect(await renderedContrast(decision)).toBeGreaterThanOrEqual(4.5);
+        }
+
+        await page.locator('.v-theme--light').first().evaluate(element => {
+            element.classList.replace('v-theme--light', 'v-theme--dark');
+        });
+        for (const decision of await decisions.all()) {
+            expect(await renderedContrast(decision)).toBeGreaterThanOrEqual(4.5);
+        }
     });
 });

@@ -93,7 +93,7 @@ const activePath = computed(() => activeTab.value?.to);
 }
 
 .route-tab-shell__nav :deep(.v-tab:first-child) {
-    padding-left: 2px;
+    padding-inline-start: 2px;
 }
 
 .route-tab-shell__nav :deep(.v-tab__slider) {

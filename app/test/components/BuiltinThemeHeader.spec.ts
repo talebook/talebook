@@ -161,6 +161,21 @@ describe('BuiltinThemeHeader.vue navigation', () => {
         wrapper.unmount();
     });
 
+    it('shows the trash management link only to administrators', () => {
+        let wrapper = mountHeader('minimal');
+        expect(wrapper.text()).not.toContain('navigation.trash');
+        wrapper.unmount();
+
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        wrapper = mountHeader('minimal');
+        const link = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(item => item.text().includes('navigation.trash'));
+
+        expect(link?.props('to')).toBe('/admin/trash');
+        wrapper.unmount();
+    });
+
     it('uses the menu icon and fully toggles the light-gray drawer', async () => {
         const wrapper = mountHeader('light-gray');
         const header = wrapper.findComponent(BuiltinThemeHeader).vm as unknown as {

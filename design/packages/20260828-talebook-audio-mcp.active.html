@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Audio CLI 通过 stdio MCP 接入 OpenXiaoAI Bridge 的实现方案。" />
+    <link rel="icon" href="data:," />
+    <title>Talebook Audio CLI MCP 接入 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --ink: #172033; --muted: #5d6778; --line: #d9e0ea; --accent: #8b4f16; --panel: #fff; --good: #e8f5ee; }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: #f5f7fb; font: 15px/1.65 system-ui, sans-serif; }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      .skip { position: fixed; top: 8px; left: 8px; z-index: 2; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip:focus { transform: translateY(0); }
+      main { width: min(1020px, calc(100vw - 32px)); margin: 32px auto; }
+      header, section { margin-bottom: 18px; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
+      h1, h2, h3 { margin-top: 0; line-height: 1.25; }
+      .meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); }
+      .meta span { padding: 4px 10px; border-radius: 999px; background: #eef2f7; }
+      .meta .wip { color: var(--accent); background: #fff2e4; font-weight: 700; }
+      .flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+      .flow div { padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+      .decision { padding: 14px 16px; border: 1px solid #b9dbc7; border-radius: 12px; background: var(--good); }
+      code { padding: 2px 5px; border-radius: 4px; background: #eef2f7; overflow-wrap: anywhere; }
+      pre { padding: 15px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 12px; }
+      pre code { padding: 0; color: inherit; background: transparent; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; min-width: 700px; border-collapse: collapse; }
+      th, td { padding: 9px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { background: #f6f8fb; }
+      .pending { color: var(--accent); font-weight: 700; }
+      @media (max-width: 720px) { main { width: calc(100vw - 20px); margin: 10px auto; } .flow { grid-template-columns: 1fr; } header, section { padding: 18px; } }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print { body { background: #fff; } main { width: 100%; margin: 0; } header, section, .flow div, .table-wrap { break-inside: avoid; } .skip { display: none; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#content">跳到正文</a>
+    <main id="content">
+      <header>
+        <h1>Talebook Audio CLI MCP 接入</h1>
+        <p>让 OpenXiaoAI Bridge 像调用 neteasecli 一样，通过常驻 stdio MCP 子进程浏览和播放 Talebook 有声书，同时复用已验证的 Bridge StreamPlayer 后端。</p>
+        <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-28</span><span>所属模块：packages</span><span>影响范围：CLI 协议、Bridge 配置与部署</span><span>需求来源：HOU-20</span></div>
+      </header>
+
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>“能不能与bridge接入个mcp，就是与网易cli与bridge接入mcp的方式一样”</p>
+        <p>现有 CLI 已能通过 <code>--player xiaoai</code> 调用 Bridge StreamPlayer，但 AI 对话还不能发现书目、选择章节或控制播放。本次把这些能力暴露成 MCP 工具，并接入用户指定的 <code>/opt/open-xiaoai-bridge</code> 实例。</p>
+      </section>
+
+      <section>
+        <h2>2. 目标与边界</h2>
+        <div class="table-wrap" role="region" aria-label="目标与边界" tabindex="0">
+          <table>
+            <thead><tr><th>目标</th><th>非目标</th></tr></thead>
+            <tbody><tr><td>提供 <code>talebook-audio mcp</code> stdio server；列书、列章节、按书或版本播放；暂停、恢复、停止、上一章、下一章和状态；播放结果返回 Bridge 静默结束信号；真实部署和工具调用可复现。</td><td>不通过 MCP 接收或保存密码；不修改 Talebook 服务端；不新增 HTTP MCP 监听；不把 Cookie、Bridge token 或请求头暴露给模型；不改变 neteasecli 工具。</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. 现状与证据</h2>
+        <ul>
+          <li><code>/opt/open-xiaoai-bridge/config.py</code> 已用 stdio 方式常驻启动 <code>neteasecli mcp</code>，并由 <code>MCPClientManager</code> 聚合工具。</li>
+          <li>Bridge 识别 <code>structuredContent["x-open-xiaoai-bridge"]</code> 的 <code>end_turn_silently / playback_started</code> 信号；播放工具必须复用该契约。</li>
+          <li>Talebook CLI 已具备安全登录会话、书目与章节解析，以及 OpenXiaoAI StreamPlayer 的播放和控制能力。</li>
+          <li>MCP 官方 Python SDK 在 Bridge 的 <code>/app/.venv</code> 中可用；宿主机未安装，因此 SDK 作为可选依赖并保持普通 CLI 无额外依赖。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>4. 方案</h2>
+        <div class="decision"><strong>方案结论：</strong>在 CLI 包内新增异步 MCP 控制器与官方 SDK stdio 入口。控制器持有当前 Talebook 章节队列和 Bridge 播放器；所有阻塞 HTTP 调用通过工作线程执行，后台监控在章节结束时自动续播。部署只挂载 CLI 源码和受权限保护的会话目录，Bridge token 使用既有只读路径。</div>
+        <div class="flow" aria-label="MCP 调用流程">
+          <div><strong>语音意图</strong><br />Bridge 的 OpenAI 后端选择 Talebook MCP 工具。</div>
+          <div><strong>stdio MCP</strong><br />官方 SDK 校验参数并调用异步控制器。</div>
+          <div><strong>Talebook + Bridge</strong><br />读取已保存会话，解析书目和章节，将公开音频 URL 交给 StreamPlayer。</div>
+          <div><strong>结果</strong><br />查询返回文本与结构化数据；播放返回静默结束信号。</div>
+        </div>
+        <h3>工具与状态</h3>
+        <div class="table-wrap" role="region" aria-label="MCP 工具" tabindex="0">
+          <table>
+            <thead><tr><th>工具</th><th>输入</th><th>语义</th></tr></thead>
+            <tbody>
+              <tr><td><code>list_audiobooks</code></td><td>可选 <code>query</code></td><td>列出当前账号可访问的已发布有声书，并返回 book/edition ID。</td></tr>
+              <tr><td><code>list_chapters</code></td><td><code>edition_id</code></td><td>列章节编号、标题和时长。</td></tr>
+              <tr><td><code>play_audiobook</code></td><td>edition/book/query 三选一；可选 chapter</td><td>建立章节队列并开始播放，返回静默结束信号。</td></tr>
+              <tr><td><code>next_chapter</code> / <code>previous_chapter</code></td><td>无</td><td>在当前队列切章并返回静默结束信号。</td></tr>
+              <tr><td><code>pause</code> / <code>resume</code> / <code>stop</code> / <code>status</code></td><td>无</td><td>确定性控制并报告当前书、章节、进度和队列位置。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <pre aria-label="Bridge 配置示例"><code>"talebook_audio": {
+  "type": "stdio",
+  "command": "/app/.venv/bin/python",
+  "args": ["-m", "talebook_audio_cli.cli", "mcp"],
+  "env": {"PYTHONPATH": "/opt/talebook-audio-cli/src", "TALEBOOK_AUDIO_PLAYER": "xiaoai"},
+  "cwd": "/opt/talebook-audio-cli",
+  "timeout": 180
+}</code></pre>
+      </section>
+
+      <section>
+        <h2>5. 影响范围、风险与回滚</h2>
+        <ul>
+          <li><strong>代码：</strong>新增 MCP server/controller、CLI 子命令、可选 SDK 依赖、测试和文档；普通命令保持兼容。</li>
+          <li><strong>部署：</strong>新增只读 CLI 源码挂载、读写会话目录挂载和一个 MCP server 配置；Bridge 容器需重建一次。</li>
+          <li><strong>凭据：</strong>管理员先在宿主机登录一次；MCP 不接收密码。会话目录和 Cookie 保持 0600，Bridge token 不进入工具参数或结果。</li>
+          <li><strong>风险：</strong>完整章节下载会让播放工具调用持续约 14 秒；timeout 设为 180 秒。后台自动续播和显式切章可能竞态，使用单一异步锁与监控任务串行化。</li>
+          <li><strong>回滚：</strong>从 <code>mcp_servers</code> 删除 <code>talebook_audio</code> 并移除两项挂载后重建单个容器；CLI 代码回滚为独立提交，不涉及数据迁移。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>6. 测试计划与结果</h2>
+        <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0">
+          <table>
+            <thead><tr><th>验证层</th><th>命令或场景</th><th>预期</th><th>结果</th></tr></thead>
+            <tbody>
+              <tr><td>单元</td><td><code>PYTHONPATH=packages/talebook-audio-cli/src python3 -m pytest packages/talebook-audio-cli/tests</code></td><td>工具选择、队列、控制、静默信号、错误和既有 CLI 全通过。</td><td>通过，30 passed。</td></tr>
+              <tr><td>协议</td><td>容器内官方 MCP ClientSession 初始化、列工具并依次调用 9 个工具</td><td>stdio 无协议污染，schema 与 structuredContent 正确。</td><td>通过，退出码 0；发现 9 个工具，静默播放信号与 Bridge 契约完全一致。</td></tr>
+              <tr><td>真实部署</td><td><code>/opt/open-xiaoai-bridge</code> 容器</td><td>连接两个 MCP server；Talebook 工具可列书、播放、暂停、恢复、切章和停止。</td><td>通过；Bridge 同时连接 neteasecli 13 个工具与 talebook_audio 9 个工具。真实列出《西游记》3 章，完成首章播放、暂停、恢复、下一章、上一章和停止，最终 idle，容器 healthy。</td></tr>
+              <tr><td>质量门禁</td><td><code>ruff check</code>、<code>ruff format --check</code>、<code>make lint-py-fix</code>、<code>make lint-py</code>、<code>make check-design</code></td><td>相关门禁通过。</td><td>ruff 与 lint 通过；check-design 共 111 份方案通过。<code>make pytest</code> 因宿主机缺少 Calibre，在 6 个既有服务端模块收集阶段失败，与本包无关；独立包 30 项测试全通过。</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>纯 CLI 协议与部署改动，无 Web 页面、布局、视觉资源或前端消费者，因此界面审查豁免。</p>
+      </section>
+
+      <section>
+        <h2>7. 决策记录</h2>
+        <ol>
+          <li><strong>2026-08-28：</strong>用户明确要求复用 neteasecli → Bridge 的 MCP 方式；选择 stdio 而非新增网络监听。</li>
+          <li><strong>2026-08-28：</strong>不提供登录 MCP 工具，避免模型上下文和工具参数承载密码；采用管理员预登录的 0600 会话目录。</li>
+          <li><strong>2026-08-28：</strong>使用官方 SDK 作为可选依赖；Bridge 部署复用其现有 SDK，普通 CLI 仍保持零运行时依赖。</li>
+        </ol>
+      </section>
+      <footer>Talebook internal design · packages · ACTIVE · 2026-08-28</footer>
+    </main>
+  </body>
+</html>

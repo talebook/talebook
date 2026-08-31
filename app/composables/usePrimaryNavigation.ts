@@ -49,6 +49,7 @@ export function usePrimaryNavigation(store: ReturnType<typeof useMainStore>, t: 
                     { key: 'settings', icon: 'mdi-cog', href: '/admin/settings/general', activePrefix: '/admin/settings', text: t('navigation.settings') },
                     { key: 'users', icon: 'mdi-human-greeting', href: '/admin/users', text: t('navigation.users') },
                     { key: 'books', icon: 'mdi-library-shelves', href: '/admin/books', text: t('navigation.books') },
+                    { key: 'trash', icon: 'mdi-backup-restore', href: '/admin/trash', text: t('navigation.trash') },
                     { key: 'audio-jobs', icon: 'mdi-playlist-music', href: '/audio-jobs', text: t('navigation.audiobookJobs') },
                     { key: 'imports', icon: 'mdi-import', href: '/admin/imports', text: t('navigation.import') },
                     { key: 'logs', icon: 'mdi-text-box-outline', href: '/admin/logs', text: t('navigation.systemLogs') },

@@ -1,0 +1,48 @@
+{
+  "err": "ok",
+  "kindle_sender": "",
+  "conversion_options": [],
+  "book": {
+    "id": 14,
+    "title": "图片漫画样例",
+    "rating": 0,
+    "timestamp": "2026-08-28",
+    "pubdate": "2026-08-28",
+    "author": "佚名",
+    "authors": ["佚名"],
+    "author_sort": "佚名",
+    "tag": "漫画",
+    "tags": ["漫画"],
+    "publisher": "",
+    "comments": "图片压缩包漫画",
+    "series": null,
+    "language": null,
+    "isbn": null,
+    "img": "/get/cover/14.jpg",
+    "thumb": "/get/thumb_60x80/14.jpg",
+    "collector": "admin",
+    "count_visit": 0,
+    "count_download": 0,
+    "available_formats": ["CBZ", "EPUB"],
+    "files": [
+      {
+        "format": "CBZ",
+        "size": 2048,
+        "href": "/api/book/14.CBZ",
+        "online_readable": true
+      },
+      {
+        "format": "EPUB",
+        "size": 4096,
+        "href": "/api/book/14.EPUB",
+        "online_readable": true
+      }
+    ],
+    "media_type": "comic",
+    "media_type_locked": false,
+    "online_readable": true,
+    "scope": "public",
+    "is_public": true,
+    "is_owner": true
+  }
+}

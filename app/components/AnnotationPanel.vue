@@ -472,7 +472,7 @@ watch(() => props.bookId, loadAnnotations);
 .annotation-card__meta { display:flex; flex-wrap:wrap; align-items:center; gap:4px 6px; min-width:0; }
 .annotation-card__chapter { display:inline-flex; align-items:center; gap:4px; font-size:.78rem; font-weight:700; }
 .annotation-card__fallback { padding:1px 5px; color:#8a5a00; background:#fff2ce; border-radius:999px; font-size:.75rem; font-weight:700; }
-.annotation-card__quote { margin:6px 0 3px; padding:0 0 0 10px; color:rgba(var(--v-theme-on-surface),.76); border-left:2px solid rgba(var(--v-theme-primary),.4); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.5; }
+.annotation-card__quote { margin:6px 0 3px; padding-inline-start:10px; color:rgba(var(--v-theme-on-surface),.76); border-inline-start:2px solid rgba(var(--v-theme-primary),.4); font-family:"Noto Serif SC","Songti SC",serif; line-height:1.5; }
 .annotation-card__content { margin:3px 0; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.45; }
 .annotation-card__footer { min-height:28px; margin-top:4px; color:rgba(var(--v-theme-on-surface),.68); font-size:.75rem; flex-wrap:wrap; }
 .annotation-card__author { display:inline-flex; align-items:center; gap:4px; color:rgba(var(--v-theme-on-surface),.78); font-weight:600; }

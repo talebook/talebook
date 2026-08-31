@@ -6,6 +6,7 @@
             icon="mdi-upload"
             size="large"
             elevation="4"
+            :aria-label="$t('messages.uploadBooks')"
             @click="dialog = !dialog"
         />
         <v-dialog
@@ -31,6 +32,9 @@
                 </v-toolbar>
                 <v-card-text>
                     <p>{{ $t('messages.uploadNotice') }}</p>
+                    <p class="text-caption text-medium-emphasis mb-3">
+                        {{ $t('book.supportedFormatsUpload') }}
+                    </p>
                     <v-form
                         ref="form"
                         @submit.prevent="do_upload"
@@ -38,6 +42,7 @@
                         <v-file-input
                             v-model="ebooks"
                             :label="$t('messages.selectEbook')"
+                            accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.cbz,.zip,.cbr,.rar"
                         />
                     </v-form>
                     <v-progress-linear

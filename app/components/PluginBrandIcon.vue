@@ -56,7 +56,7 @@ watch(() => props.brandIcon, () => {
     position:absolute;
     inset:0;
     border-radius:inherit;
-    box-shadow:inset 0 0 0 1px oklch(0 0 0 / .1);
+    box-shadow:inset 0 0 0 1px rgba(var(--v-theme-on-surface), .1);
     content:"";
     pointer-events:none;
 }

@@ -447,9 +447,9 @@
                     <template v-if="selectedBook">
                         <p>{{ selectedBook.author }} · {{ selectedBook.publisher }}</p>
                         <p class="text-body-2">{{ selectedBook.intro }}</p>
-                        <v-chip class="mr-2" variant="tonal">{{ t('weread.chapterCount', { count: selectedChapters.length }) }}</v-chip>
+                        <v-chip class="me-2" variant="tonal">{{ t('weread.chapterCount', { count: selectedChapters.length }) }}</v-chip>
                         <v-chip v-if="selectedProgress" variant="tonal">{{ t('weread.progress', { count: selectedProgress.book?.progress || 0 }) }}</v-chip>
-                        <v-btn v-if="selectedBook.deepLink" class="ml-2" variant="text" :href="selectedBook.deepLink">
+                        <v-btn v-if="selectedBook.deepLink" class="ms-2" variant="text" :href="selectedBook.deepLink">
                             {{ t('weread.openInWeread') }}
                         </v-btn>
                     </template>

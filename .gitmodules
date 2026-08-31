@@ -1,0 +1,3 @@
+[submodule "packages/talebook-audio-cli"]
+	path = packages/talebook-audio-cli
+	url = https://github.com/hehetoshang/talebook-audio-cli.git
