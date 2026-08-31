@@ -49,6 +49,83 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByText('下载').first()).toBeVisible();
     });
 
+    test('uses the requested four-zone order with one canonical action per task', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+        const sectionOrder = await page.locator([
+            '[data-testid="book-title-section"]',
+            '[data-testid="book-metadata-section"]',
+            '[data-testid="book-action-section"]',
+            '[data-testid="book-content-section"]',
+        ].join(', ')).evaluateAll(elements => elements.map(element => element.getAttribute('data-testid')));
+        expect(sectionOrder).toEqual([
+            'book-title-section',
+            'book-metadata-section',
+            'book-action-section',
+            'book-content-section',
+        ]);
+
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toHaveCount(1);
+        await expect(page.getByRole('heading', { level: 2, name: '书籍操作' })).toHaveCount(1);
+        await expect(page.getByRole('heading', { level: 2, name: '内容简介' })).toHaveCount(1);
+        await expect(page.getByTestId('open-online-reader')).toHaveCount(1);
+        await expect(page.getByTestId('book-action-download')).toHaveCount(1);
+        await expect(page.getByTestId('book-action-send')).toHaveCount(1);
+        await expect(page.getByTestId('book-action-shelf')).toHaveCount(1);
+        await expect(page.getByTestId('book-action-process')).toHaveCount(1);
+        await expect(page.getByTestId('book-action-manage')).toHaveCount(1);
+        await expect(page.getByTestId('book-metadata-section')).toContainText('上传者');
+        await expect(page.getByTestId('book-metadata-section')).toContainText('上传时间');
+        await expect(page.getByTestId('book-content-section')).toContainText(apiBook.book.comments.slice(0, 20));
+    });
+
+    test('keeps every reader and owner action reachable on a narrow mobile viewport', async ({ page }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+        const actionTestIds = [
+            'open-online-reader',
+            'book-action-download',
+            'book-action-send',
+            'book-action-shelf',
+            'book-action-reading-state',
+            'open-audiobook',
+            'book-action-process',
+            'book-action-manage',
+        ];
+        for (const testId of actionTestIds) {
+            const action = page.getByTestId(testId);
+            await action.scrollIntoViewIfNeeded();
+            await expect(action).toBeVisible();
+            const bounds = await action.boundingBox();
+            expect(bounds).not.toBeNull();
+            expect(bounds!.x).toBeGreaterThanOrEqual(0);
+            expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+        }
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+        await page.getByTestId('book-action-process').click();
+        await expect(page.getByText('转换格式', { exact: true })).toBeVisible();
+        await page.keyboard.press('Escape');
+        await page.getByTestId('book-action-manage').click();
+        const editInfoAction = page.getByText('编辑书籍信息', { exact: true });
+        await expect(editInfoAction).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(editInfoAction).toBeHidden();
+
+        await page.setViewportSize({ width: 320, height: 800 });
+        await page.waitForTimeout(200);
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        for (const testId of actionTestIds) {
+            const bounds = await page.getByTestId(testId).boundingBox();
+            expect(bounds).not.toBeNull();
+            expect(bounds!.x).toBeGreaterThanOrEqual(0);
+            expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+        }
+    });
+
     test('does not request an undefined book when navigating to Recent', async ({ page }) => {
         const undefinedBookRequests: string[] = [];
         const asyncDataWarnings: string[] = [];
@@ -134,13 +211,12 @@ test.describe('Book Detail Page', () => {
         await expect(page.locator('.v-alert')).toBeVisible();
     });
 
-    test('uses the unified reader when EPUB and TXT both exist', async ({ page }) => {
+    test('uses one unified reader entry when EPUB and TXT both exist', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
 
         const readLinks = page.locator(`a[href="/read/${bookId}"]`);
-        await expect(readLinks).toHaveCount(2);
-        await expect(readLinks.nth(0)).toContainText('阅读');
-        await expect(readLinks.nth(1)).toContainText('在线阅读');
+        await expect(readLinks).toHaveCount(1);
+        await expect(readLinks).toContainText('阅读');
     });
 
     test('routes comic containers to read-comic and keeps download available', async ({ page, context }) => {
@@ -204,7 +280,7 @@ test.describe('Book Detail Page', () => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByText(apiBook.book.title).first()).toBeVisible({ timeout: 15_000 });
 
-        const metadata = page.locator('.tag-chips');
+        const metadata = page.locator('.book-metadata');
         const author = apiBook.book.authors[0];
         const tag = apiBook.book.tags[0];
         const authorChip = metadata.locator(`a[href="/author/${encodeURIComponent(author)}"]`);

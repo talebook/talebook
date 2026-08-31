@@ -79,7 +79,10 @@
                                         placeholder="reader@kindle.com"
                                         hide-details="auto"
                                     />
-                                    <div v-else class="device-target__network">
+                                    <div
+                                        v-else
+                                        class="device-target__network"
+                                    >
                                         <v-text-field
                                             v-model="deviceTarget.ip"
                                             data-testid="send-device-ip"
@@ -235,7 +238,10 @@
                                 <p class="mb-4">
                                     {{ t('book.selectMatchingBook') }}
                                 </p>
-                                <BookCards_Small :books="refer_books" :max-columns="2">
+                                <BookCards_Small
+                                    :books="refer_books"
+                                    :max-columns="2"
+                                >
                                     <template #actions="{ book: referBook }">
                                         <v-card-actions>
                                             <v-chip
@@ -482,290 +488,45 @@
                     </v-card>
                 </v-dialog>
 
-                <!-- Main Book Info -->
-                <v-card>
-                    <v-toolbar
-                        flat
-                        density="compact"
-                        class="book-action-toolbar"
-                        :color="store.theme === 'light' ? 'white' : 'grey-darken-4'"
+                <!-- Zone 1: Book title -->
+                <header
+                    class="book-title-block mb-4"
+                    data-testid="book-title-section"
+                >
+                    <h1 class="book-title">
+                        {{ book.title }}
+                    </h1>
+                </header>
+
+                <!-- Zone 2: Cover and metadata -->
+                <v-card
+                    variant="outlined"
+                    class="book-overview"
+                    data-testid="book-metadata-section"
+                >
+                    <v-row
+                        no-gutters
+                        align="start"
                     >
-                        <v-btn
-                            icon
-                            size="small"
-                            :aria-label="t('book.download')"
-                            @click="dialog_download = true"
-                        >
-                            <v-icon>mdi-download</v-icon>
-                        </v-btn>
-
-                        <v-spacer />
-
-                        <v-btn
-                            color="primary"
-                            variant="elevated"
-                            class="mx-2"
-                            @click="dialog_send_to_device = !dialog_send_to_device"
-                        >
-                            <v-icon start>
-                                mdi-devices
-                            </v-icon>
-                            {{ t('book.sendToDevice') }}
-                        </v-btn>
-
-                        <v-btn
-                            v-if="book.id > 0 && store.user.is_login"
-                            color="primary"
-                            variant="elevated"
-                            class="mx-2"
-                            :loading="readingStateLoading"
-                            @click="toggleShelf"
-                        >
-                            <v-icon start>
-                                mdi-bookshelf
-                            </v-icon>
-                            {{ isInShelf ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
-                        </v-btn>
-
-                        <v-btn
-                            v-if="book.id > 0 && book.media_type !== 'comic'"
-                            color="amber-darken-2"
-                            variant="elevated"
-                            class="mx-2"
-                            :to="'/book/' + book.id + '/audios'"
-                            data-testid="open-audiobook"
-                        >
-                            <v-icon start>
-                                mdi-book-music
-                            </v-icon>
-                            {{ t('audiobook.title') }}
-                        </v-btn>
-
-                        <v-btn
-                            v-if="book.id > 0 && hasCompatibleFormats"
-                            color="primary"
-                            variant="elevated"
-                            class="mx-2"
-                            :href="readerPath"
-                            target="_blank"
-                            data-testid="open-online-reader"
-                        >
-                            <v-icon start>
-                                mdi-book-open-page-variant
-                            </v-icon>
-                            {{ t('common.read') }}
-                        </v-btn>
-                        <v-btn
-                            v-else-if="book.id > 0"
-                            color="grey"
-                            variant="tonal"
-                            class="mx-2"
-                            disabled
-                            data-testid="online-reading-unsupported"
-                        >
-                            <v-icon start>
-                                mdi-book-off-outline
-                            </v-icon>
-                            {{ book.media_type === 'comic' ? t('book.comicReadUnsupported') : t('book.onlineReadUnsupported') }}
-                        </v-btn>
-
-                        <template v-if="book.is_owner">
-                            <v-menu offset-y>
-                                <template #activator="{ props }">
-                                    <v-btn
-                                        v-bind="props"
-                                        color="primary"
-                                        variant="elevated"
-                                        class="ml-2"
-                                    >
-                                        <v-icon start>
-                                            mdi-file-cog
-                                        </v-icon>
-                                        {{ t('book.process') }}
-                                        <v-icon size="small">
-                                            mdi-dots-vertical
-                                        </v-icon>
-                                    </v-btn>
-                                </template>
-                                <v-list density="compact">
-                                    <v-list-item :disabled="!hasEpubAzw3OrPDF" @click="save_meta_to_file">
-                                        <template #prepend>
-                                            <v-icon>mdi-file-sync</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.saveMetaToFile') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="show_conversion_dialog">
-                                        <template #prepend>
-                                            <v-icon>mdi-swap-horizontal</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.convert') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="seperate_book" :disabled="book.files && book.files.length <= 1">
-                                        <template #prepend>
-                                            <v-icon>mdi-content-copy</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.seperate') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="show_delete_format_dialog" :disabled="book.files && book.files.length <= 1">
-                                        <template #prepend>
-                                            <v-icon>mdi-file-document-remove-outline</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.deleteFormat') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="show_upload_format_dialog">
-                                        <template #prepend>
-                                            <v-icon>mdi-file-upload-outline</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <template v-if="bookToolActions.length > 0">
-                                        <v-divider />
-                                        <v-list-subheader>{{ t('book.pluginTools') }}</v-list-subheader>
-                                        <v-list-item
-                                            v-for="action in bookToolActions"
-                                            :key="action.plugin_key"
-                                            :to="{ path: action.route, query: { book_id: book.id } }"
-                                            :data-testid="`book-tool-${action.plugin_key}`"
-                                        >
-                                            <template #prepend>
-                                                <v-icon>{{ action.icon }}</v-icon>
-                                            </template>
-                                            <v-list-item-title>{{ action.name }}</v-list-item-title>
-                                        </v-list-item>
-                                    </template>
-                                    <template v-if="hasMixedMediaFormats">
-                                        <v-divider />
-                                        <v-list-subheader>{{ t('book.chooseMediaType') }}</v-list-subheader>
-                                        <v-list-item
-                                            data-testid="set-media-type-comic"
-                                            :disabled="setting_media_type"
-                                            @click="set_media_type('comic')"
-                                        >
-                                            <template #prepend>
-                                                <v-icon>mdi-image-multiple</v-icon>
-                                            </template>
-                                            <v-list-item-title>{{ t('book.setAsComic') }}</v-list-item-title>
-                                            <template #append>
-                                                <v-icon
-                                                    v-if="book.media_type === 'comic'"
-                                                    color="success"
-                                                >
-                                                    mdi-check-circle
-                                                </v-icon>
-                                            </template>
-                                        </v-list-item>
-                                        <v-list-item
-                                            data-testid="set-media-type-ebook"
-                                            :disabled="setting_media_type"
-                                            @click="set_media_type('ebook')"
-                                        >
-                                            <template #prepend>
-                                                <v-icon>mdi-book-outline</v-icon>
-                                            </template>
-                                            <v-list-item-title>{{ t('book.setAsEbook') }}</v-list-item-title>
-                                            <template #append>
-                                                <v-icon
-                                                    v-if="book.media_type === 'ebook'"
-                                                    color="success"
-                                                >
-                                                    mdi-check-circle
-                                                </v-icon>
-                                            </template>
-                                        </v-list-item>
-                                    </template>
-                                </v-list>
-                            </v-menu>
-
-                            <v-menu offset-y>
-                                <template #activator="{ props }">
-                                    <v-btn
-                                        v-bind="props"
-                                        color="primary"
-                                        variant="elevated"
-                                        class="ml-2 mr-4"
-                                    >
-                                        {{ t('common.manage') }}
-                                        <v-icon size="small">
-                                            mdi-dots-vertical
-                                        </v-icon>
-                                    </v-btn>
-                                </template>
-                                <v-list density="compact">
-                                    <v-list-item :to="'/book/' + book.id + '/edit'">
-                                        <template #prepend>
-                                            <v-icon>mdi-cog</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.editInfo') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="get_refer">
-                                        <template #prepend>
-                                            <v-icon>mdi-apps</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.updateFromInternet') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-list-item @click="set_scope">
-                                        <template #prepend>
-                                            <v-icon>{{ book.scope === 'private' ? 'mdi-earth-off' : 'mdi-earth' }}</v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ book.scope === 'private' ? t('book.setPublic') : t('book.setPrivate') }}</v-list-item-title>
-                                    </v-list-item>
-                                    <v-divider />
-                                    <v-list-item @click="delete_book">
-                                        <template #prepend>
-                                            <v-icon color="error">
-                                                mdi-delete-forever
-                                            </v-icon>
-                                        </template>
-                                        <v-list-item-title>{{ t('book.deleteBook') }}</v-list-item-title>
-                                    </v-list-item>
-                                </v-list>
-                            </v-menu>
-                        </template>
-                    </v-toolbar>
-                    <v-row>
                         <v-col
-                            class="mx-auto"
-                            cols="8"
+                            class="book-cover-column"
+                            cols="12"
                             sm="4"
                         >
-                            <div style="position: relative; display: inline-block; width: 100%;">
+                            <div class="book-cover-wrap">
                                 <v-img
                                     class="book-img"
                                     :src="book.img"
+                                    :alt="`${book.title} ${t('book.cover')}`"
                                     :aspect-ratio="11 / 15"
-                                    max-height="500px"
+                                    max-height="500"
                                     contain
-                                    style="border-radius: 14px;"
                                 />
                                 <div
                                     v-if="readingState === READING_STATE.FINISHED"
-                                    style="
-                                        position: absolute;
-                                        top: 95%;
-                                        left: 0;
-                                        right: 0;
-                                        height: 40px;
-                                        background: rgba(158, 158, 158, 0.7);
-                                        display: flex;
-                                        align-items: center;
-                                        justify-content: center;
-                                        z-index: 2;
-                                        box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-                                        backdrop-filter: blur(2px);
-                                    "
+                                    class="book-cover-status"
                                 >
-                                    <span
-                                        style="
-                                            color: white;
-                                            font-size: 1.2rem;
-                                            font-weight: bold;
-                                            text-shadow: 1px 1px 3px rgba(0,0,0,0.7);
-                                            line-height: 1;
-                                            letter-spacing: 2px;
-                                        "
-                                    >
-                                        {{ t('readingState.finished') }}
-                                    </span>
+                                    {{ t('readingState.finished') }}
                                 </div>
                             </div>
                         </v-col>
@@ -773,39 +534,119 @@
                             cols="12"
                             sm="8"
                         >
-                            <v-card-text>
-                                <div v-if="book.id > 0 && store.user.is_login">
-                                    <p class="text-h5 mb-2">
-                                        {{ book.title }}
-                                    </p>
-                                </div>
-                                <div v-else>
-                                    <p class="text-h5 mb-2">
-                                        {{ book.title }}
-                                    </p>
-                                </div>
-                                <div>
-                                    <span class="text-grey">{{ book.author }}著，{{ pub_year }}年版</span>
-                                    <span
+                            <v-card-text class="book-metadata">
+                                <dl class="book-facts">
+                                    <div
+                                        v-if="book.authors && book.authors.length > 0"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.field.authors') }}</dt>
+                                        <dd>
+                                            <v-chip
+                                                v-for="author in book.authors"
+                                                :key="'author-' + author"
+                                                class="mr-2 mb-2"
+                                                size="small"
+                                                color="primary"
+                                                :to="'/author/' + encodeURIComponent(author)"
+                                                variant="tonal"
+                                            >
+                                                <v-icon start>
+                                                    mdi-account
+                                                </v-icon>
+                                                {{ author }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div
+                                        v-if="book.publisher"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.publisher') }}</dt>
+                                        <dd>
+                                            <v-chip
+                                                size="small"
+                                                color="primary"
+                                                :to="'/publisher/' + encodeURIComponent(book.publisher)"
+                                                variant="tonal"
+                                            >
+                                                <v-icon start>
+                                                    mdi-domain
+                                                </v-icon>
+                                                {{ book.publisher }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div
+                                        v-if="book.series"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.series') }}</dt>
+                                        <dd>
+                                            <v-chip
+                                                size="small"
+                                                color="primary"
+                                                :to="'/series/' + encodeURIComponent(book.series)"
+                                                variant="tonal"
+                                            >
+                                                <v-icon start>
+                                                    mdi-bookshelf
+                                                </v-icon>
+                                                {{ book.series }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div class="book-facts__row">
+                                        <dt>{{ t('book.field.pubdate') }}</dt>
+                                        <dd>{{ pub_year }}</dd>
+                                    </div>
+                                    <div
                                         v-if="book.files && book.files.length > 0"
-                                        class="text-grey font-weight-bold"
-                                    >&nbsp;&nbsp;&nbsp;[{{ book.files.map(f => f.format).join(', ') }}<span v-if="book.files[0].size >= 1048576"> - {{ parseInt(book.files[0].size / 1048576) }}MB</span><span v-else-if="book.files[0].size > 0"> - {{ parseInt(book.files[0].size / 1024) }}KB</span>]</span>
-                                </div>
-                                <v-rating
-                                    v-model="book.rating"
-                                    color="yellow-darken-2"
-                                    length="10"
-                                    readonly
-                                    density="compact"
-                                    size="small"
-                                />
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.format') }}</dt>
+                                        <dd class="book-format-list">
+                                            <v-chip
+                                                v-for="file in book.files"
+                                                :key="file.format"
+                                                size="small"
+                                                variant="outlined"
+                                            >
+                                                {{ file.format }} · {{ formatFileSize(file.size) }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div
+                                        v-if="book.isbn"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.isbn') }}</dt>
+                                        <dd>{{ book.isbn }}</dd>
+                                    </div>
+                                    <div class="book-facts__row">
+                                        <dt>{{ t('book.field.rating') }}</dt>
+                                        <dd>
+                                            <v-rating
+                                                v-model="book.rating"
+                                                :aria-label="`${t('book.field.rating')} ${book.rating}`"
+                                                color="yellow-darken-2"
+                                                length="10"
+                                                readonly
+                                                density="compact"
+                                                size="small"
+                                            />
+                                        </dd>
+                                    </div>
+                                </dl>
+
                                 <div
                                     v-if="readingState === READING_STATE.READING"
-                                    class="mt-2"
+                                    class="mt-3"
                                 >
                                     <v-chip
                                         size="small"
                                         color="primary"
+                                        variant="tonal"
                                     >
                                         <v-icon
                                             size="small"
@@ -818,11 +659,12 @@
                                 </div>
                                 <div
                                     v-else-if="readingState === READING_STATE.FINISHED"
-                                    class="mt-2"
+                                    class="mt-3"
                                 >
                                     <v-chip
                                         size="small"
                                         color="grey"
+                                        variant="tonal"
                                     >
                                         <v-icon
                                             size="small"
@@ -833,65 +675,13 @@
                                         {{ completedReadingText }}
                                     </v-chip>
                                 </div>
-                                <br>
-                                <div class="tag-chips mt-2">
-                                    <v-chip
-                                        v-for="author in book.authors"
-                                        :key="'author-' + author"
-                                        class="ma-1"
-                                        size="small"
-                                        color="primary"
-                                        :to="'/author/' + encodeURIComponent(author)"
-                                        variant="tonal"
-                                    >
-                                        <v-icon start>
-                                            mdi-account
-                                        </v-icon>
-                                        {{ author }}
-                                    </v-chip>
-                                    <v-chip
-                                        v-if="book.publisher"
-                                        class="ma-1"
-                                        size="small"
-                                        color="primary"
-                                        :to="'/publisher/' + encodeURIComponent(book.publisher)"
-                                        variant="tonal"
-                                    >
-                                        <v-icon start>
-                                            mdi-domain
-                                        </v-icon>
-                                        {{ t('book.publisher') }}：{{ book.publisher }}
-                                    </v-chip>
-                                    <v-chip
-                                        v-if="book.series"
-                                        class="ma-1"
-                                        size="small"
-                                        color="primary"
-                                        :to="'/series/' + encodeURIComponent(book.series)"
-                                        variant="tonal"
-                                    >
-                                        <v-icon start>
-                                            mdi-bookshelf
-                                        </v-icon>
-                                        {{ t('book.series') }}: {{ book.series }}
-                                    </v-chip>
-                                    <v-chip
-                                        v-if="book.isbn"
-                                        class="ma-1"
-                                        size="small"
-                                        color="primary"
-                                        variant="tonal"
-                                    >
-                                        <v-icon start>
-                                            mdi-barcode
-                                        </v-icon>
-                                        ISBN：{{ book.isbn }}
-                                    </v-chip>
+
+                                <div class="tag-chips mt-4">
                                     <template v-for="tag in book.tags">
                                         <v-chip
                                             v-if="tag"
                                             :key="'tag-' + tag"
-                                            class="ma-1"
+                                            class="mr-2 mb-2"
                                             size="small"
                                             color="primary"
                                             :to="'/tag/' + encodeURIComponent(tag)"
@@ -905,7 +695,7 @@
                                     </template>
                                     <v-chip
                                         v-if="book.media_type && book.media_type !== 'unknown'"
-                                        class="ma-1"
+                                        class="mr-2 mb-2"
                                         size="small"
                                         :color="book.media_type === 'comic' ? 'deep-orange' : 'blue-grey'"
                                         variant="flat"
@@ -918,7 +708,7 @@
                                     </v-chip>
                                     <v-chip
                                         v-if="book.scope"
-                                        class="ma-1"
+                                        class="mr-2 mb-2"
                                         size="small"
                                         :color="book.scope === 'private' ? 'orange' : 'teal'"
                                         variant="flat"
@@ -929,6 +719,7 @@
                                         {{ book.scope === 'private' ? t('book.scopePrivate') : t('book.scopePublic') }}
                                     </v-chip>
                                 </div>
+
                                 <v-alert
                                     v-if="book.media_type === 'comic' && !hasCompatibleFormats"
                                     type="info"
@@ -939,182 +730,82 @@
                                 >
                                     {{ t('book.comicReadUnsupportedDescription') }}
                                 </v-alert>
-                            </v-card-text>
-                            <v-card-text>
-                                <p
-                                    v-if="book.id > 0 && book.comments && book.comments !== '暂无简介'"
-                                    class="book-comments"
-                                    v-html="book.comments"
-                                />
-                                <p v-else-if="book.id > 0">
-                                    {{ t('book.viewDetails') }}
-                                </p>
+
+                                <div class="book-provenance mt-4">
+                                    <span v-if="book.collector">
+                                        <v-icon size="small">mdi-account</v-icon>
+                                        {{ t('book.addedBy') }}：{{ book.collector }}
+                                    </span>
+                                    <span v-if="book.timestamp">
+                                        <v-icon size="small">mdi-clock</v-icon>
+                                        {{ t('book.addedAt') }}：{{ book.timestamp }}
+                                    </span>
+                                </div>
                             </v-card-text>
                         </v-col>
                     </v-row>
-                    <v-card-text class="text-right book-footer">
-                        <span class="text-grey"> {{ book.collector }} @ {{ book.timestamp }} </span>
-                    </v-card-text>
                 </v-card>
-            </v-col>
-        </v-row>
 
-        <!-- Action Buttons Below Main Content -->
-        <v-row class="mt-4">
-            <v-col cols="12">
-                <v-row justify="space-around">
-                    <v-col
-                        v-if="book.id > 0 && hasCompatibleFormats"
-                        cols="12"
-                        sm="6"
-                        md="auto"
-                        class="flex-grow-1"
+                <!-- Zone 3: Reader and owner actions -->
+                <BookDetailActions
+                    class="mt-4"
+                    :book="book"
+                    :reader-path="readerPath"
+                    :has-compatible-formats="hasCompatibleFormats"
+                    :can-save-metadata="hasEpubAzw3OrPDF"
+                    :has-mixed-media-formats="hasMixedMediaFormats"
+                    :book-tool-actions="bookToolActions"
+                    :setting-media-type="setting_media_type"
+                    :is-logged-in="store.user.is_login"
+                    :is-in-shelf="isInShelf"
+                    :reading-state="readingState"
+                    :reading-state-loading="readingStateLoading"
+                    :reading-state-text="readingStateText"
+                    @download="dialog_download = true"
+                    @send-to-device="dialog_send_to_device = true"
+                    @toggle-shelf="toggleShelf"
+                    @change-reading-state="handleReadingStateChange"
+                    @save-meta="save_meta_to_file"
+                    @convert="show_conversion_dialog"
+                    @separate="seperate_book"
+                    @delete-format="show_delete_format_dialog"
+                    @upload-format="show_upload_format_dialog"
+                    @set-media-type="set_media_type"
+                    @get-refer="get_refer"
+                    @set-scope="set_scope"
+                    @delete-book="delete_book"
+                />
+
+                <!-- Zone 4: Introduction and annotations -->
+                <v-card
+                    variant="outlined"
+                    class="book-introduction mt-4"
+                    data-testid="book-content-section"
+                >
+                    <v-card-title
+                        class="book-section-title"
+                        tag="h2"
                     >
-                        <v-card
-                            variant="outlined"
-                            class="mb-2 h-100"
-                        >
-                            <v-list density="compact">
-                                <v-list-item
-                                    :href="readerPath"
-                                    target="_blank"
-                                    class="w-100"
-                                >
-                                    <template #prepend>
-                                        <v-avatar color="primary">
-                                            <v-icon color="white">
-                                                mdi-book-open-page-variant
-                                            </v-icon>
-                                        </v-avatar>
-                                    </template>
-                                    <v-list-item-title>{{ t('book.onlineRead') }}</v-list-item-title>
-                                    <template #append>
-                                        <v-icon>mdi-chevron-right</v-icon>
-                                    </template>
-                                </v-list-item>
-                            </v-list>
-                        </v-card>
-                    </v-col>
-
-                    <v-col
-                        cols="12"
-                        sm="6"
-                        md="auto"
-                        class="flex-grow-1"
-                    >
-                        <v-card
-                            variant="outlined"
-                            class="mb-2 h-100"
-                        >
-                            <v-list density="compact">
-                                <v-list-item
-                                    class="w-100"
-                                    @click="dialog_download = !dialog_download"
-                                >
-                                    <template #prepend>
-                                        <v-avatar color="primary">
-                                            <v-icon color="white">
-                                                mdi-download
-                                            </v-icon>
-                                        </v-avatar>
-                                    </template>
-                                    <v-list-item-title>{{ t('common.download') }}</v-list-item-title>
-                                    <template #append>
-                                        <v-icon>mdi-chevron-right</v-icon>
-                                    </template>
-                                </v-list-item>
-                            </v-list>
-                        </v-card>
-                    </v-col>
-
-                    <v-col
-                        cols="12"
-                        sm="6"
-                        md="auto"
-                        class="flex-grow-1"
-                    >
-                        <v-card
-                            variant="outlined"
-                            class="mb-2 h-100"
-                        >
-                            <v-list density="compact">
-                                <v-list-item
-                                    class="w-100"
-                                    @click="dialog_send_to_device = !dialog_send_to_device"
-                                >
-                                    <template #prepend>
-                                        <v-avatar color="primary">
-                                            <v-icon color="white">
-                                                mdi-devices
-                                            </v-icon>
-                                        </v-avatar>
-                                    </template>
-                                    <v-list-item-title>
-                                        {{ t('book.sendToDevice') }}
-                                    </v-list-item-title>
-                                    <template #append>
-                                        <v-icon>mdi-chevron-right</v-icon>
-                                    </template>
-                                </v-list-item>
-                            </v-list>
-                        </v-card>
-                    </v-col>
-                </v-row>
-            </v-col>
-        </v-row>
-
-        <v-row
-            v-if="book.id > 0 && store.user.is_login"
-            class="mt-4"
-        >
-            <v-col cols="12">
-                <v-card variant="outlined">
+                        <v-icon size="small">
+                            mdi-text-box-outline
+                        </v-icon>
+                        <span>{{ t('book.introduction') }}</span>
+                    </v-card-title>
                     <v-card-text>
-                        <div class="d-flex flex-wrap align-center ga-2">
-                            <v-btn
-                                variant="tonal"
-                                :color="isInShelf ? 'orange' : 'primary'"
-                                size="small"
-                                @click="toggleShelf"
-                            >
-                                <v-icon start>
-                                    mdi-bookshelf
-                                </v-icon>
-                                {{ isInShelf ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
-                            </v-btn>
-
-                            <v-btn
-                                variant="tonal"
-                                :color="readingStateText.color"
-                                size="small"
-                                @click="handleReadingStateChange"
-                            >
-                                <v-icon start>
-                                    {{ readingStateText.icon }}
-                                </v-icon>
-                                {{ readingStateText.label }}
-                            </v-btn>
-
-                            <v-chip
-                                v-if="readingState > 0"
-                                size="small"
-                                :color="readingState === 1 ? 'blue' : 'grey'"
-                                class="ml-2"
-                            >
-                                {{ readingState === 1 ? t('book.currentlyReading') : t('book.alreadyFinished') }}
-                            </v-chip>
-                        </div>
+                        <div
+                            v-if="book.id > 0 && book.comments && book.comments !== '暂无简介'"
+                            class="book-comments"
+                            v-html="book.comments"
+                        />
+                        <p v-else-if="book.id > 0">
+                            {{ t('book.viewDetails') }}
+                        </p>
                     </v-card-text>
                 </v-card>
-            </v-col>
-        </v-row>
 
-        <v-row
-            v-if="book.id > 0 && store.user.is_login"
-            class="mt-4"
-        >
-            <v-col cols="12">
                 <AnnotationPanel
+                    v-if="book.id > 0 && store.user.is_login"
+                    class="mt-4"
                     :book-id="book.id"
                     hide-when-empty
                     @locate="openAnnotationInReader"
@@ -1132,6 +823,7 @@ import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import BookCards_Small from '~/components/BookCards_Small.vue';
 import BookConvertDialog from '~/components/BookConvertDialog.vue';
+import BookDetailActions from '~/components/BookDetailActions.vue';
 import AnnotationPanel from '~/components/AnnotationPanel.vue';
 import { READING_STATE, useBookReadingState } from '~/composables/useBookReadingState';
 import { readerPathForBook } from '~/utils/comic-reader';
@@ -1847,13 +1539,6 @@ const completedReadingText = computed(() => {
     return t('readingState.completedReading', { date: lastReadTime.value });
 });
 
-const readingStateButtonText = computed(() => {
-    if (readingState.value === READING_STATE.READING) {
-        return t('readingState.setDone');
-    }
-    return t('readingState.setReading');
-});
-
 // Load devices on mount
 const loadDevices = async () => {
     if (store.user?.is_login) {
@@ -1874,49 +1559,124 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.book-title-block {
+    padding: 4px 0 4px 18px;
+    border-inline-start: 5px solid rgb(var(--v-theme-primary));
+}
+
+.book-title {
+    margin: 0;
+    font-size: clamp(1.9rem, 4vw, 2.8rem);
+    font-weight: 750;
+    line-height: 1.16;
+    overflow-wrap: anywhere;
+}
+
+.book-overview {
+    overflow: hidden;
+}
+
+.book-cover-column {
+    padding: 24px;
+    background: rgba(var(--v-theme-primary), .045);
+}
+
+.book-cover-wrap {
+    position: relative;
+    width: min(100%, 320px);
+    margin-inline: auto;
+}
+
 .book-img {
-    border-radius: 4px;
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(20, 35, 55, .14);
 }
 
-.align-right {
-    text-align: right;
+.book-cover-status {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    background: rgba(55, 65, 81, .82);
+    border-radius: 0 0 14px 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    backdrop-filter: blur(3px);
 }
 
-.book-footer {
-    padding-top: 0;
-    padding-bottom: 3px;
+.book-metadata {
+    min-width: 0;
+    padding: 24px;
 }
 
-@media (max-width: 600px) {
-    .book-action-toolbar {
-        height: auto !important;
-    }
+.book-facts {
+    display: grid;
+    gap: 12px;
+    margin: 0;
+}
 
-    .book-action-toolbar :deep(.v-toolbar__content) {
-        height: auto !important;
-        min-height: 48px;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: 8px;
-        padding: 8px;
-    }
+.book-facts__row {
+    display: grid;
+    grid-template-columns: minmax(88px, .24fr) minmax(0, 1fr);
+    gap: 14px;
+    align-items: start;
+}
 
-    .book-action-toolbar :deep(.v-spacer) {
-        display: none;
-    }
+.book-facts dt {
+    color: rgba(var(--v-theme-on-surface), .62);
+    font-size: .875rem;
+    font-weight: 650;
+}
 
-    .book-action-toolbar :deep(.v-btn) {
-        margin-inline: 0 !important;
-    }
+.book-facts dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.book-format-list,
+.tag-chips,
+.book-provenance {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.book-provenance {
+    flex-direction: column;
+    padding-top: 16px;
+    color: rgba(var(--v-theme-on-surface), .62);
+    border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+    font-size: .8rem;
+    overflow-wrap: anywhere;
+}
+
+.book-provenance span {
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+}
+
+.book-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 700;
 }
 
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */
 .book-comments {
+    max-width: 75ch;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
     white-space: pre-line;
-}
-
-.tag-chips a {
-    margin: 4px 2px;
 }
 
 .refer-progress { padding:0 2px; }
@@ -1927,12 +1687,27 @@ onMounted(async () => {
 .device-target { display:grid; gap:12px; }
 .device-target__network { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,.38fr); gap:12px; }
 
-/* 减小管理菜单图标和文字的间距 */
-:deep(.v-list-item__spacer) {
-    width: 8px !important;
+@media (max-width: 600px) {
+    .book-title-block {
+        padding-inline-start: 13px;
+    }
+
+    .book-title {
+        font-size: clamp(1.75rem, 9vw, 2.35rem);
+    }
+
+    .book-cover-column,
+    .book-metadata {
+        padding: 18px;
+    }
+
+    .device-target__network { grid-template-columns:1fr; }
 }
 
-@media (max-width: 600px) {
-    .device-target__network { grid-template-columns:1fr; }
+@media (max-width: 480px) {
+    .book-facts__row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 5px;
+    }
 }
 </style>

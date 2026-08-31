@@ -172,7 +172,12 @@
     "setAsReading": "Set as Reading",
     "markAsFinished": "Mark as Finished",
     "currentlyReading": "Currently Reading",
-    "alreadyFinished": "Already Finished"
+    "alreadyFinished": "Already Finished",
+    "readerActions": "Book actions",
+    "ownerActions": "Owner controls",
+    "introduction": "Introduction",
+    "addedBy": "Added by",
+    "addedAt": "Added at"
   },
   "readingState": {
     "reading": "Reading",

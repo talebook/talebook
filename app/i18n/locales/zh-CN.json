@@ -176,7 +176,12 @@
     "setAsReading": "设为在读",
     "markAsFinished": "标记读完",
     "currentlyReading": "在读",
-    "alreadyFinished": "已读完"
+    "alreadyFinished": "已读完",
+    "readerActions": "书籍操作",
+    "ownerActions": "管理操作",
+    "introduction": "内容简介",
+    "addedBy": "上传者",
+    "addedAt": "上传时间"
   },
   "readingState": {
     "reading": "在读",
