@@ -539,14 +539,15 @@
                             v-if="book.id > 0 && store.user.is_login && hasEpubFormat"
                             color="deep-orange-darken-2"
                             variant="elevated"
-                            class="mx-2"
+                            class="tale-agent-entry mx-2"
                             :to="'/book/' + book.id + '/tale-agent'"
+                            :aria-label="t('taleAgent.title')"
                             data-testid="open-tale-agent"
                         >
                             <v-icon start>
                                 mdi-account-star-outline
                             </v-icon>
-                            {{ t('taleAgent.title') }}
+                            <span class="tale-agent-entry__label">{{ t('taleAgent.title') }}</span>
                         </v-btn>
 
                         <v-btn
@@ -1778,5 +1779,20 @@ onMounted(async () => {
 /* 减小管理菜单图标和文字的间距 */
 :deep(.v-list-item__spacer) {
     width: 8px !important;
+}
+
+@media (max-width: 960px) {
+    .tale-agent-entry {
+        min-width: 40px !important;
+        padding-inline: 8px !important;
+    }
+
+    .tale-agent-entry :deep(.v-icon--start) {
+        margin-inline-end: 0;
+    }
+
+    .tale-agent-entry__label {
+        display: none;
+    }
 }
 </style>

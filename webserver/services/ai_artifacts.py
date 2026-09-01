@@ -236,7 +236,7 @@ class TaleAgentArtifactStore:
             if moved_old:
                 shutil.rmtree(backup, ignore_errors=True)
         except Exception:
-            if artifact_root.exists():
+            if moved_old and artifact_root.exists():
                 shutil.rmtree(artifact_root, ignore_errors=True)
             if moved_old and backup.exists():
                 os.replace(backup, artifact_root)

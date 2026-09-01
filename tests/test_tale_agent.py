@@ -166,6 +166,17 @@ class TaleAgentArtifactStoreTest(unittest.TestCase):
             store.delete(7, first.ref.relative_path)
             self.assertFalse(Path(directory, first.ref.relative_path).parent.exists())
 
+    def test_staging_failure_preserves_the_live_bundle_before_backup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = TaleAgentArtifactStore(directory, "agents")
+            first = store.replace_agent(7, "agent-1", manifest_payload())
+
+            with mock.patch("webserver.services.ai_artifacts.os.open", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    store.replace_agent(7, "agent-1", {**manifest_payload(), "display_name": "阿宁"})
+
+            self.assertEqual(store.read_agent(7, first.ref.relative_path, first.ref.sha256)["display_name"], "林舟")
+
 
 class TaleAgentAPITest(test_main.TestWithUserLogin):
     def setUp(self):
@@ -204,25 +215,28 @@ class TaleAgentAPITest(test_main.TestWithUserLogin):
     def _json_post(self, url, body):
         return self.json(url, method="POST", headers={"Content-Type": "application/json"}, body=json.dumps(body))
 
-    def _create_preview(self, cutoff=CHAPTERS[1]["href"]):
+    def _create_preview(self, cutoff=CHAPTERS[1]["href"], requested_name="林舟", display_name="林舟"):
         with mock.patch.object(TaleAgentService, "submit_preview"):
             response = self._json_post(
                 "/api/ai/tale-agent/previews",
-                {"book_id": test_main.BID_EPUB, "name": "林舟", "cutoff_href": cutoff},
+                {"book_id": test_main.BID_EPUB, "name": requested_name, "cutoff_href": cutoff},
             )
         self.assertEqual(response["err"], "ok")
         session = test_main.get_db()
         preview = session.get(models.AITask, response["preview"]["id"])
         preview.status = "succeeded"
-        manifest = manifest_payload(1 if cutoff == CHAPTERS[0]["href"] else 2)
+        manifest = {
+            **manifest_payload(1 if cutoff == CHAPTERS[0]["href"] else 2),
+            "display_name": display_name,
+        }
         write = self.artifacts.replace_agent(preview.creator_id, preview.id, manifest, preview=True)
         preview.result_data = write.ref.to_dict()
         session.commit()
         self.assertEqual(set(preview.result_data), {"artifact_path", "artifact_sha256", "artifact_status"})
         return preview.id
 
-    def _create_agent(self, cutoff=CHAPTERS[1]["href"]):
-        preview_id = self._create_preview(cutoff)
+    def _create_agent(self, cutoff=CHAPTERS[1]["href"], requested_name="林舟", display_name="林舟"):
+        preview_id = self._create_preview(cutoff, requested_name=requested_name, display_name=display_name)
         response = self._json_post("/api/ai/tale-agent/agents", {"preview_id": preview_id})
         self.assertEqual(response["err"], "ok")
         return response["agent"]
@@ -353,13 +367,28 @@ class TaleAgentAPITest(test_main.TestWithUserLogin):
         self.assertEqual(lowered["agent"]["cutoff"]["index"], 0)
         self.assertEqual(conversation["cutoff"]["index"], 0)
 
+    def test_ai_recommended_agent_can_regenerate_the_same_identity(self):
+        agent = self._create_agent(CHAPTERS[0]["href"], requested_name="")
+        preview_id = self._create_preview(CHAPTERS[1]["href"], requested_name="")
+
+        response = self.json(
+            f"/api/ai/tale-agent/agents/{agent['id']}",
+            method="PATCH",
+            headers={"Content-Type": "application/json"},
+            body=json.dumps({"preview_id": preview_id}),
+        )
+
+        self.assertEqual(response["err"], "ok")
+        self.assertEqual(response["agent"]["display_name"], "林舟")
+        self.assertEqual(response["agent"]["cutoff"]["index"], 1)
+
     def test_boundary_preview_cannot_change_agent_identity(self):
         agent = self._create_agent(CHAPTERS[0]["href"])
-        preview_id = self._create_preview(CHAPTERS[1]["href"])
-        session = test_main.get_db()
-        preview = session.get(models.AITask, preview_id)
-        preview.ai_draft = {**(preview.ai_draft or {}), "requested_name": "另一个角色"}
-        session.commit()
+        preview_id = self._create_preview(
+            CHAPTERS[1]["href"],
+            requested_name="另一个角色",
+            display_name="另一个角色",
+        )
 
         response = self.json(
             f"/api/ai/tale-agent/agents/{agent['id']}",
@@ -388,6 +417,15 @@ class TaleAgentAPITest(test_main.TestWithUserLogin):
             )
         self.assertEqual(response["err"], "ok")
         submit.assert_called_once()
+
+    def test_stream_returns_login_error_instead_of_awaiting_a_dict(self):
+        self.user.return_value = None
+        try:
+            response = self.json("/api/ai/tale-agent/messages/11111111-1111-1111-1111-111111111111/stream")
+        finally:
+            self.user.return_value = 1
+
+        self.assertEqual(response["err"], "user.need_login")
 
     def test_cancel_and_retry_stay_in_the_conversation_json(self):
         agent = self._create_agent()

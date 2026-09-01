@@ -964,7 +964,6 @@ class TaleAgentItem(_TaleAgentBase):
             or preview.status != "succeeded"
             or preview.book_id != agent.book_id
             or preview.book_version != agent.book_version
-            or (preview.ai_draft or {}).get("requested_name") != agent.display_name
         ):
             return {"err": "ai.preview_required", "msg": "调整边界前需要生成并确认新的安全预览"}
         new_index = int((preview.ai_draft or {}).get("cutoff_index", 0))
@@ -972,6 +971,8 @@ class TaleAgentItem(_TaleAgentBase):
             manifest = self._preview_manifest(preview)
         except TaleAgentArtifactError:
             return self._artifact_error()
+        if manifest["display_name"] != agent.display_name:
+            return {"err": "ai.preview_required", "msg": "调整边界不能改变 TaleAgent 人物"}
         write = self._artifacts().replace_agent(agent.creator_id, agent.id, manifest)
         agent.display_name = manifest["display_name"]
         agent.manifest_path = write.ref.relative_path
@@ -1161,6 +1162,7 @@ class TaleAgentMessageFeedback(_TaleAgentBase):
 
 
 class TaleAgentMessageStream(_TaleAgentBase):
+    @js
     @auth
     async def get(self, message_id):
         message, conversation, _agent, _book, error = self._message_access(message_id)

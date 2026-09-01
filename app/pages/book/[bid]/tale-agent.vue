@@ -350,7 +350,8 @@
                                 color="deep-orange-darken-2"
                                 icon="mdi-send"
                                 :aria-label="t('taleAgent.send')"
-                                :disabled="!draft.trim() || hasPendingMessage"
+                                :loading="sendingMessage"
+                                :disabled="!draft.trim() || hasPendingMessage || sendingMessage"
                             />
                         </form>
                         <div class="composer-note">
@@ -409,6 +410,7 @@ const preview = ref<any>(null);
 const previewBusy = computed(() => ['queued', 'running'].includes(preview.value?.status));
 const deleteDialog = ref(false);
 const draft = ref('');
+const sendingMessage = ref(false);
 const messagesContainer = ref<HTMLElement | null>(null);
 let disposed = false;
 
@@ -519,12 +521,19 @@ async function streamMessage(message: any) {
 
 async function sendMessage() {
     const content = draft.value.trim();
-    if (!content) return;
-    draft.value = '';
-    const response = await $backend(`/ai/tale-agent/conversations/${conversation.value.id}/messages`, jsonOptions('POST', { content }));
-    if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
-    upsertMessage(response.message);
-    await streamMessage(response.message);
+    if (!content || sendingMessage.value) return;
+    sendingMessage.value = true;
+    try {
+        const response = await $backend(`/ai/tale-agent/conversations/${conversation.value.id}/messages`, jsonOptions('POST', { content }));
+        if (response.err !== 'ok') { errorMessage.value = response.msg; return; }
+        if (draft.value.trim() === content) draft.value = '';
+        upsertMessage(response.message);
+        await streamMessage(response.message);
+    } catch (error: any) {
+        errorMessage.value = error.message || String(error);
+    } finally {
+        sendingMessage.value = false;
+    }
 }
 
 async function stopMessage(message: any) {
@@ -560,7 +569,8 @@ onBeforeUnmount(() => { disposed = true; });
 </script>
 
 <style scoped>
-.tale-agent-page { --agent-accent: #9a4d38; --agent-paper: rgb(var(--v-theme-surface)); }
+.tale-agent-page { --agent-accent: #9a4d38; --agent-accent-fill: #9a4d38; --agent-paper: rgb(var(--v-theme-surface)); }
+:global(.v-theme--dark) .tale-agent-page { --agent-accent: #e7a38e; }
 .page-hero { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:30px; border:1px solid rgba(var(--v-border-color),.18); border-radius:24px; background:linear-gradient(135deg,rgba(154,77,56,.11),rgba(232,168,83,.07)); }
 .page-hero h1,.agent-console h2,.empty-chat h2 { margin:2px 0 6px; font-family:Georgia,"Noto Serif SC",serif; line-height:1.2; }
 .page-hero p,.agent-console p,.empty-chat p { margin:0; color:rgba(var(--v-theme-on-surface),.68); }
@@ -580,7 +590,7 @@ onBeforeUnmount(() => { disposed = true; });
 .chat-shell { overflow:hidden; }
 .messages { min-height:360px; max-height:62vh; padding:24px; overflow-y:auto; background:linear-gradient(180deg,rgba(var(--v-theme-surface),1),rgba(var(--v-theme-background),.7)); }
 .chat-empty { padding:80px 20px; color:rgba(var(--v-theme-on-surface),.68); text-align:center; }
-.message-turn + .message-turn { margin-top:26px; }.bubble { width:fit-content; max-width:min(78%,720px); padding:12px 15px; border-radius:16px; white-space:pre-wrap; }.user-bubble { margin-left:auto; color:#fff; border-bottom-right-radius:5px; background:var(--agent-accent); }
+.message-turn + .message-turn { margin-top:26px; }.bubble { width:fit-content; max-width:min(78%,720px); padding:12px 15px; border-radius:16px; white-space:pre-wrap; }.user-bubble { margin-left:auto; color:#fff; border-bottom-right-radius:5px; background:var(--agent-accent-fill); }
 .assistant-row { display:flex; align-items:flex-start; gap:11px; margin-top:12px; }.mini-avatar { width:30px; height:30px; border-radius:9px; font:800 .65rem system-ui,sans-serif; }.assistant-content { max-width:min(86%,760px); }.answer-text { margin:0; white-space:pre-wrap; }
 .generating,.message-error { display:flex; align-items:center; gap:9px; color:rgba(var(--v-theme-on-surface),.65); }.message-error { color:rgb(var(--v-theme-error)); }
 .feedback-row { display:flex; flex-wrap:wrap; align-items:center; gap:3px; margin-top:10px; color:rgba(var(--v-theme-on-surface),.68); font-size:.75rem; }

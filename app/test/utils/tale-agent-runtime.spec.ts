@@ -16,6 +16,9 @@ describe('TaleAgent UI contract', () => {
         expect(page).toContain('taleAgent.recommendTarget');
         expect(page).toContain(':error-messages="customNameError"');
         expect(page).toContain("sendFeedback(message, 'not_useful')");
+        expect(page).toContain('const sendingMessage = ref(false)');
+        expect(page).toContain("if (draft.value.trim() === content) draft.value = '';");
+        expect(page).toContain(':global(.v-theme--dark) .tale-agent-page');
         expect(page).not.toContain('spoiler_confirmed');
         expect(page).not.toContain('too_much_quote');
         expect(page).toContain('deleteAgent');
@@ -23,6 +26,8 @@ describe('TaleAgent UI contract', () => {
 
     it('is reachable from an EPUB book and keeps both locales complete', () => {
         expect(detail).toContain('data-testid="open-tale-agent"');
+        expect(detail).toContain('class="tale-agent-entry mx-2"');
+        expect(detail).toContain('@media (max-width: 960px)');
         expect(detail).toContain('hasEpubFormat');
         expect(detail).toContain("'/tale-agent'");
         expect(en.taleAgent.title).toBe('TaleAgent');
