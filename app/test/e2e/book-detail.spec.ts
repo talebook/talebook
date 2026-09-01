@@ -121,6 +121,7 @@ test.describe('Book Detail Page', () => {
         ]) {
             await page.setViewportSize(viewport);
             await page.waitForTimeout(100);
+            await page.getByTestId('metadata-reading-row').scrollIntoViewIfNeeded();
             const layout = await page.evaluate(() => {
                 const collect = (rowTestId, statusTestId, actionTestId) => {
                     const row = document.querySelector(`[data-testid="${rowTestId}"]`);
@@ -137,9 +138,11 @@ test.describe('Book Detail Page', () => {
                     const controlStyle = getComputedStyle(control);
                     const statusStyle = getComputedStyle(status);
                     const actionStyle = getComputedStyle(action);
+                    const actionTargetStyle = getComputedStyle(action, '::before');
                     return {
+                        row: { height: row.getBoundingClientRect().height },
                         label: { left: labelRect.left, right: labelRect.right, top: labelRect.top, bottom: labelRect.bottom },
-                        control: { left: controlRect.left, top: controlRect.top, bottom: controlRect.bottom },
+                        control: { left: controlRect.left, top: controlRect.top, bottom: controlRect.bottom, height: controlRect.height },
                         status: { left: statusRect.left, top: statusRect.top, width: statusRect.width, height: statusRect.height },
                         action: { left: actionRect.left, top: actionRect.top, width: actionRect.width, height: actionRect.height },
                         display: controlStyle.display,
@@ -148,11 +151,36 @@ test.describe('Book Detail Page', () => {
                         iconSize: getComputedStyle(icon).fontSize,
                         actionBackground: actionStyle.backgroundColor,
                         actionBorder: actionStyle.borderTopWidth,
+                        actionOverflow: actionStyle.overflow,
+                        actionTargetHeight: Number.parseFloat(actionTargetStyle.height),
                     };
+                };
+                const referenceRows = Array.from(document.querySelectorAll('.book-facts__row:not(.book-facts__row--state)'));
+                const referenceRowHeights = referenceRows.map(row => row.getBoundingClientRect().height);
+                const referenceControlHeights = referenceRows
+                    .map(row => row.querySelector('dd')?.getBoundingClientRect().height)
+                    .filter(height => typeof height === 'number');
+                const hitsExpandedTarget = (selector, edge) => {
+                    const action = document.querySelector(selector);
+                    if (!action) return false;
+                    const rect = action.getBoundingClientRect();
+                    const x = rect.left + rect.width / 2;
+                    const y = edge === 'top' ? rect.top - 6 : rect.bottom + 6;
+                    return document.elementFromPoint(x, y)?.closest(selector) === action;
                 };
                 return {
                     reading: collect('metadata-reading-row', 'metadata-reading-status', 'metadata-reading-action'),
                     shelf: collect('metadata-shelf-row', 'metadata-shelf-status', 'metadata-shelf-action'),
+                    reference: {
+                        rowMin: Math.min(...referenceRowHeights),
+                        rowMax: Math.max(...referenceRowHeights),
+                        controlMin: Math.min(...referenceControlHeights),
+                        controlMax: Math.max(...referenceControlHeights),
+                    },
+                    expandedTarget: {
+                        readingTop: hitsExpandedTarget('[data-testid="metadata-reading-action"]', 'top'),
+                        shelfBottom: hitsExpandedTarget('[data-testid="metadata-shelf-action"]', 'bottom'),
+                    },
                 };
             });
 
@@ -171,8 +199,24 @@ test.describe('Book Detail Page', () => {
             expect(reading.borderRadius).toBe(shelf.borderRadius);
             expect(reading.iconSize).toBe('18px');
             expect(shelf.iconSize).toBe('18px');
-            expect(reading.action.height).toBeGreaterThanOrEqual(44);
-            expect(shelf.action.height).toBeGreaterThanOrEqual(44);
+            expect(reading.row.height).toBeGreaterThanOrEqual(layout.reference.rowMin);
+            expect(reading.row.height).toBeLessThanOrEqual(layout.reference.rowMax);
+            expect(shelf.row.height).toBeGreaterThanOrEqual(layout.reference.rowMin);
+            expect(shelf.row.height).toBeLessThanOrEqual(layout.reference.rowMax);
+            expect(reading.control.height).toBe(reading.status.height);
+            expect(shelf.control.height).toBe(shelf.status.height);
+            expect(reading.control.height).toBeGreaterThanOrEqual(layout.reference.controlMin);
+            expect(reading.control.height).toBeLessThanOrEqual(layout.reference.controlMax);
+            expect(shelf.control.height).toBeGreaterThanOrEqual(layout.reference.controlMin);
+            expect(shelf.control.height).toBeLessThanOrEqual(layout.reference.controlMax);
+            expect(reading.action.height).toBeLessThan(44);
+            expect(shelf.action.height).toBeLessThan(44);
+            expect(reading.actionTargetHeight).toBe(44);
+            expect(shelf.actionTargetHeight).toBe(44);
+            expect(reading.actionOverflow).toBe('visible');
+            expect(shelf.actionOverflow).toBe('visible');
+            expect(layout.expandedTarget.readingTop).toBe(true);
+            expect(layout.expandedTarget.shelfBottom).toBe(true);
             expect(reading.actionBackground).toBe('rgba(0, 0, 0, 0)');
             expect(shelf.actionBackground).toBe('rgba(0, 0, 0, 0)');
             expect(reading.actionBorder).toBe('0px');
@@ -292,6 +336,10 @@ test.describe('Book Detail Page', () => {
             'book-action-process',
             'book-action-manage',
         ];
+        const compactMetadataActions = new Set([
+            'metadata-shelf-action',
+            'metadata-reading-action',
+        ]);
         for (const testId of actionTestIds) {
             const action = page.getByTestId(testId);
             await action.scrollIntoViewIfNeeded();
@@ -300,7 +348,13 @@ test.describe('Book Detail Page', () => {
             expect(bounds).not.toBeNull();
             expect(bounds!.x).toBeGreaterThanOrEqual(0);
             expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
-            expect(bounds!.height).toBeGreaterThanOrEqual(44);
+            if (compactMetadataActions.has(testId)) {
+                expect(bounds!.height).toBeLessThan(44);
+                expect(await action.evaluate(element => Number.parseFloat(getComputedStyle(element, '::before').height))).toBe(44);
+            }
+            else {
+                expect(bounds!.height).toBeGreaterThanOrEqual(44);
+            }
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -321,7 +375,13 @@ test.describe('Book Detail Page', () => {
             expect(bounds).not.toBeNull();
             expect(bounds!.x).toBeGreaterThanOrEqual(0);
             expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
-            expect(bounds!.height).toBeGreaterThanOrEqual(44);
+            if (compactMetadataActions.has(testId)) {
+                expect(bounds!.height).toBeLessThan(44);
+                expect(await page.getByTestId(testId).evaluate(element => Number.parseFloat(getComputedStyle(element, '::before').height))).toBe(44);
+            }
+            else {
+                expect(bounds!.height).toBeGreaterThanOrEqual(44);
+            }
         }
     });
 

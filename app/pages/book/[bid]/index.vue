@@ -1754,8 +1754,18 @@ onMounted(async () => {
 .book-state-control :deep(.v-btn) {
     justify-self: start;
     min-width: 0;
-    min-height: 44px;
+    overflow: visible;
     padding-inline: 8px;
+}
+
+.book-state-control :deep(.v-btn)::before {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: 44px;
+    content: '';
+    transform: translateY(-50%);
 }
 
 .book-format-list,
