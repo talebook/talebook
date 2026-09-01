@@ -1012,8 +1012,16 @@ class BookDelete(BaseHandler):
         if not can_manage or not (self.is_admin() or self.is_book_owner(bid, self.user_id())):
             return {"err": "permission", "msg": _("无权操作")}
 
-        from webserver.models import AITask, ScanFile
-        from webserver.services.ai_artifacts import SUMMARY_DUCK_FEATURE, AIArtifactError, AIArtifactStore
+        from webserver.models import AITask, ScanFile, TaleAgent, TaleAgentConversation
+        from webserver.services.ai_artifacts import (
+            SUMMARY_DUCK_FEATURE,
+            AIArtifactError,
+            AIArtifactStore,
+            TaleAgentArtifactError,
+            TaleAgentArtifactStore,
+        )
+        from webserver.services.tale_agent import FEATURE_KEY as TALE_AGENT_FEATURE_KEY
+        from webserver.services.tale_agent import TaleAgentService, conversation_messages
 
         artifact_store = AIArtifactStore(CONF)
         ai_tasks = self.session.query(AITask).filter(AITask.book_id == bid).all()
@@ -1031,11 +1039,54 @@ class BookDelete(BaseHandler):
             self.db.delete_book(bid)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        tale_agent_runtime = TaleAgentService()
+        tale_agent_runtime.setup(self.settings["SessionMaker"], CONF)
+        active_preview_ids = [
+            row[0]
+            for row in self.session.query(AITask.id).filter(
+                AITask.book_id == bid,
+                AITask.feature == TALE_AGENT_FEATURE_KEY,
+                AITask.status.in_(["queued", "running"]),
+            )
+        ]
+        for preview_id in active_preview_ids:
+            tale_agent_runtime.cancel(preview_id)
+        preview_artifacts = []
+        for preview in self.session.query(AITask).filter(
+            AITask.book_id == bid,
+            AITask.feature == TALE_AGENT_FEATURE_KEY,
+        ):
+            ref = preview.result_data or {}
+            if ref.get("artifact_path"):
+                preview_artifacts.append((preview.creator_id, ref["artifact_path"]))
         self.session.query(AITask).filter(AITask.book_id == bid).delete()
+        agents = self.session.query(TaleAgent).filter(TaleAgent.book_id == bid).all()
+        agent_ids = [agent.id for agent in agents]
+        agent_artifacts = [(agent.creator_id, agent.manifest_path) for agent in agents]
+        if agent_ids:
+            conversations = self.session.query(TaleAgentConversation).filter(
+                TaleAgentConversation.tale_agent_id.in_(agent_ids)
+            )
+            for conversation in conversations:
+                for message in conversation_messages(conversation):
+                    if message.get("status") in {"queued", "running"}:
+                        tale_agent_runtime.cancel(message["id"])
+            conversations.delete(synchronize_session=False)
+            self.session.query(TaleAgent).filter(TaleAgent.id.in_(agent_ids)).delete(synchronize_session=False)
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()
+        artifacts = TaleAgentArtifactStore.from_config(CONF, "agents")
+        cleanup_failed = False
+        for owner_id, relative_path in preview_artifacts + agent_artifacts:
+            try:
+                artifacts.delete(owner_id, relative_path)
+            except TaleAgentArtifactError:
+                cleanup_failed = True
+                logging.exception("Failed to clean AI artifact for deleted book bid=%s", bid)
         self.add_msg("success", _("删除书籍《%s》") % book["title"])
+        if cleanup_failed:
+            return {"err": "ai.artifact_cleanup_failed", "msg": _("书籍已删除，但部分 AI 产物目录清理失败")}
         return {"err": "ok", "msg": _("删除成功")}
 
 

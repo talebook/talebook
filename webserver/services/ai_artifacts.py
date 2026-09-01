@@ -11,9 +11,417 @@ import re
 import shutil
 import tempfile
 import threading
+import urllib.parse
 import uuid
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Mapping, Optional
+
+
+DEFAULT_AI_ARTIFACT_ROOT = "/data/books/ai"
+DEFAULT_WORKSPACE_SECRET = "cookie_secret"
+SAFE_SEGMENT_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$")
+AGENT_ENTRY_FILENAME = "AGENTS.md"
+AGENT_PROFILE_PATH = PurePosixPath("references", "profile.md")
+AGENT_THINKING_PATH = PurePosixPath("references", "thinking.md")
+AGENT_SOURCES_PATH = PurePosixPath("references", "sources.md")
+AGENT_REFERENCE_PATHS = (AGENT_PROFILE_PATH, AGENT_THINKING_PATH, AGENT_SOURCES_PATH)
+AGENT_BUNDLE_PATHS = (AGENT_ENTRY_FILENAME, *(path.as_posix() for path in AGENT_REFERENCE_PATHS))
+AGENT_MAX_LINES = 80
+
+
+class TaleAgentArtifactError(RuntimeError):
+    """Raised when an artifact path or its content cannot be trusted."""
+
+
+@dataclass(frozen=True)
+class ArtifactRef:
+    relative_path: str
+    sha256: str
+    status: str = "ready"
+
+    def to_dict(self) -> Dict[str, str]:
+        return {
+            "artifact_path": self.relative_path,
+            "artifact_sha256": self.sha256,
+            "artifact_status": self.status,
+        }
+
+
+@dataclass(frozen=True)
+class ArtifactWrite:
+    ref: ArtifactRef
+    previous: Optional[Dict[str, bytes]]
+
+
+def workspace_id(owner_id: int, secret: str = DEFAULT_WORKSPACE_SECRET) -> str:
+    """Return a stable opaque directory name without user-facing identifiers."""
+
+    del secret
+    try:
+        value = int(owner_id)
+    except (TypeError, ValueError) as exc:
+        raise TaleAgentArtifactError("invalid artifact owner") from exc
+    if value <= 0:
+        raise TaleAgentArtifactError("invalid artifact owner")
+    return workspace_identifier(value, {})
+
+
+class TaleAgentArtifactStore:
+    """Store one standard Markdown Agent directory below books/ai."""
+
+    def __init__(self, root: str, feature: str, workspace_secret: str = DEFAULT_WORKSPACE_SECRET):
+        if not SAFE_SEGMENT_RE.fullmatch(feature or ""):
+            raise TaleAgentArtifactError("invalid artifact feature")
+        self.root = Path(root or DEFAULT_AI_ARTIFACT_ROOT).expanduser().resolve()
+        self.feature = feature
+        self.workspace_secret = str(workspace_secret or DEFAULT_WORKSPACE_SECRET)
+
+    @classmethod
+    def from_config(cls, config: Dict[str, Any], feature: str) -> "TaleAgentArtifactStore":
+        return cls(
+            str(config.get("AI_ARTIFACT_ROOT") or DEFAULT_AI_ARTIFACT_ROOT),
+            feature,
+            str(config.get("AI_ARTIFACT_WORKSPACE_SECRET") or config.get("cookie_secret") or DEFAULT_WORKSPACE_SECRET),
+        )
+
+    def agent_path(self, owner_id: int, artifact_id: str, preview: bool = False) -> str:
+        if not SAFE_SEGMENT_RE.fullmatch(str(artifact_id or "")):
+            raise TaleAgentArtifactError("invalid artifact id")
+        parts = [workspace_id(owner_id, self.workspace_secret), self.feature]
+        if preview:
+            parts.append("previews")
+        parts.extend([str(artifact_id), AGENT_ENTRY_FILENAME])
+        return PurePosixPath(*parts).as_posix()
+
+    def replace_agent(
+        self,
+        owner_id: int,
+        artifact_id: str,
+        payload: Dict[str, Any],
+        preview: bool = False,
+    ) -> ArtifactWrite:
+        checked = self._normalize_payload(payload)
+        relative_path = self.agent_path(owner_id, artifact_id, preview=preview)
+        entry = self._resolve_entry(owner_id, relative_path)
+        previous = self._read_existing_bundle(entry.parent)
+        bundle = {
+            AGENT_ENTRY_FILENAME: self._render_agents(checked).encode("utf-8"),
+            AGENT_PROFILE_PATH.as_posix(): self._render_profile(checked).encode("utf-8"),
+            AGENT_THINKING_PATH.as_posix(): self._render_thinking(checked).encode("utf-8"),
+            AGENT_SOURCES_PATH.as_posix(): self._render_sources(checked).encode("utf-8"),
+        }
+        self._replace_bundle(entry.parent, bundle)
+        return ArtifactWrite(
+            ref=ArtifactRef(relative_path=relative_path, sha256=self._bundle_digest(bundle)),
+            previous=previous,
+        )
+
+    def restore(self, owner_id: int, write: ArtifactWrite) -> None:
+        entry = self._resolve_entry(owner_id, write.ref.relative_path)
+        if write.previous is None:
+            self.delete(owner_id, write.ref.relative_path)
+            return
+        self._replace_bundle(entry.parent, write.previous)
+
+    def read_agent(self, owner_id: int, relative_path: str, expected_sha256: str) -> Dict[str, Any]:
+        entry = self._resolve_entry(owner_id, relative_path)
+        try:
+            bundle = {path: entry.parent.joinpath(*PurePosixPath(path).parts).read_bytes() for path in AGENT_BUNDLE_PATHS}
+        except OSError as exc:
+            raise TaleAgentArtifactError("artifact is unavailable") from exc
+        actual_paths = {path.relative_to(entry.parent).as_posix() for path in entry.parent.rglob("*") if path.is_file()}
+        if actual_paths != set(AGENT_BUNDLE_PATHS):
+            raise TaleAgentArtifactError("artifact integrity check failed")
+        if not expected_sha256 or not hmac.compare_digest(self._bundle_digest(bundle), expected_sha256):
+            raise TaleAgentArtifactError("artifact integrity check failed")
+        try:
+            agents_text = bundle[AGENT_ENTRY_FILENAME].decode("utf-8")
+            profile_text = bundle[AGENT_PROFILE_PATH.as_posix()].decode("utf-8")
+            thinking_text = bundle[AGENT_THINKING_PATH.as_posix()].decode("utf-8")
+            sources_text = bundle[AGENT_SOURCES_PATH.as_posix()].decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise TaleAgentArtifactError("artifact content is invalid") from exc
+        if len(agents_text.splitlines()) > AGENT_MAX_LINES:
+            raise TaleAgentArtifactError("AGENTS.md exceeds 80 lines")
+        payload = self._parse_references(profile_text, thinking_text, sources_text)
+        expected_title = f"# TaleAgent: {payload['display_name']}"
+        referenced_paths = {f"`{path.as_posix()}`" for path in AGENT_REFERENCE_PATHS}
+        if not agents_text.startswith(expected_title + "\n") or any(path not in agents_text for path in referenced_paths):
+            raise TaleAgentArtifactError("artifact content is invalid")
+        return payload
+
+    def delete(self, owner_id: int, relative_path: str) -> None:
+        entry = self._resolve_entry(owner_id, relative_path)
+        artifact_root = entry.parent
+        try:
+            shutil.rmtree(artifact_root)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise TaleAgentArtifactError("artifact cleanup failed") from exc
+
+        feature_root = self.root / workspace_id(owner_id, self.workspace_secret) / self.feature
+        parent = artifact_root.parent
+        while parent != feature_root and feature_root in parent.parents:
+            try:
+                parent.rmdir()
+            except OSError:
+                break
+            parent = parent.parent
+
+    def _resolve_entry(self, owner_id: int, relative_path: str) -> Path:
+        path = PurePosixPath(str(relative_path or ""))
+        parts = path.parts
+        expected_prefix = (workspace_id(owner_id, self.workspace_secret), self.feature)
+        if path.is_absolute() or tuple(parts[:2]) != expected_prefix or parts[-1:] != (AGENT_ENTRY_FILENAME,):
+            raise TaleAgentArtifactError("artifact path is outside the owner workspace")
+        artifact_parts = parts[2:-1]
+        valid_final = len(artifact_parts) == 1 and artifact_parts[0] != "previews"
+        valid_preview = len(artifact_parts) == 2 and artifact_parts[0] == "previews"
+        artifact_id = artifact_parts[-1] if artifact_parts else ""
+        if not (valid_final or valid_preview) or not SAFE_SEGMENT_RE.fullmatch(artifact_id):
+            raise TaleAgentArtifactError("artifact path is invalid")
+        target = self.root.joinpath(*parts).resolve()
+        try:
+            target.relative_to(self.root)
+        except ValueError as exc:
+            raise TaleAgentArtifactError("artifact path is outside the storage root") from exc
+        return target
+
+    def _read_existing_bundle(self, artifact_root: Path) -> Optional[Dict[str, bytes]]:
+        if not artifact_root.exists():
+            return None
+        previous: Dict[str, bytes] = {}
+        for path in artifact_root.rglob("*"):
+            if path.is_file():
+                previous[path.relative_to(artifact_root).as_posix()] = path.read_bytes()
+        return previous
+
+    @staticmethod
+    def _bundle_digest(bundle: Dict[str, bytes]) -> str:
+        digest = hashlib.sha256()
+        for relative_path in sorted(bundle):
+            digest.update(relative_path.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(bundle[relative_path])
+            digest.update(b"\0")
+        return digest.hexdigest()
+
+    @staticmethod
+    def _replace_bundle(artifact_root: Path, bundle: Dict[str, bytes]) -> None:
+        artifact_root.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        staging = Path(tempfile.mkdtemp(prefix=f".{artifact_root.name}-", suffix=".tmp", dir=str(artifact_root.parent)))
+        backup = artifact_root.parent / f".{artifact_root.name}-{uuid.uuid4().hex}.bak"
+        moved_old = False
+        try:
+            os.chmod(staging, 0o700)
+            for relative_path, content in bundle.items():
+                target = staging.joinpath(*PurePosixPath(relative_path).parts)
+                target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            if artifact_root.exists():
+                os.replace(artifact_root, backup)
+                moved_old = True
+            os.replace(staging, artifact_root)
+            directory_fd = os.open(str(artifact_root.parent), os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+            if moved_old:
+                shutil.rmtree(backup, ignore_errors=True)
+        except Exception:
+            if moved_old and artifact_root.exists():
+                shutil.rmtree(artifact_root, ignore_errors=True)
+            if moved_old and backup.exists():
+                os.replace(backup, artifact_root)
+            raise
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+            if backup.exists() and artifact_root.exists():
+                shutil.rmtree(backup, ignore_errors=True)
+
+    @staticmethod
+    def _one_line(value: Any, label: str) -> str:
+        if not isinstance(value, str):
+            raise TaleAgentArtifactError(f"{label} is invalid")
+        text = " ".join(value.split())
+        if not text:
+            raise TaleAgentArtifactError(f"{label} is invalid")
+        return text
+
+    @classmethod
+    def _normalize_payload(cls, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise TaleAgentArtifactError("artifact payload must be an object")
+
+        def values(key: str, minimum: int, maximum: int) -> list[str]:
+            raw = payload.get(key)
+            if not isinstance(raw, list) or not minimum <= len(raw) <= maximum:
+                raise TaleAgentArtifactError(f"{key} is invalid")
+            return [cls._one_line(item, key) for item in raw]
+
+        raw_sources = payload.get("sources")
+        if not isinstance(raw_sources, list) or not raw_sources:
+            raise TaleAgentArtifactError("sources is invalid")
+        sources = []
+        for source in raw_sources:
+            if not isinstance(source, dict):
+                raise TaleAgentArtifactError("sources is invalid")
+            sources.append(
+                {
+                    "href": cls._one_line(source.get("href"), "source href"),
+                    "title": cls._one_line(source.get("title"), "source title"),
+                }
+            )
+        return {
+            "display_name": cls._one_line(payload.get("display_name"), "display_name"),
+            "introduction": cls._one_line(payload.get("introduction"), "introduction"),
+            "thinking_patterns": values("thinking_patterns", 3, 6),
+            "decision_principles": values("decision_principles", 2, 6),
+            "problem_solving_steps": values("problem_solving_steps", 3, 6),
+            "blind_spots": values("blind_spots", 1, 4),
+            "sources": sources,
+            "ai_derived": True,
+        }
+
+    @staticmethod
+    def _render_agents(payload: Dict[str, Any]) -> str:
+        content = f"""# TaleAgent: {payload["display_name"]}
+
+You are a TaleAgent derived from a person described in a book.
+
+## Required context
+
+Read all of these authoritative context documents before answering:
+
+- `references/profile.md`
+- `references/thinking.md`
+- `references/sources.md`
+
+## Working method
+
+- Understand the user's real problem before applying the reference model.
+- Use its thinking patterns, decision principles, and problem-solving steps to propose concrete next actions.
+- Surface the documented blind spots when this perspective may fail.
+- Do not invent evidence or claim to be the original person.
+- Keep the answer concise and useful rather than performing a character imitation.
+"""
+        if len(content.splitlines()) > AGENT_MAX_LINES:
+            raise TaleAgentArtifactError("AGENTS.md exceeds 80 lines")
+        return content
+
+    @staticmethod
+    def _render_profile(payload: Dict[str, Any]) -> str:
+        lines = [
+            "# TaleAgent Profile",
+            "",
+            "## Display Name",
+            payload["display_name"],
+            "",
+            "## Introduction",
+            payload["introduction"],
+            "",
+        ]
+        return "\n".join(lines)
+
+    @staticmethod
+    def _render_thinking(payload: Dict[str, Any]) -> str:
+        lines = ["# TaleAgent Thinking Model", ""]
+        sections = (
+            ("Thinking Patterns", payload["thinking_patterns"]),
+            ("Decision Principles", payload["decision_principles"]),
+            ("Problem-Solving Steps", payload["problem_solving_steps"]),
+            ("Blind Spots", payload["blind_spots"]),
+        )
+        for heading, values in sections:
+            lines.extend([f"## {heading}", *[f"- {value}" for value in values], ""])
+        return "\n".join(lines)
+
+    @staticmethod
+    def _render_sources(payload: Dict[str, Any]) -> str:
+        lines = ["# TaleAgent Sources", ""]
+        for source in payload["sources"]:
+            href = urllib.parse.quote(source["href"], safe="/._-~")
+            lines.extend([f"- href: `{href}`", f"  title: {source['title']}"])
+        return "\n".join(lines) + "\n"
+
+    @classmethod
+    def _parse_sections(cls, content: str, title: str, expected: set[str]) -> Dict[str, list[str]]:
+        lines = content.splitlines()
+        if not lines or lines[0] != title:
+            raise TaleAgentArtifactError("artifact content is invalid")
+        sections: Dict[str, list[str]] = {}
+        current = ""
+        for line in lines[1:]:
+            if line.startswith("## "):
+                current = line[3:]
+                if current in sections:
+                    raise TaleAgentArtifactError("artifact content is invalid")
+                sections[current] = []
+            elif current and line:
+                sections[current].append(line)
+        if set(sections) != expected:
+            raise TaleAgentArtifactError("artifact content is invalid")
+        return sections
+
+    @classmethod
+    def _parse_references(cls, profile: str, thinking: str, sources_content: str) -> Dict[str, Any]:
+        profile_sections = cls._parse_sections(
+            profile,
+            "# TaleAgent Profile",
+            {"Display Name", "Introduction"},
+        )
+        thinking_sections = cls._parse_sections(
+            thinking,
+            "# TaleAgent Thinking Model",
+            {"Thinking Patterns", "Decision Principles", "Problem-Solving Steps", "Blind Spots"},
+        )
+
+        def scalar(sections: Dict[str, list[str]], name: str) -> str:
+            values = sections[name]
+            if len(values) != 1:
+                raise TaleAgentArtifactError("artifact content is invalid")
+            return cls._one_line(values[0], name)
+
+        def bullets(name: str) -> list[str]:
+            values = thinking_sections[name]
+            if not values or any(not value.startswith("- ") for value in values):
+                raise TaleAgentArtifactError("artifact content is invalid")
+            return [cls._one_line(value[2:], name) for value in values]
+
+        source_lines = sources_content.splitlines()
+        if len(source_lines) < 3 or source_lines[:2] != ["# TaleAgent Sources", ""]:
+            raise TaleAgentArtifactError("artifact content is invalid")
+        source_lines = source_lines[2:]
+        if not source_lines or len(source_lines) % 2:
+            raise TaleAgentArtifactError("artifact content is invalid")
+        sources = []
+        for index in range(0, len(source_lines), 2):
+            href_line, title_line = source_lines[index : index + 2]
+            if not href_line.startswith("- href: `") or not href_line.endswith("`") or not title_line.startswith("  title: "):
+                raise TaleAgentArtifactError("artifact content is invalid")
+            sources.append(
+                {
+                    "href": urllib.parse.unquote(href_line[len("- href: `") : -1]),
+                    "title": cls._one_line(title_line[len("  title: ") :], "source title"),
+                }
+            )
+        payload = {
+            "display_name": scalar(profile_sections, "Display Name"),
+            "introduction": scalar(profile_sections, "Introduction"),
+            "thinking_patterns": bullets("Thinking Patterns"),
+            "decision_principles": bullets("Decision Principles"),
+            "problem_solving_steps": bullets("Problem-Solving Steps"),
+            "blind_spots": bullets("Blind Spots"),
+            "sources": sources,
+        }
+        return cls._normalize_payload(payload)
 
 
 SUMMARY_DUCK_FEATURE = "summary_duck"

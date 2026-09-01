@@ -39,6 +39,8 @@ class RuntimeRequest:
     output_schema: Dict[str, Any]
     model: Optional[str] = None
     service_name: str = "talebook_ai"
+    started_message: str = "正在分析内容"
+    progress_message: str = "正在生成结果"
 
 
 @dataclasses.dataclass(frozen=True)

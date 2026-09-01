@@ -577,6 +577,49 @@ class AITask(Base, SQLAlchemyMixin):
     creator = relationship(Reader, backref="ai_tasks")
 
 
+class TaleAgent(Base, SQLAlchemyMixin):
+    """A creator-private index for a directory-backed person manifest."""
+
+    __tablename__ = "tale_agents"
+
+    id = Column(String(36), primary_key=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_version = Column(String(128), nullable=False)
+    display_name = Column(String(200), nullable=False)
+    manifest_path = Column(String(1024), nullable=False)
+    manifest_sha256 = Column(String(64), nullable=False)
+    artifact_status = Column(String(24), default="ready", nullable=False, index=True)
+    cutoff_href = Column(String(1024), nullable=False)
+    cutoff_title = Column(String(512), default="")
+    cutoff_index = Column(Integer, nullable=False)
+    schema_version = Column(String(32), default="tale_agent_manifest.v2", nullable=False)
+    prompt_version = Column(String(32), default="tale_agent_manifest.zh.v2", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    creator = relationship(Reader, backref="tale_agents")
+
+
+class TaleAgentConversation(Base, SQLAlchemyMixin):
+    """One private TaleAgent conversation with all message state in one JSON field."""
+
+    __tablename__ = "tale_agent_conversations"
+
+    id = Column(String(36), primary_key=True)
+    tale_agent_id = Column(String(36), ForeignKey("tale_agents.id"), nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    cutoff_href = Column(String(1024), nullable=False)
+    cutoff_title = Column(String(512), default="")
+    cutoff_index = Column(Integer, nullable=False)
+    messages = Column(MutableDict.as_mutable(JSONType), default={}, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    tale_agent = relationship(TaleAgent, backref="conversations")
+    creator = relationship(Reader, backref="tale_agent_conversations")
+
+
 class Skill(Base, SQLAlchemyMixin):
     """Creator-private index for a directory-authoritative Agent Skill."""
 
