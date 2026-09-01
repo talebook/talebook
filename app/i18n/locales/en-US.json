@@ -172,6 +172,7 @@
     "readingStatus": "Reading status",
     "shelfStatus": "Shelf status",
     "wantToReadStatus": "Want to read",
+    "notAddedToShelf": "Not on shelf",
     "addedToShelf": "Added to shelf",
     "setAsWantToRead": "Set as want to read",
     "setAsReading": "Set as Reading",

@@ -89,7 +89,7 @@ test.describe('Book Detail Page', () => {
 
         await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
         await expect(page.getByTestId('metadata-reading-action')).toContainText('设为在读');
-        await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
         await expect(page.getByTestId('metadata-shelf-action')).toContainText('加入书架');
         await expect(page.getByTestId('book-action-shelf')).toHaveCount(0);
         await expect(page.getByTestId('book-action-reading-state')).toHaveCount(0);
@@ -109,6 +109,80 @@ test.describe('Book Detail Page', () => {
 
         await page.getByTestId('metadata-reading-action').click();
         await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
+    });
+
+    test('uses one aligned field-status-action structure for both metadata state rows', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+        for (const viewport of [
+            { width: 1280, height: 900 },
+            { width: 390, height: 844 },
+        ]) {
+            await page.setViewportSize(viewport);
+            await page.waitForTimeout(100);
+            const layout = await page.evaluate(() => {
+                const collect = (rowTestId, statusTestId, actionTestId) => {
+                    const row = document.querySelector(`[data-testid="${rowTestId}"]`);
+                    const label = row?.querySelector('dt');
+                    const control = row?.querySelector('dd');
+                    const status = document.querySelector(`[data-testid="${statusTestId}"]`);
+                    const action = document.querySelector(`[data-testid="${actionTestId}"]`);
+                    const icon = status?.querySelector('.v-icon');
+                    if (!row || !label || !control || !status || !action || !icon) return null;
+                    const labelRect = label.getBoundingClientRect();
+                    const controlRect = control.getBoundingClientRect();
+                    const statusRect = status.getBoundingClientRect();
+                    const actionRect = action.getBoundingClientRect();
+                    const controlStyle = getComputedStyle(control);
+                    const statusStyle = getComputedStyle(status);
+                    const actionStyle = getComputedStyle(action);
+                    return {
+                        label: { left: labelRect.left, right: labelRect.right, top: labelRect.top, bottom: labelRect.bottom },
+                        control: { left: controlRect.left, top: controlRect.top, bottom: controlRect.bottom },
+                        status: { left: statusRect.left, top: statusRect.top, width: statusRect.width, height: statusRect.height },
+                        action: { left: actionRect.left, top: actionRect.top, width: actionRect.width, height: actionRect.height },
+                        display: controlStyle.display,
+                        columns: controlStyle.gridTemplateColumns,
+                        borderRadius: statusStyle.borderRadius,
+                        iconSize: getComputedStyle(icon).fontSize,
+                        actionBackground: actionStyle.backgroundColor,
+                        actionBorder: actionStyle.borderTopWidth,
+                    };
+                };
+                return {
+                    reading: collect('metadata-reading-row', 'metadata-reading-status', 'metadata-reading-action'),
+                    shelf: collect('metadata-shelf-row', 'metadata-shelf-status', 'metadata-shelf-action'),
+                };
+            });
+
+            expect(layout.reading).not.toBeNull();
+            expect(layout.shelf).not.toBeNull();
+            const reading = layout.reading!;
+            const shelf = layout.shelf!;
+            expect(reading.display).toBe('grid');
+            expect(reading.columns).toBe(shelf.columns);
+            expect(Math.abs(reading.status.left - shelf.status.left)).toBeLessThanOrEqual(1);
+            expect(Math.abs(reading.status.width - shelf.status.width)).toBeLessThanOrEqual(1);
+            expect(Math.abs(reading.status.height - shelf.status.height)).toBeLessThanOrEqual(1);
+            expect(Math.abs(reading.action.left - shelf.action.left)).toBeLessThanOrEqual(1);
+            expect(Math.abs((reading.status.top + reading.status.height / 2) - (reading.action.top + reading.action.height / 2))).toBeLessThanOrEqual(1);
+            expect(Math.abs((shelf.status.top + shelf.status.height / 2) - (shelf.action.top + shelf.action.height / 2))).toBeLessThanOrEqual(1);
+            expect(reading.borderRadius).toBe(shelf.borderRadius);
+            expect(reading.iconSize).toBe('18px');
+            expect(shelf.iconSize).toBe('18px');
+            expect(reading.action.height).toBeGreaterThanOrEqual(44);
+            expect(shelf.action.height).toBeGreaterThanOrEqual(44);
+            expect(reading.actionBackground).toBe('rgba(0, 0, 0, 0)');
+            expect(shelf.actionBackground).toBe('rgba(0, 0, 0, 0)');
+            expect(reading.actionBorder).toBe('0px');
+            expect(shelf.actionBorder).toBe('0px');
+
+            if (viewport.width <= 480) {
+                expect(reading.label.bottom).toBeLessThanOrEqual(reading.control.top);
+                expect(shelf.label.bottom).toBeLessThanOrEqual(shelf.control.top);
+            }
+        }
     });
 
     test('aligns the title with the cover and lets the introduction use the full width', async ({ page }) => {

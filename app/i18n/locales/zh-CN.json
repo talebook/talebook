@@ -176,6 +176,7 @@
     "readingStatus": "阅读状态",
     "shelfStatus": "书架状态",
     "wantToReadStatus": "想读",
+    "notAddedToShelf": "未加入书架",
     "addedToShelf": "已加入书架",
     "setAsWantToRead": "设为想读",
     "setAsReading": "设为在读",

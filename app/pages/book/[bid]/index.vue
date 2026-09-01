@@ -639,7 +639,7 @@
                                     </div>
                                     <div
                                         v-if="book.id > 0 && store.user.is_login"
-                                        class="book-facts__row"
+                                        class="book-facts__row book-facts__row--state"
                                         data-testid="metadata-reading-row"
                                     >
                                         <dt>{{ t('book.readingStatus') }}</dt>
@@ -675,7 +675,7 @@
                                     </div>
                                     <div
                                         v-if="book.id > 0 && store.user.is_login"
-                                        class="book-facts__row"
+                                        class="book-facts__row book-facts__row--state"
                                         data-testid="metadata-shelf-row"
                                     >
                                         <dt>{{ t('book.shelfStatus') }}</dt>
@@ -684,27 +684,26 @@
                                             aria-live="polite"
                                         >
                                             <v-chip
-                                                v-if="isInShelf"
                                                 size="small"
-                                                color="success"
+                                                :color="isInShelf ? 'success' : 'blue-grey'"
                                                 variant="tonal"
                                                 data-testid="metadata-shelf-status"
                                             >
                                                 <v-icon start>
                                                     mdi-bookshelf
                                                 </v-icon>
-                                                {{ t('book.addedToShelf') }}
+                                                {{ isInShelf ? t('book.addedToShelf') : t('book.notAddedToShelf') }}
                                             </v-chip>
                                             <v-btn
                                                 size="small"
                                                 :color="isInShelf ? 'orange-darken-2' : 'primary'"
-                                                :variant="isInShelf ? 'text' : 'tonal'"
+                                                variant="text"
                                                 :loading="readingStateLoading"
                                                 data-testid="metadata-shelf-action"
                                                 @click="toggleShelf"
                                             >
                                                 <v-icon start>
-                                                    {{ isInShelf ? 'mdi-bookshelf-minus' : 'mdi-bookshelf-plus' }}
+                                                    {{ isInShelf ? 'mdi-book-remove-outline' : 'mdi-plus' }}
                                                 </v-icon>
                                                 {{ isInShelf ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
                                             </v-btn>
@@ -1729,15 +1728,34 @@ onMounted(async () => {
     overflow-wrap: anywhere;
 }
 
+.book-facts__row--state {
+    align-items: center;
+}
+
 .book-state-control {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 112px minmax(0, 1fr);
     gap: 8px;
     align-items: center;
 }
 
+.book-state-control :deep(.v-chip) {
+    justify-content: flex-start;
+    width: 112px;
+    min-width: 112px;
+    height: 30px;
+    border-radius: 999px;
+}
+
+.book-state-control :deep(.v-icon) {
+    font-size: 18px;
+}
+
 .book-state-control :deep(.v-btn) {
+    justify-self: start;
+    min-width: 0;
     min-height: 44px;
+    padding-inline: 8px;
 }
 
 .book-format-list,
