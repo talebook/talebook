@@ -80,7 +80,7 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('book-content-section')).toContainText(apiBook.book.comments.slice(0, 20));
     });
 
-    test('uses whitespace and soft surfaces instead of outlined section cards', async ({ page }) => {
+    test('uses whitespace instead of outlined cards or container surfaces', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
 
@@ -110,8 +110,25 @@ test.describe('Book Detail Page', () => {
         }
 
         await expect(page.locator('.book-annotations')).toHaveCount(1);
-        expect(await page.locator('.book-annotations').evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
-        expect(await page.getByTestId('book-action-section').evaluate(element => getComputedStyle(element).backgroundImage)).toContain('linear-gradient');
+        for (const selector of [
+            '[data-testid="book-action-section"]',
+            '.book-provenance',
+            '.book-annotations',
+        ]) {
+            const styles = await page.locator(selector).evaluate((element) => {
+                const computed = getComputedStyle(element);
+                return {
+                    backgroundColor: computed.backgroundColor,
+                    backgroundImage: computed.backgroundImage,
+                    borderRadius: computed.borderRadius,
+                };
+            });
+            expect(styles).toEqual({
+                backgroundColor: 'rgba(0, 0, 0, 0)',
+                backgroundImage: 'none',
+                borderRadius: '0px',
+            });
+        }
     });
 
     test('keeps every reader and owner action reachable on a narrow mobile viewport', async ({ page }) => {

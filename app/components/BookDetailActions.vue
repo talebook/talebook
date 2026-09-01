@@ -344,13 +344,7 @@ const { t } = useI18n();
 
 <style scoped>
 .book-actions {
-    padding: clamp(22px, 3vw, 32px);
-    background: linear-gradient(
-        135deg,
-        rgba(var(--v-theme-primary), .075),
-        rgba(var(--v-theme-primary), .025)
-    );
-    border-radius: 22px;
+    padding-block: 2px;
 }
 
 .book-actions__title {
@@ -398,11 +392,6 @@ const { t } = useI18n();
 }
 
 @media (max-width: 480px) {
-    .book-actions {
-        padding: 20px 14px;
-        border-radius: 16px;
-    }
-
     .book-actions__grid,
     .book-actions__grid--owner {
         grid-template-columns: minmax(0, 1fr);

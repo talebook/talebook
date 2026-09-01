@@ -1661,10 +1661,7 @@ onMounted(async () => {
 
 .book-provenance {
     flex-direction: column;
-    padding: 14px 16px;
     color: rgba(var(--v-theme-on-surface), .62);
-    background: rgba(var(--v-theme-on-surface), .035);
-    border-radius: 12px;
     font-size: .8rem;
     overflow-wrap: anywhere;
 }
@@ -1694,9 +1691,9 @@ onMounted(async () => {
 }
 
 .book-annotations {
-    background: rgba(var(--v-theme-on-surface), .025);
+    background: transparent;
     border: 0;
-    border-radius: 20px;
+    border-radius: 0;
 }
 
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */
