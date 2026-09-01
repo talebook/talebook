@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
+import datetime
 import logging
 import os
 import shutil
@@ -54,7 +55,7 @@ class TrashManager:
         for root, dirs, files in os.walk(path):
             for f in files:
                 fp = os.path.join(root, f)
-                if not os.path.isfile(fp):
+                if os.path.islink(fp) or not os.path.isfile(fp):
                     continue
                 if not os.access(fp, os.R_OK):
                     continue
@@ -85,6 +86,104 @@ class TrashManager:
             TrashManager.TRASH_SIZES_CACHE["trash"] = 0
             TrashManager.TRASH_SIZES_CACHE["upload"] = 0
             TrashManager.TRASH_SIZES_CACHE["ts"] = 0
+
+    @staticmethod
+    def _book_trash_path(cache, book_id):
+        """Return a Calibre-owned trash path for an integer book id."""
+        book_id = int(book_id)
+        trash_root = os.path.realpath(cache.backend.trash_dir)
+        book_root = os.path.realpath(os.path.join(trash_root, "b"))
+        path = os.path.realpath(os.path.join(book_root, str(book_id)))
+        if os.path.commonpath((book_root, path)) != book_root:
+            raise ValueError("invalid trash book path")
+        return path
+
+    @staticmethod
+    def _trash_book_formats(path):
+        formats = []
+        try:
+            entries = os.scandir(path)
+        except OSError:
+            return formats
+        with entries:
+            for entry in entries:
+                if not entry.is_file(follow_symlinks=False):
+                    continue
+                name = entry.name.lower()
+                if name in ("cover.jpg", "metadata.opf", "annotations.json") or "." not in name:
+                    continue
+                formats.append(name.rsplit(".", 1)[-1].upper())
+        return sorted(set(formats))
+
+    @classmethod
+    def list_books(cls, cache):
+        """List whole-book entries using Calibre as the source of truth."""
+        books, _ = cache.list_trash_entries()
+        items = []
+        for entry in books:
+            path = cls._book_trash_path(cache, entry.book_id)
+            deleted_at = datetime.datetime.fromtimestamp(entry.mtime, tz=datetime.timezone.utc)
+            items.append(
+                {
+                    "id": entry.book_id,
+                    "title": entry.title,
+                    "author": entry.author,
+                    "deleted_at": deleted_at.isoformat().replace("+00:00", "Z"),
+                    "size": cls._calc_dir_size(path),
+                    "formats": cls._trash_book_formats(path),
+                }
+            )
+        items.sort(key=lambda item: item["deleted_at"], reverse=True)
+        return items
+
+    @classmethod
+    def restore_books(cls, db, book_ids):
+        """Restore trash entries and refresh the legacy Calibre facade."""
+        cache = db.new_api
+        available = {entry.book_id for entry in cache.list_trash_entries()[0]}
+        existing = set(cache.all_book_ids())
+        restored = []
+        failures = []
+        for book_id in dict.fromkeys(book_ids):
+            if book_id not in available:
+                failures.append({"id": book_id, "reason": "not_found"})
+                continue
+            if book_id in existing:
+                failures.append({"id": book_id, "reason": "id_conflict"})
+                continue
+            try:
+                cache.move_book_from_trash(book_id)
+                # LibraryDatabase keeps a separate legacy data cache. The new
+                # API restores metadata.db and files; explicitly publish the
+                # added id so existing Talebook reads see it immediately.
+                db.data.books_added((book_id,))
+                db.notify("add", [book_id])
+                restored.append(book_id)
+                existing.add(book_id)
+            except Exception:
+                logging.exception("Failed to restore Calibre trash book %s", book_id)
+                failures.append({"id": book_id, "reason": "restore_failed"})
+        cls.clear_trash_cache()
+        return restored, failures
+
+    @classmethod
+    def delete_books(cls, cache, book_ids):
+        """Permanently delete whole-book trash entries by integer id."""
+        available = {entry.book_id for entry in cache.list_trash_entries()[0]}
+        deleted = []
+        failures = []
+        for book_id in dict.fromkeys(book_ids):
+            if book_id not in available:
+                failures.append({"id": book_id, "reason": "not_found"})
+                continue
+            try:
+                cache.delete_trash_entry(book_id, "b")
+                deleted.append(book_id)
+            except Exception:
+                logging.exception("Failed to permanently delete Calibre trash book %s", book_id)
+                failures.append({"id": book_id, "reason": "delete_failed"})
+        cls.clear_trash_cache()
+        return deleted, failures
 
     @staticmethod
     def clear_trashs():

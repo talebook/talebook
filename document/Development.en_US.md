@@ -21,7 +21,7 @@ talebook/
 The recommended local development approach:
 
 - **Backend**: `make dev` —— Run the backend in a Docker container, while mounting the `webserver/` directory into the container. The Python code will auto-restart the service after modifications.
-- **Frontend**: `cd app && npm run dev` —— Start the Nuxt development server locally (default `http://localhost:3000`). The `routeRules` in `nuxt.config.ts` has configured reverse proxy for `/api/**`, `/get/**`, `/read/**` to the backend container (default `http://127.0.0.1:8080`).
+- **Frontend**: `cd app && npm run dev` —— Start the Nuxt development server locally (default `http://localhost:3000`). The `routeRules` in `nuxt.config.ts` has configured reverse proxy for `/api/**`, `/get/**`, `/read/**`, and `/read-comic/**` to the backend container (default `http://127.0.0.1:8080`).
 
 This combination: frontend hot reload, backend auto-restart, no manual Nginx configuration needed.
 

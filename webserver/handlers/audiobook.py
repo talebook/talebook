@@ -184,10 +184,17 @@ def _can_subscription_view(session, reader, book_id):
     return not item or item.scope != "private" or (reader and item.collector_id == reader.id)
 
 
+def _supports_audiobook_source(book):
+    if book.get("media_type") == "comic":
+        return False
+    formats = {str(value).upper() for value in book.get("available_formats", [])}
+    return bool(formats.intersection({"EPUB", "TXT"}))
+
+
 def _generation_capability(handler, book):
     enabled = bool(CONF.get("AUDIOBOOK_ENABLED", True))
-    formats = {str(value).upper() for value in book.get("available_formats", [])}
-    compatible = bool(formats.intersection({"EPUB", "TXT"}))
+    is_comic = book.get("media_type") == "comic"
+    compatible = _supports_audiobook_source(book)
     owner_allowed = bool(
         handler.current_user
         and CONF.get("AUDIOBOOK_OWNER_GENERATE", False)
@@ -204,6 +211,8 @@ def _generation_capability(handler, book):
     capacity_ok = free_bytes >= minimum_bytes
     if not enabled:
         reason = "disabled"
+    elif is_comic:
+        reason = "media_type.not_supported"
     elif not compatible:
         reason = "format.not_supported"
     elif not handler.current_user:
@@ -319,6 +328,8 @@ class AudiobookDetail(BaseHandler):
         book = self.get_book(book_id, raise_exception=False)
         if not book:
             return {"err": "not_found", "msg": _("书籍不存在")}
+        if book.get("media_type") == "comic":
+            return {"err": "media_type.not_supported", "msg": _("漫画不支持生成有声书")}
         query = self.session.query(AudiobookEdition).filter(AudiobookEdition.book_id == int(book_id))
         if not (self.is_admin() or (self.current_user and self.is_book_owner(int(book_id), self.user_id()))):
             query = query.filter(AudiobookEdition.status == "published")
@@ -468,13 +479,14 @@ class AudiobookJobCreate(BaseHandler):
         owner_allowed = CONF.get("AUDIOBOOK_OWNER_GENERATE", False) and self.is_book_owner(int(book_id), self.user_id())
         if not self.is_admin() and not owner_allowed:
             return {"err": "permission", "msg": _("只有管理员或获准的书籍所有者可以生成有声书")}
+        if book.get("media_type") == "comic":
+            return {"err": "media_type.not_supported", "msg": _("漫画不支持生成有声书")}
         storage = AudiobookStorage()
         storage.ensure()
         minimum_bytes = max(0.0, float(CONF.get("AUDIOBOOK_MIN_FREE_GB", 5))) * 1024**3
         if shutil.disk_usage(storage.root).free < minimum_bytes:
             return {"err": "audiobook.disk_low", "msg": _("可用磁盘空间不足，暂不能创建生成任务")}
-        formats = {str(value).upper() for value in book.get("available_formats", [])}
-        if not formats.intersection({"EPUB", "TXT"}):
+        if not _supports_audiobook_source(book):
             return {"err": "format.not_supported", "msg": _("生成有声书需要 EPUB 或 TXT 格式")}
         try:
             body = _json_body(self)

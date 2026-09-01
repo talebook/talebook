@@ -8,6 +8,7 @@ from webserver.services.booksource.engine import BookDetail, BookSummary
 from webserver.services.booksource.metadata import (
     BookSourceMetadataService,
     MetadataSource,
+    collect_metadata_sources,
     decode_provider_value,
     encode_provider_value,
     load_builtin_sources,
@@ -37,6 +38,14 @@ class TestBookSourceProviderToken(TestCase):
 
 
 class TestBookSourceMetadataSearch(TestCase):
+    def test_collection_does_not_append_builtin_qimao_when_no_source_is_enabled(self):
+        query = mock.Mock()
+        query.filter.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        session = mock.Mock()
+        session.query.return_value = query
+
+        self.assertEqual(collect_metadata_sources(session), [])
+
     def test_builtin_snapshot_is_metadata_only(self):
         source = load_builtin_sources()[0]
 
@@ -69,6 +78,21 @@ class TestBookSourceMetadataSearch(TestCase):
         self.assertEqual(result.books, ["metadata"])
         self.assertEqual(result.failures[0]["source"], "故障源")
         self.assertEqual(result.failures[0]["code"], "fetch_failed")
+
+    @mock.patch("webserver.services.booksource.metadata.BookSourceEngine")
+    def test_limits_results_from_each_metadata_source(self, engine_cls):
+        source = MetadataSource("builtin:many", "多结果源", {"bookSourceUrl": "https://many.example"})
+        engine_cls.return_value.search.return_value = [
+            BookSummary(name="书%d" % index, author="作者", book_url="https://many.example/book/%d" % index)
+            for index in range(4)
+        ]
+        service = BookSourceMetadataService([source], "secret", config={"BOOKSOURCE_SEARCH_RESULT_LIMIT": 2})
+        service._metadata_from_summary = mock.Mock(side_effect=lambda summary, _source: summary.name)
+
+        result = service.search("书")
+
+        self.assertEqual(result.books, ["书0", "书1"])
+        self.assertEqual(service._metadata_from_summary.call_count, 2)
 
     @mock.patch("webserver.services.booksource.metadata.BookSourceEngine")
     def test_applies_signed_builtin_result(self, engine_cls):

@@ -1,0 +1,556 @@
+import datetime
+import json
+
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+from tests.plugin_fixtures import MockMultiTabProvider
+from webserver.models import (
+    Base,
+    PluginConnection,
+    PluginDefinition,
+    PluginInstallation,
+    PluginPermission,
+    PluginRunItem,
+    PluginSecret,
+    PluginSourceRecord,
+)
+from webserver.plugins.register import PROVIDER_GROUPS
+from webserver.plugins.runtime import PluginManifest
+from webserver.plugins.runtime.protocol import ManifestError
+from webserver.services.plugin_runtime import (
+    REGISTRY,
+    PluginRegistry,
+    PluginRuntime,
+    PluginRuntimeError,
+    ensure_builtin_definitions,
+    ensure_builtin_installations,
+    install_builtin,
+    rotate_connection_secret,
+    save_connection,
+)
+from webserver.services.plugin_secrets import SecretCipher, SecretCipherError, redact
+
+
+SETTINGS = {"PLUGIN_SECRET_KEY": "unit-test-plugin-key", "cookie_secret": "unused-cookie-secret"}
+PLUGIN_KEY = MockMultiTabProvider.manifest["id"]
+TEST_REGISTRY = PluginRegistry()
+TEST_REGISTRY.register(MockMultiTabProvider())
+
+
+@pytest.fixture
+def db_session():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    try:
+        yield session
+    finally:
+        session.close()
+        engine.dispose()
+
+
+def build_connection(session, credentials=None, config=None, owner_type="instance", owner_id=0):
+    installation = install_builtin(session, PLUGIN_KEY, installed_by=1, registry=TEST_REGISTRY)
+    return save_connection(
+        session,
+        SETTINGS,
+        installation.id,
+        owner_type,
+        owner_id,
+        credentials or {"token": "super-secret-token"},
+        config=config,
+    )
+
+
+def execute(session, connection, action="run", parent_run_id=None):
+    runtime = PluginRuntime(session, SETTINGS, registry=TEST_REGISTRY, sleeper=lambda _: None)
+    run = runtime.prepare_run(connection.id, action, requested_by=1, parent_run_id=parent_run_id)
+    runtime.execute(run.id)
+    session.refresh(run)
+    session.refresh(connection)
+    return run
+
+
+def test_manifest_protocol_and_category_capability_contract():
+    manifest = PluginManifest.validate(MockMultiTabProvider.manifest)
+    assert manifest.raw["protocol_version"] == "talebook.plugin/v1"
+    assert manifest.raw["categories"] == ["metadata", "reviews"]
+    assert set(manifest.raw["actions"]) == {"test", "preview", "run", "retry", "rollback"}
+
+    invalid = dict(MockMultiTabProvider.manifest)
+    invalid["capabilities"] = ["annotations.import"]
+    with pytest.raises(ManifestError) as exc:
+        PluginManifest.validate(invalid)
+    assert exc.value.code == "manifest.capability_invalid"
+
+
+def test_manifest_forbids_plaintext_secret_defaults():
+    invalid = dict(MockMultiTabProvider.manifest)
+    invalid["auth_schema"] = {
+        "type": "object",
+        "properties": {"token": {"type": "string", "writeOnly": True, "default": "leak"}},
+    }
+    with pytest.raises(ManifestError) as exc:
+        PluginManifest.validate(invalid)
+    assert exc.value.code == "manifest.secret_default_forbidden"
+
+
+def test_builtin_definition_installation_and_permissions_are_shared(db_session):
+    definitions = ensure_builtin_definitions(db_session, registry=TEST_REGISTRY)
+    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7, registry=TEST_REGISTRY)
+    definition = db_session.get(PluginDefinition, installation.definition_id)
+
+    assert len(definitions) >= 1
+    assert definition.categories == ["metadata", "reviews"]
+    assert installation.scope == "shared"
+    assert installation.plugin_key == PLUGIN_KEY
+    assert db_session.query(PluginPermission).filter(PluginPermission.installation_id == installation.id).count() == 2
+
+
+def test_builtin_capabilities_are_registered_without_ai_or_calibre_server(db_session):
+    definitions = ensure_builtin_definitions(db_session)
+    builtins = {item.plugin_key: item for item in definitions if item.plugin_key.startswith("talebook.")}
+
+    assert "talebook.meta.builtin" not in builtins
+    assert "talebook.source.opds" in builtins
+    assert "talebook.source.legado" in builtins
+    catalog = json.dumps([item.to_public_dict() for item in builtins.values()], ensure_ascii=False).lower()
+    assert "calibre content server" not in catalog
+    assert "calibre-web" not in catalog
+    assert '"ai"' not in catalog
+    # manage_kind 曾是与插件一一对应的闭合枚举，前端要为每个取值写一条分支；
+    # 现在改为声明式的管理入口，前端只做 navigateTo / 弹窗映射。
+    opds_ui = builtins["talebook.source.opds"].to_public_dict()["ui"]
+    assert opds_ui["manage_dialog"] == "opds"
+    assert "manage_kind" not in opds_ui
+    legado_ui = builtins["talebook.source.legado"].to_public_dict()["ui"]
+    assert legado_ui["manage_route"] == "/plugins/legado"
+    assert "manage_label_key" not in legado_ui
+    tool_ui = builtins["talebook.tool.text-replace"].to_public_dict()["ui"]
+    assert tool_ui["manage_route"] == "/plugins/text-replace"
+
+
+def test_enabled_providers_follow_active_installation_state(db_session):
+    install_builtin(db_session, "talebook.push.boox", installed_by=7)
+    install_builtin(db_session, "talebook.source.opds", installed_by=7)
+    runtime = PluginRuntime(db_session, SETTINGS)
+
+    providers = runtime.enabled_providers("integrations.push")
+    assert [provider.manifest["id"] for provider in providers] == ["talebook.push.boox"]
+
+    installation = db_session.query(PluginInstallation).filter(PluginInstallation.plugin_key == "talebook.push.boox").one()
+    installation.enabled = False
+    db_session.commit()
+
+    assert runtime.enabled_providers("integrations.push") == []
+
+
+def test_builtin_installation_is_idempotent_and_keeps_user_connections_personal(db_session):
+    settings = {**SETTINGS, "auto_fill_meta": False}
+    first = ensure_builtin_installations(db_session, installed_by=1, settings=settings)
+    second = ensure_builtin_installations(db_session, installed_by=1, settings=settings)
+
+    assert len(first) == len(second) == len(REGISTRY.providers())
+    expected_instance_connections = sum(
+        "instance" in provider.manifest["connection_owners"] for provider in REGISTRY.providers()
+    )
+    assert db_session.query(PluginConnection).count() == expected_instance_connections
+    weread = next(item for item in first if item.plugin_key == "talebook.combo.weread")
+    assert not weread.enabled
+    assert not db_session.query(PluginConnection).filter(PluginConnection.installation_id == weread.id).count()
+    opds = next(item for item in first if item.plugin_key == "talebook.source.opds")
+    connection = db_session.query(PluginConnection).filter(PluginConnection.installation_id == opds.id).one()
+    assert connection.secret_id is None
+
+    run = PluginRuntime(db_session, settings).prepare_run(connection.id, "test", requested_by=1)
+    PluginRuntime(db_session, settings).execute(run.id)
+    assert run.status == "succeeded"
+    assert connection.health == "healthy"
+
+
+def test_brs_and_all_push_plugins_default_enabled_without_overwriting_existing_state(db_session):
+    first = ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+    installation_by_key = {item.plugin_key: item for item in first}
+    expected_keys = {"talebook.annotation.brs"} | {
+        provider.manifest["id"] for provider in PROVIDER_GROUPS["push"]
+    }
+
+    assert expected_keys <= {
+        plugin_key for plugin_key, installation in installation_by_key.items() if installation.enabled
+    }
+
+    disabled_keys = {"talebook.annotation.brs", "talebook.push.boox", "talebook.push.kindle"}
+    for plugin_key in disabled_keys:
+        installation_by_key[plugin_key].enabled = False
+    db_session.commit()
+
+    ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+
+    assert not {
+        plugin_key
+        for (plugin_key,) in db_session.query(PluginInstallation.plugin_key)
+        .filter(PluginInstallation.plugin_key.in_(disabled_keys), PluginInstallation.enabled.is_(True))
+        .all()
+    }
+
+
+def test_metadata_defaults_enable_all_except_neodb_and_only_seed_once(db_session):
+    settings = {
+        **SETTINGS,
+        "META_SELECTED_SOURCES": ["douban_v2", "baidu", "google", "booksource"],
+    }
+    ensure_builtin_installations(db_session, installed_by=1, settings=settings)
+
+    enabled_meta = {
+        plugin_key
+        for (plugin_key,) in db_session.query(PluginInstallation.plugin_key)
+        .filter(PluginInstallation.enabled.is_(True), PluginInstallation.plugin_key.like("talebook.meta.%"))
+        .all()
+    }
+    assert enabled_meta == {
+        provider.manifest["id"] for provider in PROVIDER_GROUPS["meta"] if provider.manifest["id"] != "talebook.meta.neodb"
+    }
+    legado = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.source.legado").one()
+    assert legado.enabled is True
+
+    calibre = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.meta.calibre").one()
+    calibre_connection = db_session.query(PluginConnection).filter_by(installation_id=calibre.id).one()
+    assert calibre_connection.config == {}
+
+    # 之后修改旧设置不会覆盖管理员已经在插件中心作出的启停选择。
+    ensure_builtin_installations(
+        db_session,
+        installed_by=1,
+        settings={**SETTINGS, "META_SELECTED_SOURCES": ["qimao", "amazon"]},
+    )
+    enabled_after = {
+        plugin_key
+        for (plugin_key,) in db_session.query(PluginInstallation.plugin_key)
+        .filter(PluginInstallation.enabled.is_(True), PluginInstallation.plugin_key.like("talebook.meta.%"))
+        .all()
+    }
+    assert enabled_after == enabled_meta
+    assert calibre_connection.config == {}
+
+
+def test_existing_metadata_states_are_not_overwritten_by_new_defaults(db_session):
+    ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+    baike = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.meta.baike").one()
+    neodb = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.meta.neodb").one()
+    assert baike.enabled is True
+    assert neodb.enabled is False
+
+    baike.enabled = False
+    neodb.enabled = True
+    db_session.commit()
+
+    ensure_builtin_installations(
+        db_session,
+        installed_by=1,
+        settings={**SETTINGS, "META_SELECTED_SOURCES": ["baidu"]},
+    )
+    db_session.refresh(baike)
+    db_session.refresh(neodb)
+    assert baike.enabled is False
+    assert neodb.enabled is True
+
+
+def test_legado_installation_controls_source_and_metadata_capabilities_together(db_session):
+    ensure_builtin_installations(db_session, installed_by=1, settings=SETTINGS)
+    installation = db_session.query(PluginInstallation).filter_by(plugin_key="talebook.source.legado").one()
+    connection = db_session.query(PluginConnection).filter_by(installation_id=installation.id).one()
+    runtime = PluginRuntime(db_session, SETTINGS)
+
+    assert connection.id in [item.id for item in runtime.connections_for("sources.search")]
+    assert connection.id in [item.id for item in runtime.connections_for("metadata.lookup")]
+
+    installation.enabled = False
+    db_session.commit()
+
+    assert connection.id not in [item.id for item in runtime.connections_for("sources.search")]
+    assert connection.id not in [item.id for item in runtime.connections_for("metadata.lookup")]
+
+
+def test_existing_connection_can_update_config_without_rotating_secret(db_session):
+    connection = build_connection(db_session, credentials={"token": "first-secret"}, config={"delay_seconds": 1})
+    secret = db_session.get(PluginSecret, connection.secret_id)
+    version = secret.version
+
+    updated = save_connection(
+        db_session,
+        SETTINGS,
+        connection.installation_id,
+        "instance",
+        0,
+        None,
+        role=connection.role,
+        config={"delay_seconds": 2},
+    )
+
+    db_session.refresh(secret)
+    assert updated.id == connection.id
+    assert updated.config == {"delay_seconds": 2}
+    assert secret.version == version
+    assert SecretCipher(SETTINGS).decrypt(secret.ciphertext) == {"token": "first-secret"}
+
+
+def test_reinstall_does_not_silently_reapprove_revoked_permissions(db_session):
+    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=7, registry=TEST_REGISTRY)
+    permission = (
+        db_session.query(PluginPermission)
+        .filter(PluginPermission.installation_id == installation.id, PluginPermission.permission == "plugin_records.write")
+        .one()
+    )
+    permission.revoked_at = datetime.datetime.now()
+    db_session.commit()
+
+    install_builtin(db_session, PLUGIN_KEY, installed_by=7, registry=TEST_REGISTRY)
+    db_session.refresh(permission)
+    assert permission.revoked_at is not None
+
+
+def test_connection_scopes_must_be_approved(db_session):
+    installation = install_builtin(
+        db_session,
+        PLUGIN_KEY,
+        installed_by=1,
+        approved_permissions=["books.read"],
+        registry=TEST_REGISTRY,
+    )
+    with pytest.raises(PluginRuntimeError) as exc:
+        save_connection(
+            db_session,
+            SETTINGS,
+            installation.id,
+            "instance",
+            0,
+            {"token": "secret"},
+            scopes=["plugin_records.write"],
+        )
+    assert exc.value.code == "plugin.scope_not_approved"
+
+
+def test_secret_values_are_rejected_from_public_config(db_session):
+    installation = install_builtin(db_session, PLUGIN_KEY, installed_by=1, registry=TEST_REGISTRY)
+    with pytest.raises(PluginRuntimeError) as exc:
+        save_connection(
+            db_session,
+            SETTINGS,
+            installation.id,
+            "instance",
+            0,
+            {"token": "secret"},
+            config={"nested": {"api_token": "secret"}},
+        )
+    assert exc.value.code == "plugin.secret_in_config"
+
+
+def test_secret_is_encrypted_masked_and_rotatable(db_session):
+    connection = build_connection(db_session, {"token": "visible-only-at-provider"})
+    secret = db_session.get(PluginSecret, connection.secret_id)
+
+    assert "visible-only-at-provider" not in secret.ciphertext
+    assert "ciphertext" not in secret.to_public_dict()
+    assert secret.to_public_dict()["mask"] == "••••ider"
+    assert SecretCipher(SETTINGS).decrypt(secret.ciphertext) == {"token": "visible-only-at-provider"}
+
+    rotate_connection_secret(db_session, SETTINGS, connection.id, {"token": "rotated-secret"})
+    db_session.refresh(secret)
+    assert secret.version == 2
+    assert "rotated-secret" not in secret.ciphertext
+    assert SecretCipher(SETTINGS).decrypt(secret.ciphertext) == {"token": "rotated-secret"}
+
+
+def test_default_placeholder_key_cannot_store_credentials():
+    with pytest.raises(SecretCipherError):
+        SecretCipher({"PLUGIN_SECRET_KEY": "", "cookie_secret": "cookie_secret"})
+
+
+def test_redactor_handles_nested_values_headers_and_error_strings():
+    secret = {"token": "secret-value"}
+    value = {
+        "authorization": "Bearer secret-value",
+        "nested": [{"source_token": "secret-value"}, "request token=secret-value"],
+    }
+    safe = redact(value, secret)
+    assert "secret-value" not in json.dumps(safe)
+    assert safe["authorization"] == "[REDACTED]"
+    assert safe["nested"][0]["source_token"] == "[REDACTED]"
+
+
+def test_mock_provider_test_preview_and_cross_tab_run_share_connection(db_session):
+    connection = build_connection(db_session)
+
+    test_run = execute(db_session, connection, "test")
+    assert test_run.status == "succeeded"
+    assert connection.health == "healthy"
+    assert db_session.query(PluginSourceRecord).count() == 0
+
+    preview = execute(db_session, connection, "preview")
+    assert preview.status == "succeeded"
+    assert db_session.query(PluginRunItem).filter(PluginRunItem.run_id == preview.id).count() == 2
+    assert db_session.query(PluginSourceRecord).count() == 0
+    assert connection.cursor == {}
+
+    run = execute(db_session, connection, "run")
+    records = db_session.query(PluginSourceRecord).order_by(PluginSourceRecord.id).all()
+    assert run.status == "succeeded"
+    assert run.counts["written"] == 2
+    assert connection.cursor == {"offset": 1}
+    assert {record.entity_type for record in records} == {"metadata", "review"}
+    assert {record.connection_id for record in records} == {connection.id}
+    assert "super-secret-token" not in json.dumps([record.data for record in records])
+    assert "super-secret-token" not in json.dumps(
+        [item.to_public_dict() for item in db_session.query(PluginRunItem).all()], ensure_ascii=False
+    )
+    secret = db_session.get(PluginSecret, connection.secret_id)
+    public_payload = {
+        "connection": connection.to_public_dict(secret),
+        "run": run.to_public_dict(),
+        "items": [item.to_public_dict() for item in db_session.query(PluginRunItem).all()],
+    }
+    assert "super-secret-token" not in json.dumps(public_payload, ensure_ascii=False)
+    assert "ciphertext" not in json.dumps(public_payload, ensure_ascii=False)
+
+
+def test_repeated_run_is_idempotent(db_session):
+    connection = build_connection(db_session)
+    first = execute(db_session, connection)
+    second = execute(db_session, connection)
+
+    assert first.counts["written"] == 2
+    assert second.status == "succeeded"
+    assert second.counts["written"] == 0
+    assert second.counts["skipped"] == 2
+    assert db_session.query(PluginSourceRecord).count() == 2
+    assert connection.cursor == {"offset": 2}
+
+
+def test_partial_run_does_not_advance_cursor_and_retry_only_failed_items(db_session):
+    connection = build_connection(db_session, config={"fail_external_ids": ["mock-review-1"]})
+    failed = execute(db_session, connection)
+
+    assert failed.status == "partial"
+    assert failed.counts["failed"] == 1
+    assert connection.cursor == {}
+    assert db_session.query(PluginSourceRecord).count() == 1
+
+    retried = execute(db_session, connection, "retry", parent_run_id=failed.id)
+    retry_items = db_session.query(PluginRunItem).filter(PluginRunItem.run_id == retried.id).all()
+    assert retried.status == "succeeded"
+    assert [item.external_id for item in retry_items] == ["mock-review-1"]
+    assert db_session.query(PluginSourceRecord).count() == 2
+    assert connection.cursor == {"offset": 1}
+
+
+def test_rollback_restores_cursor_and_protects_local_edits(db_session):
+    connection = build_connection(db_session)
+    source_run = execute(db_session, connection)
+    protected = db_session.query(PluginSourceRecord).filter(PluginSourceRecord.external_id == "mock-book-1").one()
+    protected.local_modified = True
+    db_session.commit()
+
+    rollback = execute(db_session, connection, "rollback", parent_run_id=source_run.id)
+    records = db_session.query(PluginSourceRecord).order_by(PluginSourceRecord.external_id).all()
+    assert rollback.status == "partial"
+    assert rollback.counts["conflicts"] == 1
+    assert connection.cursor == {}
+    assert {record.external_id: record.status for record in records} == {
+        "mock-book-1": "active",
+        "mock-review-1": "rolled_back",
+    }
+
+
+def test_rollback_does_not_regress_cursor_after_newer_run(db_session):
+    connection = build_connection(db_session)
+    first = execute(db_session, connection)
+    execute(db_session, connection)
+
+    rollback = execute(db_session, connection, "rollback", parent_run_id=first.id)
+    assert rollback.status == "partial"
+    assert rollback.counts["conflicts"] == 1
+    assert connection.cursor == {"offset": 2}
+
+
+def test_connection_lease_rejects_concurrent_execution(db_session):
+    connection = build_connection(db_session)
+    connection.lease_token = "another-worker"
+    connection.lease_until = datetime.datetime.now() + datetime.timedelta(minutes=5)
+    db_session.commit()
+
+    run = execute(db_session, connection)
+    assert run.status == "failed"
+    assert run.error_code == "plugin.concurrent_run"
+    assert db_session.query(PluginSourceRecord).count() == 0
+
+
+def test_rate_limit_retries_then_succeeds(db_session):
+    connection = build_connection(
+        db_session,
+        config={"rate_limit_attempts": 1, "max_retries": 2, "backoff_seconds": 0},
+    )
+    run = execute(db_session, connection)
+    assert run.status == "succeeded"
+    assert run.attempt == 2
+    assert connection.health == "healthy"
+
+
+def test_rate_limit_exhaustion_is_structured_and_redacted(db_session):
+    connection = build_connection(
+        db_session,
+        config={"rate_limit_attempts": 5, "max_retries": 1, "backoff_seconds": 0},
+    )
+    run = execute(db_session, connection)
+    assert run.status == "failed"
+    assert run.error_code == "provider_rate_limited"
+    assert "super-secret-token" not in run.error_message
+    assert "[REDACTED]" in run.error_message
+    assert connection.health == "degraded"
+
+
+def test_unauthorized_is_not_retried(db_session):
+    connection = build_connection(db_session, credentials={"token": "bad-token"}, config={"max_retries": 5})
+    run = execute(db_session, connection, "test")
+    assert run.status == "failed"
+    assert run.error_code == "provider_unauthorized"
+    assert run.attempt == 1
+    assert connection.health == "unauthorized"
+    assert "bad-token" not in run.error_message
+
+
+def test_running_timeout_is_not_retried_and_never_advances_cursor(db_session):
+    connection = build_connection(
+        db_session,
+        config={"delay_seconds": 0.08, "timeout_seconds": 0.01, "max_retries": 1, "backoff_seconds": 0},
+    )
+    run = execute(db_session, connection)
+    assert run.status == "failed"
+    assert run.error_code == "plugin.timeout"
+    # ThreadPoolExecutor cannot cancel an attempt that is already running. A
+    # second submission would overlap the first one after the lease expires.
+    assert run.attempt == 1
+    # A running future cannot be cancelled. Keep the lease through its grace
+    # window so a new request cannot immediately overlap the timed-out call.
+    assert connection.lease_token
+    assert connection.lease_until > datetime.datetime.now()
+    assert connection.cursor == {}
+    assert db_session.query(PluginSourceRecord).count() == 0
+
+
+def test_user_and_instance_connections_can_share_one_installation(db_session):
+    instance_connection = build_connection(db_session, credentials={"token": "instance-token"})
+    user_connection = save_connection(
+        db_session,
+        SETTINGS,
+        instance_connection.installation_id,
+        "user",
+        42,
+        {"token": "user-token"},
+    )
+    assert instance_connection.installation_id == user_connection.installation_id
+    assert instance_connection.owner_type == "instance"
+    assert user_connection.owner_type == "user"
+    assert user_connection.owner_id == 42
+    assert db_session.query(PluginConnection).count() == 2

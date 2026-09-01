@@ -14,7 +14,9 @@ from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _
 from webserver.models import Device, Message, Reader
 from webserver.plugins import captcha as captcha_module
+from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.mail import MailService
+from webserver.services.plugin_runtime import PluginRuntime, ensure_runtime_installations
 from webserver.version import VERSION
 
 
@@ -437,6 +439,8 @@ class UserInfo(BaseHandler):
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "show_network_library": CONF.get("SHOW_NETWORK_LIBRARY", True),
+            "opds_enabled": CONF.get("OPDS_ENABLED", True),
+            "webdav_enabled": CONF.get("ENABLE_WEBDAV_SERVICE", True),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"] and not demo_mode.is_demo_mode(CONF),
@@ -554,6 +558,7 @@ class UserDevices(BaseHandler):
     @js
     @auth
     def get(self):
+        ensure_runtime_installations(self.session, CONF)
         user_id = self.user_id()
         devices = self.session.query(Device).filter(Device.reader_id == user_id).all()
         personal = [d.to_dict() for d in devices]
@@ -561,7 +566,19 @@ class UserDevices(BaseHandler):
         global_devices = CONF.get("DEVICES", []) or []
         used_names = {d["name"] for d in personal}
         result = personal + [g for g in global_devices if g.get("name") not in used_names]
-        return {"err": "ok", "devices": result}
+        device_types = []
+        for provider in PluginRuntime(self.session, CONF).enabled_providers(PUSH_CAPABILITY):
+            device_type = (provider.manifest.get("ui") or {}).get("device_type")
+            if not device_type:
+                continue
+            device_types.append(
+                {
+                    "text": provider.manifest["name"],
+                    "value": device_type,
+                    "default_port": provider.default_port,
+                }
+            )
+        return {"err": "ok", "devices": result, "device_types": device_types}
 
     @js
     @auth

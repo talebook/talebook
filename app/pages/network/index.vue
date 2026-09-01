@@ -1,8 +1,5 @@
 <template>
     <div>
-        <h2>{{ $t('network.title') }}</h2>
-        <v-divider class="mt-3 mb-2" />
-
         <v-tabs
             v-model="activeTab"
             color="primary"
@@ -102,7 +99,17 @@
                             type="info"
                             variant="tonal"
                         >
-                            {{ $t('network.noSource') }}
+                            <div class="d-flex align-center flex-wrap ga-3">
+                                <span>{{ emptyStateText }}</span>
+                                <v-btn
+                                    v-if="store.user.is_admin"
+                                    size="small"
+                                    variant="text"
+                                    to="/admin/settings/plugins"
+                                >
+                                    {{ $t('network.manageSourcePlugins') }}
+                                </v-btn>
+                            </div>
                         </v-alert>
                     </v-col>
 
@@ -211,7 +218,7 @@
                     >
                         <v-select
                             v-model="exploreSourceId"
-                            :items="sources.map(s => ({ value: s.id, title: s.name }))"
+                            :items="sources.map(s => ({ value: s.source_key || s.id, title: s.name }))"
                             :label="$t('network.explorePickSource')"
                             density="compact"
                             hide-details
@@ -310,6 +317,7 @@ store.setNavbar(true);
 
 const activeTab = ref(0);
 const sources = ref([]);
+const availability = ref({ state: 'no_configured_sources', enabled_plugins: 0, configured_sources: 0 });
 const selected = ref([]);
 const searchMode = ref('top');
 const keyword = ref('');
@@ -335,7 +343,13 @@ const explorePage = ref(1);
 const exploreLoading = ref(false);
 
 // 手选模式下供 autocomplete 过滤选择（2000+ 源由 autocomplete 内置虚拟滚动处理）
-const sourceItems = computed(() => sources.value.map((s) => ({ value: s.id, title: s.name })));
+const sourceItems = computed(() => sources.value.map((s) => ({ value: s.source_key || s.id, title: s.name })));
+const emptyStateText = computed(() => {
+    if (availability.value.state === 'no_enabled_plugins') {
+        return store.user.is_admin ? t('network.noEnabledPluginsAdmin') : t('network.noEnabledPluginsUser');
+    }
+    return store.user.is_admin ? t('network.noConfiguredSourcesAdmin') : t('network.noConfiguredSourcesUser');
+});
 
 const toCards = (group) => {
     return (group.books || []).map((b) => ({
@@ -405,7 +419,7 @@ const pollSearch = async (taskId, token) => {
     const { $backend } = useNuxtApp();
     const deadline = Date.now() + SEARCH_POLL_TIMEOUT;
     while (token === searchToken && Date.now() < deadline) {
-        const s = await $backend(`/network/search/status?task_id=${taskId}`);
+        const s = await $backend(`/book-sources/search/status?task_id=${taskId}`);
         if (token !== searchToken) return;
         if (s.err !== 'ok') break;
         const fresh = (s.results || []).filter((g) => (g.books || []).length > 0);
@@ -435,7 +449,7 @@ const fetchSearch = async (page) => {
     }
     searchProgress.value = { done: 0, total: 0 };
     try {
-        let url = `/network/search?key=${encodeURIComponent(keyword.value.trim())}&page=${page}&mode=${searchMode.value}`;
+        let url = `/book-sources/search?key=${encodeURIComponent(keyword.value.trim())}&page=${page}&mode=${searchMode.value}`;
         if (searchMode.value === 'custom' && selected.value.length > 0) {
             url += `&sources=${selected.value.join(',')}`;
         }
@@ -489,7 +503,7 @@ const loadCategories = async () => {
     explorePage.value = 1;
     if (!exploreSourceId.value) return;
     const { $backend } = useNuxtApp();
-    const rsp = await $backend(`/network/categories?source_id=${exploreSourceId.value}`);
+    const rsp = await $backend(`/book-sources/categories?source_id=${exploreSourceId.value}`);
     if (rsp.err === 'ok') categories.value = rsp.items || [];
 };
 
@@ -498,7 +512,7 @@ const fetchExplore = async (page) => {
     const { $backend, $alert } = useNuxtApp();
     exploreLoading.value = true;
     try {
-        const url = `/network/explore?source_id=${exploreSourceId.value}&url=${encodeURIComponent(exploreCategoryUrl.value)}&page=${page}`;
+        const url = `/book-sources/browse?source_id=${exploreSourceId.value}&url=${encodeURIComponent(exploreCategoryUrl.value)}&page=${page}`;
         const rsp = await $backend(url);
         if (rsp.err === 'ok') {
             exploreBooks.value = rsp.books || [];
@@ -537,8 +551,11 @@ onMounted(async () => {
             searched.value = true;
         }
     }
-    const rsp = await $backend('/network/sources');
-    if (rsp.err === 'ok') sources.value = rsp.items || [];
+    const rsp = await $backend('/book-sources');
+    if (rsp.err === 'ok') {
+        sources.value = rsp.items || [];
+        availability.value = rsp.availability || availability.value;
+    }
 });
 
 onBeforeUnmount(() => {

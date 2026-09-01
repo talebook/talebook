@@ -10,7 +10,6 @@ import os
 import random
 import re
 import shutil
-import threading
 import time
 import urllib
 
@@ -20,27 +19,28 @@ from tornado import web
 from webserver import demo_mode, loader, utils
 from webserver.constants import (
     CALIBRE_ERROR_FLAG,
-    META_SELECTED_SOURCES,
-    META_SOURCE_AI,
-    META_SOURCE_AMAZON,
-    META_SOURCE_BAIDU,
-    META_SOURCE_BOOKSOURCE,
-    META_SOURCE_DOUBAN,
-    META_SOURCE_DOUBAN_V2,
-    META_SOURCE_GOOGLE,
-    META_SOURCE_NEODB,
-    META_SOURCE_QIMAO,
-    META_SOURCE_TOMATO,
-    META_SOURCE_XHSD,
+    MEDIA_TYPE_COMIC,
+    MEDIA_TYPE_EBOOK,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
 from webserver.i18n import _
-from webserver.models import AudiobookEdition, Item, ReadingState
-from webserver.plugins.meta import baike, biquge, calibre, douban, douban_v2, neodb, qimao, tomato, xhsd, youshu
+from webserver.models import (
+    AudiobookEdition,
+    Item,
+    ReadingState,
+)
+from webserver.plugins.meta import baike, biquge, calibre, douban_v2, neodb, qimao, tomato, xhsd, youshu
+from webserver.plugins.meta import common as meta_common
 from webserver.plugins.meta.ai.api import KEY as AI_KEY
 from webserver.plugins.meta.ai.api import AIBookApi
+from webserver.plugins.meta.base import to_calibre_metadata
 from webserver.plugins.parser.txt import get_content_encoding
+from webserver.plugins.push.base import PUSH_CAPABILITY
+from webserver.plugins.runtime.domains import MetadataQuery
+from webserver.plugins.runtime.protocol import UpstreamError
+from webserver.plugins.runtime.triggers import TRIGGER_AUTO, trigger_of
 from webserver.services.aliases import AliasService, clean_aliases
+from webserver.services.async_service import AsyncService
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
     KEY as BOOKSOURCE_KEY,
@@ -49,7 +49,6 @@ from webserver.services.booksource.metadata import (
     BookSourceMetadataService,
     MetadataSearchResult,
     collect_metadata_sources,
-    load_builtin_sources,
     metadata_to_evidence,
 )
 from webserver.services.convert import CONVERSION_TARGETS, ConvertService
@@ -61,9 +60,25 @@ from webserver.services.external_index import (
 )
 from webserver.services.extract import ExtractService
 from webserver.services.mail import MailService
+from webserver.services.media_analysis import (
+    COMIC_CONTAINER_FORMATS,
+    InvalidMediaError,
+    analyze_media_file,
+    has_mixed_media_formats,
+    merge_media_type,
+)
+from webserver.services.plugin_runtime import REGISTRY, PluginRuntime, PluginRuntimeError, ensure_runtime_installations
+
+
+# 调用方按能力找插件，不认识任何具体 plugin_key。
+META_LOOKUP_CAPABILITY = "metadata.lookup"
+TRANSFORM_CAPABILITY = "integrations.tool"
 
 
 CONF = loader.get_settings()
+# 元数据来源可能发生不可取消的阻塞 I/O；全进程共享固定容量，避免每个
+# 请求各建线程池而让超时任务无限累积线程。
+_METADATA_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=16, thread_name_prefix="metadata-lookup")
 
 
 class Index(BaseHandler):
@@ -233,6 +248,8 @@ class BookToPDF(BaseHandler):
 
 
 class BookRefer(BaseHandler):
+    SOURCE_RESULT_LIMIT = 5
+
     def has_proper_book(self, books, mi):
         if not books or not mi.isbn or mi.isbn == baike.BAIKE_ISBN:
             return False
@@ -256,26 +273,35 @@ class BookRefer(BaseHandler):
         books = []
         failures = []
         completed = 0
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks)) as executor:
-            future_map = {executor.submit(fn): name for name, fn in tasks.items()}
-            done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
-            for f in not_done:
-                name = future_map[f]
-                logging.warning("查询 %s 超时，已跳过", name)
-                failures.append(self._refer_failure(name, "timeout", "查询超时"))
-            for f in done:
-                name = future_map[f]
-                completed += 1
-                try:
-                    result = f.result()
-                    result_books, result_failures = self._unpack_search_result(name, result)
-                    books.extend(result_books)
-                    failures.extend(result_failures)
-                    logging.info("%s 查询完成：%d 条", name, len(result_books))
-                except Exception as e:
-                    logging.error("%s 查询失败：%s", name, e)
-                    failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
+        outcomes = {}
+        future_map = {_METADATA_EXECUTOR.submit(fn): name for name, fn in tasks.items()}
+        done, not_done = concurrent.futures.wait(future_map, timeout=self.REFER_TIMEOUT)
+        for f in not_done:
+            f.cancel()
+            name = future_map[f]
+            logging.warning("查询 %s 超时，已跳过", name)
+            failures.append(self._refer_failure(name, "timeout", "查询超时"))
+            outcomes[name] = PluginRuntimeError(
+                "plugin.timeout",
+                "Plugin metadata lookup timed out",
+                retryable=True,
+            )
+        for f in done:
+            name = future_map[f]
+            completed += 1
+            try:
+                result = f.result()
+                outcomes[name] = result
+                result_books, result_failures = self._unpack_search_result(name, result)
+                books.extend(result_books)
+                failures.extend(result_failures)
+                logging.info("%s 查询完成：%d 条", name, len(result_books))
+            except Exception as e:
+                logging.error("%s 查询失败：%s", name, e)
+                outcomes[name] = e
+                failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
 
+        self._finish_plugin_lookup(outcomes)
         self._refer_summary = {
             "event": "summary",
             "failures": self._dedupe_failures(failures),
@@ -293,19 +319,33 @@ class BookRefer(BaseHandler):
 
         logging.info("并行查询(流式) %d 个信息源，超时 %ds", len(tasks), self.REFER_TIMEOUT)
         loop = asyncio.get_event_loop()
-        executor = concurrent.futures.ThreadPoolExecutor(max_workers=len(tasks))
         failures = []
         completed = 0
+        outcomes = {}
+        pending_map = {}
+        yield {"event": "progress", "failures": [], "total": len(tasks), "completed": 0}
         try:
-            pending_map = {loop.run_in_executor(executor, fn): name for name, fn in tasks.items()}
+            pending_map = {loop.run_in_executor(_METADATA_EXECUTOR, fn): name for name, fn in tasks.items()}
             deadline = time.time() + self.REFER_TIMEOUT
 
             while pending_map:
                 remaining = deadline - time.time()
                 if remaining <= 0:
                     for fut, name in pending_map.items():
+                        fut.cancel()
                         logging.warning("查询 %s 超时，已跳过", name)
                         failures.append(self._refer_failure(name, "timeout", "查询超时"))
+                        outcomes[name] = PluginRuntimeError(
+                            "plugin.timeout",
+                            "Plugin metadata lookup timed out",
+                            retryable=True,
+                        )
+                    yield {
+                        "event": "progress",
+                        "failures": self._dedupe_failures(failures),
+                        "total": len(tasks),
+                        "completed": completed,
+                    }
                     break
 
                 done_set, _ = await asyncio.wait(
@@ -319,6 +359,7 @@ class BookRefer(BaseHandler):
                     completed += 1
                     try:
                         result = fut.result()
+                        outcomes[name] = result
                         result_books, result_failures = self._unpack_search_result(name, result)
                         failures.extend(result_failures)
                         logging.info("%s 查询完成：%d 条", name, len(result_books))
@@ -326,9 +367,19 @@ class BookRefer(BaseHandler):
                             yield b
                     except Exception as e:
                         logging.error("%s 查询失败：%s", name, e)
+                        outcomes[name] = e
                         failures.append(self._refer_failure(name, "fetch_failed", "查询失败"))
+                    yield {
+                        "event": "progress",
+                        "failures": self._dedupe_failures(failures),
+                        "total": len(tasks),
+                        "completed": completed,
+                    }
         finally:
-            executor.shutdown(wait=False)
+            for fut in pending_map:
+                fut.cancel()
+            # 事件循环所在线程写 health，worker 不触碰 session。
+            self._finish_plugin_lookup(outcomes)
         yield {
             "event": "summary",
             "failures": self._dedupe_failures(failures),
@@ -342,10 +393,10 @@ class BookRefer(BaseHandler):
 
     def _unpack_search_result(self, name, result):
         if isinstance(result, MetadataSearchResult):
-            books = list(result.books or [])
+            books = list(result.books or [])[: self.SOURCE_RESULT_LIMIT]
             failures = list(result.failures or [])
         else:
-            books = list(result or [])
+            books = list(result or [])[: self.SOURCE_RESULT_LIMIT]
             failures = []
         if not books and not failures:
             failures.append(self._refer_failure(name, "no_result", "未找到匹配图书"))
@@ -365,165 +416,92 @@ class BookRefer(BaseHandler):
                 output.append(safe_failure)
         return output
 
+    @staticmethod
+    def _meta_task_name(plugin_id):
+        try:
+            return REGISTRY.get(plugin_id).manifest.get("name") or plugin_id
+        except PluginRuntimeError:
+            return plugin_id
+
     def _build_search_tasks(self, mi):
-        sources = CONF.get(META_SELECTED_SOURCES, ["douban", "baidu"])
-        logging.info("META_SELECTED_SOURCES 配置：%s", sources)
-        if not sources:
-            return {}
-
+        ensure_runtime_installations(self.session, CONF)
         title = re.sub("[(（].*", "", mi.title)
-        author = mi.authors[0] if getattr(mi, "authors", None) else None
         tasks = {}
+        query = MetadataQuery(
+            title=title,
+            isbn=mi.isbn or "",
+            publisher=getattr(mi, "publisher", "") or "",
+            authors=tuple(getattr(mi, "authors", None) or ()),
+        )
 
-        metadata_service = None
-        metadata_result = None
-        metadata_lock = threading.Lock()
-        if META_SOURCE_BOOKSOURCE in sources or META_SOURCE_AI in sources:
-            try:
-                metadata_sources = collect_metadata_sources(self.session, CONF.get("BOOKSOURCE_METADATA_TOP_K", 10))
-            except Exception as err:
-                logging.warning("读取在线书源失败，将只尝试内置快照：%s", err)
-                metadata_sources = load_builtin_sources()
-            metadata_service = BookSourceMetadataService(
-                metadata_sources,
-                CONF.get("cookie_secret", "talebook"),
-                config=CONF,
+        # 元数据插件的 installation.enabled 是唯一选源状态。旧
+        # META_SELECTED_SOURCES 只在首次物化时迁移，不再参与每次查询。
+        runtime = PluginRuntime(self.session, CONF)
+        connections = runtime.connections_for(META_LOOKUP_CAPABILITY, self.user_id())
+        self._plugin_runtime, self._plugin_units = runtime, []
+        # tasks 以来源名为键（面向用户展示），而 finish_read 需要按 connection.id
+        # 回写 health——同一插件可能同时有实例级与用户级连接，两者不能混用一个键。
+        self._plugin_task_keys = {}
+        if connections:
+            self._plugin_units, prepare_failures = runtime.prepare_read(
+                connections,
+                timeout=self.REFER_TIMEOUT,
+                audit=True,
+                requested_by=self.user_id(),
+                provider_method="search_books",
             )
+            for connection_id, error in prepare_failures.items():
+                logging.warning("插件连接 %s 凭据不可用：%s", connection_id, error)
+            for unit in self._plugin_units:
+                task_name = self._meta_task_name(unit["plugin_key"])
+                if task_name in tasks:  # 同一插件的多条连接：附连接号以区分
+                    task_name = "%s#%s" % (task_name, unit["key"])
+                self._plugin_task_keys[task_name] = unit["key"]
 
-            def _lookup_online_sources():
-                nonlocal metadata_result
-                with metadata_lock:
-                    if metadata_result is None:
-                        metadata_result = metadata_service.search(title, author)
-                    return metadata_result
+                def _plugin_lookup(_unit=unit):
+                    return _unit["call"]("search_books", query) or []
 
-        if META_SOURCE_DOUBAN in sources:
-
-            def _douban():
-                api = douban.DoubanBookApi(
-                    CONF["douban_apikey"],
-                    CONF["douban_baseurl"],
-                    copy_image=False,
-                    manual_select=False,
-                    maxCount=CONF["douban_max_count"],
-                )
-                try:
-                    result = api.search_books(title) or []
-                except Exception:
-                    logging.error(_("豆瓣接口查询 %s 失败" % title))
-                    result = []
-                if not self.has_proper_book(result, mi):
-                    book = api.get_book_by_isbn(mi.isbn)
-                    if book:
-                        result = [book] + list(result)
-                return [api._metadata(b) for b in result]
-
-            tasks["douban"] = _douban
-
-        if META_SOURCE_DOUBAN_V2 in sources:
-
-            def _douban_v2():
-                plugin = douban_v2.DoubanV2MetaPlugin()
-                try:
-                    return plugin.search(title=title, isbn=mi.isbn, publisher=mi.publisher)
-                except Exception:
-                    logging.error("DoubanV2 query %s failed" % title)
-                    return []
-
-            tasks["douban_v2"] = _douban_v2
-
-        if META_SOURCE_BAIDU in sources:
-
-            def _baidu():
-                api = baike.BaiduBaikeApi(copy_image=False)
-                book = api.get_book(title, author)
-                return [book] if book else []
-
-            tasks["baidu"] = _baidu
-
-        calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
-        if calibre_sources:
-
-            def _calibre():
-                results = calibre.CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
-                if not results:
-                    results = calibre.CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
-                for r in results or []:
-                    r.cover_data = calibre.CalibreMetadataApi.get_cover(r.cover_url) if getattr(r, "cover_url", None) else None
-                    r.provider_key = calibre.KEY
-                return list(results) if results else []
-
-            tasks["calibre"] = _calibre
-
-        if META_SOURCE_XHSD in sources:
-
-            def _xhsd():
-                api = xhsd.XhsdBookApi(copy_image=False)
-                book = api.get_book(mi.isbn or title)
-                return [book] if book else []
-
-            tasks["xhsd"] = _xhsd
-
-        if META_SOURCE_TOMATO in sources:
-
-            def _tomato():
-                api = tomato.TomatoNovelApi(copy_image=False)
-                book = api.get_book(title, author)
-                return [book] if book else []
-
-            tasks["tomato"] = _tomato
-
-        if META_SOURCE_QIMAO in sources:
-
-            def _qimao():
-                api = qimao.QimaoNovelApi(copy_image=False)
-                book = api.get_book(title, author)
-                return [book] if book else []
-
-            tasks["qimao"] = _qimao
-
-        if META_SOURCE_NEODB in sources:
-
-            def _neodb():
-                plugin = neodb.NeodbMetaPlugin()
-                try:
-                    return plugin.search(title=title, isbn=mi.isbn, publisher=mi.publisher)
-                except Exception:
-                    logging.error("NeoDB query %s failed" % title)
-                    return []
-
-            tasks["neodb"] = _neodb
-
-        if META_SOURCE_BOOKSOURCE in sources:
-
-            def _booksource():
-                return _lookup_online_sources()
-
-            tasks["booksource"] = _booksource
-
-        if META_SOURCE_AI in sources:
-
-            def _ai():
-                logging.info("查询 AI 信息源，title=%s", title)
-                api = AIBookApi(
-                    api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
-                    api_key=CONF.get("ai_api_key", ""),
-                    model=CONF.get("ai_model", "gpt-3.5-turbo"),
-                    use_thinking=CONF.get("ai_use_thinking", False),
-                    copy_image=False,
-                )
-                online = _lookup_online_sources()
-                evidence = [metadata_to_evidence(book) for book in online.books]
-                book = api.get_book(title, author, evidence=evidence)
-                logging.info("AI 查询结果：%d 条", 1 if book else 0)
-                failures = list(online.failures)
-                if not book:
-                    failures.append(self._refer_failure("ai", "no_result", "AI 未生成可验证的元数据"))
-                return MetadataSearchResult(books=[book] if book else [], failures=failures)
-
-            tasks["ai"] = _ai
+                tasks[task_name] = _plugin_lookup
 
         return tasks
+
+    def _finish_plugin_lookup(self, results):
+        """线程池 join 之后回写 health，worker 全程不触碰 session。"""
+        units = getattr(self, "_plugin_units", None)
+        if not units:
+            return
+        by_connection = {
+            connection_id: results.get(
+                task_name,
+                # 流式消费者可能在其他来源先返回后提前断开。此时外层
+                # future 即使 cancel() 返回，也无法证明里面已经运行的
+                # provider 停止了；按 timeout 保留 grace lease，避免下一次
+                # 请求与旧调用重叠。
+                PluginRuntimeError("plugin.timeout", "Plugin metadata lookup did not finish", retryable=True),
+            )
+            for task_name, connection_id in getattr(self, "_plugin_task_keys", {}).items()
+        }
+        self._plugin_runtime.finish_read(units, by_connection)
+
+    def _plugin_metadata_detail(self, plugin_key, provider_value):
+        """按 plugin_key 取详情：连接与凭据都由运行时解析，handler 不接触密文。"""
+        runtime = PluginRuntime(self.session, CONF)
+        connections = [
+            connection
+            for connection in runtime.connections_for(META_LOOKUP_CAPABILITY, self.user_id())
+            if runtime.plugin_key_of(connection) == plugin_key
+        ]
+        if not connections:
+            return None
+        results = runtime.read_many(connections, "get_metadata", provider_value, timeout=self.REFER_TIMEOUT)
+        # 结果以 connection.id 为键；取第一条能给出结果的连接。
+        outcome = next(
+            (results[item.id] for item in connections if results.get(item.id) is not None),
+            None,
+        )
+        if isinstance(outcome, Exception):
+            raise outcome
+        return to_calibre_metadata(outcome) or outcome
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
         refer_mi = None
@@ -540,26 +518,9 @@ class BookRefer(BaseHandler):
                         "msg": _("百度百科查询失败"),
                     }
                 )
-        elif provider_key == douban.KEY:
-            mi.douban_id = provider_value
-            api = douban.DoubanBookApi(
-                CONF["douban_apikey"],
-                CONF["douban_baseurl"],
-                copy_image=True,
-                manual_select=False,
-                maxCount=1,
-            )
-            try:
-                refer_mi = api.get_book(mi)
-                # 检查豆瓣封面是否获取成功
-                if refer_mi and not refer_mi.cover_data:
-                    # 封面获取失败，保留本地原有的封面数据
-                    refer_mi.cover_data = mi.cover_data
-                    # 记录日志
-                    logging.info("豆瓣封面获取失败，保留本地原有封面")
-            except Exception as e:
-                logging.error("获取豆瓣书籍信息失败: %s", e)
-                raise RuntimeError({"err": "httprequest.douban.failed", "msg": _("豆瓣接口查询失败")})
+        elif provider_key == "douban":
+            # 豆瓣 V1 依赖已停止发放的官方 apikey，历史条目改由 V2 重新搜索。
+            raise RuntimeError({"err": "source.replaced", "msg": _("豆瓣来源已升级为 V2，请重新搜索")})
         elif provider_key == youshu.KEY:
             raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
         elif provider_key == tomato.KEY:
@@ -592,6 +553,15 @@ class BookRefer(BaseHandler):
             except Exception as e:
                 logging.error("NeoDB query failed: %s", e)
                 raise RuntimeError({"err": "httprequest.neodb.failed", "msg": _("NeoDB查询失败")})
+        elif self._is_plugin_metadata_provider(provider_key):
+            # 插件来源：按 plugin_key 取详情，不为任何具体插件单开分支。
+            try:
+                refer_mi = self._plugin_metadata_detail(provider_key, provider_value)
+            except Exception as e:
+                logging.error("插件 %s 元数据查询失败：%s", provider_key, e)
+                raise RuntimeError({"err": "httprequest.plugin.failed", "msg": _("插件查询失败")})
+            if refer_mi is None:
+                raise RuntimeError({"err": "plugin.connection_missing", "msg": _("请先配置该插件的连接")})
         elif provider_key == biquge.KEY:
             raise RuntimeError({"err": "source.replaced", "msg": _("该固定来源已替换为在线书源，请重新搜索")})
         elif provider_key == BOOKSOURCE_KEY:
@@ -673,6 +643,13 @@ class BookRefer(BaseHandler):
 
         return refer_mi
 
+    def _is_plugin_metadata_provider(self, provider_key):
+        try:
+            provider = PluginRuntime(self.session, CONF).registry.get(provider_key)
+        except Exception:
+            return False
+        return META_LOOKUP_CAPABILITY in (provider.manifest.get("capabilities") or [])
+
     @js
     @auth
     async def get(self, id):
@@ -697,7 +674,7 @@ class BookRefer(BaseHandler):
             logging.info("[STREAM] 元信息已发送")
 
             async for b in self.plugin_search_books_stream(mi):
-                if isinstance(b, dict) and b.get("event") == "summary":
+                if isinstance(b, dict) and b.get("event") in {"progress", "summary"}:
                     self.write(json.dumps(b, ensure_ascii=False) + "\n")
                     await self.flush()
                     continue
@@ -807,8 +784,10 @@ class BookRefer(BaseHandler):
         cover_fallback = False
         if only_cover == "yes":
             # 仅设置封面，检查封面数据是否有效
-            if refer_mi.cover_data and len(refer_mi.cover_data) > 0:
-                mi.cover_data = refer_mi.cover_data
+            refer_cover_data = getattr(refer_mi, "cover_data", None)
+            if refer_cover_data and len(refer_cover_data) > 1 and refer_cover_data[1]:
+                mi.cover_data = refer_cover_data
+                mi.timestamp = datetime.datetime.now(datetime.timezone.utc)
             else:
                 return {"err": "cover.empty", "msg": _("获取到的封面数据为空")}
         else:
@@ -905,7 +884,7 @@ class BookEdit(BaseHandler):
             if data["pubdate"] == "__DELETE__":
                 mi.set("pubdate", None)
             else:
-                content = douban.str2date(data["pubdate"])
+                content = meta_common.str2date(data["pubdate"])
                 if content is None:
                     return {
                         "err": "params.pudate.invalid",
@@ -1022,11 +1001,15 @@ class BookDelete(BaseHandler):
         if not can_manage or not (self.is_admin() or self.is_book_owner(bid, self.user_id())):
             return {"err": "permission", "msg": _("无权操作")}
 
+        item = self.session.get(Item, bid)
+        permanent = bool(item and item.scope == "private")
         external_indexed = is_external_index_book(self.session, bid)
         if external_indexed:
             delete_external_index_book_record(self.db, bid)
         else:
-            self.db.delete_book(bid)
+            # Calibre defaults to its per-library trash. Private books bypass
+            # it so their files and metadata cannot appear in admin trash.
+            self.db.delete_book(bid, permanent=permanent)
         # 同步清理该书籍对应的 ScanFile 记录，避免重新导入时因哈希重复被误判为 drop
         from webserver.models import ScanFile
 
@@ -1279,6 +1262,10 @@ class BookUploadBase(BaseHandler):
     EBOOK_MAGIC = {
         "epub": b"PK\x03\x04",
         "pdf": b"%PDF",
+        "cbz": b"PK\x03\x04",
+        "zip": b"PK\x03\x04",
+        "cbr": b"Rar!\x1a\x07",
+        "rar": b"Rar!\x1a\x07",
     }
 
     def check_upload_permission(self):
@@ -1354,21 +1341,53 @@ class BookUploadBase(BaseHandler):
             except OSError:
                 continue
 
+    def _remove_rejected_upload(self, fpath):
+        upload_dir = os.path.realpath(CONF["upload_path"])
+        cleanup_path = os.path.realpath(fpath)
+        try:
+            if os.path.commonpath([upload_dir, cleanup_path]) == upload_dir and cleanup_path != upload_dir:
+                os.remove(cleanup_path)
+        except (OSError, ValueError):
+            pass
+
+    def _save_media_type(self, book_id, media_type, item=None):
+        item = item or self.session.query(Item).filter(Item.book_id == book_id).first()
+        if not item:
+            item = Item()
+            item.book_id = book_id
+            item.collector_id = self.user_id()
+        if not item.media_type_locked:
+            item.media_type = merge_media_type(item.media_type, media_type)
+        item.save()
+        return item
+
     def import_uploaded_book(self, fpath, fmt):
         from calibre.ebooks.metadata.meta import get_metadata
 
-        # read ebook meta
-        with open(fpath, "rb") as stream:
-            mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
-            mi.title = utils.super_strip(mi.title)
-            # 保留所有作者信息，与批量导入逻辑保持一致
-            mi.authors = [utils.super_strip(s) for s in mi.authors]
+        try:
+            analysis = analyze_media_file(fpath, fmt)
+        except InvalidMediaError as err:
+            logging.warning("reject uploaded media %s: %s", fpath, err.message)
+            self._remove_rejected_upload(fpath)
+            return {"err": "params.format", "msg": _("文件校验失败：%s") % err.message}
+
+        # 漫画容器不解压读取元数据，使用文件名构造最小 Calibre metadata。
+        if fmt in COMIC_CONTAINER_FORMATS:
+            from calibre.ebooks.metadata.book.base import Metadata
+
+            mi = Metadata(os.path.splitext(os.path.basename(fpath))[0], [_("佚名")])
+        else:
+            with open(fpath, "rb") as stream:
+                mi = get_metadata(stream, stream_type=fmt, use_libprs_metadata=True)
+                mi.title = utils.super_strip(mi.title)
+                # 保留所有作者信息，与批量导入逻辑保持一致
+                mi.authors = [utils.super_strip(s) for s in mi.authors]
 
         # 非结构化的格式，calibre无法识别准确的信息，直接从文件名提取
         if fmt in ["txt", "pdf"]:
             # 使用文件名提取标题，与批量导入逻辑保持一致
             fname = os.path.basename(fpath)
-            mi.title = fname.replace("." + fmt, "")
+            mi.title = os.path.splitext(fname)[0]
             mi.authors = [_("佚名")]
             # 确保author_sort也被设置，与批量导入逻辑保持一致
             mi.author_sort = mi.authors[0] if mi.authors else ""
@@ -1376,7 +1395,6 @@ class BookUploadBase(BaseHandler):
         logging.info("upload mi.title = " + repr(mi.title))
         books = self.db.books_with_same_title(mi)
         same_author_book_id = None
-        different_author_books = []
 
         if books:
             # 区分同名同作者和同名不同作者的书籍
@@ -1387,21 +1405,21 @@ class BookUploadBase(BaseHandler):
                 # 检查作者是否相同
                 if set(book_authors) == set(mi_authors):
                     same_author_book_id = b.get("id")
-                    # 检查是否已存在相同格式
+                    # 检查是否已存在相同格式。重传也会回填旧记录的媒体分类。
                     if fmt.upper() in b.get("available_formats", ""):
+                        self._save_media_type(same_author_book_id, analysis.media_type)
                         return {
                             "err": "samebook",
                             "msg": _("同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
                             "book_id": same_author_book_id,
                         }
-                else:
-                    different_author_books.append(b)
 
         # 如果存在同名同作者书籍，添加格式到该书籍
         if same_author_book_id:
             logging.info("import [%s] from %s with format %s", repr(mi.title), fpath, fmt)
             self.db.add_format(same_author_book_id, fmt.upper(), fpath, True)
             book_id = same_author_book_id
+            self._save_media_type(book_id, analysis.media_type)
         else:
             fpaths = [fpath]
             book_id = self.db.import_book(mi, fpaths)
@@ -1409,6 +1427,7 @@ class BookUploadBase(BaseHandler):
             item = Item()
             item.book_id = book_id
             item.collector_id = self.user_id()
+            item.media_type = analysis.media_type
             try:
                 item.create_time = self.cache.field_for("timestamp", book_id)
             except Exception:
@@ -1416,7 +1435,32 @@ class BookUploadBase(BaseHandler):
             item.save()
         self.add_msg("success", _("导入书籍成功！"))
         AutoFillService().auto_fill(book_id)
+        self.run_auto_transforms(book_id, fmt)
         return {"err": "ok", "book_id": book_id}
+
+    def run_auto_transforms(self, book_id, fmt):
+        """新书入库后，按连接配置自动处理正文。
+
+        默认手动：只有把 trigger 显式配成 auto 的插件才会执行，且只有声明了
+        supports_auto_trigger 的插件才允许配置该选项。自动改写用户刚上传的
+        文件不可逆，因此宁可不做也不默认做。
+        """
+        try:
+            from webserver.services.book_transform import auto_fix_encoding
+
+            runtime = PluginRuntime(self.session, CONF)
+            for connection in runtime.connections_for(TRANSFORM_CAPABILITY):
+                plugin_key = runtime.plugin_key_of(connection)
+                provider = runtime.registry.get(plugin_key)
+                if trigger_of(connection.config) != TRIGGER_AUTO:
+                    continue
+                if not getattr(provider, "supports_auto_trigger", False):
+                    continue
+                if str(fmt or "").upper() not in getattr(provider, "supported_formats", frozenset()):
+                    continue
+                auto_fix_encoding(AsyncService(), book_id, self.user_id(), connection.id)
+        except Exception as err:  # 自动处理失败不得影响上传本身
+            logging.warning("新书自动处理调度失败 book=%s: %s", book_id, err)
 
 
 class BookUpload(BookUploadBase):
@@ -1609,23 +1653,12 @@ class BookUploadComplete(BookUploadBase):
 
         try:
             with open(fpath, "wb") as out:
-                for i, p in enumerate(chunk_paths):
+                for p in chunk_paths:
                     with open(p, "rb") as part:
-                        chunk_data = part.read()
-                        if i == 0 and fmt in self.EBOOK_MAGIC and not chunk_data.startswith(self.EBOOK_MAGIC[fmt]):
-                            raise ValueError("format mismatch")
-                        out.write(chunk_data)
-        except ValueError:
-            # fpath 已通过 realpath + startswith 守卫校验，属受控路径
-            upload_dir = os.path.realpath(CONF["upload_path"])
-            cleanup_path = os.path.realpath(fpath)
-            if cleanup_path.startswith(upload_dir + os.sep):
-                try:
-                    os.remove(cleanup_path)
-                except OSError:
-                    pass
-            shutil.rmtree(chunk_dir, ignore_errors=True)
-            return {"err": "params.format", "msg": _("文件内容与格式不匹配")}
+                        shutil.copyfileobj(part, out, length=1024 * 1024)
+        except OSError:
+            self._remove_rejected_upload(fpath)
+            raise
 
         # 合并成功后才清理分片目录；若合并过程中出现非预期异常（如磁盘写满），
         # 分片会保留在磁盘上以便用户重新调用/complete重试，而不是被静默丢弃
@@ -1663,6 +1696,14 @@ class BookRead(BaseHandler):
 
         book = self.get_book_or_404(id)
         book_id = book["id"]
+        readable_formats = [fmt for fmt in ("epub", "pdf", "txt", "mobi", "azw", "azw3") if book.get("fmt_%s" % fmt)]
+        if not readable_formats:
+            if book.get("media_type") == "comic":
+                reason = _("当前漫画格式暂不支持在线阅读，请下载后使用本地漫画阅读器")
+            else:
+                reason = _("抱歉，在线阅读器暂不支持该格式的书籍")
+            raise web.HTTPError(415, reason=reason)
+
         audiobook_edition = (
             self.session.query(AudiobookEdition)
             .filter(AudiobookEdition.book_id == book_id, AudiobookEdition.status == "published")
@@ -1803,18 +1844,25 @@ class BookSendToDevice(BaseHandler):
         except Exception:
             return {"err": "params.invalid", "msg": _("请求参数格式错误")}
 
+        if not device_type:
+            return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
+        try:
+            PluginRuntime(self.session, CONF).provider_for(
+                PUSH_CAPABILITY,
+                {"device_type": device_type},
+            )
+        except PluginRuntimeError:
+            return {"err": "device.unsupported", "msg": _("不支持的设备类型: %s") % device_type}
+
         # Kindle设备使用邮箱地址，其他设备使用device_url
         if device_type == "kindle":
             if not mailbox:
                 return {"err": "params.missing", "msg": _("Kindle设备需要提供邮箱地址")}
         else:
-            if not device_type or not device_url:
+            # 地址可省略：回落到该用户上次保存在插件连接里的设备地址。
+            device_url = device_url or self._saved_device_url(device_type)
+            if not device_url:
                 return {"err": "params.missing", "msg": _("设备类型和设备地址不能为空")}
-
-        # 支持的设备类型
-        supported_types = ["duokan", "ireader", "hanwang", "boox", "dangdang", "kindle", "purelibro"]
-        if device_type not in supported_types:
-            return {"err": "device.unsupported", "msg": _("不支持的设备类型: %s") % device_type}
 
         # Kindle设备通过邮件发送
         if device_type == "kindle":
@@ -1826,32 +1874,68 @@ class BookSendToDevice(BaseHandler):
         """通过邮件发送书籍到Kindle设备"""
         self.user_history("push_history", book)
         self.count_increase(book_id, count_download=1)
-
-        # epub、pdf、txt格式可以直接发送，不需要转换
-        for fmt in ["epub", "pdf", "txt"]:
-            fmt_key = "fmt_%s" % fmt
-            if fmt_key in book:
-                fpath = book[fmt_key]
-                MailService().send_book(self.user_id(), self.site_url, book, mail_to, fmt, fpath)
-                self.add_msg(
-                    "success",
-                    _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+        runtime = PluginRuntime(self.session, CONF)
+        platform = {"book": book, "user_id": self.user_id(), "site_url": self.site_url}
+        try:
+            if not self.user_id():
+                result = runtime.guest_sync(
+                    PUSH_CAPABILITY,
+                    {"device_type": "kindle"},
+                    "push",
+                    {},
+                    mail_to,
+                    timeout=CONF.get("PUSH_TIMEOUT", 60),
+                    context_overrides={"platform": platform},
                 )
-                return {"err": "ok", "msg": _("服务器后台正在推送。您可关闭此窗口，继续浏览其他书籍。")}
+            else:
+                connection = runtime.user_connection_for(
+                    PUSH_CAPABILITY,
+                    self.user_id(),
+                    selector={"device_type": "kindle"},
+                )
+                result = runtime.sync(
+                    connection,
+                    "push",
+                    {},
+                    mail_to,
+                    timeout=CONF.get("PUSH_TIMEOUT", 60),
+                    context_overrides={"platform": platform},
+                    required_scopes=("books.read", "network.write"),
+                    requested_by=self.user_id(),
+                    audit_data={"book_id": book_id, "device_type": "kindle"},
+                )
+        except PluginRuntimeError as exc:
+            return {"err": "upload.error", "msg": str(exc)}
 
-        # 如果没有可直接发送的格式，检查是否有azw3或mobi格式需要转换
-        if "fmt_azw3" in book or "fmt_mobi" in book:
-            fmt = "azw3" if "fmt_azw3" in book else "mobi"
-            logging.info("[SEND_TO_KINDLE] found %s format, needs conversion to epub", fmt)
-            ConvertService().convert_and_send(self.user_id(), self.site_url, book, mail_to)
-            self.add_msg(
-                "success",
-                _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
-            )
+        if not result.get("success"):
+            return {"err": "format.not_supported", "msg": _("书籍没有Kindle支持的格式!")}
+
+        self.add_msg(
+            "success",
+            _("服务器正在推送《%(title)s》到%(email)s") % {"title": book["title"], "email": mail_to},
+        )
+        if result.get("converting"):
             return {"err": "ok", "msg": _("服务器正在转换格式，稍后将自动推送。您可关闭此窗口，继续浏览其他书籍。")}
+        return {"err": "ok", "msg": _("服务器后台正在推送。您可关闭此窗口，继续浏览其他书籍。")}
 
-        # 没有Kindle支持的格式
-        return {"err": "format.not_supported", "msg": _("书籍没有Kindle支持的格式!")}
+    def _saved_device_url(self, device_type):
+        """取当前用户在该设备插件连接里保存过的地址。"""
+        if not self.user_id():
+            # 游客没有个人连接，且不能读取任何实例级/其他用户保存的局域网地址。
+            return ""
+        runtime = PluginRuntime(self.session, CONF)
+        try:
+            return str(
+                runtime.user_connection_config(
+                    PUSH_CAPABILITY,
+                    self.user_id(),
+                    "device_url",
+                    selector={"device_type": device_type},
+                )
+                or ""
+            )
+        except PluginRuntimeError:
+            return ""
 
     def _send_to_other_device(self, book, book_id, device_type, device_url):
         """通过WiFi上传发送书籍到其他设备"""
@@ -1874,31 +1958,9 @@ class BookSendToDevice(BaseHandler):
         if not os.path.exists(file_path):
             return {"err": "file.missing", "msg": _("书籍文件不存在: %s") % file_path}
 
-        # 导入对应的上传器
+        # 走 typed 插件运行时：按 manifest 的 device_type 声明解析
+        # provider，认证用户经个人 connection + runtime.sync 执行。
         try:
-            from webserver.plugins.sending.uploader import (
-                BooxUploader,
-                DangdangUploader,
-                DuokanUploader,
-                HanwangUploader,
-                IReaderUploader,
-                PureLibroUploader,
-            )
-
-            uploader_map = {
-                "duokan": DuokanUploader,
-                "ireader": IReaderUploader,
-                "hanwang": HanwangUploader,
-                "boox": BooxUploader,
-                "dangdang": DangdangUploader,
-                "purelibro": PureLibroUploader,
-            }
-
-            uploader_class = uploader_map.get(device_type)
-            if not uploader_class:
-                return {"err": "uploader.not_found", "msg": _("找不到对应的上传器: %s") % device_type}
-
-            # 创建上传器实例
             book_name = book.get("title", "")
             if len(book_name) > 120:
                 book_name = ""
@@ -1906,38 +1968,56 @@ class BookSendToDevice(BaseHandler):
                 book_name = None
             else:
                 book_name += os.path.splitext(file_path)[-1]
-            uploader = uploader_class(file_path, file_name=book_name)
 
-            # 构建设备上传URL
-            if not device_url.startswith(("http://", "https://")):
-                device_url = "http://" + device_url
-
-            # 执行上传
             logging.info(
                 "[SEND_TO_DEVICE] sending book %s (%s) to device %s: %s", book_id, file_format, device_type, device_url
             )
-            result = uploader.upload(device_url)
-
-            if result.get("success"):
-                logging.info("[SEND_TO_DEVICE] success: %s -> %s", book_id, device_type)
-                return {"err": "ok", "msg": _("书籍发送成功")}
+            if not self.user_id():
+                # ALLOW_GUEST_PUSH 是既有兼容能力。PluginRun.requested_by 非空，
+                # 不能伪造用户或把局域网地址保存为共享配置；游客只执行本次推送。
+                PluginRuntime(self.session, CONF).guest_sync(
+                    PUSH_CAPABILITY,
+                    {"device_type": device_type},
+                    "push",
+                    {"path": file_path, "name": book_name},
+                    device_url,
+                    timeout=CONF.get("PUSH_TIMEOUT", 60),
+                )
             else:
-                error_type = result.get("error_type", "unknown")
-                error_msg = result.get("message", _("发送失败"))
-
-                if error_type == "connection":
-                    return {"err": "connection.failed", "msg": _("无法连接到设备。请确认IP地址正确，且设备已开启WiFi上传功能")}
-                elif error_type == "timeout":
-                    return {"err": "upload.timeout", "msg": _("上传超时。请检查网络连接和设备状态")}
-                elif error_type == "http":
-                    status_code = result.get("status_code", 0)
-                    return {"err": "upload.failed", "msg": _("上传失败 (HTTP %d)。请查看日志获取详细信息") % status_code}
-                else:
-                    return {"err": "upload.error", "msg": _("上传过程出错: %s。请查看日志获取详细信息") % error_msg}
-
-        except ImportError as e:
-            logging.error("[SEND_TO_DEVICE] import uploader failed: %s", e)
-            return {"err": "uploader.import_error", "msg": _("设备上传功能不可用")}
+                runtime = PluginRuntime(self.session, CONF)
+                connection = runtime.user_connection_for(
+                    PUSH_CAPABILITY,
+                    self.user_id(),
+                    selector={"device_type": device_type},
+                    config_updates={"device_url": device_url},
+                )
+                runtime.sync(
+                    connection,
+                    "push",
+                    {"path": file_path, "name": book_name},
+                    device_url,
+                    timeout=CONF.get("PUSH_TIMEOUT", 60),
+                    required_scopes=("books.read", "network.write"),
+                    requested_by=self.user_id(),
+                    audit_data={"book_id": book_id, "format": file_format, "device_type": device_type},
+                )
+            logging.info("[SEND_TO_DEVICE] success: %s -> %s", book_id, device_type)
+            return {"err": "ok", "msg": _("书籍发送成功")}
+        except UpstreamError as exc:
+            message = str(exc)
+            logging.warning("[SEND_TO_DEVICE] failed: %s -> %s: %s", book_id, device_type, message)
+            if exc.error_type == "connection":
+                return {"err": "connection.failed", "msg": _("无法连接到设备。请确认IP地址正确，且设备已开启WiFi上传功能")}
+            if exc.error_type == "timeout":
+                return {"err": "upload.timeout", "msg": _("上传超时。请检查网络连接和设备状态")}
+            return {"err": "upload.error", "msg": _("上传过程出错: %s。请查看日志获取详细信息") % message}
+        except PluginRuntimeError as exc:
+            logging.warning("[SEND_TO_DEVICE] runtime failed: %s -> %s: %s", book_id, device_type, exc.code)
+            if exc.code == "plugin.timeout":
+                return {"err": "upload.timeout", "msg": _("上传超时。请检查网络连接和设备状态")}
+            if exc.code in {"plugin.provider_unavailable", "plugin.provider_ambiguous"}:
+                return {"err": "device.unsupported", "msg": _("不支持的设备类型: %s") % device_type}
+            return {"err": "upload.error", "msg": _("发送过程出错，请查看日志获取详细信息")}
         except Exception as e:
             logging.error("[SEND_TO_DEVICE] send failed: %s", e)
             return {"err": "upload.error", "msg": _("发送过程出错，请查看日志获取详细信息")}
@@ -2053,6 +2133,59 @@ class BookSetScope(BaseHandler):
             return {"err": "ok", "msg": _("更新成功")}
         else:
             return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
+
+
+class BookSetMediaType(BaseHandler):
+    @js
+    @auth
+    def post(self, bid):
+        book = self.get_book(int(bid), raise_exception=False)
+        if not book:
+            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
+
+        book_id = book["id"]
+        if not self.current_user.can_edit() or not (self.is_admin() or self.is_book_owner(book_id, self.user_id())):
+            return {"err": "permission", "msg": _("无权操作")}
+
+        try:
+            data = tornado.escape.json_decode(self.request.body)
+        except (TypeError, ValueError):
+            return {"err": "params.invalid", "msg": _("请求参数格式错误")}
+        media_type = data.get("media_type") if isinstance(data, dict) else None
+        if media_type not in (MEDIA_TYPE_COMIC, MEDIA_TYPE_EBOOK):
+            return {"err": "params.media_type", "msg": _("媒体类型只能设置为漫画或电子书")}
+        if not has_mixed_media_formats(book.get("available_formats", [])):
+            return {
+                "err": "media_type.not_mixed",
+                "msg": _("只有同时包含电子书和漫画格式的书籍才需要手动设置媒体类型"),
+            }
+
+        try:
+            item = self.session.query(Item).filter(Item.book_id == book_id).first()
+            if not item:
+                item = Item()
+                item.book_id = book_id
+                item.collector_id = self.user_id()
+                try:
+                    item.create_time = self.cache.field_for("timestamp", book_id)
+                except Exception:
+                    item.create_time = datetime.datetime.now()
+                self.session.add(item)
+            item.media_type = media_type
+            item.media_type_locked = True
+            self.session.commit()
+        except Exception as err:
+            self.session.rollback()
+            logging.error("set book %d media type failed: %s", book_id, err)
+            return {"err": "db.update.failed", "msg": _("更新失败，请稍后再试")}
+
+        label = _("漫画") if media_type == MEDIA_TYPE_COMIC else _("电子书")
+        return {
+            "err": "ok",
+            "msg": _("已将书籍设置为%s") % label,
+            "media_type": media_type,
+            "media_type_locked": True,
+        }
 
 
 class BookDeleteFormat(BaseHandler):
@@ -2602,6 +2735,7 @@ def routes():
         (r"/api/book/([0-9]+)/delete", BookDelete),
         (r"/api/book/([0-9]+)/edit", BookEdit),
         (r"/api/book/([0-9]+)/setscope", BookSetScope),
+        (r"/api/book/([0-9]+)/media_type", BookSetMediaType),
         (r"/api/book/([0-9]+\..+)", BookDownload),
         (r"/api/book/([0-9]+)/send_to_device", BookSendToDevice),
         (r"/api/book/([0-9]+)/mailto", BookSendToMail),

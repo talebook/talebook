@@ -40,9 +40,9 @@ class TestNetworkLibrary(TestWithUserLogin):
         return FakeSession(
             {
                 "/search": text("search.html"),
-                "/book/1001": text("bookinfo.html"),
                 "/toc": text("toc.html"),
                 "/c/1": text("content.html"),
+                "/book/1001": text("bookinfo.html"),
             }
         )
 
@@ -59,12 +59,117 @@ class TestNetworkLibrary(TestWithUserLogin):
         d = self.json("/api/network/sources")
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["items"][0]["id"], self.sid)
+        self.assertEqual(d["items"][0]["source_key"], "legado:%d" % self.sid)
+
+    def test_generic_sources_report_ready_availability(self):
+        d = self.json("/api/book-sources")
+        self.assertEqual(d["availability"]["state"], "ready")
+        self.assertGreaterEqual(d["availability"]["enabled_plugins"], 1)
+        self.assertEqual(d["availability"]["configured_sources"], len(d["items"]))
+
+    def test_generic_sources_distinguish_disabled_plugins_from_missing_configuration(self):
+        from webserver.plugins.register import SOURCE_PROVIDERS
+
+        source_keys = [provider.manifest["id"] for provider in SOURCE_PROVIDERS]
+        session = get_db()
+        installations = (
+            session.query(models.PluginInstallation).filter(models.PluginInstallation.plugin_key.in_(source_keys)).all()
+        )
+        previous = {item.id: (item.enabled, item.status) for item in installations}
+        try:
+            for installation in installations:
+                installation.enabled = False
+            session.commit()
+            disabled = self.json("/api/book-sources")
+            self.assertEqual(disabled["availability"]["state"], "no_enabled_plugins")
+            self.assertEqual(disabled["availability"]["enabled_plugins"], 0)
+
+            legado = next(item for item in installations if item.plugin_key == "talebook.source.legado")
+            legado.enabled = True
+            legado.status = "active"
+            session.query(models.BookSourceModel).delete()
+            session.commit()
+            unconfigured = self.json("/api/book-sources")
+            self.assertEqual(unconfigured["availability"]["state"], "no_configured_sources")
+            self.assertEqual(unconfigured["availability"]["enabled_plugins"], 1)
+            self.assertEqual(unconfigured["availability"]["configured_sources"], 0)
+        finally:
+            session = get_db()
+            for installation_id, (enabled, status) in previous.items():
+                installation = session.get(models.PluginInstallation, installation_id)
+                installation.enabled = enabled
+                installation.status = status
+            session.commit()
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_generic_source_route_accepts_opaque_binding_key_end_to_end(self, m_session):
+        """T9：Legado 只作为 SourceProvider，通过通用入口完成搜索、详情、目录和正文。"""
+
+        def fake_session(*args, **kwargs):
+            return self._fake()
+
+        m_session.side_effect = fake_session
+        source_key = "legado:%d" % self.sid
+
+        sources = self.json("/api/book-sources")
+        self.assertEqual(sources["items"][0]["source_key"], source_key)
+
+        created = self.json("/api/book-sources/search?key=%s&sources=%s" % (Q("剑来"), Q(source_key)))
+        deadline = time.time() + 5
+        searched = self.json("/api/book-sources/search/status?task_id=%s" % created["task_id"])
+        while not searched.get("finished") and time.time() < deadline:
+            time.sleep(0.05)
+            searched = self.json("/api/book-sources/search/status?task_id=%s" % created["task_id"])
+        self.assertEqual(searched["results"][0]["source_id"], source_key)
+        self.assertEqual(searched["results"][0]["books"][0]["name"], "剑来")
+
+        book = self.json("/api/book-sources/book?source_id=%s&book_url=%s" % (Q(source_key), Q("/book/1001")))
+        self.assertEqual(book["download_mode"], "by_chapters")
+        toc = self.json("/api/book-sources/toc?source_id=%s&book_url=%s" % (Q(source_key), Q("/book/1001")))
+        self.assertEqual(len(toc["chapters"]), 3, toc)
+        content = self.json("/api/book-sources/content?source_id=%s&chapter_url=%s" % (Q(source_key), Q("http://x.com/c/1")))
+        self.assertIn("正文第一段", content["content"])
+
+    def test_search_uses_legado_global_concurrency(self):
+        self.json("/api/book-sources")
+        session = get_db()
+        connection = (
+            session.query(models.PluginConnection)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .one()
+        )
+        original = dict(connection.config or {})
+        connection.config = {**original, "search_concurrency": 7}
+        session.commit()
+
+        def restore():
+            cleanup = get_db()
+            item = cleanup.get(models.PluginConnection, connection.id)
+            item.config = original
+            cleanup.commit()
+
+        self.addCleanup(restore)
+        with mock.patch("webserver.services.source_catalog.SourceCatalogService.prepare_search", return_value=[]), mock.patch(
+            "webserver.handlers.network_library.SearchTaskService.configure"
+        ) as configure, mock.patch(
+            "webserver.handlers.network_library.SearchTaskService.create_task",
+            return_value={"task_id": "configured", "total": 1},
+        ):
+            result = self.json(
+                "/api/book-sources/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid))
+            )
+
+        self.assertEqual(result["err"], "ok")
+        configure.assert_called_once_with(7)
 
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_search(self, m_session):
         m_session.return_value = self._fake()
         # 创建任务：立即返回 task_id，不阻塞
-        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        # 默认搜索还会覆盖启用的公共书源插件；这里显式选中 Legado，
+        # 让本用例只验证其任务进度与 runtime lease/run 收口。
+        d = self.json("/api/network/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
         self.assertEqual(d["err"], "ok")
         self.assertTrue(d["task_id"])
         self.assertEqual(d["total"], 1)
@@ -73,6 +178,95 @@ class TestNetworkLibrary(TestWithUserLogin):
         self.assertTrue(s["finished"])
         self.assertEqual(len(s["results"]), 1)
         self.assertEqual(s["results"][0]["books"][0]["name"], "剑来")
+
+        session = get_db()
+        run = (
+            session.query(models.PluginRun)
+            .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .order_by(models.PluginRun.id.desc())
+            .first()
+        )
+        self.assertIsNotNone(run)
+        self.assertEqual(run.action, "read")
+        self.assertEqual(run.status, "succeeded")
+        connection = session.get(models.PluginConnection, run.connection_id)
+        self.assertFalse(connection.lease_token)
+        self.assertIsNone(connection.lease_until)
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_search_groups_multiple_bindings_into_one_runtime_run(self, m_session):
+        """Legado 多个事实书源共用一条 connection，也只占用一个 lease/run。"""
+        m_session.side_effect = lambda *_args, **_kwargs: self._fake()
+        session = get_db()
+        second = models.BookSourceModel(CSS_SOURCE)
+        second.name = "备用书源"
+        second.save()
+        before = (
+            session.query(models.PluginRun)
+            .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .count()
+        )
+
+        created = self.json("/api/network/search?key=%s&mode=all" % Q("剑来"))
+        result = self._wait_finished(created["task_id"])
+        self.assertTrue(result["finished"])
+
+        session = get_db()
+        runs = (
+            session.query(models.PluginRun)
+            .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .order_by(models.PluginRun.id)
+            .all()
+        )
+        self.assertEqual(len(runs), before + 1)
+        self.assertEqual(runs[-1].counts["fetched"], 2)
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_search_audit_finalizes_without_status_polling(self, m_session):
+        """客户端离开页面也不得把 durable PluginRun 永久留在 running。"""
+        m_session.return_value = self._fake()
+        session = get_db()
+        previous_run = (
+            session.query(models.PluginRun)
+            .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .order_by(models.PluginRun.id.desc())
+            .first()
+        )
+        previous_run_id = previous_run.id if previous_run is not None else 0
+        created = self.json("/api/network/search?key=%s" % Q("剑来"))
+        self.assertTrue(created["task_id"])
+
+        deadline = time.time() + 5
+        run = None
+        while time.time() < deadline:
+            session = get_db()
+            run = (
+                session.query(models.PluginRun)
+                .join(models.PluginConnection, models.PluginConnection.id == models.PluginRun.connection_id)
+                .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+                .filter(
+                    models.PluginInstallation.plugin_key == "talebook.source.legado",
+                    models.PluginRun.id > previous_run_id,
+                )
+                .order_by(models.PluginRun.id.desc())
+                .first()
+            )
+            if run is not None and run.status != "running":
+                break
+            time.sleep(0.05)
+
+        self.assertIsNotNone(run)
+        self.assertEqual(run.status, "succeeded")
+        connection = session.get(models.PluginConnection, run.connection_id)
+        self.assertFalse(connection.lease_token)
 
     def test_search_empty_key(self):
         d = self.json("/api/network/search?key=")

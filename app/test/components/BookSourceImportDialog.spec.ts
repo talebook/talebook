@@ -34,6 +34,8 @@ type DialogVm = {
     tab: string;
     jsonText: string;
     url: string;
+    sampleSource: string;
+    sampleOptions: Array<{ title: string; value: string; url: string }>;
     fileInput: HTMLInputElement | null;
     onFileSelected: (event: Event) => void;
     triggerFileSelect: () => void;
@@ -85,6 +87,49 @@ describe('BookSourceImportDialog.vue', () => {
         const wrapper = mountDialog();
         const vm = wrapper.vm as unknown as DialogVm;
         expect(vm.url).toBe('https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan');
+        wrapper.unmount();
+    });
+
+    it('offers the built-in and three remote sample sources', () => {
+        const wrapper = mountDialog();
+        const vm = wrapper.vm as unknown as DialogVm;
+        expect(vm.sampleSource).toBe('builtin');
+        expect(vm.sampleOptions.map(item => item.value)).toEqual([
+            'builtin',
+            'https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json',
+            'https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json',
+            'https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json',
+        ]);
+        wrapper.unmount();
+    });
+
+    it('uses the seed endpoint for the built-in sample source', async () => {
+        const wrapper = mountDialog();
+        backendMock.mockResolvedValue({ err: 'ok' });
+        const vm = wrapper.vm as unknown as DialogVm;
+        vm.tab = 'seed';
+        vm.sampleSource = 'builtin';
+
+        await vm.doImport();
+
+        expect(backendMock).toHaveBeenCalledWith('/admin/booksource/seed', expect.objectContaining({ method: 'POST' }));
+        wrapper.unmount();
+    });
+
+    it('imports a selected remote sample through the URL endpoint', async () => {
+        const wrapper = mountDialog();
+        backendMock.mockResolvedValue({ err: 'ok' });
+        const vm = wrapper.vm as unknown as DialogVm;
+        const sampleUrl = 'https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json';
+        vm.tab = 'seed';
+        vm.sampleSource = sampleUrl;
+
+        await vm.doImport();
+
+        expect(backendMock).toHaveBeenCalledWith('/admin/booksource/import', expect.objectContaining({
+            method: 'POST',
+            body: JSON.stringify({ url: sampleUrl }),
+        }));
         wrapper.unmount();
     });
 

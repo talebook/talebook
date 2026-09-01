@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="重建 Talebook 插件领域语言并据此重写插件开发指南。" />
+    <link rel="icon" href="data:," />
+    <title>重建插件领域模型与开发指南 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f5f7fa; --panel:#fff; --ink:#172033; --muted:#5f6b7d; --line:#d8e0ea; --accent:#315f91; --soft:#edf4fb; --good:#176443; --warn:#9a5c09; --shadow:0 12px 30px rgba(25,45,75,.08); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(180deg,#fbfcfe,var(--bg)); line-height:1.65; }
+      a { color:var(--accent); text-underline-offset:3px; }
+      a:focus-visible { outline:3px solid #e18a32; outline-offset:3px; }
+      code { padding:.1em .35em; border-radius:4px; background:#eef2f6; font-family:"SFMono-Regular",Consolas,monospace; font-size:.9em; }
+      .skip { position:fixed; top:8px; left:8px; z-index:3; padding:8px 12px; color:white; background:var(--ink); transform:translateY(-160%); }
+      .skip:focus { transform:translateY(0); }
+      .page { width:min(1120px,calc(100vw - 32px)); margin:auto; padding:28px 0 56px; }
+      .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+      .hero { padding:32px; }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,48px); line-height:1.12; }
+      h2 { margin:0 0 14px; font-size:23px; }
+      h3 { margin:22px 0 8px; font-size:17px; }
+      p,li,td,th { font-size:14px; }
+      p { margin:0 0 12px; }
+      .sub { max-width:880px; color:var(--muted); font-size:17px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 11px; color:#4c5b70; background:#eef2f7; border-radius:999px; font-size:12px; font-weight:700; }
+      .chip.wip { color:var(--warn); background:#fff4dd; }
+      .chip.active { color:var(--good); background:#e7f5ed; }
+      .card { margin-top:18px; padding:26px 28px; scroll-margin-top:18px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#fbfcfe; }
+      .box h3 { margin-top:0; }
+      .callout.good { color:#184f3b; border-color:#b9d9c9; background:#edf8f2; }
+      .callout.warn { border-color:#eed4a3; background:#fff9ec; }
+      ul,ol { margin:8px 0 0 20px; padding:0; }
+      li + li { margin-top:6px; }
+      .table { margin-top:14px; overflow-x:auto; border:1px solid var(--line); border-radius:14px; }
+      table { width:100%; min-width:700px; border-collapse:collapse; background:white; }
+      th,td { padding:11px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:#526174; background:#f7f9fc; font-size:12px; }
+      th:last-child,td:last-child { border-right:0; }
+      tr:last-child td { border-bottom:0; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
+      .step { min-height:130px; padding:15px; border:1px solid var(--line); border-radius:14px; background:white; }
+      .step b { display:block; margin-bottom:6px; }
+      .step small { color:var(--muted); }
+      .verified { color:var(--good); font-weight:700; }
+      footer { padding-top:18px; color:var(--muted); text-align:center; font-size:12px; }
+      @media (max-width:720px) { .page{width:calc(100vw - 20px);padding-top:10px}.hero,.card{padding:22px 19px;border-radius:15px}.grid,.flow{grid-template-columns:1fr}.step{min-height:0} }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+      @media print { body{background:white}.page{width:100%;padding:0}.hero,.card{box-shadow:none}.box,.callout,.table,.step{break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>重建插件领域模型与开发指南</h1>
+        <p class="sub">以当前运行时代码和已经确认的产品边界为事实源，统一插件、能力、Provider、启用状态和连接所有权等概念，重写一份稳定、可执行的开发指南。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-08-30</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：CONTEXT.md、document/PluginGuide.md</span>
+          <span class="chip">需求来源：用户要求使用 domain-modeling 重整插件设计体系</span>
+        </div>
+      </header>
+
+      <main id="main">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“使用 domain-modeling 重新整理 plugin 的设计体系，重写 PluginGuide.md。”</div>
+          <p>现有指南混合了分支交接、历史 PR 决策、产品入口和运行时契约，并且仍介绍已经删除的 <code>auto_install</code>、<code>ensure_auto_installations()</code> 和不可运行的 MetadataProvider 示例。它无法继续作为插件开发的权威入口。</p>
+        </section>
+
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>建立无实现细节的插件领域词汇表。</li><li>让开发指南准确覆盖身份、目录、Manifest、能力、生命周期、所有权、运行时与 API。</li><li>提供一份符合当前类型契约的最小可运行插件示例。</li><li>明确划线笔记、本地权威数据与 BRS 外部副本的关系。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不改变运行时代码、数据库或现有 API。</li><li>不设计第三方插件下载、上传和进程隔离机制。</li><li>不把所有内部 HTTP 接口包装成公共稳定 API。</li><li>不为历史 PR 和临时分支维护交接说明。</li></ul></article>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3. 现状证据</h2>
+          <div class="table" role="region" aria-label="现状证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>代码事实</th><th>指南调整</th></tr></thead>
+              <tbody>
+                <tr><td>内置插件没有产品安装动作</td><td><code>ensure_builtin_installations()</code> 物化全部注册插件，仅首次读取 <code>initial_enabled()</code></td><td>删除 auto-install 叙述，把管理员职责定义为启停和全局策略</td></tr>
+                <tr><td>插件与 Provider 被混用</td><td>注册表接收实现对象，数据库分别保存 Definition、Installation、Connection 与 Run</td><td>以领域实体分层，不再把 Provider 当生命周期对象</td></tr>
+                <tr><td>目录类别与协议类别不同</td><td>目录使用 <code>combo/meta/source/...</code>，Manifest 类别使用 <code>integrations/metadata/book_sources/...</code></td><td>增加显式映射表和命名规则</td></tr>
+                <tr><td>配置有两种所有权</td><td><code>connection_owners</code> 只允许 instance 和 user，管理员不能管理其他用户连接</td><td>分别定义全局配置与个人设置</td></tr>
+                <tr><td>划线笔记以本地为权威</td><td>本地 Annotation 保存内容，AnnotationSource 只保存外部副本身份与同步状态</td><td>加入专章说明可见性、导入和公开笔记外发</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>4. 领域模型</h2>
+          <div class="callout good"><strong>核心结论：</strong>插件是产品与生命周期单元，能力是业务发现边界，Provider 是实现角色，连接是配置与凭据的所有权边界，运行是审计边界。</div>
+          <div class="flow" aria-label="插件领域关系">
+            <article class="step"><b>插件定义</b><small>声明稳定身份、版本、能力、权限与配置契约。</small></article>
+            <article class="step"><b>插件启用状态</b><small>管理员决定当前实例是否开放该内置插件。</small></article>
+            <article class="step"><b>实例或用户连接</b><small>由相应所有者保存公开配置、加密凭据和授权范围。</small></article>
+            <article class="step"><b>能力调用与运行</b><small>业务按能力发现连接；运行时统一审计、超时、重试和健康状态。</small></article>
+          </div>
+          <h3>需要避免的等同关系</h3>
+          <ul>
+            <li>插件不等于 Provider；一个综合插件可以由一个 Provider 实现多种能力。</li>
+            <li>启用不等于已配置，也不等于健康。</li>
+            <li><code>combo</code> 不等于 Manifest 的 <code>integrations</code> 分类。</li>
+            <li>用户连接不等于租户配置；当前所有权主体是具体 Talebook 用户。</li>
+            <li>额外功能不等于通用执行入口；能标准化的行为必须走类型化能力。</li>
+          </ul>
+        </section>
+
+        <section class="card">
+          <h2>5. 开发指南结构</h2>
+          <ol>
+            <li>指南定位与权威事实源。</li>
+            <li>领域模型和状态判定。</li>
+            <li>插件 ID、代码目录与唯一注册入口。</li>
+            <li>Manifest v1 字段、配置 Schema、安全与 UI 声明。</li>
+            <li>七类类型化 Provider 契约和额外功能逃生舱。</li>
+            <li>运行时调用模式、连接发现、超时重试、审计与分页。</li>
+            <li>全局配置和个人设置的产品边界。</li>
+            <li>各能力的专项约束，包括元数据、书源、划线笔记、书籍工具和发送到设备。</li>
+            <li>管理 API、个人 API 与业务 API 的职责边界。</li>
+            <li>最小可运行插件、注册步骤、测试与提交检查。</li>
+          </ol>
+          <p>历史分支进度、一次性迁移表和某个 PR 的选择不再进入长期开发指南；必要时由对应 ACTIVE 方案保存。</p>
+        </section>
+
+        <section class="card">
+          <h2>6. 影响、风险与回滚</h2>
+          <div class="grid">
+            <article class="box"><h3>影响范围</h3><p>新增根级领域词汇表，整体替换插件开发指南，并新增本次内部方案。没有运行时、数据库、接口或页面行为变化。</p></article>
+            <article class="box"><h3>保持不变</h3><p>现有插件 ID、Manifest v1、注册清单、默认启用状态、管理入口、个人连接和业务 API 全部保持不变。</p></article>
+          </div>
+          <div class="callout warn"><strong>主要风险：</strong>文档把当前实现细节误写成长期保证。缓解方式是明确“协议契约”和“当前平台实现”的层级，并用源码与契约测试逐项校验示例。</div>
+          <p><strong>回滚：</strong>本次只修改 Markdown 和内部 HTML，按文件回退即可，不涉及数据清理。</p>
+          <p><strong>界面审查：</strong>本次没有页面、交互、文案资源或前端消费者变化，不需要执行 interface-review；剩余风险仅为文档准确性。</p>
+        </section>
+
+        <section class="card">
+          <h2>7. 测试计划与结果</h2>
+          <div class="table" role="region" aria-label="测试计划" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>计划命令</th><th>验收口径</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>领域一致性</td><td>人工对照 <code>CONTEXT.md</code>、Manifest、接口、注册表和运行时模型</td><td>术语没有一词多义，且不把目录和类名等实现规则写入词汇表</td><td class="verified">通过</td></tr>
+                <tr><td>示例契约</td><td>只读 Docker 容器加载指南代码片段，执行 <code>PluginManifest.validate()</code> 与 <code>contract_violations()</code></td><td>最小示例通过当前 v1 契约</td><td class="verified">通过</td></tr>
+                <tr><td>插件契约回归</td><td><code>pytest tests/test_plugin_contract.py -q -p no:cacheprovider</code></td><td>目录、注册、Manifest、Provider 与图标等契约保持有效</td><td class="verified">23 passed in 0.64s</td></tr>
+                <tr><td>引用与格式</td><td>相对链接脚本、<code>rg</code> 旧术语检查、<code>git diff --check</code></td><td>11 个相对链接存在；旧机制仅出现在明确的禁止说明中；补丁无空白错误</td><td class="verified">通过</td></tr>
+                <tr><td>设计门禁</td><td><code>make check-design</code></td><td>ACTIVE 单文件方案结构与资源约束通过</td><td class="verified">122 份方案通过</td></tr>
+                <tr><td>全量回归</td><td>未运行后端与前端全量集成测试</td><td>本次只修改 Markdown、领域词汇表和内部方案，不进入运行时或界面代码路径</td><td class="verified">按影响范围跳过</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>8. 决策记录</h2>
+          <ol>
+            <li><strong>2026-08-30：</strong>使用单一根级 <code>CONTEXT.md</code> 逐步积累 Talebook 领域语言；本次只增加插件相关术语。</li>
+            <li><strong>2026-08-30：</strong>保留 Provider 作为实现角色，但明确废弃通用 <code>PluginProvider</code> 概念。</li>
+            <li><strong>2026-08-30：</strong>不新增 ADR。本次没有改变难以逆转的运行时决策，只是将已有 ACTIVE 方案和代码事实收敛成统一语言。</li>
+            <li><strong>2026-08-30：</strong>指南面向长期插件开发，不继续承担分支交接和单次 PR 复盘职责。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-08-30</footer>
+    </div>
+  </body>
+</html>

@@ -26,88 +26,82 @@
                             {{ t('book.sendToDevice') }}
                         </v-card-title>
                         <v-card-text>
-                            <p class="mb-4">
-                                {{ t('book.selectDevice') }}:
-                                <span class="text-caption text-medium-emphasis">
-                                    ({{ t('messages.willSendFormat', { format: selectedFormat }) }})
-                                </span>
+                            <p class="mb-4 text-body-2 text-medium-emphasis">
+                                {{ t('messages.willSendFormat', { format: selectedFormat }) }}
                             </p>
-                            <v-radio-group v-model="selectedDeviceOption">
-                                <v-radio
-                                    v-for="(device, idx) in devices"
-                                    :key="'device-' + idx"
-                                    :value="'saved-' + idx"
-                                >
-                                    <template #label>
-                                        <span v-if="device.type === 'kindle'">
-                                            {{ device.name }} ({{ getDeviceTypeText(device.type) }}) - {{ device.mailbox }}
-                                        </span>
-                                        <span v-else>
-                                            {{ device.name }} ({{ getDeviceTypeText(device.type) }}) - {{ device.ip }}:{{ device.port }}
-                                        </span>
-                                    </template>
-                                </v-radio>
-                                <v-radio
-                                    value="temporary"
-                                    :label="t('book.temporaryDevice')"
-                                />
-                            </v-radio-group>
-
-                            <!-- 临时设备输入框 -->
-                            <div
-                                v-if="selectedDeviceOption === 'temporary'"
-                                class="mt-4 pl-8"
+                            <v-alert
+                                v-if="deviceTypes.length === 0"
+                                type="info"
+                                variant="tonal"
+                                density="compact"
                             >
+                                {{ t('book.noEnabledDeviceTypes') }}
+                            </v-alert>
+                            <template v-else>
                                 <v-select
-                                    v-model="tempDevice.type"
+                                    v-model="selectedDeviceType"
+                                    data-testid="send-device-type"
                                     :items="deviceTypes"
                                     item-title="text"
                                     item-value="value"
                                     :label="t('book.deviceType') + ' *'"
                                     variant="outlined"
                                     density="compact"
+                                    :hint="selectedDeviceType ? '' : t('book.deviceTypeFirstHint')"
+                                    persistent-hint
+                                    @update:model-value="handleDeviceTypeChange"
                                 />
-                                <v-text-field
-                                    v-model="tempDevice.ip"
-                                    :label="t('book.deviceIP') + ' *'"
-                                    variant="outlined"
-                                    density="compact"
-                                    placeholder="192.168.1.100"
-                                />
-                                <v-text-field
-                                    v-model="tempDevice.port"
-                                    :label="t('book.devicePort') + ' *'"
-                                    variant="outlined"
-                                    density="compact"
-                                    type="number"
-                                    placeholder="8080"
-                                />
-                                <v-alert
-                                    v-if="tempDevice.type === 'kindle'"
-                                    type="info"
-                                    variant="tonal"
-                                    density="compact"
-                                    class="mt-2"
+                                <div
+                                    v-if="selectedDeviceType"
+                                    class="device-target mt-3"
                                 >
-                                    {{ t('book.kindleNotSupportTemporary') }}
-                                </v-alert>
-                            </div>
-
-                            <div
-                                v-if="devices.length === 0 && selectedDeviceOption !== 'temporary'"
-                                class="text-center py-4"
-                            >
-                                <v-icon
-                                    size="48"
-                                    color="grey"
-                                >
-                                    mdi-devices
-                                </v-icon>
-                                <p class="mt-2 text-medium-emphasis">
-                                    {{ t('book.noDevices') }}<br>
-                                    {{ t('book.configDeviceDesc') }}
-                                </p>
-                            </div>
+                                    <v-select
+                                        v-if="matchingSavedDevices.length > 0"
+                                        v-model="selectedSavedDeviceOption"
+                                        data-testid="send-device-saved"
+                                        :items="savedDeviceItems"
+                                        item-title="title"
+                                        item-value="value"
+                                        :label="t('book.savedDevice')"
+                                        variant="outlined"
+                                        density="compact"
+                                        hide-details="auto"
+                                        @update:model-value="handleSavedDeviceChange"
+                                    />
+                                    <v-text-field
+                                        v-if="isKindleDevice"
+                                        v-model="deviceTarget.mailbox"
+                                        data-testid="send-device-mailbox"
+                                        :label="t('book.kindleMailbox') + ' *'"
+                                        variant="outlined"
+                                        density="compact"
+                                        type="email"
+                                        placeholder="reader@kindle.com"
+                                        hide-details="auto"
+                                    />
+                                    <div v-else class="device-target__network">
+                                        <v-text-field
+                                            v-model="deviceTarget.ip"
+                                            data-testid="send-device-ip"
+                                            :label="t('book.deviceIP') + ' *'"
+                                            variant="outlined"
+                                            density="compact"
+                                            placeholder="192.168.1.100"
+                                            hide-details="auto"
+                                        />
+                                        <v-text-field
+                                            v-model="deviceTarget.port"
+                                            data-testid="send-device-port"
+                                            :label="t('book.devicePort') + ' *'"
+                                            variant="outlined"
+                                            density="compact"
+                                            type="number"
+                                            placeholder="8080"
+                                            hide-details="auto"
+                                        />
+                                    </div>
+                                </div>
+                            </template>
                         </v-card-text>
                         <v-card-actions>
                             <v-spacer />
@@ -121,8 +115,8 @@
                                 color="primary"
                                 variant="flat"
                                 :loading="sending_to_device"
-                                @click="sendToDevice"
                                 :disabled="!canSendToDevice"
+                                @click="sendToDevice"
                             >
                                 {{ t('common.send') }}
                             </v-btn>
@@ -184,6 +178,7 @@
                     v-model="dialog_refer"
                     persistent
                     width="800"
+                    class="refer-dialog"
                 >
                     <v-card>
                         <v-toolbar
@@ -200,34 +195,43 @@
                                 {{ t('common.cancel') }}
                             </v-btn>
                         </v-toolbar>
-                        <v-card-text class="pt-4">
-                            <v-alert
-                                v-if="!refer_books_loading && refer_summary.failures.length > 0"
-                                class="mb-4"
-                                type="warning"
-                                variant="tonal"
+                        <v-card-text class="refer-dialog__body pt-3">
+                            <section
+                                class="refer-progress mb-4"
+                                aria-live="polite"
                             >
-                                {{ t('book.referPartialFailure', {
-                                    count: refer_summary.failures.length,
-                                    sources: refer_failed_sources,
-                                }) }}
-                            </v-alert>
-                            <p
-                                v-if="refer_books_loading"
-                                class="py-6 text-center"
-                            >
-                                <v-progress-circular
-                                    indeterminate
+                                <div class="refer-progress__label">
+                                    <span>
+                                        {{ refer_summary.total > 0
+                                            ? t('book.referProgress', { completed: refer_summary.completed, total: refer_summary.total })
+                                            : t('book.referProgressLoading') }}
+                                    </span>
+                                    <span v-if="refer_summary.total > 0">{{ refer_progress_percent }}%</span>
+                                </div>
+                                <v-progress-linear
+                                    :model-value="refer_progress_percent"
+                                    :indeterminate="refer_books_loading && refer_summary.total === 0"
+                                    :aria-label="refer_summary.total > 0
+                                        ? t('book.referProgress', { completed: refer_summary.completed, total: refer_summary.total })
+                                        : t('book.referProgressLoading')"
                                     color="primary"
+                                    height="4"
+                                    rounded
                                 />
-                            </p>
+                                <p
+                                    v-if="refer_summary.failures.length > 0"
+                                    class="refer-progress__failures"
+                                >
+                                    {{ t('book.referIncompleteSources', { sources: refer_failed_sources }) }}
+                                </p>
+                            </section>
                             <p
-                                v-else-if="refer_books.length === 0"
+                                v-if="!refer_books_loading && refer_books.length === 0"
                                 class="py-6 text-center"
                             >
                                 {{ t(refer_summary.failures.length > 0 ? 'book.noMatchingBooksWithFailures' : 'book.noMatchingBooks') }}
                             </p>
-                            <template v-else>
+                            <template v-else-if="refer_books.length > 0">
                                 <p class="mb-4">
                                     {{ t('book.selectMatchingBook') }}
                                 </p>
@@ -335,7 +339,7 @@
                                 variant="outlined"
                                 density="compact"
                                 show-size
-                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt"
+                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.cbz,.zip,.cbr,.rar"
                                 prepend-icon="mdi-file-document"
                             />
                             <v-alert
@@ -483,11 +487,13 @@
                     <v-toolbar
                         flat
                         density="compact"
+                        class="book-action-toolbar"
                         :color="store.theme === 'light' ? 'white' : 'grey-darken-4'"
                     >
                         <v-btn
                             icon
                             size="small"
+                            :aria-label="t('book.download')"
                             @click="dialog_download = true"
                         >
                             <v-icon>mdi-download</v-icon>
@@ -522,7 +528,7 @@
                         </v-btn>
 
                         <v-btn
-                            v-if="book.id > 0"
+                            v-if="book.id > 0 && book.media_type !== 'comic'"
                             color="amber-darken-2"
                             variant="elevated"
                             class="mx-2"
@@ -536,17 +542,31 @@
                         </v-btn>
 
                         <v-btn
-                            v-if="book.id > 0"
+                            v-if="book.id > 0 && hasCompatibleFormats"
                             color="primary"
                             variant="elevated"
                             class="mx-2"
-                            :href="'/read/' + book.id"
+                            :href="readerPath"
                             target="_blank"
+                            data-testid="open-online-reader"
                         >
                             <v-icon start>
                                 mdi-book-open-page-variant
                             </v-icon>
                             {{ t('common.read') }}
+                        </v-btn>
+                        <v-btn
+                            v-else-if="book.id > 0"
+                            color="grey"
+                            variant="tonal"
+                            class="mx-2"
+                            disabled
+                            data-testid="online-reading-unsupported"
+                        >
+                            <v-icon start>
+                                mdi-book-off-outline
+                            </v-icon>
+                            {{ book.media_type === 'comic' ? t('book.comicReadUnsupported') : t('book.onlineReadUnsupported') }}
                         </v-btn>
 
                         <template v-if="book.is_owner">
@@ -598,6 +618,61 @@
                                         </template>
                                         <v-list-item-title>{{ t('book.uploadNewFormat') }}</v-list-item-title>
                                     </v-list-item>
+                                    <template v-if="bookToolActions.length > 0">
+                                        <v-divider />
+                                        <v-list-subheader>{{ t('book.pluginTools') }}</v-list-subheader>
+                                        <v-list-item
+                                            v-for="action in bookToolActions"
+                                            :key="action.plugin_key"
+                                            :to="{ path: action.route, query: { book_id: book.id } }"
+                                            :data-testid="`book-tool-${action.plugin_key}`"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>{{ action.icon }}</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ action.name }}</v-list-item-title>
+                                        </v-list-item>
+                                    </template>
+                                    <template v-if="hasMixedMediaFormats">
+                                        <v-divider />
+                                        <v-list-subheader>{{ t('book.chooseMediaType') }}</v-list-subheader>
+                                        <v-list-item
+                                            data-testid="set-media-type-comic"
+                                            :disabled="setting_media_type"
+                                            @click="set_media_type('comic')"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>mdi-image-multiple</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ t('book.setAsComic') }}</v-list-item-title>
+                                            <template #append>
+                                                <v-icon
+                                                    v-if="book.media_type === 'comic'"
+                                                    color="success"
+                                                >
+                                                    mdi-check-circle
+                                                </v-icon>
+                                            </template>
+                                        </v-list-item>
+                                        <v-list-item
+                                            data-testid="set-media-type-ebook"
+                                            :disabled="setting_media_type"
+                                            @click="set_media_type('ebook')"
+                                        >
+                                            <template #prepend>
+                                                <v-icon>mdi-book-outline</v-icon>
+                                            </template>
+                                            <v-list-item-title>{{ t('book.setAsEbook') }}</v-list-item-title>
+                                            <template #append>
+                                                <v-icon
+                                                    v-if="book.media_type === 'ebook'"
+                                                    color="success"
+                                                >
+                                                    mdi-check-circle
+                                                </v-icon>
+                                            </template>
+                                        </v-list-item>
+                                    </template>
                                 </v-list>
                             </v-menu>
 
@@ -843,6 +918,19 @@
                                         </v-chip>
                                     </template>
                                     <v-chip
+                                        v-if="book.media_type && book.media_type !== 'unknown'"
+                                        class="ma-1"
+                                        size="small"
+                                        :color="book.media_type === 'comic' ? 'deep-orange' : 'blue-grey'"
+                                        variant="flat"
+                                        data-testid="media-type-chip"
+                                    >
+                                        <v-icon start>
+                                            {{ book.media_type === 'comic' ? 'mdi-image-multiple' : 'mdi-book-outline' }}
+                                        </v-icon>
+                                        {{ book.media_type === 'comic' ? t('book.mediaTypeComic') : t('book.mediaTypeEbook') }}
+                                    </v-chip>
+                                    <v-chip
                                         v-if="book.scope"
                                         class="ma-1"
                                         size="small"
@@ -855,6 +943,16 @@
                                         {{ book.scope === 'private' ? t('book.scopePrivate') : t('book.scopePublic') }}
                                     </v-chip>
                                 </div>
+                                <v-alert
+                                    v-if="book.media_type === 'comic' && !hasCompatibleFormats"
+                                    type="info"
+                                    variant="tonal"
+                                    density="compact"
+                                    class="mt-3"
+                                    data-testid="comic-reader-notice"
+                                >
+                                    {{ t('book.comicReadUnsupportedDescription') }}
+                                </v-alert>
                             </v-card-text>
                             <v-card-text>
                                 <p
@@ -892,7 +990,7 @@
                         >
                             <v-list density="compact">
                                 <v-list-item
-                                    :href="'/read/' + book.id"
+                                    :href="readerPath"
                                     target="_blank"
                                     class="w-100"
                                 >
@@ -1024,6 +1122,19 @@
                 </v-card>
             </v-col>
         </v-row>
+
+        <v-row
+            v-if="book.id > 0 && store.user.is_login"
+            class="mt-4"
+        >
+            <v-col cols="12">
+                <AnnotationPanel
+                    :book-id="book.id"
+                    hide-when-empty
+                    @locate="openAnnotationInReader"
+                />
+            </v-col>
+        </v-row>
     </div>
 </template>
 
@@ -1035,7 +1146,9 @@ import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
 import BookCards_Small from '~/components/BookCards_Small.vue';
 import BookConvertDialog from '~/components/BookConvertDialog.vue';
+import AnnotationPanel from '~/components/AnnotationPanel.vue';
 import { READING_STATE, useBookReadingState } from '~/composables/useBookReadingState';
+import { readerPathForBook } from '~/utils/comic-reader';
 
 const route = useRoute();
 const router = useRouter();
@@ -1070,8 +1183,31 @@ const book = ref({
     collector: '',
     timestamp: '',
     is_owner: false,
-    series: ''
+    series: '',
+    media_type: 'unknown',
+    media_type_locked: false,
+    online_readable: null
 });
+const bookToolActions = ref([]);
+
+async function loadBookToolActions(currentBookId, isAdmin) {
+    if (!currentBookId || !isAdmin) {
+        bookToolActions.value = [];
+        return;
+    }
+    try {
+        const response = await $backend(`/plugins/tools/book-actions?book_id=${encodeURIComponent(currentBookId)}`);
+        bookToolActions.value = response.err === 'ok' ? (response.actions || []) : [];
+    } catch {
+        bookToolActions.value = [];
+    }
+}
+
+watch(
+    [routeBookId, () => store.user.is_admin],
+    ([currentBookId, isAdmin]) => loadBookToolActions(currentBookId, isAdmin),
+    { immediate: true },
+);
 
 // Dialogs
 const dialog_download = ref(false);
@@ -1087,19 +1223,25 @@ const kindle_sender = ref('');
 // Device management
 const sending_to_device = ref(false);
 const devices = ref([]);
-const selectedDeviceOption = ref(null);
-const tempDevice = ref({
-    type: '',
-    ip: '',
-    port: ''
-});
 const deviceTypes = ref([]);
+const selectedDeviceType = ref('');
+const selectedSavedDeviceOption = ref('temporary');
+const deviceTarget = ref({
+    mailbox: '',
+    ip: '',
+    port: '',
+    schema: 'http',
+});
 
 // Refer books
 const refer_books_loading = ref(false);
 const refer_books_setting_btn_loading = ref(false);
 const refer_books = ref([]);
 const refer_summary = ref({ failures: [], total: 0, completed: 0 });
+const refer_progress_percent = computed(() => {
+    if (!refer_summary.value.total) return 0;
+    return Math.min(100, Math.round((refer_summary.value.completed / refer_summary.value.total) * 100));
+});
 const refer_failed_sources = computed(() => {
     return [...new Set(refer_summary.value.failures.map(item => item.source).filter(Boolean))].join('、');
 });
@@ -1108,6 +1250,7 @@ const refer_failed_sources = computed(() => {
 const dialog_upload_format = ref(false);
 const upload_format_file = ref(null);
 const uploading_format = ref(false);
+const setting_media_type = ref(false);
 
 // Separate format
 const dialog_separate = ref(false);
@@ -1172,11 +1315,13 @@ const pub_year = computed(() => {
     return book.value.pubdate.split('-')[0];
 });
 
-const hasCompatibleFormats = computed(() => {
-    if (!book.value || !book.value.files) return false;
-    const formats = book.value.files.map(x => x.format.toLowerCase());
-    const compatible = ['epub', 'azw3', 'pdf', 'txt', 'mobi', 'azw'];
-    return formats.some(f => compatible.includes(f));
+const readerPath = computed(() => readerPathForBook(book.value));
+const hasCompatibleFormats = computed(() => Boolean(readerPath.value));
+const hasMixedMediaFormats = computed(() => {
+    const formats = new Set((book.value.files || []).map(file => String(file.format || '').toLowerCase()));
+    const hasComic = ['cbz', 'zip', 'cbr', 'rar'].some(format => formats.has(format));
+    const hasEbook = ['epub', 'mobi', 'azw', 'azw3', 'pdf', 'txt'].some(format => formats.has(format));
+    return hasComic && hasEbook;
 });
 
 const selectedFormat = computed(() => {
@@ -1189,20 +1334,29 @@ const selectedFormat = computed(() => {
     return formats[0]?.toUpperCase() || 'N/A';
 });
 
+const matchingSavedDevices = computed(() => {
+    return devices.value
+        .map((device, index) => ({ device, index }))
+        .filter(item => item.device.type === selectedDeviceType.value);
+});
+
+const savedDeviceItems = computed(() => {
+    const items = matchingSavedDevices.value.map(({ device, index }) => {
+        const target = device.type === 'kindle' ? device.mailbox : `${device.ip}:${device.port}`;
+        return {
+            title: `${device.name} · ${target}`,
+            value: `saved-${index}`,
+        };
+    });
+    return [...items, { title: t('book.temporaryDevice'), value: 'temporary' }];
+});
+
+const isKindleDevice = computed(() => selectedDeviceType.value === 'kindle');
+
 const canSendToDevice = computed(() => {
-    if (!selectedDeviceOption.value) return false;
-
-    if (selectedDeviceOption.value === 'temporary') {
-        if (!tempDevice.value.type) return false;
-        if (tempDevice.value.type === 'kindle') return false;
-        return !!(tempDevice.value.ip && tempDevice.value.port);
-    }
-
-    const idx = parseInt(selectedDeviceOption.value.replace('saved-', ''));
-    const device = devices.value[idx];
-    if (!device) return false;
-    if (device.type === 'kindle') return !!device.mailbox;
-    return !!(device.ip && device.port);
+    if (!selectedDeviceType.value) return false;
+    if (isKindleDevice.value) return !!deviceTarget.value.mailbox.trim();
+    return !!(deviceTarget.value.ip.trim() && String(deviceTarget.value.port).trim());
 });
 
 const hasEpubAzw3OrPDF = computed(() => {
@@ -1211,23 +1365,59 @@ const hasEpubAzw3OrPDF = computed(() => {
     return formats.some(f => ['epub', 'azw3', 'pdf'].includes(f));
 });
 
+const openAnnotationInReader = (annotation) => {
+    const query = new URLSearchParams();
+    if (annotation.cfi) query.set('cfi', annotation.cfi);
+    if (annotation.chapter) query.set('chapter', annotation.chapter);
+    window.open(`/read/${book.value.id}?${query.toString()}`, '_blank', 'noopener');
+};
+
 useHead({
     title: () => book.value.title || t('book.detailsTitle')
 });
 
 // Device methods
-const getDeviceTypeText = (type) => {
-    const keyMap = {
-        'duokan': 'settings.deviceTypeDuokan',
-        'ireader': 'settings.deviceTypeIreader',
-        'hanwang': 'settings.deviceTypeHanwang',
-        'boox': 'settings.deviceTypeBoox',
-        'dangdang': 'settings.deviceTypeDangdang',
-        'kindle': 'common.kindle',
-        'purelibro': 'settings.deviceTypePurelibro',
+const resetDeviceTarget = () => {
+    deviceTarget.value = {
+        mailbox: '',
+        ip: '',
+        port: '',
+        schema: 'http',
     };
-    if (keyMap[type]) return t(keyMap[type]) || type;
-    return type;
+};
+
+const handleSavedDeviceChange = (option) => {
+    selectedSavedDeviceOption.value = option || 'temporary';
+    resetDeviceTarget();
+
+    if (selectedSavedDeviceOption.value === 'temporary') {
+        const type = deviceTypes.value.find(item => item.value === selectedDeviceType.value);
+        if (!isKindleDevice.value && type?.default_port) {
+            deviceTarget.value.port = String(type.default_port);
+        }
+        return;
+    }
+
+    const deviceIndex = Number.parseInt(selectedSavedDeviceOption.value.replace('saved-', ''), 10);
+    const device = devices.value[deviceIndex];
+    if (!device || device.type !== selectedDeviceType.value) {
+        selectedSavedDeviceOption.value = 'temporary';
+        return;
+    }
+    deviceTarget.value = {
+        mailbox: device.mailbox || '',
+        ip: device.ip || '',
+        port: device.port ? String(device.port) : '',
+        schema: device.schema || 'http',
+    };
+};
+
+const handleDeviceTypeChange = (deviceType) => {
+    selectedDeviceType.value = deviceType || '';
+    resetDeviceTarget();
+    const firstSaved = matchingSavedDevices.value[0];
+    selectedSavedDeviceOption.value = firstSaved ? `saved-${firstSaved.index}` : 'temporary';
+    handleSavedDeviceChange(selectedSavedDeviceOption.value);
 };
 
 const loadUserDevices = async () => {
@@ -1235,38 +1425,23 @@ const loadUserDevices = async () => {
         const rsp = await $backend('/user/devices');
         if (rsp.err === 'ok') {
             devices.value = rsp.devices || [];
+            deviceTypes.value = rsp.device_types || [];
+            if (!deviceTypes.value.some(item => item.value === selectedDeviceType.value)) {
+                selectedDeviceType.value = '';
+                selectedSavedDeviceOption.value = 'temporary';
+                resetDeviceTarget();
+            }
         }
     } catch (e) {
         console.error('Failed to load user devices:', e);
     }
 };
 
-const loadDevicePreferences = () => {
-    if (typeof localStorage === 'undefined') return;
-    try {
-        const savedOption = localStorage.getItem('last_selected_device_option');
-        if (savedOption) {
-            // Check if the saved option is still valid
-            if (savedOption === 'temporary') {
-                selectedDeviceOption.value = 'temporary';
-            } else if (savedOption.startsWith('saved-') && devices.value.length > 0) {
-                const idx = parseInt(savedOption.replace('saved-', ''));
-                if (idx < devices.value.length) {
-                    selectedDeviceOption.value = savedOption;
-                }
-            }
-        }
-        const savedTempDevice = localStorage.getItem('temp_device_info');
-        if (savedTempDevice) {
-            tempDevice.value = JSON.parse(savedTempDevice);
-        }
-    } catch (e) {
-        console.error('Failed to load device preferences:', e);
-    }
-};
-
 const closeDeviceDialog = () => {
     dialog_send_to_device.value = false;
+    selectedDeviceType.value = '';
+    selectedSavedDeviceOption.value = 'temporary';
+    resetDeviceTarget();
 };
 
 const sendToDevice = async () => {
@@ -1277,34 +1452,24 @@ const sendToDevice = async () => {
 
     sending_to_device.value = true;
     try {
-        let deviceInfo;
-        let deviceName;
-
-        if (selectedDeviceOption.value === 'temporary') {
-            deviceInfo = {
-                type: tempDevice.value.type,
-                ip: tempDevice.value.ip,
-                port: tempDevice.value.port,
-                schema: 'http'
-            };
-            deviceName = t('book.temporaryDevice');
-        } else {
-            const deviceIndex = parseInt(selectedDeviceOption.value.replace('saved-', ''));
-            deviceInfo = devices.value[deviceIndex];
-            deviceName = deviceInfo.name;
-        }
+        const selectedType = deviceTypes.value.find(item => item.value === selectedDeviceType.value);
+        const deviceIndex = selectedSavedDeviceOption.value.startsWith('saved-')
+            ? Number.parseInt(selectedSavedDeviceOption.value.replace('saved-', ''), 10)
+            : -1;
+        const savedDevice = deviceIndex >= 0 ? devices.value[deviceIndex] : null;
+        const deviceName = savedDevice?.name || selectedType?.text || t('book.temporaryDevice');
 
         let requestBody;
-        if (deviceInfo.type === 'kindle') {
+        if (isKindleDevice.value) {
             requestBody = {
-                device_type: deviceInfo.type,
-                mailbox: deviceInfo.mailbox
+                device_type: selectedDeviceType.value,
+                mailbox: deviceTarget.value.mailbox.trim(),
             };
         } else {
-            const url = `${deviceInfo.schema || 'http'}://${deviceInfo.ip}:${deviceInfo.port}`;
+            const url = `${deviceTarget.value.schema || 'http'}://${deviceTarget.value.ip.trim()}:${deviceTarget.value.port}`;
             requestBody = {
-                device_type: deviceInfo.type,
-                device_url: url
+                device_type: selectedDeviceType.value,
+                device_url: url,
             };
         }
 
@@ -1315,7 +1480,7 @@ const sendToDevice = async () => {
 
         if (response.err === 'ok') {
             if ($alert) $alert('success', t('book.sendToDeviceSuccess', { deviceName }));
-            dialog_send_to_device.value = false;
+            closeDeviceDialog();
         } else {
             if ($alert) $alert('error', response.msg || t('book.sendFailed'));
         }
@@ -1337,13 +1502,15 @@ const get_refer = async () => {
         for await (const data of $backend_stream(`/book/${bookid.value}/refer?stream=1`)) {
             if (firstLine) {
                 firstLine = false;
-                refer_books_loading.value = false;
-            } else if (data.event === 'summary') {
+                continue;
+            }
+            if (data.event === 'progress' || data.event === 'summary') {
                 refer_summary.value = {
                     failures: Array.isArray(data.failures) ? data.failures : [],
                     total: data.total || 0,
                     completed: data.completed || 0,
                 };
+                if (data.event === 'summary') refer_books_loading.value = false;
             } else {
                 data.href = '';
                 if (!data.cover_url || data.cover_url === '') {
@@ -1478,6 +1645,29 @@ const show_upload_format_dialog = () => {
     dialog_upload_format.value = true;
 };
 
+const set_media_type = async (mediaType) => {
+    setting_media_type.value = true;
+    try {
+        const rsp = await $backend(`/book/${book.value.id}/media_type`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ media_type: mediaType }),
+        });
+        if (rsp.err === 'ok') {
+            book.value.media_type = rsp.media_type;
+            book.value.media_type_locked = rsp.media_type_locked === true;
+            $alert('success', rsp.msg || t('book.setMediaTypeSuccess'));
+        } else {
+            $alert('error', rsp.msg || t('book.setMediaTypeFailed'));
+        }
+    } catch (err) {
+        console.error('Set media type error:', err);
+        $alert('error', t('book.setMediaTypeFailed'));
+    } finally {
+        setting_media_type.value = false;
+    }
+};
+
 const confirmUploadFormat = async () => {
     if (!upload_format_file.value) {
         $alert('error', t('book.selectFileToUpload'));
@@ -1586,46 +1776,6 @@ const confirmDeleteFormat = async () => {
     }
 };
 
-// Watch tempDevice changes, auto-fill port based on type
-watch(() => tempDevice.value.type, (newType) => {
-    const portMap = {
-        duokan: '12121',
-        boox: '8085',
-        hanwang: '9310',
-        ireader: '10123',
-        dangdang: '11111',
-    };
-    if (portMap[newType]) {
-        tempDevice.value.port = portMap[newType];
-    }
-});
-
-// Watch dialog_send_to_device open, auto-select default device
-watch(dialog_send_to_device, (isOpen) => {
-    if (!isOpen) return;
-    if (selectedDeviceOption.value) return;
-
-    if (devices.value && devices.value.length > 0) {
-        selectedDeviceOption.value = 'saved-0';
-    } else {
-        selectedDeviceOption.value = 'temporary';
-    }
-});
-
-// Watch tempDevice changes, persist to localStorage
-watch(tempDevice, (newVal) => {
-    if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('temp_device_info', JSON.stringify(newVal));
-    }
-}, { deep: true });
-
-// Watch selectedDeviceOption changes, persist to localStorage
-watch(selectedDeviceOption, (newValue) => {
-    if (typeof localStorage !== 'undefined' && newValue) {
-        localStorage.setItem('last_selected_device_option', newValue);
-    }
-});
-
 const readingStateLoading = ref(false);
 const {
     isInShelf,
@@ -1723,7 +1873,6 @@ const readingStateButtonText = computed(() => {
 const loadDevices = async () => {
     if (store.user?.is_login) {
         await loadUserDevices();
-        loadDevicePreferences();
     }
 };
 
@@ -1735,15 +1884,6 @@ watch(() => store.user?.is_login, async (isLogin) => {
 });
 
 onMounted(async () => {
-    deviceTypes.value = [
-        { text: t('settings.deviceTypeDuokan'), value: 'duokan' },
-        { text: t('settings.deviceTypeIreader'), value: 'ireader' },
-        { text: t('settings.deviceTypeHanwang'), value: 'hanwang' },
-        { text: t('settings.deviceTypeBoox'), value: 'boox' },
-        { text: t('settings.deviceTypeDangdang'), value: 'dangdang' },
-        { text: t('common.kindle') || 'Kindle', value: 'kindle' },
-        { text: t('settings.deviceTypePurelibro') || 'PureLibro', value: 'purelibro' },
-    ];
     await loadDevices();
 });
 </script>
@@ -1762,6 +1902,29 @@ onMounted(async () => {
     padding-bottom: 3px;
 }
 
+@media (max-width: 600px) {
+    .book-action-toolbar {
+        height: auto !important;
+    }
+
+    .book-action-toolbar :deep(.v-toolbar__content) {
+        height: auto !important;
+        min-height: 48px;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .book-action-toolbar :deep(.v-spacer) {
+        display: none;
+    }
+
+    .book-action-toolbar :deep(.v-btn) {
+        margin-inline: 0 !important;
+    }
+}
+
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */
 .book-comments {
     white-space: pre-line;
@@ -1771,8 +1934,20 @@ onMounted(async () => {
     margin: 4px 2px;
 }
 
+.refer-progress { padding:0 2px; }
+.refer-progress__label { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:7px; color:rgba(var(--v-theme-on-surface),.72); font-size:12px; }
+.refer-progress__failures { margin:7px 0 0; color:rgb(var(--v-theme-warning)); font-size:12px; line-height:1.4; overflow-wrap:anywhere; white-space:normal; }
+:global(.refer-dialog .v-overlay__content) { scrollbar-width:none; }
+:global(.refer-dialog .v-overlay__content::-webkit-scrollbar) { display:none; width:0; height:0; }
+.device-target { display:grid; gap:12px; }
+.device-target__network { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,.38fr); gap:12px; }
+
 /* 减小管理菜单图标和文字的间距 */
 :deep(.v-list-item__spacer) {
     width: 8px !important;
+}
+
+@media (max-width: 600px) {
+    .device-target__network { grid-template-columns:1fr; }
 }
 </style>

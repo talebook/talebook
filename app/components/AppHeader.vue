@@ -33,7 +33,7 @@
                                     color="primary"
                                     @click="do_mobile_search"
                                 >
-                                    {{ $t('common.search') }}
+                                    {{ t('common.search') }}
                                 </v-btn>
                             </v-col>
                         </v-row>
@@ -62,7 +62,7 @@
                         hide-details
                         prepend-inner-icon="mdi-magnify"
                         name="name"
-                        :label="$t('common.search')"
+                        :label="t('common.search')"
                         class="d-none d-sm-flex search-field"
                         :theme="store.theme"
                         :bg-color="store.theme === 'light' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.3)'"
@@ -131,7 +131,7 @@
 
                                 <template #append>
                                     <v-btn @click.prevent="hidemsg(idx, msg.id)">
-                                        {{ $t('messages.ok') }}
+                                        {{ t('messages.ok') }}
                                     </v-btn>
                                 </template>
                             </v-list-item>
@@ -211,32 +211,37 @@
                             </v-list-item>
                             <v-divider class="my-2" />
                             <v-list-item
-                                to="/user/detail"
-                                :title="$t('messages.userCenter')"
+                                to="/me/account"
+                                :title="t('messages.userCenter')"
                                 prepend-icon="mdi-account-box"
                             />
                             <v-list-item
-                                to="/user/history"
-                                :title="$t('messages.readingHistory')"
+                                to="/me/history"
+                                :title="t('messages.readingHistory')"
                                 prepend-icon="mdi-history"
                             />
                             <v-list-item
+                                to="/me/plugins"
+                                :title="t('pluginManagement.personalPluginsNavigation')"
+                                prepend-icon="mdi-power-plug-outline"
+                            />
+                            <v-list-item
                                 to="/scopedbooks"
-                                :title="$t('navigation.scopedBooks')"
+                                :title="t('navigation.scopedBooks')"
                                 prepend-icon="mdi-shield-account"
                             />
                             <v-list-item
                                 v-if="store.sys.allow.FEEDBACK"
                                 target="_blank"
                                 :href="store.sys.FEEDBACK_URL"
-                                :title="$t('messages.feedback')"
+                                :title="t('messages.feedback')"
                                 prepend-icon="mdi-message-alert"
                             />
                             <v-divider />
                             <template v-if="store.user.is_admin">
                                 <v-list-item
                                     to="/admin/settings"
-                                    :title="$t('messages.adminEntry')"
+                                    :title="t('messages.adminEntry')"
                                 >
                                     <template #prepend>
                                         <v-icon color="red">
@@ -248,7 +253,7 @@
 
                             <v-list-item
                                 to="/logout"
-                                :title="$t('messages.logout')"
+                                :title="t('messages.logout')"
                                 prepend-icon="mdi-exit-to-app"
                             />
                         </v-list>
@@ -308,7 +313,7 @@
                             size="24"
                         >
                             mdi-account-circle
-                        </v-icon> {{ $t('messages.pleaseLogin') }}
+                        </v-icon> {{ t('messages.pleaseLogin') }}
                     </v-btn>
                 </template>
             </template>
@@ -323,6 +328,8 @@
         >
             <v-list
                 v-if="items.length > 0"
+                v-model:opened="openedGroups"
+                class="app-navigation-list"
                 density="compact"
             >
                 <template
@@ -337,7 +344,7 @@
                     <v-list-group
                         v-else-if="item.groups"
                         class="app-navigation-group"
-                        :value="item.text"
+                        :value="item.key"
                     >
                         <template #activator="{ props }">
                             <v-list-item
@@ -351,6 +358,7 @@
                             v-for="link in item.groups"
                             :key="link.href"
                             :to="link.href"
+                            :active="isPrimaryNavigationItemActive(link, route.path)"
                             :title="link.text"
                             :prepend-icon="link.icon"
                         />
@@ -408,6 +416,7 @@
                         :key="item.text"
                         density="compact"
                         :to="item.href"
+                        :active="isPrimaryNavigationItemActive(item, route.path)"
                         :target="item.target"
                         :title="item.text"
                         :prepend-icon="item.icon"
@@ -427,16 +436,8 @@
                         </template>
                     </v-list-item>
                 </template>
-                <v-list-item
-                    v-if="store.sys.sidebar_extra_html"
-                    class="sidebar-extra-item"
-                >
-                    <div
-                        class="sidebar-extra-content press-content"
-                        v-html="store.sys.sidebar_extra_html"
-                    />
-                </v-list-item>
             </v-list>
+            <SidebarHelpMenu />
         </v-navigation-drawer>
     </div>
 </template>
@@ -444,6 +445,8 @@
 <script setup>
 import { useDisplay } from 'vuetify';
 import { useMainStore } from '@/stores/main';
+import { isPrimaryNavigationItemActive, usePrimaryNavigation } from '@/composables/usePrimaryNavigation';
+import SidebarHelpMenu from '@/components/SidebarHelpMenu.vue';
 import { useI18n } from '#i18n';
 
 const store = useMainStore();
@@ -453,7 +456,7 @@ const route = useRoute();
 const { locale, locales, setLocale, t } = useI18n();
 
 const err = ref('');
-const visit_admin_pages = ref(false);
+const openedGroups = ref([]);
 const sidebar = ref(null);
 const btn_search = ref(false);
 const search = ref('');
@@ -461,7 +464,6 @@ const messages = computed(() => store.messages);
 
 const mobile_search = ref(null);
 const search_input = ref(null);
-const readDoneCount = ref(0);
 
 // 多语言相关
 const availableLocales = computed(() => {
@@ -472,100 +474,22 @@ const allLocales = computed(() => {
     return locales.value || [];
 });
 
-const items = computed(() => {
-    var home_links = [
-        // home
-        { icon: 'mdi-home', href: '/', text: $t('navigation.home') },
-    ];
-    var library_links = [
-        { icon: 'mdi-book', href: '/library', text: $t('navigation.localLibrary') },
-        ...(store.sys.show_network_library !== false
-            ? [{ icon: 'mdi-cloud-search', href: '/network', text: $t('navigation.networkLibrary') }]
-            : []),
-        { icon: 'mdi-book-music', href: '/audios', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
-    ];
-    var shelf_links = store.user.is_login
-        ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') }]
-        : [];
-    var admin_links = [
-        {
-            icon: 'mdi-cog',
-            text: $t('navigation.admin'),
-            // expand: route.path.indexOf("/admin/") == 0, // V3 list group handles expand differently (via value/opened)
-            groups: [
-                { icon: 'mdi-cog', href: '/admin/settings', text: $t('navigation.settings') },
-                { icon: 'mdi-human-greeting', href: '/admin/users', text: $t('navigation.users') },
-                { icon: 'mdi-library-shelves', href: '/admin/books', text: $t('navigation.books') },
-                { icon: 'mdi-playlist-music', href: '/audio-jobs', text: $t('navigation.audiobookJobs') },
-                { icon: 'mdi-import', href: '/admin/imports', text: $t('navigation.import') },
-                { icon: 'mdi-book-cog', href: '/admin/booksources', text: $t('navigation.bookSources') },
-                { icon: 'mdi-palette', href: '/admin/themes', text: $t('navigation.themes') },
-                { icon: 'mdi-text-box-outline', href: '/admin/logs', text: $t('navigation.systemLogs') },
-            ],
-        },
-    ];
-    var nav_links = [
-        { heading: $t('navigation.categories') },
-        ...(store.user.is_login
-            ? [{
-                icon: 'mdi-check-circle',
-                href: '/user/history?tab=finished',
-                text: $t('navigation.readBooks'),
-                count: readDoneCount.value,
-            }]
-            : []),
-        { icon: 'mdi-widgets', href: '/nav', text: $t('navigation.browse'), count: store.sys.books },
-        { icon: 'mdi-home-group', href: '/publisher', text: $t('navigation.publishers'), count: store.sys.publishers },
-        { icon: 'mdi-human-greeting', href: '/author', text: $t('navigation.authors'), count: store.sys.authors },
-        { icon: 'mdi-tag-heart', href: '/tag', text: $t('navigation.tags'), count: store.sys.tags },
-        { icon: 'mdi-file', href: '/format', text: $t('navigation.formats'), count: store.sys.formats },
-        {
-            target: '',
-            links: [
-                { icon: 'mdi-library-shelves', href: '/series', text: $t('navigation.series'), count: store.sys.series },
-                { icon: 'mdi-star-half', href: '/rating', text: $t('navigation.ratings') },
-                { icon: 'mdi-trending-up', href: '/hot', text: $t('navigation.hot') },
-                { icon: 'mdi-history', href: '/recent', text: $t('navigation.recent') },
-            ],
-        },
-    ];
-    var friend_links = [
-        // links
-        { heading: $t('messages.friendshipLinks') },
-        { links: store.sys.friends, target: '_blank' },
-    ];
-    var sys_links = [
-        { heading: $t('messages.system') },
-        { icon: 'mdi-history', text: $t('messages.systemVersion'), href: '', count: store.sys.version },
-        { icon: 'mdi-human', text: $t('messages.userCount'), href: '', count: store.sys.users },
-        { icon: 'mdi-cellphone', text: $t('messages.opdsIntroduction'), href: '/opds-readme', count: 'OPDS', target: '_blank' },
-        { icon: 'mdi-cloud-sync', text: $t('messages.webdavIntroduction'), href: '/webdav-readme', count: 'WebDAV', target: '_blank' },
-    ];
-
-    return home_links
-        .concat(library_links)
-        .concat(shelf_links)
-        .concat(store.user.is_admin ? admin_links : [])
-        .concat(nav_links)
-        .concat(store.sys.friends.length > 0 ? friend_links : [])
-        .concat(store.sys.show_sidebar_sys !== false ? sys_links : []);
-});
+const items = usePrimaryNavigation(store, t);
 
 onMounted(() => {
-    visit_admin_pages.value = route.path.indexOf('/admin/') == 0;
     sidebar.value = display.mdAndUp.value;
     store.bootstrap().then((rsp) => {
         err.value = rsp.err;
-        if (store.user.is_login) {
-            const { $backend } = useNuxtApp();
-            $backend('/read-done').then((rsp) => {
-                if (rsp.err === 'ok') {
-                    readDoneCount.value = rsp.total || 0;
-                }
-            }).catch(() => {});
-        }
     });
 });
+
+watch(() => route.path, (path) => {
+    if (path === '/admin' || path.startsWith('/admin/')) {
+        if (!openedGroups.value.includes('admin')) openedGroups.value = [...openedGroups.value, 'admin'];
+        return;
+    }
+    openedGroups.value = openedGroups.value.filter(value => value !== 'admin');
+}, { immediate: true });
 
 function chunk(arr, len) {
     var e = arr.length;
@@ -616,6 +540,17 @@ function toggleTheme() {
 }
 .search-field {
     width: 100% !important;
+}
+
+:deep(.app-navigation-drawer .v-navigation-drawer__content) {
+    display: flex;
+    flex-direction: column;
+}
+
+.app-navigation-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto !important;
 }
 .search-field :deep(.v-input__control) {
     width: 100% !important;

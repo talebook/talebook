@@ -56,6 +56,24 @@ test.describe('Audiobook production and playback', () => {
         await expect(page.locator('[data-job-id="1"]')).toContainText('百年孤独');
     });
 
+    test('excludes comics from every audiobook creation entry', async ({ page, request }) => {
+        test.setTimeout(120_000);
+        const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+
+        await page.goto('/book/14');
+        await expect(page.getByTestId('open-audiobook')).toHaveCount(0);
+
+        await gotoWithColdStartRetry(page, '/audios/create?book=14', () => page.getByRole('heading', { name: '创建有声书' }));
+        await expect(page.getByTestId('select-audiobook-book-14')).toHaveCount(0);
+        await expect(page.getByTestId('selected-book-panel')).not.toContainText('图片漫画样例');
+        await expect(page.getByTestId('submit-create-wizard')).toHaveCount(0);
+
+        const response = await request.post(`${mockApi}/api/book/14/audio-jobs`, {
+            data: { mode: 'quick', engine: 'edgetts' },
+        });
+        expect((await response.json()).err).toBe('media_type.not_supported');
+    });
+
     test('guides unsupported formats to EPUB conversion before creation', async ({ page }) => {
         await page.goto('/audios/create?book=3');
         await expect(page.getByTestId('selected-book-panel')).toContainText('安徒生童话', { timeout: 15_000 });

@@ -164,7 +164,7 @@ class TestAliasService(TestWithUserLogin):
             )
 
         self.assertEqual(result["err"], "ok")
-        delete_book.assert_called_once_with(regular_book_id)
+        delete_book.assert_called_once_with(regular_book_id, permanent=False)
         delete_external.assert_called_once_with(self._app.settings["legacy"], external_book_id)
         self.assertEqual(service.get_book_aliases(regular_book_id), [])
         self.assertEqual(service.get_book_aliases(external_book_id), [])

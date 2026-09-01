@@ -14,7 +14,6 @@ import unittest
 import urllib
 from unittest import mock
 
-import requests
 from tornado import testing, web
 
 
@@ -24,7 +23,7 @@ sys.path.append(projdir)
 
 import webserver.handlers.base
 import webserver.handlers.book
-from webserver import loader, main, models, plugins  # nosq: E402
+from webserver import loader, main, models  # nosq: E402
 from webserver.handlers.base import BaseHandler
 
 
@@ -101,6 +100,30 @@ def get_db():
     # 因此测试中通过本 session 修改数据后必须立即 commit
     session.rollback()
     return session
+
+
+@contextlib.contextmanager
+def enabled_builtin_plugin(plugin_key):
+    """Temporarily enable one built-in plugin for tests that exercise its runtime path."""
+    from webserver.models import PluginInstallation
+    from webserver.services.plugin_runtime import ensure_runtime_installations
+
+    session = get_db()
+    ensure_runtime_installations(session, main.CONF)
+    installation = session.query(PluginInstallation).filter(PluginInstallation.plugin_key == plugin_key).one()
+    original_enabled = installation.enabled
+    original_status = installation.status
+    installation.enabled = True
+    installation.status = "active"
+    session.commit()
+    try:
+        yield
+    finally:
+        session = get_db()
+        installation = session.get(PluginInstallation, installation.id)
+        installation.enabled = original_enabled
+        installation.status = original_status
+        session.commit()
 
 
 def Q(s):
@@ -291,6 +314,53 @@ class TestAppWithoutLogin(TestApp):
         d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
         self.assertEqual(d["err"], "user.need_login")
 
+    def test_guest_send_to_device_still_works_when_enabled(self):
+        """未安装时游客推送保持默认兼容，不能因缺少 user_id 而失败。"""
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
+                with mock.patch.object(provider, "uploader_class") as mock_boox:
+                    mock_boox.return_value.upload.return_value = {"success": True}
+                    data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                    result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        self.assertEqual(result["err"], "ok")
+        mock_boox.assert_called_once()
+
+    def test_guest_send_to_device_cannot_bypass_disabled_installation(self):
+        """全局开关允许游客时，现有插件安装的禁用状态仍然优先。"""
+        from webserver.models import PluginInstallation
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.services.plugin_runtime import install_builtin
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+        installation = (
+            session.query(PluginInstallation).filter(PluginInstallation.plugin_key == provider.manifest["id"]).first()
+        )
+        if installation is None:
+            installation = install_builtin(session, provider.manifest["id"], 1)
+        original_enabled = installation.enabled
+        original_status = installation.status
+        installation.enabled = False
+        session.commit()
+
+        try:
+            with mock.patch.dict(webserver.handlers.book.CONF, {"ALLOW_GUEST_PUSH": True}):
+                with mock.patch.object(provider, "uploader_class") as mock_boox:
+                    data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                    result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+            self.assertEqual(result["err"], "upload.error")
+            mock_boox.assert_not_called()
+        finally:
+            session = get_db()
+            installation = session.get(PluginInstallation, installation.id)
+            installation.enabled = original_enabled
+            installation.status = original_status
+            session.commit()
+
     def test_user_devices_get(self):
         d = self.json("/api/user/devices")
         self.assertEqual(d["err"], "user.need_login")
@@ -305,6 +375,8 @@ class TestAppWithoutLogin(TestApp):
         self.assertEqual(d["user"]["is_admin"], False)
         self.assertEqual(d["sys"]["books"], 13)
         self.assertEqual(d["sys"]["show_network_library"], True)
+        self.assertEqual(d["sys"]["opds_enabled"], True)
+        self.assertEqual(d["sys"]["webdav_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_enabled"], True)
         self.assertEqual(d["sys"]["upload"]["chunk_threshold"], 8 * 1024 * 1024)
         self.assertEqual(d["sys"]["upload"]["chunk_size"], 4 * 1024 * 1024)
@@ -334,6 +406,20 @@ class TestAppWithoutLogin(TestApp):
             self.assertEqual(d["sys"]["show_network_library"], False)
         finally:
             main.CONF["SHOW_NETWORK_LIBRARY"] = previous
+
+    def test_user_info_reflects_external_library_service_status_without_credentials(self):
+        previous_opds = main.CONF.get("OPDS_ENABLED", True)
+        previous_webdav = main.CONF.get("ENABLE_WEBDAV_SERVICE", True)
+        try:
+            main.CONF["OPDS_ENABLED"] = False
+            main.CONF["ENABLE_WEBDAV_SERVICE"] = False
+            d = self.json("/api/user/info")
+            self.assertEqual(d["sys"]["opds_enabled"], False)
+            self.assertEqual(d["sys"]["webdav_enabled"], False)
+            self.assertNotIn("password", d["sys"])
+        finally:
+            main.CONF["OPDS_ENABLED"] = previous_opds
+            main.CONF["ENABLE_WEBDAV_SERVICE"] = previous_webdav
 
     def test_book(self):
         d = self.json("/api/book/1")
@@ -475,6 +561,9 @@ class TestUser(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
         self.assertIn("devices", d)
         self.assertIsInstance(d["devices"], list)
+        self.assertIn("device_types", d)
+        self.assertIsInstance(d["device_types"], list)
+        self.assertIn("kindle", {item["value"] for item in d["device_types"]})
 
     def test_devices_post_save(self):
         devices_data = [
@@ -596,15 +685,156 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(m.call_count, 1)
 
     def test_send_to_device_wifi(self):
-        with mock.patch("webserver.plugins.sending.uploader.BooxUploader") as MockBoox:
-            mock_instance = MockBoox.return_value
-            mock_instance.get_upload_url.return_value = "http://192.168.1.1:8080/upload"
-            mock_instance.upload.return_value = {"success": True}
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
 
-            data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
-            d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
-            self.assertEqual(d["err"], "ok")
-            MockBoox.assert_called_once()
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+                self.assertEqual(d["err"], "ok")
+                MockBoox.assert_called_once()
+
+    def test_send_to_device_discovers_manifest_declared_device_type(self):
+        """handler 不维护设备白名单，新 provider 只需声明 ui.device_type。"""
+        from webserver.plugins.push.base import DevicePushProvider
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+        from webserver.services.plugin_runtime import REGISTRY
+
+        base = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        manifest = {
+            **base.manifest,
+            "id": "talebook.push.dynamic-device",
+            "name": "Dynamic device",
+            "ui": {**base.manifest["ui"], "device_type": "dynamic"},
+        }
+
+        class DynamicUploader:
+            def __init__(self, file_path, file_name=None, timeout=60):
+                self.timeout = timeout
+
+            def upload(self, _url):
+                return {"success": True}
+
+            def default_port(self):
+                return 19191
+
+        provider = DevicePushProvider(manifest, DynamicUploader)
+        with mock.patch.dict(REGISTRY._providers, {manifest["id"]: provider}):
+            result = self.json(
+                "/api/book/1/send_to_device",
+                method="POST",
+                body=json.dumps({"device_type": "dynamic", "device_url": "192.168.1.9:19191"}),
+            )
+
+        self.assertEqual(result["err"], "ok")
+
+    def test_send_to_device_wifi_records_a_run(self):
+        """推送是 sync 模式：写向外部设备，必须留下审计。"""
+        from webserver.models import PluginConnection, PluginInstallation, PluginRun
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+
+        def runs():
+            return (
+                session.query(PluginRun)
+                .join(PluginConnection, PluginConnection.id == PluginRun.connection_id)
+                .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+                .filter(PluginInstallation.plugin_key == provider.manifest["id"])
+                .all()
+            )
+
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+                before = len(runs())
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        after = runs()
+        self.assertEqual(len(after), before + 1, "推送必须留下 run 记录")
+        self.assertEqual(after[-1].status, "succeeded")
+        self.assertEqual(after[-1].action, "sync")
+        self.assertEqual(after[-1].input_data["device_type"], "boox")
+        connection = session.get(PluginConnection, after[-1].connection_id)
+        self.assertFalse(connection.lease_token)
+        self.assertIsNone(connection.lease_until)
+
+    def test_send_to_device_remembers_and_reuses_the_device_address(self):
+        """D-7 纳入插件中心的理由：设备地址存在每用户连接里，下次不必重填。"""
+        from webserver.models import PluginConnection, PluginInstallation
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+                data = {"device_type": "boox", "device_url": "192.168.1.7:8085"}
+                self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        connection = (
+            session.query(PluginConnection)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .filter(PluginInstallation.plugin_key == provider.manifest["id"])
+            .first()
+        )
+        self.assertEqual(connection.config.get("device_url"), "192.168.1.7:8085", "设备地址必须记进连接")
+
+        # 第二次不带地址：应回落到连接里存的那个
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": True}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps({"device_type": "boox"}))
+                self.assertEqual(d["err"], "ok")
+                self.assertIn("192.168.1.7:8085", MockBoox.return_value.upload.call_args.args[0])
+
+    def test_send_to_device_wifi_failure_is_recorded(self):
+        from webserver.models import PluginConnection, PluginInstallation, PluginRun
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        session = get_db()
+
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {"success": False, "message": "device refused"}
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                d = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        self.assertEqual(d["err"], "upload.error")
+        run = (
+            session.query(PluginRun)
+            .join(PluginConnection, PluginConnection.id == PluginRun.connection_id)
+            .join(PluginInstallation, PluginInstallation.id == PluginConnection.installation_id)
+            .filter(PluginInstallation.plugin_key == provider.manifest["id"])
+            .order_by(PluginRun.id.desc())
+            .first()
+        )
+        self.assertEqual(run.status, "failed")
+        self.assertIn("device refused", run.error_message)
+
+    def test_send_to_device_uses_structured_transport_error_not_message_sniffing(self):
+        from webserver.plugins.register import PUSH_PROVIDERS_BY_DEVICE
+
+        provider = PUSH_PROVIDERS_BY_DEVICE["boox"]
+        with enabled_builtin_plugin(provider.manifest["id"]):
+            with mock.patch.object(provider, "uploader_class") as MockBoox:
+                MockBoox.return_value.upload.return_value = {
+                    "success": False,
+                    "error_type": "timeout",
+                    "status_code": None,
+                    "message": "设备没有及时应答",
+                }
+                data = {"device_type": "boox", "device_url": "192.168.1.1:8080"}
+                result = self.json("/api/book/1/send_to_device", method="POST", body=json.dumps(data))
+
+        self.assertEqual(result["err"], "upload.timeout")
 
     def test_send_to_device_missing_params(self):
         d = self.json("/api/book/1/send_to_device", method="POST", body="")
@@ -716,34 +946,7 @@ class TestBook(TestWithUserLogin):
             self.assertEqual(r["err"], "ok")
 
 
-class TestReferDouban(TestWithUserLogin):
-    def setUp(self):
-        self.douban_url = "http://10.0.0.15:7001"
-        try:
-            requests.get(self.douban_url, timeout=2)
-        except:
-            self.skipTest("without douban plugin, skip refer test")
-        super().setUp()
-
-    def tttest_refer(self):
-        # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
-        main.CONF["douban_baseurl"] = self.douban_url
-        d = self.json("/api/book/1/refer")
-        self.assertEqual(d["err"], "ok")
-
-        global _app
-        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="Yo"):
-            for book in d["books"]:
-                body = "provider_key=%(provider_key)s&provider_value=%(provider_value)s" % book
-                r = self.json("/api/book/1/refer", method="POST", raise_error=True, body=body)
-                self.assertEqual(r["err"], "ok")
-
-
 class TestRefer(TestWithUserLogin):
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.search_books")
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_book_by_isbn")
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_book_by_id")
-    @mock.patch("webserver.plugins.meta.douban.DoubanBookApi.get_cover")
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi._baike")
     @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi.get_cover")
     @mock.patch("webserver.plugins.meta.youshu.YoushuApi._youshu")
@@ -751,15 +954,9 @@ class TestRefer(TestWithUserLogin):
     @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
     @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
     @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
-    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5, m4, m3, m2, m1):
+    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5):
         from tests.test_baike import BAIKE_PAGE
-        from tests.test_douban import DOUBAN_BOOK, DOUBAN_SEARCH
         from tests.test_youshu import YOUSHU_PAGE
-
-        m1.return_value = DOUBAN_SEARCH["books"]
-        m2.return_value = dict(DOUBAN_BOOK)
-        m3.return_value = dict(DOUBAN_BOOK)
-        m4.return_value = ("jpg", b"image-body")
 
         m5.return_value = BAIKE_PAGE
         m6.return_value = ("jpg", b"image-body")
@@ -771,7 +968,6 @@ class TestRefer(TestWithUserLogin):
         m_xhsd.return_value = None
 
         # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
-        # main.CONF["douban_baseurl"] = self.douban_url
         d = self.json("/api/book/1/refer")
         self.assertEqual(d["err"], "ok")
 
@@ -781,6 +977,48 @@ class TestRefer(TestWithUserLogin):
                 body = "provider_key=%(provider_key)s&provider_value=%(provider_value)s" % book
                 r = self.json("/api/book/1/refer", method="POST", raise_error=True, body=body)
                 self.assertEqual(r["err"], "ok")
+
+
+class TestReferCoverUpdate(TestWithUserLogin):
+    def test_only_cover_refreshes_timestamp_without_replacing_other_metadata(self):
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        db = self._app.settings["legacy"]
+        original_mi = db.get_metadata(BID_EPUB, index_is_id=True)
+
+        refer_mi = Metadata("不应写入的标题", ["不应写入的作者"])
+        refer_mi.cover_data = ("jpeg", db.cover(BID_TXT, index_is_id=True))
+
+        with mock.patch("webserver.handlers.book.set_metadata_preserving_external_paths") as save_metadata:
+            with mock.patch.object(webserver.handlers.book.BookRefer, "plugin_get_book_meta", return_value=refer_mi):
+                result = self.json(
+                    f"/api/book/{BID_EPUB}/refer",
+                    method="POST",
+                    body="provider_key=Test&provider_value=cover&only_cover=yes",
+                )
+
+        self.assertEqual(result["err"], "ok")
+        save_metadata.assert_called_once()
+        saved_mi = save_metadata.call_args.args[3]
+        self.assertEqual(saved_mi.cover_data, refer_mi.cover_data)
+        self.assertNotEqual(saved_mi.timestamp.strftime("%s"), original_mi.timestamp.strftime("%s"))
+        self.assertEqual(saved_mi.title, original_mi.title)
+        self.assertEqual(saved_mi.authors, original_mi.authors)
+
+    def test_only_cover_rejects_metadata_without_image_bytes(self):
+        from calibre.ebooks.metadata.book.base import Metadata
+
+        refer_mi = Metadata("无封面结果")
+        refer_mi.cover_data = (None, None)
+
+        with mock.patch.object(webserver.handlers.book.BookRefer, "plugin_get_book_meta", return_value=refer_mi):
+            result = self.json(
+                f"/api/book/{BID_EPUB}/refer",
+                method="POST",
+                body="provider_key=Test&provider_value=empty&only_cover=yes",
+            )
+
+        self.assertEqual(result["err"], "cover.empty")
 
 
 class TestReferFailureSummary(TestWithUserLogin):
@@ -835,10 +1073,140 @@ class TestReferFailureSummary(TestWithUserLogin):
 
         frames = [json.loads(line) for line in response.body.decode("utf-8").splitlines()]
         self.assertEqual(frames[0]["err"], "ok")
-        self.assertEqual(frames[1]["title"], "可用结果")
+        progress = [frame for frame in frames if frame.get("event") == "progress"]
+        self.assertEqual(progress[0], {"event": "progress", "failures": [], "total": 3, "completed": 0})
+        self.assertEqual(progress[-1]["completed"], 3)
+        self.assertIn("可用结果", [frame.get("title") for frame in frames])
         self.assertEqual(frames[-1]["event"], "summary")
         self.assertIn(self.escaped_failure, frames[-1]["failures"])
         self.assertNotIn("<script>", response.body.decode("utf-8"))
+
+    def test_each_metadata_source_returns_at_most_five_candidates(self):
+        handler = webserver.handlers.book.BookRefer.__new__(webserver.handlers.book.BookRefer)
+        books, failures = handler._unpack_search_result("many", [{"title": str(index)} for index in range(8)])
+
+        self.assertEqual(len(books), 5)
+        self.assertEqual(failures, [])
+
+
+class TestWereadRefer(TestWithUserLogin):
+    api_key = "wrk-metadata-test-only"
+
+    def _clear_connection(self):
+        session = get_db()
+        connections = (
+            session.query(models.PluginConnection)
+            .filter(
+                models.PluginConnection.owner_type == "user",
+                models.PluginConnection.owner_id == 1,
+                models.PluginConnection.name == "微信读书",
+            )
+            .all()
+        )
+        secret_ids = [connection.secret_id for connection in connections if connection.secret_id]
+        for connection in connections:
+            session.delete(connection)
+        session.commit()
+        if secret_ids:
+            session.query(models.PluginSecret).filter(models.PluginSecret.id.in_(secret_ids)).delete(synchronize_session=False)
+            session.commit()
+
+    def setUp(self):
+        super().setUp()
+        self._clear_connection()
+        self.previous_secret_key = webserver.handlers.book.CONF.get("PLUGIN_SECRET_KEY")
+        webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = "weread-metadata-test-key"
+        from webserver.plugins.combo.weread import WEREAD_PLUGIN_KEY
+        from webserver.services.plugin_runtime import ensure_runtime_installations, install_builtin, save_connection
+
+        session = get_db()
+        ensure_runtime_installations(session, webserver.handlers.book.CONF)
+        self._metadata_installation_states = {}
+        for item in session.query(models.PluginInstallation).all():
+            definition = session.get(models.PluginDefinition, item.definition_id)
+            if (
+                item.plugin_key != WEREAD_PLUGIN_KEY
+                and definition is not None
+                and "metadata.lookup" in (definition.capabilities or [])
+            ):
+                self._metadata_installation_states[item.id] = (item.enabled, item.status)
+                item.enabled = False
+        session.commit()
+        installation = install_builtin(session, WEREAD_PLUGIN_KEY, installed_by=1)
+        save_connection(
+            session,
+            webserver.handlers.book.CONF,
+            installation.id,
+            "user",
+            1,
+            {"api_key": self.api_key},
+            name="微信读书",
+        )
+
+    def tearDown(self):
+        self._clear_connection()
+        session = get_db()
+        for installation_id, (enabled, status) in self._metadata_installation_states.items():
+            installation = session.get(models.PluginInstallation, installation_id)
+            installation.enabled = enabled
+            installation.status = status
+        session.commit()
+        if self.previous_secret_key is None:
+            webserver.handlers.book.CONF.pop("PLUGIN_SECRET_KEY", None)
+        else:
+            webserver.handlers.book.CONF["PLUGIN_SECRET_KEY"] = self.previous_secret_key
+        super().tearDown()
+
+    @mock.patch("webserver.plugins.combo.weread.metadata.WereadProvider.query")
+    def test_configured_connection_joins_existing_metadata_search_and_applies_selection(self, query):
+        query.return_value = {
+            "results": [
+                {
+                    "title": "电子书",
+                    "books": [
+                        {
+                            "newRating": 920,
+                            "bookInfo": {
+                                "bookId": "weread-book-1",
+                                "title": "微信读书结果",
+                                "author": "测试作者",
+                                "publisher": "测试出版社",
+                                "intro": "搜索简介",
+                                "deepLink": "weread://bookDetail?bookId=weread-book-1",
+                            },
+                        }
+                    ],
+                }
+            ]
+        }
+        with mock.patch.dict(webserver.handlers.book.CONF, {"META_SELECTED_SOURCES": []}):
+            data = self.json("/api/book/1/refer")
+
+        self.assertEqual(data["err"], "ok")
+        self.assertEqual([book["source"] for book in data["books"]], ["微信读书"])
+        self.assertEqual(data["books"][0]["provider_key"], "talebook.combo.weread")
+        args = query.call_args.args
+        self.assertEqual(args[0], self.api_key)
+        self.assertEqual(args[1], "search")
+        self.assertEqual(args[2]["scope"], 10)
+
+        query.reset_mock()
+        query.return_value = {
+            "bookId": "weread-book-1",
+            "title": "微信读书详情",
+            "author": "测试作者",
+            "publisher": "测试出版社",
+            "intro": "完整简介",
+        }
+        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="ok"):
+            result = self.json(
+                "/api/book/1/refer",
+                method="POST",
+                body="provider_key=talebook.combo.weread&provider_value=weread-book-1&only_meta=yes",
+            )
+
+        self.assertEqual(result["err"], "ok")
+        query.assert_called_once_with(self.api_key, "book_info", {"bookId": "weread-book-1"})
 
 
 class TestUserSignUp(TestWithUserLogin):

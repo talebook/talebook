@@ -15,8 +15,9 @@ vi.mock('#i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { pushMock, routeState, storeState } = vi.hoisted(() => ({
     pushMock: vi.fn(),
+    routeState: { path: '/' },
     storeState: {
         theme: 'light',
         sys: {
@@ -48,6 +49,10 @@ vi.mock('@/stores/main', () => ({
 
 mockNuxtImport('useRouter', () => {
     return () => ({ push: pushMock });
+});
+
+mockNuxtImport('useRoute', () => {
+    return () => routeState;
 });
 
 const vuetify = createVuetify({ components, directives });
@@ -119,45 +124,55 @@ describe('BuiltinThemeHeader.vue navigation', () => {
         storeState.sys.show_network_library = true;
         storeState.user.is_login = false;
         storeState.user.is_admin = false;
+        routeState.path = '/';
     });
 
     it.each(['light-gray', 'minimal', 'graphite', 'brass', 'warm-red'] as const)(
-        'shows My Shelf to signed-in users in the %s theme',
+        'shows My Reading to signed-in users in the %s theme',
         (variant) => {
             storeState.user.is_login = true;
             const wrapper = mountHeader(variant);
 
-            const shelfLink = wrapper.findAllComponents({ name: 'VListItem' })
-                .find(item => item.text().includes('navigation.myShelf'));
-            expect(shelfLink).toBeDefined();
-            expect(shelfLink?.props('to')).toBe('/user/shelf');
+            const readingLink = wrapper.findAllComponents({ name: 'VListItem' })
+                .find(item => item.text().includes('navigation.myReading'));
+            expect(readingLink).toBeDefined();
+            expect(readingLink?.props('to')).toBe('/me/shelf');
 
             wrapper.unmount();
         },
     );
 
-    it('hides My Shelf from signed-out users', () => {
+    it('hides My Reading from signed-out users', () => {
         const wrapper = mountHeader('minimal');
 
-        expect(wrapper.text()).not.toContain('navigation.myShelf');
+        expect(wrapper.text()).not.toContain('navigation.myReading');
 
         wrapper.unmount();
     });
 
-    it('shows the network library link by default', () => {
+    it('shows one consolidated library entry regardless of the legacy setting', () => {
         const wrapper = mountHeader('minimal');
 
-        expect(wrapper.text()).toContain('navigation.networkLibrary');
-
-        wrapper.unmount();
-    });
-
-    it('hides the network library link when disabled', () => {
-        storeState.sys.show_network_library = false;
-        const wrapper = mountHeader('minimal');
-
+        expect(wrapper.text()).toContain('navigation.libraryBrowse');
         expect(wrapper.text()).not.toContain('navigation.networkLibrary');
+        storeState.sys.show_network_library = false;
+        expect(wrapper.text()).toContain('navigation.libraryBrowse');
 
+        wrapper.unmount();
+    });
+
+    it('shows the trash management link only to administrators', () => {
+        let wrapper = mountHeader('minimal');
+        expect(wrapper.text()).not.toContain('navigation.trash');
+        wrapper.unmount();
+
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        wrapper = mountHeader('minimal');
+        const link = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(item => item.text().includes('navigation.trash'));
+
+        expect(link?.props('to')).toBe('/admin/trash');
         wrapper.unmount();
     });
 
@@ -179,6 +194,22 @@ describe('BuiltinThemeHeader.vue navigation', () => {
         await wrapper.get('.tb-theme-nav-toggle').trigger('click');
 
         expect(header.sidebar).toBe(true);
+        wrapper.unmount();
+    });
+
+    it.each([
+        ['/library/network', 'navigation.libraryBrowse'],
+        ['/me/plugins', 'navigation.myReading'],
+        ['/admin/settings/plugins', 'navigation.settings'],
+    ])('keeps the aggregate navigation entry active on %s', (path, label) => {
+        storeState.user.is_login = true;
+        storeState.user.is_admin = true;
+        routeState.path = path;
+        const wrapper = mountHeader('graphite');
+        const item = wrapper.findAllComponents({ name: 'VListItem' })
+            .find(candidate => candidate.text().includes(label));
+
+        expect(item?.props('active')).toBe(true);
         wrapper.unmount();
     });
 });

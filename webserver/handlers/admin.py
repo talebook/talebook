@@ -41,7 +41,6 @@ CONF = loader.get_settings()
 
 # 元数据源配置
 META_ALL_SOURCES = [
-    "douban",
     "douban_v2",
     "baidu",
     "google",
@@ -53,15 +52,15 @@ META_ALL_SOURCES = [
     "neodb",
     "booksource",
 ]
-DEFAULT_META_SOURCES = ["douban", "baidu", "xinhua", "booksource"]
+DEFAULT_META_SOURCES = ["douban_v2", "baidu", "xinhua", "booksource"]
 SOCIAL_AUTH_SETTING_RE = re.compile(r"^SOCIAL_AUTH_[A-Z0-9_]+_(KEY|SECRET)$")
 
 
 def normalize_meta_sources(value):
-    """把下线的固定站点选项迁移到通用在线书源，并保持百度百科独立。"""
+    """把下线的固定站点选项迁移到仍在维护的来源，并保持百度百科独立。"""
     if not isinstance(value, list):
         return list(DEFAULT_META_SOURCES)
-    aliases = {"biquge": "booksource", "youshu": "booksource"}
+    aliases = {"biquge": "booksource", "youshu": "booksource", "douban": "douban_v2"}
     normalized = []
     for source in value:
         source = aliases.get(source, source)
@@ -404,11 +403,18 @@ class AdminSettings(BaseHandler):
         # 演示账号看到的是 settings.py 里的出厂默认值，不暴露真实部署配置（密钥、
         # 数据库地址等）；真实管理员仍看到当前生效的运行配置。
         settings_dict = dict(DEFAULT_SETTINGS) if self.is_demo_fake_admin() else dict(CONF)
-        # 添加元数据源配置
-        settings_dict["META_ALL_SOURCES"] = META_ALL_SOURCES
-        settings_dict["META_SELECTED_SOURCES"] = normalize_meta_sources(
-            settings_dict.get("META_SELECTED_SOURCES", DEFAULT_META_SOURCES)
-        )
+        # 已迁入插件中心的字段不再由系统设置读写，避免形成第二个配置入口。
+        for plugin_setting in (
+            "auto_fill_meta",
+            "auto_fill_keep_cover",
+            "META_SELECTED_SOURCES",
+            "ai_api_url",
+            "ai_api_key",
+            "ai_model",
+            "ai_use_thinking",
+            "DEVICES",
+        ):
+            settings_dict.pop(plugin_setting, None)
 
         return {"err": "ok", "settings": settings_dict, "sns": sns, "site_url": self.site_url}
 
@@ -427,9 +433,6 @@ class AdminSettings(BaseHandler):
         if not self.admin_user:
             return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
-        if "META_SELECTED_SOURCES" in data:
-            data["META_SELECTED_SOURCES"] = normalize_meta_sources(data["META_SELECTED_SOURCES"])
-
         # 验证：如果启用了私人图书馆模式，访问码不能为空
         invite_mode = data.get("INVITE_MODE", False)
         invite_code = data.get("INVITE_CODE", "")
@@ -527,16 +530,6 @@ class AdminSettings(BaseHandler):
             "import_allowed_roots",
             "import_watch_interval_seconds",
             "import_scan_batch_size",
-            "douban_apikey",
-            "douban_baseurl",
-            "douban_max_count",
-            "auto_fill_meta",
-            "auto_fill_keep_cover",
-            "META_SELECTED_SOURCES",
-            "ai_api_url",
-            "ai_api_key",
-            "ai_model",
-            "ai_use_thinking",
             "push_title",
             "push_content",
             "site_title",
@@ -557,7 +550,6 @@ class AdminSettings(BaseHandler):
             "CAPTCHA_ENABLE_FOR_RESET",
             "GEETEST_CAPTCHA_ID",
             "GEETEST_CAPTCHA_KEY",
-            "DEVICES",
             # 首页设置
             "MAIN_PAGE_RANDOM_COUNT",
             "MAIN_PAGE_RECENT_COUNT",
@@ -992,8 +984,10 @@ class AdminBookDelete(BaseHandler):
                     self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
                     self.session.query(Item).filter(Item.book_id == bid).delete()
                 else:
-                    # 删除图书
-                    self.db.delete_book(bid)
+                    # 私藏书不进入 Calibre 回收站，避免管理员在回收站中看到私藏内容。
+                    item = self.session.get(Item, bid)
+                    permanent = bool(item and item.scope == "private")
+                    self.db.delete_book(bid, permanent=permanent)
                 alias_service.delete_book_aliases(bid)
                 self.session.commit()
                 deleted_count += 1
@@ -1248,35 +1242,79 @@ class AdminOPDSImport(BaseHandler):
             return {"err": "error", "msg": _("OPDS 导入失败：{}").format(str(e))}
 
 
+def _trash_idlist(handler):
+    try:
+        request = tornado.escape.json_decode(handler.request.body or b"{}")
+    except (TypeError, ValueError):
+        return None, {"err": "params.error", "msg": _("参数错误")}
+    idlist = request.get("idlist") if isinstance(request, dict) else None
+    if not isinstance(idlist, list) or not idlist:
+        return None, {"err": "params.error.idlist", "msg": _("idlist参数错误，必须是非空整数数组")}
+    if any(isinstance(book_id, bool) or not isinstance(book_id, int) or book_id < 1 for book_id in idlist):
+        return None, {"err": "params.error.idlist", "msg": _("idlist参数错误，必须是非空整数数组")}
+    return request, None
+
+
+class AdminTrash(BaseHandler):
+    """List, restore and permanently delete whole-book Calibre trash entries."""
+
+    @js
+    @is_admin
+    def get(self):
+        items = TrashManager.list_books(self.cache)
+        return {
+            "err": "ok",
+            "items": items,
+            "total": len(items),
+            "total_size": sum(item["size"] for item in items),
+        }
+
+    @js
+    @is_admin
+    def patch(self):
+        request, error = _trash_idlist(self)
+        if error:
+            return error
+        restored, failures = TrashManager.restore_books(self.db, request["idlist"])
+        return {
+            "err": "ok",
+            "restored": restored,
+            "failures": failures,
+            "msg": _("已恢复 %d 本书籍，%d 本失败") % (len(restored), len(failures)),
+        }
+
+    @js
+    @is_admin
+    def delete(self):
+        request, error = _trash_idlist(self)
+        if error:
+            return error
+        if request.get("confirm") is not True:
+            return {"err": "params.confirm", "msg": _("请确认永久删除操作")}
+        deleted, failures = TrashManager.delete_books(self.cache, request["idlist"])
+        return {
+            "err": "ok",
+            "deleted": deleted,
+            "failures": failures,
+            "msg": _("已永久删除 %d 本书籍，%d 本失败") % (len(deleted), len(failures)),
+        }
+
+
 class AdminTrashSize(BaseHandler):
     """获取回收站和上传目录大小"""
 
     @js
-    @auth
+    @is_admin
     def get(self):
-        if not self.admin_user:
-            return {"err": "ok", "sizes": {}, "msg": _("非管理员用户")}
-        sizes = TrashManager.get_trash_sizes()
-        # 返回实际路径用于调试
-        return {
-            "err": "ok",
-            "sizes": sizes,
-            "trash_path": TrashManager.TRASH_PATH,
-            "upload_path": TrashManager.UPLOAD_TRASH_PATH,
-        }
+        return {"err": "ok", "sizes": TrashManager.get_trash_sizes()}
 
 
 class AdminTrashClear(BaseHandler):
     """清理回收站和上传目录"""
 
     @js
-    @auth
+    @is_admin
     def post(self):
-        if not self.admin_user:
-            return {
-                "err": "permission.not_admin",
-                "msg": _("当前用户非管理员，无权操作"),
-            }
         errors = TrashManager.clear_trashs()
         if errors:
             return {"err": "error", "msg": _("清理失败：%s") % "; ".join(errors)}
@@ -1438,6 +1476,7 @@ def routes():
         (r"/api/admin/opds/import/failed", AdminOPDSImportFailedList),
         (r"/api/admin/opds/import/retry", AdminOPDSImportRetry),
         (r"/api/admin/opds/sources", AdminOpdsSources),
+        (r"/api/admin/trash", AdminTrash),
         (r"/api/admin/trash/size", AdminTrashSize),
         (r"/api/admin/trash/clear", AdminTrashClear),
         (r"/api/admin/log", AdminSystemLog),

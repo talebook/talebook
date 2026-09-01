@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE | e }}">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>{{ book.title | e }}</title>
+  <link rel="icon" href="/logo/favicon.ico" />
+  <link rel="stylesheet" href="/static/komga-reader/style.css?v={{ READER_VERSION | e }}" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body, #comic-reader-page, #comic-reader-host { width: 100%; height: 100%; margin: 0; }
+    body { overflow: hidden; background: #111827; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    #comic-reader-page { position: relative; min-height: 420px; }
+    #comic-reader-host .kr-reader { width: 100%; height: 100%; }
+    .reader-state {
+      position: absolute;
+      z-index: 20;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 24px;
+      text-align: center;
+      background: #111827;
+    }
+    .reader-state[hidden] { display: none; }
+    .reader-state h1, .reader-state p { margin: 0; }
+    .reader-state p { max-width: 520px; color: #cbd5e1; line-height: 1.65; }
+    .reader-state__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+    .reader-state__actions button, .reader-state__actions a {
+      min-height: 44px;
+      padding: 10px 18px;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      color: #f8fafc;
+      background: #1e293b;
+      font: inherit;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .reader-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #334155;
+      border-top-color: #60a5fa;
+      border-radius: 50%;
+      animation: reader-spin .85s linear infinite;
+    }
+    .reader-notice {
+      position: absolute;
+      z-index: 30;
+      right: 16px;
+      bottom: calc(18px + env(safe-area-inset-bottom));
+      max-width: min(430px, calc(100% - 32px));
+      padding: 12px 42px 12px 16px;
+      border: 1px solid #ef4444;
+      border-radius: 10px;
+      color: #fee2e2;
+      background: rgb(69 10 10 / 94%);
+      box-shadow: 0 12px 32px rgb(0 0 0 / 35%);
+    }
+    .reader-notice[hidden] { display: none; }
+    .reader-notice button {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 36px;
+      height: 36px;
+      border: 0;
+      color: inherit;
+      background: transparent;
+      font-size: 22px;
+      cursor: pointer;
+    }
+    @keyframes reader-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .reader-spinner { animation: none; } }
+    @media (max-width: 600px) {
+      #comic-reader-page { min-height: 100dvh; }
+      .reader-notice { right: 8px; bottom: calc(8px + env(safe-area-inset-bottom)); max-width: calc(100% - 16px); }
+    }
+  </style>
+</head>
+<body>
+  <main
+    id="comic-reader-page"
+    data-book-id="{{ book.id | int }}"
+    data-msg-default-error="{{ messages.default_error | e }}"
+    data-msg-invalid-response="{{ messages.invalid_response | e }}"
+    data-msg-session-expired="{{ messages.session_expired | e }}"
+    data-msg-request-failed="{{ messages.request_failed | e }}"
+    data-msg-invalid-manifest="{{ messages.invalid_manifest | e }}"
+    data-msg-progress-unsaved="{{ messages.progress_unsaved | e }}"
+    data-msg-image-error="{{ messages.image_error | e }}"
+    data-msg-reader-error="{{ messages.reader_error | e }}"
+  >
+    <div id="comic-reader-host" data-testid="comic-reader-host"></div>
+    <section id="reader-loading" class="reader-state" aria-live="polite">
+      <div class="reader-spinner" aria-hidden="true"></div>
+      <p>{{ messages.loading | e }}</p>
+    </section>
+    <section id="reader-error" class="reader-state" role="alert" hidden>
+      <h1>{{ messages.load_error | e }}</h1>
+      <p id="reader-error-message">{{ messages.default_error | e }}</p>
+      <div class="reader-state__actions">
+        <button id="reader-retry" type="button">{{ messages.retry | e }}</button>
+        <a href="/book/{{ book.id | int }}">{{ messages.back | e }}</a>
+      </div>
+    </section>
+    <aside id="reader-notice" class="reader-notice" role="status" hidden>
+      <span id="reader-notice-message"></span>
+      <button id="reader-notice-close" type="button" aria-label="{{ messages.close | e }}">×</button>
+    </aside>
+  </main>
+
+  <script type="module">
+    const readerVersion = '{{ READER_VERSION | e }}';
+    const readerModuleUrl = `/static/komga-reader/komga-reader.es.js?v=${readerVersion}`;
+    const page = document.getElementById('comic-reader-page');
+    const host = document.getElementById('comic-reader-host');
+    const loading = document.getElementById('reader-loading');
+    const errorState = document.getElementById('reader-error');
+    const errorMessage = document.getElementById('reader-error-message');
+    const notice = document.getElementById('reader-notice');
+    const noticeMessage = document.getElementById('reader-notice-message');
+    const bookId = Number(page.dataset.bookId);
+    const messages = {
+      defaultError: page.dataset.msgDefaultError,
+      invalidResponse: page.dataset.msgInvalidResponse,
+      sessionExpired: page.dataset.msgSessionExpired,
+      requestFailed: page.dataset.msgRequestFailed,
+      invalidManifest: page.dataset.msgInvalidManifest,
+      progressUnsaved: page.dataset.msgProgressUnsaved,
+      imageError: page.dataset.msgImageError,
+      readerError: page.dataset.msgReaderError,
+    };
+    const bookUrl = `/book/${bookId}`;
+    const manifestUrl = `/api/book/${bookId}/comic/pages`;
+    const progressUrl = `/api/book/${bookId}/comic/progress`;
+
+    let reader;
+    let saveTimer;
+    let pendingProgress;
+    let active = true;
+
+    function showNotice(message) {
+      noticeMessage.textContent = message;
+      notice.hidden = false;
+    }
+
+    function showError(message) {
+      loading.hidden = true;
+      errorMessage.textContent = message || messages.defaultError;
+      errorState.hidden = false;
+    }
+
+    async function requestJson(url, options) {
+      const response = await fetch(url, { credentials: 'same-origin', ...options });
+      let payload;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new Error(response.status === 401 ? messages.sessionExpired : messages.invalidResponse);
+      }
+      if (!response.ok || payload.err !== 'ok') {
+        throw new Error(payload.msg || `${messages.requestFailed}（${response.status}）`);
+      }
+      return payload;
+    }
+
+    function toReaderManifest(source) {
+      if (
+        source.contract_version !== 1
+        || Number(source.book_id) !== bookId
+        || typeof source.title !== 'string'
+        || !Array.isArray(source.pages)
+        || source.pages.length === 0
+        || source.pages_count !== source.pages.length
+      ) {
+        throw new Error(messages.invalidManifest);
+      }
+      const pages = [...source.pages].sort((left, right) => left.index - right.index);
+      pages.forEach((item, index) => {
+        const validId = typeof item.id === 'string' || typeof item.id === 'number';
+        const validUrl = typeof item.url === 'string' && item.url.startsWith(`/api/book/${bookId}/comic/pages/`);
+        if (item.index !== index || !validId || !validUrl || !Number.isInteger(item.width) || item.width <= 0 || !Number.isInteger(item.height) || item.height <= 0 || typeof item.mime_type !== 'string' || !item.mime_type.startsWith('image/')) {
+          throw new Error(messages.invalidManifest);
+        }
+      });
+      return {
+        id: `${source.book_id}:${source.revision}`,
+        title: source.title,
+        pages: pages.map((item, index) => ({
+          id: item.id,
+          src: item.url,
+          alt: `${source.title} · ${index + 1}`,
+          width: item.width,
+          height: item.height,
+          mimeType: item.mime_type,
+        })),
+      };
+    }
+
+    function toInitialProgress(progress) {
+      if (!progress || progress.kind !== 'comic' || progress.version !== 1 || !Number.isInteger(progress.pageIndex) || progress.pageIndex < 0) {
+        return { pageIndex: 0 };
+      }
+      const initial = { pageIndex: progress.pageIndex };
+      if (typeof progress.pageId === 'string' || typeof progress.pageId === 'number') initial.pageId = progress.pageId;
+      return initial;
+    }
+
+    function toStoredProgress(progress) {
+      return {
+        kind: 'comic',
+        version: 1,
+        pageId: progress.pageId,
+        pageIndex: progress.pageIndex,
+        percent: progress.percent,
+        completed: progress.completed,
+      };
+    }
+
+    async function saveProgress(progress, keepalive = true) {
+      pendingProgress = undefined;
+      const response = await requestJson(progressUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progress: toStoredProgress(progress) }),
+        keepalive,
+      });
+      return response.progress;
+    }
+
+    function queueProgress(progress) {
+      pendingProgress = progress;
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => {
+        const queued = pendingProgress;
+        if (!queued) return;
+        saveProgress(queued).catch(() => {
+          pendingProgress = queued;
+          showNotice(messages.progressUnsaved);
+        });
+      }, 350);
+    }
+
+    async function exitReader(event) {
+      window.clearTimeout(saveTimer);
+      try {
+        await saveProgress(event.progress, true);
+      } catch {
+        // 离开阅读器不应被进度保存失败阻塞。
+      }
+      window.location.assign(bookUrl);
+    }
+
+    async function startReader() {
+      loading.hidden = false;
+      errorState.hidden = true;
+      notice.hidden = true;
+      reader?.destroy();
+      reader = undefined;
+      host.replaceChildren();
+
+      try {
+        const [browserModule, manifestResponse, progressResponse] = await Promise.all([
+          import(readerModuleUrl),
+          requestJson(manifestUrl),
+          requestJson(progressUrl),
+        ]);
+        if (!active) return;
+        const manifest = toReaderManifest(manifestResponse);
+        document.title = manifest.title || document.title;
+        reader = new browserModule.Reader(host, {
+          manifest,
+          initialProgress: toInitialProgress(progressResponse.progress),
+          onProgress: queueProgress,
+          onExit: exitReader,
+          onError: (event) => showNotice(event.code === 'image-load' ? messages.imageError : (event.message || messages.readerError)),
+        });
+        loading.hidden = true;
+      } catch (error) {
+        showError(error instanceof Error ? error.message : messages.defaultError);
+      }
+    }
+
+    document.getElementById('reader-retry').addEventListener('click', startReader);
+    document.getElementById('reader-notice-close').addEventListener('click', () => { notice.hidden = true; });
+    window.addEventListener('pagehide', () => {
+      active = false;
+      window.clearTimeout(saveTimer);
+      if (pendingProgress) {
+        const body = JSON.stringify({ progress: toStoredProgress(pendingProgress) });
+        navigator.sendBeacon(progressUrl, new Blob([body], { type: 'application/json' }));
+      }
+      reader?.destroy();
+      reader = undefined;
+    }, { once: true });
+
+    startReader();
+  </script>
+</body>
+</html>

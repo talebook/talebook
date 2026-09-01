@@ -39,6 +39,15 @@ vi.mock('@/stores/main', () => ({
 
 const vuetify = createVuetify({ components, directives });
 global.ResizeObserver = require('resize-observer-polyfill');
+(globalThis as Record<string, unknown>).visualViewport = {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    width: 1024,
+    height: 768,
+    scale: 1,
+    offsetLeft: 0,
+    offsetTop: 0,
+};
 
 import Upload from '@/components/Upload.vue';
 
@@ -47,6 +56,7 @@ type UploadVm = {
     ebooks: File | null;
     stage: string | null;
     progress: number;
+    dialog: boolean;
 };
 
 function makeFakeFile(name: string, size: number): File {
@@ -70,11 +80,23 @@ function mountUpload() {
         global: {
             plugins: [vuetify],
             mocks: { $t: (key: string) => key },
+            stubs: { VDialog: { template: '<div><slot /></div>' } },
         },
     });
 }
 
 describe('Upload.vue', () => {
+    it('advertises and accepts comic container formats', () => {
+        const wrapper = mountUpload();
+        const input = wrapper.find('input[type="file"]');
+
+        expect(wrapper.text()).toContain('book.supportedFormatsUpload');
+        expect(wrapper.get('button').attributes('aria-label')).toBe('messages.uploadBooks');
+        expect(input.attributes('accept')).toContain('.cbz');
+        expect(input.attributes('accept')).toContain('.cbr');
+        wrapper.unmount();
+    });
+
     it('does not post an empty upload when no ebook is selected', () => {
         const wrapper = mountUpload();
 

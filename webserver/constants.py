@@ -21,8 +21,8 @@ CALIBRE_ERROR_FLAG = "<*ERROR*>"
 # 书籍来源
 META_SOURCE_GOOGLE = "google"
 META_SOURCE_AMAZON = "amazon"
+META_SOURCE_EDELWEISS = "edelweiss"
 META_SOURCE_XHSD = "xinhua"
-META_SOURCE_DOUBAN = "douban"
 META_SOURCE_BAIDU = "baidu"
 META_SOURCE_AI = "ai"
 META_SOURCE_BIQUGE = "biquge"
@@ -36,8 +36,13 @@ META_SOURCE_BOOKSOURCE = "booksource"
 BOOK_TYPE_EBOOK = "ebook"
 BOOK_TYPE_PHYSICAL = "physical"
 
+# 媒体内容分类。PDF 和尚未重新分析的既有书籍保留 unknown。
+MEDIA_TYPE_UNKNOWN = "unknown"
+MEDIA_TYPE_EBOOK = "ebook"
+MEDIA_TYPE_COMIC = "comic"
+
 # 支持的电子书格式
-SUPPORTED_EBOOK_FORMATS = ["azw3", "epub", "mobi", "pdf", "txt", "azw"]
+SUPPORTED_EBOOK_FORMATS = ["azw3", "epub", "mobi", "pdf", "txt", "azw", "cbz", "zip", "cbr", "rar"]
 
 # 配置键名
 META_SELECTED_SOURCES = "META_SELECTED_SOURCES"

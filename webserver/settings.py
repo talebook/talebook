@@ -28,6 +28,9 @@ settings = {
     "extract_path"  : "/data/books/extract/",
     "with_library"  : "/data/books/library/",
     "cookie_secret" : "cookie_secret",
+    # Independent encryption key for plugin credentials. When empty, the runtime
+    # accepts only a non-default cookie_secret as compatible key material.
+    "PLUGIN_SECRET_KEY": "",
     "cookie_expire" : 7*86400,
     "login_url"     : "/login",
     "user_database" : 'sqlite:////data/books/calibre-webserver.db',
@@ -128,12 +131,9 @@ settings = {
     'smtp_encryption'   : "TLS",
     'smtp_username'     : "sender@talebook.org",
     'smtp_password'     : "password",
-    'douban_apikey'     : "",
-    'douban_baseurl'    : "https://api.douban.com",
-    'douban_max_count'  : 2,
     'auto_fill_meta'    : False,
     'auto_fill_keep_cover': True,
-    'META_SELECTED_SOURCES': ["douban", "baidu", "google", "amazon", "xinhua", "booksource"],
+    'META_SELECTED_SOURCES': ["douban_v2", "baidu", "google", "amazon", "xinhua", "booksource"],
     'ai_api_url'        : "https://api.openai.com/v1/chat/completions",
     'ai_api_key'        : "",
     'ai_model'          : "gpt-3.5-turbo",
@@ -189,7 +189,7 @@ settings = {
     'BOOKSOURCE_HTTP_TIMEOUT': 20,           # 单次请求超时(秒)
     'BOOKSOURCE_MAX_TOC_PAGES': 1000,        # 目录翻页上限（select 分页站点每页仅 20 章，长篇书目录分页可达数百页）
     'BOOKSOURCE_MAX_CONTENT_PAGES': 20,      # 单章正文翻页上限
-    'BOOKSOURCE_MAX_WORKERS': 6,             # 多书源搜索并发数
+    'BOOKSOURCE_MAX_WORKERS': 20,            # 非 Legado 书源搜索并发回退值；Legado 由插件全局配置控制
     'BOOKSOURCE_SEARCH_TIMEOUT': 15,         # 单书源搜索超时(秒)
     'BOOKSOURCE_MAX_SAVE_CHAPTERS': 5000,    # 保存到本地时的最大章节数
     'BOOKSOURCE_RESUME_PENDING_CHECK_ON_START': True,  # 启动时重排"已启用但上次体检未通过"的书源，让失效源被禁用

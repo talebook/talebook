@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import io
 import json
 import unittest
 import urllib.parse
 import warnings
+import zipfile
 from unittest import mock
-from tests.test_main import TestApp, TestWithUserLogin, setUpModule as init, testdir, get_db
+
+from tests.test_main import TestApp, TestWithUserLogin, testdir
+from tests.test_main import setUpModule as init
 
 
 def setUpModule():
@@ -44,6 +48,7 @@ class TestFilenameDecodeFlow(unittest.TestCase):
 
     def _decode(self, filename):
         import urllib.parse
+
         from webserver.handlers.book import decode_filename
         return urllib.parse.unquote(decode_filename(filename))
 
@@ -165,6 +170,36 @@ class TestUploadFormatSecurity(TestWithUserLogin):
         m.return_value = ("fake.pdf", b"MZ\x90\x00" + b"\x00" * 100)
         d = self.json("/api/book/upload", method="POST", body="k=1")
         self.assertEqual(d["err"], "params.format")
+
+    @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
+    def test_upload_zip_with_non_image_content_rejected(self, m):
+        body = io.BytesIO()
+        with zipfile.ZipFile(body, "w") as archive:
+            archive.writestr("payload.txt", "not a comic")
+        m.return_value = ("documents.zip", body.getvalue())
+
+        d = self.json("/api/book/upload", method="POST", body="k=1")
+
+        self.assertEqual(d["err"], "params.format")
+        self.assertIn("只能包含图片", d["msg"])
+
+    @mock.patch("webserver.handlers.book.AutoFillService.auto_fill")
+    @mock.patch("calibre.db.legacy.LibraryDatabase.import_book", return_value=987654)
+    @mock.patch("webserver.models.Item.save", autospec=True)
+    @mock.patch("webserver.handlers.base.BaseHandler.add_msg")
+    @mock.patch("webserver.handlers.base.BaseHandler.user_history")
+    @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
+    def test_upload_image_cbz_persists_comic_classification(self, get_file, _history, _msg, item_save, _import, _fill):
+        body = io.BytesIO()
+        with zipfile.ZipFile(body, "w") as archive:
+            archive.writestr("001.png", b"\x89PNG\r\n\x1a\n" + b"page")
+        get_file.return_value = ("new-comic.cbz", body.getvalue())
+
+        d = self.json("/api/book/upload", method="POST", body="k=1")
+
+        self.assertEqual(d["err"], "ok")
+        saved_item = item_save.call_args.args[0]
+        self.assertEqual(saved_item.media_type, "comic")
 
     @mock.patch("webserver.handlers.book.BookUpload.get_upload_file")
     @mock.patch("webserver.handlers.base.BaseHandler.user_history")
@@ -393,6 +428,7 @@ class TestUploadChunk(TestWithUserLogin):
     def test_complete_preserves_chunks_on_unexpected_merge_error(self, m_import, m_save, m_msg, m_hist):
         """合并分片时出现非预期异常（如磁盘写满）时应保留分片目录，以便用户重试"""
         import os
+
         from webserver.handlers.book import CONF
 
         upload_id = "merge-io-error"
@@ -428,6 +464,7 @@ class TestUploadChunk(TestWithUserLogin):
         """超过TTL未完成的分片目录，应在后续分片请求时被自动清理"""
         import os
         import time
+
         from webserver.handlers.book import CONF
 
         d = self._upload_chunk("stale-upload", 0, 2, b"AAAA")
@@ -519,14 +556,13 @@ class TestCoverUploadSecurity(TestWithUserLogin):
         super().tearDown()
 
     def _upload_cover(self, filename, content_type, data, bid=1):
-        boundary = "----TalebookTestBoundary"
         body = (
             f"------TalebookTestBoundary\r\n"
             f'Content-Disposition: form-data; name="cover"; filename="{filename}"\r\n'
             f"Content-Type: {content_type}\r\n\r\n"
         ).encode() + data + b"\r\n------TalebookTestBoundary--\r\n"
         headers = {
-            "Content-Type": f"multipart/form-data; boundary=----TalebookTestBoundary"
+            "Content-Type": "multipart/form-data; boundary=----TalebookTestBoundary"
         }
         rsp = self.fetch(
             f"/api/book/{bid}/edit", method="POST", body=body, headers=headers
@@ -634,6 +670,14 @@ class TestProxyImageHandlerSSRF(TestApp):
 class TestProxyImageWhitelist(unittest.TestCase):
     """ProxyImageHandler.is_whitelist 修复验证（直接测试 files.py 中的实现）"""
 
+    PROVIDER_HOSTS = {
+        "talebook.meta.baike": {"bcebos.com", "bdstatic.com"},
+        "talebook.meta.douban-v2": {"doubanio.com"},
+        "talebook.meta.tomato": {"byteimg.com", "fanqienovel.com"},
+        "talebook.meta.qimao": {"wtzw.com"},
+        "talebook.combo.weread": {"weread.qq.com"},
+    }
+
     def setUp(self):
         from webserver.handlers.files import ProxyImageHandler
         self.handler = ProxyImageHandler.__new__(ProxyImageHandler)
@@ -650,6 +694,9 @@ class TestProxyImageWhitelist(unittest.TestCase):
     def test_builtin_qimao_cover_cdn_allowed(self):
         self.assertTrue(self.handler.is_whitelist("cdn.wtzw.com"))
 
+    def test_weread_cover_cdn_allowed(self):
+        self.assertTrue(self.handler.is_whitelist("cdn.weread.qq.com"))
+
     def test_suffix_bypass_blocked(self):
         """attackerbcebos.com 以 bcebos.com 结尾，但不是合法子域名，必须被拒绝"""
         self.assertFalse(self.handler.is_whitelist("attackerbcebos.com"))
@@ -657,8 +704,41 @@ class TestProxyImageWhitelist(unittest.TestCase):
     def test_suffix_bypass_blocked_douban(self):
         self.assertFalse(self.handler.is_whitelist("evildoubanio.com"))
 
+    def test_suffix_bypass_blocked_weread(self):
+        self.assertFalse(self.handler.is_whitelist("evilweread.qq.com"))
+
     def test_unknown_domain_blocked(self):
         self.assertFalse(self.handler.is_whitelist("evil.com"))
 
     def test_empty_host_blocked(self):
         self.assertFalse(self.handler.is_whitelist(""))
+
+    def test_each_plugin_owns_its_proxy_image_hosts(self):
+        from webserver.services.plugin_runtime import REGISTRY
+
+        for plugin_key, expected_hosts in self.PROVIDER_HOSTS.items():
+            provider = REGISTRY.get(plugin_key)
+            self.assertEqual(set(provider.proxy_image_hosts), expected_hosts, plugin_key)
+
+    def test_registry_matches_provider_hosts_safely(self):
+        from webserver.services.plugin_runtime import REGISTRY
+
+        for hosts in self.PROVIDER_HOSTS.values():
+            for host in hosts:
+                self.assertTrue(REGISTRY.allows_image_proxy_host(host))
+                self.assertTrue(REGISTRY.allows_image_proxy_host("cdn." + host))
+                self.assertTrue(REGISTRY.allows_image_proxy_host(("CDN." + host + ".").upper()))
+                self.assertFalse(REGISTRY.allows_image_proxy_host("evil" + host))
+        self.assertFalse(REGISTRY.allows_image_proxy_host("evil.example"))
+        self.assertFalse(REGISTRY.allows_image_proxy_host(""))
+
+    def test_handler_does_not_hardcode_plugin_hosts(self):
+        import inspect
+
+        from webserver.handlers.files import ProxyImageHandler
+
+        source = inspect.getsource(ProxyImageHandler)
+        self.assertIn("REGISTRY.allows_image_proxy_host(host)", source)
+        for hosts in self.PROVIDER_HOSTS.values():
+            for host in hosts:
+                self.assertNotIn(host, source)

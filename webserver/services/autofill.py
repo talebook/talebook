@@ -4,28 +4,18 @@
 import logging
 import re
 import time
-import traceback
 
 from webserver import loader, utils
-from webserver.constants import (
-    META_SELECTED_SOURCES,
-    META_SOURCE_AI,
-    META_SOURCE_AMAZON,
-    META_SOURCE_BAIDU,
-    META_SOURCE_DOUBAN,
-    META_SOURCE_DOUBAN_V2,
-    META_SOURCE_GOOGLE,
-    META_SOURCE_NEODB,
-)
 from webserver.i18n import _
-from webserver.plugins.meta import baike, douban, douban_v2, neodb
-from webserver.plugins.meta.ai.api import AIBookApi
-from webserver.plugins.meta.calibre.api import CalibreMetadataApi
+from webserver.plugins.meta.base import to_calibre_metadata
+from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.services import AsyncService
 from webserver.services.external_index import set_metadata_preserving_external_paths
+from webserver.services.plugin_runtime import PluginRuntime, ensure_runtime_installations
 
 
 CONF = loader.get_settings()
+META_LOOKUP_CAPABILITY = "metadata.lookup"
 
 
 class AutoFillService(AsyncService):
@@ -147,118 +137,59 @@ class AutoFillService(AsyncService):
                 break
         return ts
 
+    # 自动补全按固定优先级串行尝试，命中即返回；这与搜索页并发聚合全部来源不同。
+    # 顺序与参与的来源均沿用插件化之前的行为：xhsd／tomato／qimao 不参与自动补全。
+    AUTOFILL_PRIORITY = (
+        "talebook.meta.douban-v2",
+        "talebook.meta.calibre",
+        "talebook.meta.baike",
+        "talebook.meta.neodb",
+        "talebook.meta.ai",
+    )
+
     def plugin_search_best_book_info(self, mi):
-        sources = CONF.get(META_SELECTED_SOURCES, [])
-        if not sources:
-            return None
-
+        ensure_runtime_installations(self.session, CONF)
         title = re.sub("[(（].*", "", mi.title)
-        book = None
-        books = []
+        query = MetadataQuery(
+            title=title,
+            isbn=mi.isbn or "",
+            publisher=getattr(mi, "publisher", "") or "",
+            authors=tuple(getattr(mi, "authors", None) or ()),
+        )
+        runtime = PluginRuntime(self.session, CONF)
+        connections = runtime.connections_for(META_LOOKUP_CAPABILITY)
+        units, failures = runtime.prepare_read(connections, timeout=30)
+        for connection_id, error in failures.items():
+            logging.warning("自动补全插件连接 %s 不可用：%s", connection_id, error)
+        units_by_plugin = {unit["plugin_key"]: unit for unit in units}
 
-        # 1. 豆瓣查询 ISBN
-        if META_SOURCE_DOUBAN in sources:
+        for plugin_id in self.AUTOFILL_PRIORITY:
+            unit = units_by_plugin.get(plugin_id)
+            if unit is None:
+                continue
             try:
-                api = douban.DoubanBookApi(
-                    CONF["douban_apikey"],
-                    CONF["douban_baseurl"],
-                    copy_image=True,
-                    manual_select=False,
-                    maxCount=CONF["douban_max_count"],
-                )
-                book = api.get_book_by_isbn(mi.isbn)
-                if book:
-                    book_detail_mi = api.get_book_detail(book)
-                    if book_detail_mi:
-                        if not book_detail_mi.authors or book_detail_mi.authors[0] in ("佚名", ""):
-                            book_detail_mi.authors = mi.authors
-                            book_detail_mi.author_sort = mi.author_sort
-                    return book_detail_mi
-
-                # 2. 豆瓣查询 title
-                books = api.search_books(title)
-                if books:
-                    book_detail_mi = None
-                    for b in books:
-                        if mi.title == b.get("title") and mi.publisher == b.get("publisher"):
-                            book_detail_mi = api.get_book_detail(b)
-                            break
-                    if not book_detail_mi:
-                        book_detail_mi = api.get_book_detail(books[0])
-                    if book_detail_mi:
-                        if not book_detail_mi.authors or book_detail_mi.authors[0] in ("佚名", ""):
-                            book_detail_mi.authors = mi.authors
-                            book_detail_mi.author_sort = mi.author_sort
-                    return book_detail_mi
-            except Exception:
-                logging.error(_("douban 接口查询 %s 失败"), title)
-
-        # 2.5. 豆瓣V2 查询
-        if META_SOURCE_DOUBAN_V2 in sources:
-            try:
-                plugin = douban_v2.DoubanV2MetaPlugin()
-                book = plugin.search_best(mi)
-                if book:
-                    return book
-            except Exception:
-                logging.error(_("douban_v2 接口查询 %s 失败"), title)
-
-        # 3 & 4. 使用 Google Books 和 Amazon.com 查询
-        calibre_sources = [s for s in sources if s in (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)]
-        if calibre_sources:
-            try:
-                if META_SOURCE_AMAZON not in calibre_sources:
-                    # 只有在没有 amazon 时才使用 google 查询
-                    try:
-                        results = CalibreMetadataApi.get_book_by_isbn(mi.isbn, sources=calibre_sources)
-                        if results:
-                            return results[0]
-                    except Exception:
-                        logging.error(_("calibre 插件 ISBN 查询 %s 失败"), title)
-
-                results = CalibreMetadataApi.get_book_by_title(title, authors=mi.authors, sources=calibre_sources)
-                if results:
-                    result = results[0]
-                    result.cover_data = CalibreMetadataApi.get_cover(result.cover_url) if result.cover_url else None
-                    return result
-            except Exception as e:
-                logging.error(_("calibre 插件书名查询 %s 失败：%s"), title, e)
-                logging.error(traceback.format_exc())
-
-        # 5. 百度百科查询
-        if META_SOURCE_BAIDU in sources:
-            api = baike.BaiduBaikeApi(copy_image=True)
-            try:
-                book = api.get_book(title)
-                if book:
-                    return book
-            except Exception:
-                logging.error(_("baidu 接口查询 %s 失败"), title)
-
-        # 5.5 NeoDB 查询
-        if META_SOURCE_NEODB in sources:
-            try:
-                plugin = neodb.NeodbMetaPlugin()
-                book = plugin.search_best(mi)
-                if book:
-                    return book
-            except Exception:
-                logging.error(_("neodb 接口查询 %s 失败"), title)
-
-        # 6. AI 查询
-        if META_SOURCE_AI in sources:
-            try:
-                api = AIBookApi(
-                    api_url=CONF.get("ai_api_url", "https://api.openai.com/v1/chat/completions"),
-                    api_key=CONF.get("ai_api_key", ""),
-                    model=CONF.get("ai_model", "gpt-3.5-turbo"),
-                    use_thinking=CONF.get("ai_use_thinking", False),
-                    copy_image=True,
-                )
-                book = api.get_book(title, mi.authors[0] if mi.authors else None)
-                if book:
-                    return book
-            except Exception as e:
-                logging.error(_("AI 接口查询 %s 失败: %s"), title, e)
-
+                records = unit["call"]("search_books", query) or []
+            except Exception as err:
+                logging.error(_("元数据插件 %s 查询 %s 失败：%s"), plugin_id, title, err)
+                continue
+            book = self._best_candidate(records, mi, unit["call"])
+            if book is not None:
+                return book
         return None
+
+    def _best_candidate(self, records, mi, call):
+        """标题完全匹配优先，否则取首个候选；封面按需补齐。
+
+        这段挑选逻辑此前重复实现在 douban_v2 与 neodb 的 search_best() 里，
+        属于与来源无关的通用规则，因此上移到平台，避免每个来源各写一遍。
+        """
+        candidates = [c for c in (to_calibre_metadata(record) for record in records) if c is not None]
+        if not candidates:
+            return None
+        best = next((c for c in candidates if getattr(c, "title", None) == mi.title), candidates[0])
+        if not getattr(best, "cover_data", None) and getattr(best, "cover_url", ""):
+            try:
+                best.cover_data = call("get_cover", best.cover_url)
+            except Exception:
+                best.cover_data = None
+        return best

@@ -67,6 +67,25 @@ class TestBookSourceAdmin(TestWithAdminUser):
         d = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))
         self.assertEqual(d["err"], "params.exist")
 
+    def test_export_legado_json_uses_current_state_and_stable_order(self):
+        first_id = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))["id"]
+        weighted = dict(CSS_SOURCE, bookSourceName="高权重源", bookSourceUrl="https://weighted.example.com", weight=50)
+        self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": weighted}))
+        self.json(
+            "/api/admin/booksource/toggle",
+            method="POST",
+            body=json.dumps({"id": first_id, "enabled": False}),
+        )
+
+        d = self.json("/api/admin/booksource/export")
+
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual([source["bookSourceName"] for source in d["sources"]], ["高权重源", "测试源"])
+        self.assertEqual(d["sources"][0]["ruleSearch"], CSS_SOURCE["ruleSearch"])
+        self.assertEqual(d["sources"][0]["weight"], 50)
+        self.assertFalse(d["sources"][1]["enabled"])
+        self.assertEqual(d["sources"][1]["bookSourceGroup"], "测试")
+
     @mock.patch("webserver.handlers.booksource_admin.schedule_source_checks")
     @mock.patch("webserver.handlers.booksource_admin.validate_source_raw")
     def test_import_array_queues_checks(self, m_check, m_schedule):

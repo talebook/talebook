@@ -2,19 +2,24 @@
 # -*- coding: UTF-8 -*-
 import logging
 import re
-from html import unescape
+import urllib.parse
+from html.parser import HTMLParser
 
 import requests
 
 from webserver.constants import CHROME_MOBILE_HEADERS
 from webserver.i18n import _
-from webserver.plugins.meta.douban import str2date
+from webserver.plugins.meta.common import str2date
+from webserver.plugins.runtime.safe_http import SafeHttpClient
 
 BAIKE_ISBN = "0000000000001"
+from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+
 KEY = "BaiduBaike"
 BAIKE_ENDPOINT = "https://baike.baidu.com/api/openapi/BaikeLemmaCardApi"
 BAIKE_TIMEOUT = 15
 BAIKE_ATTEMPTS = 3
+BAIKE_COVER_HOST = "bkimg.cdn.bcebos.com"
 
 _BOOK_CARD_FIELDS = {
     "ISBN",
@@ -27,6 +32,40 @@ _BOOK_CARD_FIELDS = {
     "首版时间",
     "文学体裁",
 }
+
+
+class _CardTextParser(HTMLParser):
+    """线性提取百科卡片中的文本，避免在远端 HTML 上运行回溯正则。"""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+
+def _strip_card_markup(value):
+    parser = _CardTextParser()
+    parser.feed(str(value))
+    parser.close()
+    return "".join(parser.parts)
+
+
+def _trusted_cover_url(value):
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+    except (TypeError, ValueError):
+        return None
+    if parsed.scheme.lower() != "https" or parsed.hostname != BAIKE_COVER_HOST:
+        return None
+    if parsed.username or parsed.password or port not in (None, 443):
+        return None
+    suffix = "/" + parsed.path.lstrip("/")
+    if parsed.query:
+        suffix += "?" + parsed.query
+    return "https://bkimg.cdn.bcebos.com" + suffix
 
 
 class BaiduBaikeApi:
@@ -87,7 +126,7 @@ class BaiduBaikeApi:
                 values = value if isinstance(value, list) else [value]
                 clean_values = []
                 for raw_value in values:
-                    text = unescape(re.sub(r"<[^>]+>", "", str(raw_value))).strip()
+                    text = _strip_card_markup(raw_value).strip()
                     if text:
                         clean_values.append(text)
                 if clean_values:
@@ -160,12 +199,21 @@ class BaiduBaikeApi:
     def get_cover(cover_url, normal_cover=True):
         if not cover_url:
             return None
-        # 检测 cover_url 的有效性，只支持 https 协议
-        if not cover_url.lower().startswith("https://"):
+        trusted_url = _trusted_cover_url(cover_url)
+        if not trusted_url:
             logging.error("Invalid cover url: %s", cover_url)
             return None
-        img = requests.get(cover_url, timeout=10, headers=CHROME_MOBILE_HEADERS).content
-        img_fmt = "jpg" if cover_url.lower().endswith(".jpeg") else "png"
+        try:
+            img = (
+                SafeHttpClient(allowed_hosts=(BAIKE_COVER_HOST,))
+                .get(trusted_url, timeout=10, headers=CHROME_MOBILE_HEADERS)
+                .content
+            )
+        except Exception as err:
+            logging.error("Failed to download Baidu Baike cover: %s", err)
+            return None
+        cover_path = urllib.parse.urlsplit(trusted_url).path.lower()
+        img_fmt = "jpg" if cover_path.endswith((".jpg", ".jpeg")) else "png"
         # Convert PNG to JPEG if necessary
         if img_fmt == "png":
             from PIL import Image
@@ -203,3 +251,32 @@ if __name__ == "__main__":
     api = BaiduBaikeApi()
     print(api.get_book("法神重生"))
     print(api.get_book("东周列国志"))
+
+
+class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
+    legacy_sources = ("baidu",)
+    proxy_image_hosts = ("bcebos.com", "bdstatic.com")
+    manifest = meta_manifest(
+        "talebook.meta.baike",
+        "百度百科",
+        "从百度百科词条提取书籍简介、作者与出版信息。",
+        "mdi-book-information-variant",
+        "https://baike.baidu.com/",
+        brand_icon="/images/plugin-icons/baidu-baike.ico",
+    )
+
+    def __init__(self):
+        super().__init__(copy_image=False)
+
+    def _search(self, query, context):
+        mi = self.get_book(query.title, query.authors[0] if query.authors else None)
+        return [mi] if mi else []
+
+    def _fetch(self, external_id, context):
+        return self.get_book(external_id, expected_id=external_id)
+
+    def get_cover(self, cover_url, context=None):
+        return BaiduBaikeApi.get_cover(cover_url)
+
+
+PROVIDER = BaiduBaikeProvider()

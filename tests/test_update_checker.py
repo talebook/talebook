@@ -58,14 +58,39 @@ class TestUpdateChecker(unittest.TestCase):
 
     def test_check_for_updates_does_not_report_same_version_with_v_prefix(self):
         checker = UpdateChecker()
-        checker.current_version = "v26.06.29"
+        checker.current_version = "v26.08.11"
 
-        with self._mock_latest_release("26.06.29"):
+        with self._mock_latest_release("26.08.11"):
             checker.check_for_updates()
 
         self.assertFalse(checker.has_update)
-        self.assertEqual(checker.latest_version, "26.06.29")
+        self.assertEqual(checker.latest_version, "26.08.11")
         self.assertIsNone(checker.check_error)
+
+    def test_notify_admins_hides_same_version_notification_after_upgrade(self):
+        checker = UpdateChecker()
+        checker.current_version = "v26.08.11"
+        checker.latest_version = "26.08.11"
+        checker.has_update = False
+
+        admin = mock.Mock(id=1, username="admin")
+        existing = mock.Mock(
+            data={update_checker.UPDATE_NOTIFY_VERSION_KEY: "26.08.11"},
+            unread=True,
+        )
+        admin_query = mock.Mock()
+        admin_query.filter.return_value.all.return_value = [admin]
+        message_query = mock.Mock()
+        message_query.filter.return_value.first.return_value = existing
+        session = mock.Mock()
+        session.query.side_effect = [admin_query, message_query]
+        checker.set_session_maker(mock.Mock(return_value=session))
+
+        checker._notify_admins()
+
+        self.assertFalse(existing.unread)
+        session.commit.assert_called_once_with()
+        session.close.assert_called_once_with()
 
     def test_check_for_updates_reports_only_newer_latest_release(self):
         checker = UpdateChecker()
