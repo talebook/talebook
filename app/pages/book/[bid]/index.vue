@@ -1732,6 +1732,10 @@ onMounted(async () => {
     align-items: center;
 }
 
+.book-facts__row--state + .book-facts__row--state {
+    margin-top: 10px;
+}
+
 .book-state-control {
     display: grid;
     grid-template-columns: 112px minmax(0, 1fr);
@@ -1854,6 +1858,10 @@ onMounted(async () => {
     .book-facts__row {
         grid-template-columns: minmax(0, 1fr);
         gap: 5px;
+    }
+
+    .book-facts__row--state {
+        row-gap: 15px;
     }
 }
 </style>
