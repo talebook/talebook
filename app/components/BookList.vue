@@ -30,7 +30,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
@@ -42,25 +42,12 @@ const { $backend } = useNuxtApp();
 
 store.setNavbar(true);
 
-const title = ref('');
-const books = ref([]);
-const total = ref(0);
 const page_size = ref(60);
 const page = ref(1);
-const loaded = ref(false);
 
 const loadData = async () => {
-    const fullPath = route.fullPath;
-    loaded.value = false;
     try {
-        const rsp = await $backend(fullPath);
-        if (rsp.err === 'ok') {
-            title.value = rsp.title;
-            books.value = rsp.books || [];
-            total.value = rsp.total || 0;
-            loaded.value = true;
-        }
-        return rsp;
+        return await $backend(route.fullPath);
     } catch (e) {
         console.error(e);
         return { err: 'book_list.load_failed' };
@@ -68,13 +55,20 @@ const loadData = async () => {
 };
 
 // 使用 useAsyncData，它会自动处理异步数据
-useAsyncData(
+const { data: listData } = useAsyncData(
     'book-list-' + route.fullPath,
     () => loadData(),
     {
         watch: [() => route.fullPath] // 自动监听路由变化
     }
 );
+
+// 页面在服务端请求书单后，客户端注水不会再次执行 useAsyncData handler。
+// 渲染状态必须直接来自 Nuxt 序列化的 data，不能只依赖 handler 内修改的局部 ref。
+const loaded = computed(() => listData.value?.err === 'ok');
+const title = computed(() => loaded.value ? listData.value?.title || '' : '');
+const books = computed(() => loaded.value && Array.isArray(listData.value?.books) ? listData.value.books : []);
+const total = computed(() => loaded.value ? Number(listData.value?.total) || 0 : 0);
 
 // Calculate page from query
 if (route.query.start) {
