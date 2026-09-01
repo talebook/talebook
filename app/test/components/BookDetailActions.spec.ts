@@ -77,6 +77,8 @@ describe('BookDetailActions.vue', () => {
     it('renders one canonical reader control per task and emits its actions', async () => {
         const wrapper = mountActions();
 
+        expect(wrapper.get('[data-testid="book-action-section"]').element.tagName).toBe('SECTION');
+        expect(wrapper.find('[data-testid="book-action-section"].v-card').exists()).toBe(false);
         expect(wrapper.findAll('[data-testid="open-online-reader"]')).toHaveLength(1);
         expect(wrapper.findAll('[data-testid="book-action-download"]')).toHaveLength(1);
         expect(wrapper.findAll('[data-testid="book-action-send"]')).toHaveLength(1);

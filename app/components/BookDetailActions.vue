@@ -1,19 +1,19 @@
 <template>
-    <v-card
+    <section
         class="book-actions"
-        variant="outlined"
         data-testid="book-action-section"
+        aria-labelledby="book-actions-title"
     >
-        <v-card-title
+        <h2
+            id="book-actions-title"
             class="book-actions__title"
-            tag="h2"
         >
             <v-icon size="small">
                 mdi-bookmark-outline
             </v-icon>
             <span>{{ t('book.readerActions') }}</span>
-        </v-card-title>
-        <v-card-text>
+        </h2>
+        <div class="book-actions__body">
             <div class="book-actions__grid">
                 <v-btn
                     v-if="book.id > 0 && hasCompatibleFormats"
@@ -120,8 +120,10 @@
                 </v-chip>
             </div>
 
-            <template v-if="book.is_owner">
-                <v-divider class="my-5" />
+            <div
+                v-if="book.is_owner"
+                class="book-actions__owner"
+            >
                 <h3 class="book-actions__subtitle">
                     {{ t('book.ownerActions') }}
                 </h3>
@@ -295,9 +297,9 @@
                         </v-list>
                     </v-menu>
                 </div>
-            </template>
-        </v-card-text>
-    </v-card>
+            </div>
+        </div>
+    </section>
 </template>
 
 <script setup>
@@ -341,11 +343,21 @@ const { t } = useI18n();
 </script>
 
 <style scoped>
+.book-actions {
+    padding: clamp(22px, 3vw, 32px);
+    background: linear-gradient(
+        135deg,
+        rgba(var(--v-theme-primary), .075),
+        rgba(var(--v-theme-primary), .025)
+    );
+    border-radius: 22px;
+}
+
 .book-actions__title {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-bottom: 4px;
+    margin: 0 0 18px;
     font-size: 1.15rem;
     font-weight: 700;
 }
@@ -369,6 +381,10 @@ const { t } = useI18n();
     margin-top: 12px;
 }
 
+.book-actions__owner {
+    margin-top: 28px;
+}
+
 .book-actions__subtitle {
     margin: 0 0 12px;
     color: rgba(var(--v-theme-on-surface), .72);
@@ -382,13 +398,14 @@ const { t } = useI18n();
 }
 
 @media (max-width: 480px) {
+    .book-actions {
+        padding: 20px 14px;
+        border-radius: 16px;
+    }
+
     .book-actions__grid,
     .book-actions__grid--owner {
         grid-template-columns: minmax(0, 1fr);
-    }
-
-    .book-actions :deep(.v-card-text) {
-        padding-inline: 14px;
     }
 }
 </style>

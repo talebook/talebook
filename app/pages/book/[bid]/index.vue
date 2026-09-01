@@ -490,7 +490,7 @@
 
                 <!-- Zone 1: Book title -->
                 <header
-                    class="book-title-block mb-4"
+                    class="book-title-block"
                     data-testid="book-title-section"
                 >
                     <h1 class="book-title">
@@ -499,8 +499,7 @@
                 </header>
 
                 <!-- Zone 2: Cover and metadata -->
-                <v-card
-                    variant="outlined"
+                <section
                     class="book-overview"
                     data-testid="book-metadata-section"
                 >
@@ -534,7 +533,7 @@
                             cols="12"
                             sm="8"
                         >
-                            <v-card-text class="book-metadata">
+                            <div class="book-metadata">
                                 <dl class="book-facts">
                                     <div
                                         v-if="book.authors && book.authors.length > 0"
@@ -610,7 +609,8 @@
                                                 v-for="file in book.files"
                                                 :key="file.format"
                                                 size="small"
-                                                variant="outlined"
+                                                color="blue-grey"
+                                                variant="tonal"
                                             >
                                                 {{ file.format }} · {{ formatFileSize(file.size) }}
                                             </v-chip>
@@ -741,14 +741,14 @@
                                         {{ t('book.addedAt') }}：{{ book.timestamp }}
                                     </span>
                                 </div>
-                            </v-card-text>
+                            </div>
                         </v-col>
                     </v-row>
-                </v-card>
+                </section>
 
                 <!-- Zone 3: Reader and owner actions -->
                 <BookDetailActions
-                    class="mt-4"
+                    class="book-actions-section"
                     :book="book"
                     :reader-path="readerPath"
                     :has-compatible-formats="hasCompatibleFormats"
@@ -777,21 +777,21 @@
                 />
 
                 <!-- Zone 4: Introduction and annotations -->
-                <v-card
-                    variant="outlined"
-                    class="book-introduction mt-4"
+                <section
+                    class="book-introduction"
                     data-testid="book-content-section"
+                    aria-labelledby="book-introduction-title"
                 >
-                    <v-card-title
+                    <h2
+                        id="book-introduction-title"
                         class="book-section-title"
-                        tag="h2"
                     >
                         <v-icon size="small">
                             mdi-text-box-outline
                         </v-icon>
                         <span>{{ t('book.introduction') }}</span>
-                    </v-card-title>
-                    <v-card-text>
+                    </h2>
+                    <div class="book-introduction__body">
                         <div
                             v-if="book.id > 0 && book.comments && book.comments !== '暂无简介'"
                             class="book-comments"
@@ -800,12 +800,12 @@
                         <p v-else-if="book.id > 0">
                             {{ t('book.viewDetails') }}
                         </p>
-                    </v-card-text>
-                </v-card>
+                    </div>
+                </section>
 
                 <AnnotationPanel
                     v-if="book.id > 0 && store.user.is_login"
-                    class="mt-4"
+                    class="book-annotations"
                     :book-id="book.id"
                     hide-when-empty
                     @locate="openAnnotationInReader"
@@ -1560,25 +1560,36 @@ onMounted(async () => {
 
 <style scoped>
 .book-title-block {
-    padding: 4px 0 4px 18px;
-    border-inline-start: 5px solid rgb(var(--v-theme-primary));
+    margin-bottom: clamp(30px, 4vw, 42px);
+    padding: 6px 4px 0;
 }
 
 .book-title {
     margin: 0;
     font-size: clamp(1.9rem, 4vw, 2.8rem);
     font-weight: 750;
+    letter-spacing: -.025em;
     line-height: 1.16;
     overflow-wrap: anywhere;
 }
 
 .book-overview {
+    margin-bottom: clamp(30px, 4vw, 46px);
     overflow: hidden;
 }
 
+.book-actions-section {
+    margin-bottom: clamp(30px, 4vw, 46px);
+}
+
 .book-cover-column {
-    padding: 24px;
-    background: rgba(var(--v-theme-primary), .045);
+    padding: clamp(18px, 2.5vw, 26px);
+    background: linear-gradient(
+        145deg,
+        rgba(var(--v-theme-primary), .075),
+        rgba(var(--v-theme-primary), .025)
+    );
+    border-radius: 22px;
 }
 
 .book-cover-wrap {
@@ -1650,9 +1661,10 @@ onMounted(async () => {
 
 .book-provenance {
     flex-direction: column;
-    padding-top: 16px;
+    padding: 14px 16px;
     color: rgba(var(--v-theme-on-surface), .62);
-    border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+    background: rgba(var(--v-theme-on-surface), .035);
+    border-radius: 12px;
     font-size: .8rem;
     overflow-wrap: anywhere;
 }
@@ -1663,12 +1675,28 @@ onMounted(async () => {
     align-items: flex-start;
 }
 
+.book-introduction {
+    margin-bottom: 28px;
+    padding-inline: clamp(4px, 1vw, 12px);
+}
+
 .book-section-title {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin: 0 0 14px;
     font-size: 1.15rem;
     font-weight: 700;
+}
+
+.book-introduction__body {
+    color: rgba(var(--v-theme-on-surface), .82);
+}
+
+.book-annotations {
+    background: rgba(var(--v-theme-on-surface), .025);
+    border: 0;
+    border-radius: 20px;
 }
 
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */
@@ -1688,8 +1716,14 @@ onMounted(async () => {
 .device-target__network { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,.38fr); gap:12px; }
 
 @media (max-width: 600px) {
+    .book-title-block,
+    .book-overview,
+    .book-actions-section {
+        margin-bottom: 28px;
+    }
+
     .book-title-block {
-        padding-inline-start: 13px;
+        padding-inline: 0;
     }
 
     .book-title {

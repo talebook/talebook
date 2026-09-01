@@ -51,7 +51,7 @@
     <div class="page">
       <header>
         <h1>重构书籍详情页信息与操作布局</h1>
-        <p class="muted">以书名、封面与元数据、唯一操作区、内容与笔记四个稳定区块重建详情页层级，消除重复入口，并让窄屏用户能够完整触达全部操作。</p>
+        <p class="muted">以书名、封面与元数据、唯一操作区、内容与笔记四个稳定区块重建详情页层级，消除重复入口；四区只表达信息层级，不使用黑色描边或割裂式卡片边界。</p>
         <div class="chips" aria-label="方案元信息">
           <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-08-31</span><span class="chip">所属模块：app</span><span class="chip">影响范围：书籍详情页与 E2E</span><span class="chip">需求来源：TB-194</span>
         </div>
@@ -60,12 +60,13 @@
         <section>
           <h2>1. 原始诉求</h2>
           <div class="callout">“当前页面中按钮出现重复，布局混乱，手机模式下按钮展示不完整，需要重构。参考图片分为 4 个区：1. 书名标题；2. 封面 + 元数据（以及上传时间、上传者等等）；3. 操作按钮区（浏览者的阅读、下载等，管理员的写操作按钮）；4. 内容简介、划线笔记等等。”</div>
+          <p>后续反馈明确：参考图仅用于表达分区，不应复刻黑色边框；详情页应通过留白、排版层级和轻量背景形成连续整体。</p>
           <p>现页同时在顶部工具栏和下方卡片提供阅读、下载、发送到设备，在顶部与阅读状态卡片重复提供书架操作；窄屏依赖工具栏折行，操作顺序和分组不稳定。</p>
         </section>
         <section>
           <h2>2. 目标与边界</h2>
           <div class="grid">
-            <article class="box"><h3>目标</h3><ul><li>每个用户操作只有一个可见入口。</li><li>页面按四区顺序呈现，标题只出现一次。</li><li>管理员写操作与读者操作在同一操作区分组。</li><li>320px 起不产生水平溢出，全部操作保持可触达。</li><li>保留当前权限、菜单行为、对话框与后端请求。</li></ul></article>
+            <article class="box"><h3>目标</h3><ul><li>每个用户操作只有一个可见入口。</li><li>页面按四区顺序呈现，标题只出现一次。</li><li>四区不使用黑色描边或独立卡片边界，以留白和轻量背景保持整体感。</li><li>管理员写操作与读者操作在同一操作区分组。</li><li>320px 起不产生水平溢出，全部操作保持可触达。</li><li>保留当前权限、菜单行为、对话框与后端请求。</li></ul></article>
             <article class="box"><h3>非目标</h3><ul><li>不修改 API、权限或数据模型。</li><li>不重做发送、格式转换、元数据同步等对话框。</li><li>不改变在线阅读、漫画、有声书与插件工具的业务条件。</li><li>不新增封面或元数据字段。</li></ul></article>
           </div>
         </section>
@@ -80,8 +81,8 @@
         </section>
         <section>
           <h2>4. 方案</h2>
-          <div class="callout good"><strong>结论：</strong>页面本身拥有唯一的操作区；对话框和业务方法保持原位。删除重复工具栏、下方快捷卡片和独立阅读状态卡片，将其能力汇总成按角色分组的响应式按钮网格。</div>
-          <div class="flow" aria-label="页面四区结构"><div><strong>书名</strong><p>独立 H1，长标题允许自然换行。</p></div><div><strong>封面与元数据</strong><p>封面、作者、出版、格式、评分、标签、上传者与时间。</p></div><div><strong>操作</strong><p>读者主操作优先；拥有者的文件处理与管理菜单随后呈现。</p></div><div><strong>内容</strong><p>内容简介独立成卡；可见批注延续其后。</p></div></div>
+          <div class="callout good"><strong>结论：</strong>页面本身拥有唯一的操作区；对话框和业务方法保持原位。删除重复工具栏、下方快捷卡片和独立阅读状态卡片，将其能力汇总成按角色分组的响应式按钮网格；同时移除四区外框，以连续留白、标题层级和低对比度背景建立分区。</div>
+          <div class="flow" aria-label="页面四区结构"><div><strong>书名</strong><p>独立 H1，长标题允许自然换行。</p></div><div><strong>封面与元数据</strong><p>封面使用轻量底色承托，元数据直接排版，不设外围边框。</p></div><div><strong>操作</strong><p>单一低对比度背景承载读者操作与拥有者菜单，不设描边或阴影。</p></div><div><strong>内容</strong><p>内容简介以标题和正文间距分层；批注外框移除并延续其后。</p></div></div>
           <h3>交互与响应式决策</h3>
           <ul><li>读者组按“阅读 → 下载 → 发送到设备 → 书架/阅读状态 → 有声书”排序，条件不变。</li><li>管理员组继续使用“文件处理”“管理”两个菜单，避免一次铺开危险或低频操作。</li><li>宽屏使用自动填充网格；480px 以下单列，按钮至少 44px 高且占满可用宽度。</li><li>操作区及关键入口加入稳定测试标识，E2E 同时校验唯一性、顺序和窄屏边界。</li></ul>
         </section>
@@ -95,17 +96,17 @@
           <h2>6. 测试计划与结果</h2>
           <div class="table"><table><thead><tr><th>验证层</th><th>实际命令或页面</th><th>验收口径</th><th>结果</th></tr></thead><tbody>
             <tr><td>组件单元</td><td><code>npx vitest run test/components/BookDetailActions.spec.ts</code></td><td>单一操作入口、角色显隐、菜单分组和事件转发。</td><td>4 项通过。</td></tr>
-            <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:8200 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test test/e2e/book-detail.spec.ts</code></td><td>四区顺序、按钮唯一、原有操作与特殊格式行为不回归。</td><td>Chromium 19 项通过，耗时 57.6 秒；测试服务已停止。</td></tr>
+            <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:8200 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test test/e2e/book-detail.spec.ts</code></td><td>四区顺序、无描边边界、按钮唯一、原有操作与特殊格式行为不回归。</td><td>Chromium 20 项通过，耗时 1.0 分钟；测试服务已停止。</td></tr>
             <tr><td>移动端</td><td>Playwright Chromium 390×844 与 320×800</td><td>无水平溢出，操作全部可见且菜单可打开。</td><td>通过；8 个读者/拥有者入口均在视口内，按钮高度 44px，320px 仍无横向溢出。</td></tr>
-            <tr><td>实际渲染</td><td>Chrome DevTools MCP 1.8.0 + 短生命周期 mock/Nuxt：1280×900 浅色、390×844、1280×900 深色</td><td>四区层级、长内容、按钮布局和菜单交互正确。</td><td>通过；桌面四区顺序正确、每项操作仅 1 个入口，移动端 8 个入口均为 328×44px 且文件处理菜单可打开，深色主题标题与操作区可见，所有视口无横向溢出。截图：<code>app/test/e2e/screenshots/20260831-book-detail-desktop.png</code>、<code>app/test/e2e/screenshots/20260831-book-detail-mobile.jpg</code>。该 mock 环境仅用于隔离自测，不作为真实数据体验环境。</td></tr>
+            <tr><td>实际渲染</td><td>生产构建 + Playwright Chromium + 短生命周期 mock：1280×900 与 390×844</td><td>四区以留白和轻量背景组织，无外围黑线、卡片阴影或横向溢出。</td><td>通过；标题、元数据、操作、简介四区的计算样式均为 0px border / none box-shadow，操作区保留低对比度渐变背景，桌面与移动端均无横向溢出。截图：<code>app/test/e2e/screenshots/20260831-book-detail-desktop.png</code>、<code>app/test/e2e/screenshots/20260831-book-detail-mobile.jpg</code>。该 mock 环境仅用于隔离自测，不作为真实数据体验环境。</td></tr>
             <tr><td>键盘与语义</td><td>Playwright Chromium：操作区逐项 Tab、Enter 打开菜单、Escape 关闭</td><td>焦点顺序遵循 DOM，菜单关闭后恢复触发器；标题和封面语义完整。</td><td>通过；Tab 顺序为阅读、下载、发送、书架、阅读状态、有声书、文件处理、管理；菜单可用 Enter 打开、Escape 关闭并恢复焦点；H1/H2/H3 层级与封面 alt 正确。</td></tr>
-            <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>当前工作树相对默认分支无 HIGH / MEDIUM 问题。</td><td>Approve。范围为 0 个提交、4 个已跟踪修改与 3 个未跟踪评审文件；排除 3 张二进制截图。六个界面领域均检查，初审发现的长行正文与区块标题语义已修复，复审无 Introduced / Regression 问题。</td></tr>
+            <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>当前分支及未提交反馈修订相对默认分支无 HIGH / MEDIUM 问题。</td><td>Approve。范围为 1 个提交与 7 个已跟踪反馈修订；排除 2 张二进制截图。六个界面领域均检查，展开书籍详情路由及批注组件消费者，并核对删行中的可访问性信号；生产构建实渲染覆盖 1280×900、390×844 与深色主题，无 Introduced / Regression 问题。</td></tr>
             <tr><td>构建与质量门禁</td><td><code>npm run build</code>、<code>npm run lint</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>构建与相关门禁通过。</td><td>生产构建通过；lint 为 0 error、458 个仓库既有 warning；补丁检查通过；ACTIVE 单文件方案校验 132 项通过。</td></tr>
           </tbody></table></div>
         </section>
         <section>
           <h2>7. 决策记录</h2>
-          <ol><li><strong>2026-08-31：</strong>需求已明确给出四区结构；实现按该结构收敛，不再保留“工具栏 + 快捷卡片”双入口。</li><li><strong>2026-08-31：</strong>读者操作和管理员操作同区分组，不用移动端抽屉隐藏能力，确保窄屏任务可见。</li><li><strong>2026-08-31：</strong>保持所有业务条件与方法不变，本轮只重构信息架构和响应式表现。</li><li><strong>2026-08-31：</strong>interface-review 初审后将操作区和简介标题明确为 H2、拥有者分组保留 H3，为封面补充 alt，并把简介行宽收敛到 75ch；复审通过。</li><li><strong>2026-08-31：</strong>Chrome DevTools MCP 记录到仓库既有的 SSR hydration mismatch；实际浅色、窄屏和深色渲染均无可见错位，相关 E2E 全通过，本次不扩大到 SSR 数据装载重构。</li></ol>
+          <ol><li><strong>2026-08-31：</strong>需求已明确给出四区结构；实现按该结构收敛，不再保留“工具栏 + 快捷卡片”双入口。</li><li><strong>2026-08-31：</strong>读者操作和管理员操作同区分组，不用移动端抽屉隐藏能力，确保窄屏任务可见。</li><li><strong>2026-08-31：</strong>保持所有业务条件与方法不变，本轮只重构信息架构和响应式表现。</li><li><strong>2026-08-31：</strong>interface-review 初审后将操作区和简介标题明确为 H2、拥有者分组保留 H3，为封面补充 alt，并把简介行宽收敛到 75ch；复审通过。</li><li><strong>2026-08-31：</strong>Chrome DevTools MCP 记录到仓库既有的 SSR hydration mismatch；实际浅色、窄屏和深色渲染均无可见错位，相关 E2E 全通过，本次不扩大到 SSR 数据装载重构。</li><li><strong>2026-08-31：</strong>根据反馈明确把参考截图仅视为信息架构示意；移除标题饰线、三个区块外描边、操作区分隔线和批注外框，改为弹性留白、排版层级、封面承托色与操作区低对比度背景。</li></ol>
         </section>
       </main>
       <footer>Talebook internal design · app · ACTIVE · 2026-08-31</footer>

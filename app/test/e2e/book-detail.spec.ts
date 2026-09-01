@@ -80,6 +80,40 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('book-content-section')).toContainText(apiBook.book.comments.slice(0, 20));
     });
 
+    test('uses whitespace and soft surfaces instead of outlined section cards', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+        for (const testId of [
+            'book-title-section',
+            'book-metadata-section',
+            'book-action-section',
+            'book-content-section',
+        ]) {
+            const styles = await page.getByTestId(testId).evaluate((element) => {
+                const computed = getComputedStyle(element);
+                return {
+                    borderTopWidth: computed.borderTopWidth,
+                    borderRightWidth: computed.borderRightWidth,
+                    borderBottomWidth: computed.borderBottomWidth,
+                    borderLeftWidth: computed.borderLeftWidth,
+                    boxShadow: computed.boxShadow,
+                };
+            });
+            expect(styles).toEqual({
+                borderTopWidth: '0px',
+                borderRightWidth: '0px',
+                borderBottomWidth: '0px',
+                borderLeftWidth: '0px',
+                boxShadow: 'none',
+            });
+        }
+
+        await expect(page.locator('.book-annotations')).toHaveCount(1);
+        expect(await page.locator('.book-annotations').evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
+        expect(await page.getByTestId('book-action-section').evaluate(element => getComputedStyle(element).backgroundImage)).toContain('linear-gradient');
+    });
+
     test('keeps every reader and owner action reachable on a narrow mobile viewport', async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.goto(`/book/${bookId}`);
