@@ -60,13 +60,13 @@
         <section>
           <h2>1. 原始诉求</h2>
           <div class="callout">“当前页面中按钮出现重复，布局混乱，手机模式下按钮展示不完整，需要重构。参考图片分为 4 个区：1. 书名标题；2. 封面 + 元数据（以及上传时间、上传者等等）；3. 操作按钮区（浏览者的阅读、下载等，管理员的写操作按钮）；4. 内容简介、划线笔记等等。”</div>
-          <p>后续反馈明确：参考图仅用于表达分区，不应复刻黑色边框；详情页应主要通过留白和排版层级形成连续整体，操作、上传信息及批注区域不使用外层容器底色。</p>
+          <p>后续反馈明确：参考图仅用于表达分区，不应复刻黑色边框；详情页应主要通过留白和排版层级形成连续整体，操作、上传信息及批注区域不使用外层容器底色。最新反馈进一步要求书名下移靠近封面、阅读/书架状态迁入元数据且删除操作区旧入口、简介占满可用宽度。</p>
           <p>现页同时在顶部工具栏和下方卡片提供阅读、下载、发送到设备，在顶部与阅读状态卡片重复提供书架操作；窄屏依赖工具栏折行，操作顺序和分组不稳定。</p>
         </section>
         <section>
           <h2>2. 目标与边界</h2>
           <div class="grid">
-            <article class="box"><h3>目标</h3><ul><li>每个用户操作只有一个可见入口。</li><li>页面按四区顺序呈现，标题只出现一次。</li><li>四区不使用黑色描边或独立卡片边界，以留白和排版层级保持整体感。</li><li>管理员写操作与读者操作在同一操作区分组。</li><li>320px 起不产生水平溢出，全部操作保持可触达。</li><li>保留当前权限、菜单行为、对话框与后端请求。</li></ul></article>
+            <article class="box"><h3>目标</h3><ul><li>每个用户操作只有一个可见入口。</li><li>页面按四区顺序呈现，标题只出现一次。</li><li>四区不使用黑色描边或独立卡片边界，以留白和排版层级保持整体感。</li><li>管理员写操作与读者主操作在同一操作区分组；阅读与书架状态只在元数据区出现。</li><li>简介不设置最大行宽或额外横向 padding。</li><li>320px 起不产生水平溢出，全部操作保持可触达。</li><li>保留当前权限、菜单行为、对话框与后端请求。</li></ul></article>
             <article class="box"><h3>非目标</h3><ul><li>不修改 API、权限或数据模型。</li><li>不重做发送、格式转换、元数据同步等对话框。</li><li>不改变在线阅读、漫画、有声书与插件工具的业务条件。</li><li>不新增封面或元数据字段。</li></ul></article>
           </div>
         </section>
@@ -81,10 +81,10 @@
         </section>
         <section>
           <h2>4. 方案</h2>
-          <div class="callout good"><strong>结论：</strong>页面本身拥有唯一的操作区；对话框和业务方法保持原位。删除重复工具栏、下方快捷卡片和独立阅读状态卡片，将其能力汇总成按角色分组的响应式按钮网格；同时移除四区外框和容器底色，以连续留白与标题层级建立分区。</div>
-          <div class="flow" aria-label="页面四区结构"><div><strong>书名</strong><p>独立 H1，长标题允许自然换行。</p></div><div><strong>封面与元数据</strong><p>封面使用轻量承托色，元数据及上传信息直接排版，不设外围底色。</p></div><div><strong>操作</strong><p>读者操作与拥有者菜单直接排列，由区标题、间距和按钮自身 tonal 色表达层级。</p></div><div><strong>内容</strong><p>内容简介与批注共用第四区，批注只保留单条笔记自身的状态样式。</p></div></div>
+          <div class="callout good"><strong>结论：</strong>页面本身拥有唯一的主操作区；阅读与书架状态则归入元数据，不在操作区保留旧入口。对话框和业务方法保持原位；四区外框和容器底色全部移除，以连续留白与标题层级建立分区。</div>
+          <div class="flow" aria-label="页面四区结构"><div><strong>书名</strong><p>独立 H1，下移并将封面前间距收敛到 26px 内。</p></div><div><strong>封面与元数据</strong><p>元数据增加“想读/在读/已读”阅读状态和独立书架状态及操作，两者切换互不清除。</p></div><div><strong>操作</strong><p>只保留阅读、下载、发送、有声书及拥有者菜单，不重复状态操作。</p></div><div><strong>内容</strong><p>简介取消 75ch 上限和横向 padding，桌面与移动端占满第四区。</p></div></div>
           <h3>交互与响应式决策</h3>
-          <ul><li>读者组按“阅读 → 下载 → 发送到设备 → 书架/阅读状态 → 有声书”排序，条件不变。</li><li>管理员组继续使用“文件处理”“管理”两个菜单，避免一次铺开危险或低频操作。</li><li>宽屏使用自动填充网格；480px 以下单列，按钮至少 44px 高且占满可用宽度。</li><li>操作区及关键入口加入稳定测试标识，E2E 同时校验唯一性、顺序和窄屏边界。</li></ul>
+          <ul><li>元数据区先展示阅读状态及下一状态操作，再展示加入/移除书架；操作区按“阅读 → 下载 → 发送到设备 → 有声书”排序。</li><li>管理员组继续使用“文件处理”“管理”两个菜单，避免一次铺开危险或低频操作。</li><li>宽屏使用自动填充网格；480px 以下单列，包含元数据状态操作在内的按钮至少 44px 高且不超出视口。</li><li>关键入口加入稳定测试标识，E2E 同时校验唯一性、状态切换、简介全宽和窄屏边界。</li></ul>
         </section>
         <section>
           <h2>5. 影响、风险与回滚</h2>
@@ -96,17 +96,17 @@
           <h2>6. 测试计划与结果</h2>
           <div class="table"><table><thead><tr><th>验证层</th><th>实际命令或页面</th><th>验收口径</th><th>结果</th></tr></thead><tbody>
             <tr><td>组件单元</td><td><code>npx vitest run test/components/BookDetailActions.spec.ts</code></td><td>单一操作入口、角色显隐、菜单分组和事件转发。</td><td>4 项通过。</td></tr>
-            <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:8200 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test test/e2e/book-detail.spec.ts</code></td><td>四区顺序、无描边边界、按钮唯一、原有操作与特殊格式行为不回归。</td><td>Chromium 20 项通过，耗时 1.0 分钟；测试服务已停止。</td></tr>
-            <tr><td>移动端</td><td>Playwright Chromium 390×844 与 320×800</td><td>无水平溢出，操作全部可见且菜单可打开。</td><td>通过；8 个读者/拥有者入口均在视口内，按钮高度 44px，320px 仍无横向溢出。</td></tr>
-            <tr><td>实际渲染</td><td>生产构建 + Playwright Chromium + 短生命周期 mock：1280×900 与 390×844</td><td>四区以留白和排版层级组织，无外围黑线、容器底色、卡片阴影或横向溢出。</td><td>通过；标题、元数据、操作、简介四区的计算样式均为 0px border / none box-shadow；操作区、上传信息和批注外层均为 transparent background / 0px border-radius，桌面与移动端均无横向溢出。截图：<code>app/test/e2e/screenshots/20260831-book-detail-desktop.png</code>、<code>app/test/e2e/screenshots/20260831-book-detail-mobile.jpg</code>。该 mock 环境仅用于隔离自测，不作为真实数据体验环境。</td></tr>
-            <tr><td>键盘与语义</td><td>Playwright Chromium：操作区逐项 Tab、Enter 打开菜单、Escape 关闭</td><td>焦点顺序遵循 DOM，菜单关闭后恢复触发器；标题和封面语义完整。</td><td>通过；Tab 顺序为阅读、下载、发送、书架、阅读状态、有声书、文件处理、管理；菜单可用 Enter 打开、Escape 关闭并恢复焦点；H1/H2/H3 层级与封面 alt 正确。</td></tr>
-            <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>当前分支及未提交反馈修订相对默认分支无 HIGH / MEDIUM 问题。</td><td>Approve。范围为 2 个提交与 6 个已跟踪 UX 修订；排除 2 张二进制截图。六个界面领域均检查，展开书籍详情路由及批注组件消费者，并核对删行中的可访问性信号；生产构建实渲染覆盖 1280×900 与 390×844，三处容器均为透明背景、0px 圆角且无边框/阴影，无 Introduced / Regression 问题。</td></tr>
+            <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:8200 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3200 npx playwright test test/e2e/book-detail.spec.ts</code></td><td>四区顺序、状态迁移且无重复、简介全宽、原有操作与特殊格式行为不回归。</td><td>生产构建 Chromium 22 项通过，耗时 30.0 秒；测试服务已停止。</td></tr>
+            <tr><td>移动端</td><td>Playwright Chromium 390×844 与 320×800</td><td>元数据状态操作与主操作全部可见，菜单可打开且无水平溢出。</td><td>通过；2 个元数据状态入口与 6 个读者/拥有者入口均在视口内，按钮至少 44px 高，320px 仍无横向溢出。</td></tr>
+            <tr><td>实际渲染</td><td>生产构建 + Playwright Chromium + 短生命周期 mock：1280×900 与 390×844</td><td>标题靠近封面、状态位于元数据且无旧入口、简介左右无额外留白。</td><td>通过；标题顶部内移分别为 24px / 18px，标题至封面区间距为 25.59px / 16px；简介左右额外间距均为 0px、<code>max-width: none</code>；操作区旧书架/阅读状态入口均为 0，元数据入口各为 1，两个视口均无水平溢出。截图：<code>app/test/e2e/screenshots/20260831-book-detail-desktop.png</code>、<code>app/test/e2e/screenshots/20260831-book-detail-mobile.jpg</code>。</td></tr>
+            <tr><td>键盘与语义</td><td>Playwright Chromium：元数据状态与操作区逐项 Tab、Enter 打开菜单、Escape 关闭</td><td>焦点顺序遵循 DOM，菜单关闭后恢复触发器；标题和封面语义完整。</td><td>通过；状态操作先于阅读、下载、发送、有声书、文件处理、管理；菜单可用 Enter 打开、Escape 关闭并恢复焦点；H1/H2/H3 层级与封面 alt 正确。</td></tr>
+            <tr><td>界面审查</td><td><code>interface-review full working</code></td><td>当前分支及未提交反馈修订相对默认分支无 HIGH / MEDIUM 问题。</td><td>Approve。范围为 3 个提交与 9 个已跟踪反馈修订；排除 2 张二进制截图。六个界面领域均检查，展开书籍详情路由及批注组件消费者，并核对删行中的可访问性信号；生产构建实渲染覆盖 1280×900 与 390×844；核对标题间距、独立状态操作、全宽简介、透明容器及 320px 可达性，无 Introduced / Regression 问题。</td></tr>
             <tr><td>构建与质量门禁</td><td><code>npm run build</code>、<code>npm run lint</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>构建与相关门禁通过。</td><td>生产构建通过；lint 为 0 error、458 个仓库既有 warning；补丁检查通过；ACTIVE 单文件方案校验 134 项通过。</td></tr>
           </tbody></table></div>
         </section>
         <section>
           <h2>7. 决策记录</h2>
-          <ol><li><strong>2026-08-31：</strong>需求已明确给出四区结构；实现按该结构收敛，不再保留“工具栏 + 快捷卡片”双入口。</li><li><strong>2026-08-31：</strong>读者操作和管理员操作同区分组，不用移动端抽屉隐藏能力，确保窄屏任务可见。</li><li><strong>2026-08-31：</strong>保持所有业务条件与方法不变，本轮只重构信息架构和响应式表现。</li><li><strong>2026-08-31：</strong>interface-review 初审后将操作区和简介标题明确为 H2、拥有者分组保留 H3，为封面补充 alt，并把简介行宽收敛到 75ch；复审通过。</li><li><strong>2026-08-31：</strong>Chrome DevTools MCP 记录到仓库既有的 SSR hydration mismatch；实际浅色、窄屏和深色渲染均无可见错位，相关 E2E 全通过，本次不扩大到 SSR 数据装载重构。</li><li><strong>2026-08-31：</strong>根据反馈明确把参考截图仅视为信息架构示意；移除标题饰线、三个区块外描边、操作区分隔线和批注外框，改为弹性留白、排版层级与封面承托色。</li><li><strong>2026-09-01：</strong>UX 复验要求进一步去卡片化：移除操作区整块渐变与圆角、上传信息灰底圆角、批注外层浅灰背景与圆角，保留现有四区间距、按钮主次和移动端单列行为。</li></ol>
+          <ol><li><strong>2026-08-31：</strong>需求已明确给出四区结构；实现按该结构收敛，不再保留“工具栏 + 快捷卡片”双入口。</li><li><strong>2026-08-31：</strong>读者操作和管理员操作同区分组，不用移动端抽屉隐藏能力，确保窄屏任务可见。</li><li><strong>2026-08-31：</strong>保持所有业务条件与方法不变，本轮只重构信息架构和响应式表现。</li><li><strong>2026-08-31：</strong>interface-review 初审后将操作区和简介标题明确为 H2、拥有者分组保留 H3，为封面补充 alt，并把简介行宽收敛到 75ch；复审通过。</li><li><strong>2026-08-31：</strong>Chrome DevTools MCP 记录到仓库既有的 SSR hydration mismatch；实际浅色、窄屏和深色渲染均无可见错位，相关 E2E 全通过，本次不扩大到 SSR 数据装载重构。</li><li><strong>2026-08-31：</strong>根据反馈明确把参考截图仅视为信息架构示意；移除标题饰线、三个区块外描边、操作区分隔线和批注外框，改为弹性留白、排版层级与封面承托色。</li><li><strong>2026-09-01：</strong>UX 复验要求进一步去卡片化：移除操作区整块渐变与圆角、上传信息灰底圆角、批注外层浅灰背景与圆角，保留现有四区间距、按钮主次和移动端单列行为。</li><li><strong>2026-09-01：</strong>按最新反馈将标题下移并收窄封面前间距；把阅读三态与书架状态迁入元数据、删除操作区原入口；用户明确要求简介全宽，因此取消初审采用的 75ch 上限及横向 padding，并用双视口几何断言保证左右额外间距为 0。</li></ol>
         </section>
       </main>
       <footer>Talebook internal design · app · ACTIVE · 2026-08-31</footer>

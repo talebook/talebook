@@ -72,12 +72,84 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('open-online-reader')).toHaveCount(1);
         await expect(page.getByTestId('book-action-download')).toHaveCount(1);
         await expect(page.getByTestId('book-action-send')).toHaveCount(1);
-        await expect(page.getByTestId('book-action-shelf')).toHaveCount(1);
+        await expect(page.getByTestId('metadata-reading-action')).toHaveCount(1);
+        await expect(page.getByTestId('metadata-shelf-action')).toHaveCount(1);
+        await expect(page.getByTestId('book-action-shelf')).toHaveCount(0);
+        await expect(page.getByTestId('book-action-reading-state')).toHaveCount(0);
         await expect(page.getByTestId('book-action-process')).toHaveCount(1);
         await expect(page.getByTestId('book-action-manage')).toHaveCount(1);
         await expect(page.getByTestId('book-metadata-section')).toContainText('上传者');
         await expect(page.getByTestId('book-metadata-section')).toContainText('上传时间');
         await expect(page.getByTestId('book-content-section')).toContainText(apiBook.book.comments.slice(0, 20));
+    });
+
+    test('keeps reading and shelf state in metadata without duplicate action entries', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+        await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
+        await expect(page.getByTestId('metadata-reading-action')).toContainText('设为在读');
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
+        await expect(page.getByTestId('metadata-shelf-action')).toContainText('加入书架');
+        await expect(page.getByTestId('book-action-shelf')).toHaveCount(0);
+        await expect(page.getByTestId('book-action-reading-state')).toHaveCount(0);
+
+        await page.getByTestId('metadata-shelf-action').click();
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveText('已加入书架');
+        await expect(page.getByTestId('metadata-shelf-action')).toContainText('移除书架');
+
+        await page.getByTestId('metadata-reading-action').click();
+        await expect(page.getByTestId('metadata-reading-status')).toHaveText('在读');
+        await expect(page.getByTestId('metadata-reading-action')).toContainText('标记读完');
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveText('已加入书架');
+
+        await page.getByTestId('metadata-reading-action').click();
+        await expect(page.getByTestId('metadata-reading-status')).toHaveText('已读');
+        await expect(page.getByTestId('metadata-reading-action')).toContainText('设为想读');
+
+        await page.getByTestId('metadata-reading-action').click();
+        await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
+    });
+
+    test('aligns the title with the cover and lets the introduction use the full width', async ({ page }) => {
+        await page.goto(`/book/${bookId}`);
+        await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+        const measureLayout = () => page.evaluate(() => {
+            const titleSection = document.querySelector('[data-testid="book-title-section"]');
+            const title = titleSection?.querySelector('h1');
+            const overview = document.querySelector('[data-testid="book-metadata-section"]');
+            const content = document.querySelector('[data-testid="book-content-section"]');
+            const introduction = content?.querySelector('.book-comments');
+            if (!titleSection || !title || !overview || !content || !introduction) return null;
+            const titleSectionRect = titleSection.getBoundingClientRect();
+            const titleRect = title.getBoundingClientRect();
+            const overviewRect = overview.getBoundingClientRect();
+            const contentRect = content.getBoundingClientRect();
+            const introductionRect = introduction.getBoundingClientRect();
+            return {
+                titleTopInset: titleRect.top - titleSectionRect.top,
+                titleToOverviewGap: overviewRect.top - titleSectionRect.bottom,
+                introductionLeftGap: introductionRect.left - contentRect.left,
+                introductionRightGap: contentRect.right - introductionRect.right,
+                introductionMaxWidth: getComputedStyle(introduction).maxWidth,
+            };
+        });
+
+        for (const viewport of [
+            { width: 1280, height: 900 },
+            { width: 390, height: 844 },
+        ]) {
+            await page.setViewportSize(viewport);
+            await page.waitForTimeout(100);
+            const layout = await measureLayout();
+            expect(layout).not.toBeNull();
+            expect(layout!.titleTopInset).toBeGreaterThanOrEqual(16);
+            expect(layout!.titleToOverviewGap).toBeLessThanOrEqual(26);
+            expect(Math.abs(layout!.introductionLeftGap)).toBeLessThanOrEqual(1);
+            expect(Math.abs(layout!.introductionRightGap)).toBeLessThanOrEqual(1);
+            expect(layout!.introductionMaxWidth).toBe('none');
+        }
     });
 
     test('uses whitespace instead of outlined cards or container surfaces', async ({ page }) => {
@@ -140,8 +212,8 @@ test.describe('Book Detail Page', () => {
             'open-online-reader',
             'book-action-download',
             'book-action-send',
-            'book-action-shelf',
-            'book-action-reading-state',
+            'metadata-shelf-action',
+            'metadata-reading-action',
             'open-audiobook',
             'book-action-process',
             'book-action-manage',
@@ -154,6 +226,7 @@ test.describe('Book Detail Page', () => {
             expect(bounds).not.toBeNull();
             expect(bounds!.x).toBeGreaterThanOrEqual(0);
             expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(390);
+            expect(bounds!.height).toBeGreaterThanOrEqual(44);
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
@@ -174,6 +247,7 @@ test.describe('Book Detail Page', () => {
             expect(bounds).not.toBeNull();
             expect(bounds!.x).toBeGreaterThanOrEqual(0);
             expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+            expect(bounds!.height).toBeGreaterThanOrEqual(44);
         }
     });
 

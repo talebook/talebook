@@ -53,14 +53,6 @@ const mountActions = (props = {}) => {
             readerPath: '/read/1',
             hasCompatibleFormats: true,
             canSaveMetadata: true,
-            isLoggedIn: true,
-            isInShelf: false,
-            readingState: 0,
-            readingStateText: {
-                label: 'book.setAsReading',
-                icon: 'mdi-book-open-outline',
-                color: 'primary',
-            },
             ...props,
         },
     });
@@ -82,19 +74,15 @@ describe('BookDetailActions.vue', () => {
         expect(wrapper.findAll('[data-testid="open-online-reader"]')).toHaveLength(1);
         expect(wrapper.findAll('[data-testid="book-action-download"]')).toHaveLength(1);
         expect(wrapper.findAll('[data-testid="book-action-send"]')).toHaveLength(1);
-        expect(wrapper.findAll('[data-testid="book-action-shelf"]')).toHaveLength(1);
-        expect(wrapper.findAll('[data-testid="book-action-reading-state"]')).toHaveLength(1);
         expect(wrapper.findAll('[data-testid="open-audiobook"]')).toHaveLength(1);
+        expect(wrapper.find('[data-testid="book-action-shelf"]').exists()).toBe(false);
+        expect(wrapper.find('[data-testid="book-action-reading-state"]').exists()).toBe(false);
 
         await wrapper.get('[data-testid="book-action-download"]').trigger('click');
         await wrapper.get('[data-testid="book-action-send"]').trigger('click');
-        await wrapper.get('[data-testid="book-action-shelf"]').trigger('click');
-        await wrapper.get('[data-testid="book-action-reading-state"]').trigger('click');
 
         expect(wrapper.emitted('download')).toHaveLength(1);
         expect(wrapper.emitted('send-to-device')).toHaveLength(1);
-        expect(wrapper.emitted('toggle-shelf')).toHaveLength(1);
-        expect(wrapper.emitted('change-reading-state')).toHaveLength(1);
     });
 
     it('groups owner menus without hiding the primary reader controls', async () => {
@@ -110,16 +98,13 @@ describe('BookDetailActions.vue', () => {
         expect(document.body.textContent).toContain('book.uploadNewFormat');
     });
 
-    it('hides owner and account actions when the visitor lacks those capabilities', () => {
+    it('hides owner actions when the visitor lacks those capabilities', () => {
         const wrapper = mountActions({
             book: { ...ownerBook, is_owner: false },
-            isLoggedIn: false,
         });
 
         expect(wrapper.find('[data-testid="book-action-process"]').exists()).toBe(false);
         expect(wrapper.find('[data-testid="book-action-manage"]').exists()).toBe(false);
-        expect(wrapper.find('[data-testid="book-action-shelf"]').exists()).toBe(false);
-        expect(wrapper.find('[data-testid="book-action-reading-state"]').exists()).toBe(false);
         expect(wrapper.get('[data-testid="book-action-download"]').exists()).toBe(true);
         expect(wrapper.get('[data-testid="book-action-send"]').exists()).toBe(true);
     });

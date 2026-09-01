@@ -637,6 +637,79 @@
                                             />
                                         </dd>
                                     </div>
+                                    <div
+                                        v-if="book.id > 0 && store.user.is_login"
+                                        class="book-facts__row"
+                                        data-testid="metadata-reading-row"
+                                    >
+                                        <dt>{{ t('book.readingStatus') }}</dt>
+                                        <dd
+                                            class="book-state-control"
+                                            aria-live="polite"
+                                        >
+                                            <v-chip
+                                                size="small"
+                                                :color="readingStateDisplay.color"
+                                                variant="tonal"
+                                                data-testid="metadata-reading-status"
+                                            >
+                                                <v-icon start>
+                                                    {{ readingStateDisplay.icon }}
+                                                </v-icon>
+                                                {{ readingStateDisplay.label }}
+                                            </v-chip>
+                                            <v-btn
+                                                size="small"
+                                                :color="readingStateText.color"
+                                                variant="text"
+                                                :loading="readingStateLoading"
+                                                data-testid="metadata-reading-action"
+                                                @click="handleReadingStateChange"
+                                            >
+                                                <v-icon start>
+                                                    {{ readingStateText.icon }}
+                                                </v-icon>
+                                                {{ readingStateText.label }}
+                                            </v-btn>
+                                        </dd>
+                                    </div>
+                                    <div
+                                        v-if="book.id > 0 && store.user.is_login"
+                                        class="book-facts__row"
+                                        data-testid="metadata-shelf-row"
+                                    >
+                                        <dt>{{ t('book.shelfStatus') }}</dt>
+                                        <dd
+                                            class="book-state-control"
+                                            aria-live="polite"
+                                        >
+                                            <v-chip
+                                                v-if="isInShelf"
+                                                size="small"
+                                                color="success"
+                                                variant="tonal"
+                                                data-testid="metadata-shelf-status"
+                                            >
+                                                <v-icon start>
+                                                    mdi-bookshelf
+                                                </v-icon>
+                                                {{ t('book.addedToShelf') }}
+                                            </v-chip>
+                                            <v-btn
+                                                size="small"
+                                                :color="isInShelf ? 'orange-darken-2' : 'primary'"
+                                                :variant="isInShelf ? 'text' : 'tonal'"
+                                                :loading="readingStateLoading"
+                                                data-testid="metadata-shelf-action"
+                                                @click="toggleShelf"
+                                            >
+                                                <v-icon start>
+                                                    {{ isInShelf ? 'mdi-bookshelf-minus' : 'mdi-bookshelf-plus' }}
+                                                </v-icon>
+                                                {{ isInShelf ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
+                                            </v-btn>
+                                        </dd>
+                                    </div>
                                 </dl>
 
                                 <div
@@ -756,15 +829,8 @@
                     :has-mixed-media-formats="hasMixedMediaFormats"
                     :book-tool-actions="bookToolActions"
                     :setting-media-type="setting_media_type"
-                    :is-logged-in="store.user.is_login"
-                    :is-in-shelf="isInShelf"
-                    :reading-state="readingState"
-                    :reading-state-loading="readingStateLoading"
-                    :reading-state-text="readingStateText"
                     @download="dialog_download = true"
                     @send-to-device="dialog_send_to_device = true"
-                    @toggle-shelf="toggleShelf"
-                    @change-reading-state="handleReadingStateChange"
                     @save-meta="save_meta_to_file"
                     @convert="show_conversion_dialog"
                     @separate="seperate_book"
@@ -1499,7 +1565,6 @@ const handleReadingStateChange = async () => {
         if (rsp.err === 'ok') {
             readingState.value = newState;
             if (newState === READING_STATE.READING) {
-                isInShelf.value = false;
                 readDays.value = 0;
             }
             if (newState === READING_STATE.FINISHED) {
@@ -1518,11 +1583,24 @@ const handleReadingStateChange = async () => {
     }
 };
 
+const readingStateDisplay = computed(() => {
+    if (readingState.value === READING_STATE.READING) {
+        return { label: t('readingState.reading'), icon: 'mdi-book-open-outline', color: 'primary' };
+    }
+    if (readingState.value === READING_STATE.FINISHED) {
+        return { label: t('readingState.done'), icon: 'mdi-check-circle-outline', color: 'success' };
+    }
+    return { label: t('book.wantToReadStatus'), icon: 'mdi-bookmark-outline', color: 'blue-grey' };
+});
+
 const readingStateText = computed(() => {
-    if (readingState.value === READING_STATE.UNREAD || readingState.value === READING_STATE.FINISHED) {
+    if (readingState.value === READING_STATE.UNREAD) {
         return { label: t('book.setAsReading'), icon: 'mdi-book-open-outline', color: 'primary' };
     }
-    return { label: t('book.markAsFinished'), icon: 'mdi-check-circle-outline', color: 'success' };
+    if (readingState.value === READING_STATE.READING) {
+        return { label: t('book.markAsFinished'), icon: 'mdi-check-circle-outline', color: 'success' };
+    }
+    return { label: t('book.setAsWantToRead'), icon: 'mdi-bookmark-outline', color: 'primary' };
 });
 
 const readingDaysText = computed(() => {
@@ -1560,8 +1638,8 @@ onMounted(async () => {
 
 <style scoped>
 .book-title-block {
-    margin-bottom: clamp(30px, 4vw, 42px);
-    padding: 6px 4px 0;
+    margin-bottom: clamp(18px, 2vw, 26px);
+    padding: clamp(16px, 2vw, 24px) 4px 0;
 }
 
 .book-title {
@@ -1651,6 +1729,17 @@ onMounted(async () => {
     overflow-wrap: anywhere;
 }
 
+.book-state-control {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.book-state-control :deep(.v-btn) {
+    min-height: 44px;
+}
+
 .book-format-list,
 .tag-chips,
 .book-provenance {
@@ -1674,7 +1763,6 @@ onMounted(async () => {
 
 .book-introduction {
     margin-bottom: 28px;
-    padding-inline: clamp(4px, 1vw, 12px);
 }
 
 .book-section-title {
@@ -1698,7 +1786,6 @@ onMounted(async () => {
 
 /* ponytail: pre-line 保留 \n 段落分隔、折叠多余空格、长行自动换行；不影响 v-html 中的 <br>/<p> 标签。 */
 .book-comments {
-    max-width: 75ch;
     line-height: 1.8;
     overflow-wrap: anywhere;
     white-space: pre-line;
@@ -1713,14 +1800,14 @@ onMounted(async () => {
 .device-target__network { display:grid; grid-template-columns:minmax(0,1fr) minmax(120px,.38fr); gap:12px; }
 
 @media (max-width: 600px) {
-    .book-title-block,
     .book-overview,
     .book-actions-section {
         margin-bottom: 28px;
     }
 
     .book-title-block {
-        padding-inline: 0;
+        margin-bottom: 16px;
+        padding: 18px 0 0;
     }
 
     .book-title {

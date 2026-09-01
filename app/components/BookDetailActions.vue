@@ -66,33 +66,6 @@
                 </v-btn>
 
                 <v-btn
-                    v-if="book.id > 0 && isLoggedIn"
-                    :color="isInShelf ? 'orange' : 'primary'"
-                    variant="tonal"
-                    :loading="readingStateLoading"
-                    data-testid="book-action-shelf"
-                    @click="emit('toggle-shelf')"
-                >
-                    <v-icon start>
-                        mdi-bookshelf
-                    </v-icon>
-                    {{ isInShelf ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
-                </v-btn>
-
-                <v-btn
-                    v-if="book.id > 0 && isLoggedIn"
-                    :color="readingStateText.color"
-                    variant="tonal"
-                    data-testid="book-action-reading-state"
-                    @click="emit('change-reading-state')"
-                >
-                    <v-icon start>
-                        {{ readingStateText.icon }}
-                    </v-icon>
-                    {{ readingStateText.label }}
-                </v-btn>
-
-                <v-btn
                     v-if="book.id > 0 && book.media_type !== 'comic'"
                     color="amber-darken-3"
                     variant="tonal"
@@ -104,20 +77,6 @@
                     </v-icon>
                     {{ t('audiobook.title') }}
                 </v-btn>
-            </div>
-
-            <div
-                v-if="readingState > 0"
-                class="book-actions__status"
-                aria-live="polite"
-            >
-                <v-chip
-                    size="small"
-                    :color="readingState === 1 ? 'blue' : 'grey'"
-                    variant="tonal"
-                >
-                    {{ readingState === 1 ? t('book.currentlyReading') : t('book.alreadyFinished') }}
-                </v-chip>
             </div>
 
             <div
@@ -313,21 +272,11 @@ defineProps({
     hasMixedMediaFormats: { type: Boolean, default: false },
     bookToolActions: { type: Array, default: () => [] },
     settingMediaType: { type: Boolean, default: false },
-    isLoggedIn: { type: Boolean, default: false },
-    isInShelf: { type: Boolean, default: false },
-    readingState: { type: Number, default: 0 },
-    readingStateLoading: { type: Boolean, default: false },
-    readingStateText: {
-        type: Object,
-        default: () => ({ label: '', icon: '', color: 'primary' }),
-    },
 });
 
 const emit = defineEmits([
     'download',
     'send-to-device',
-    'toggle-shelf',
-    'change-reading-state',
     'save-meta',
     'convert',
     'separate',
@@ -366,13 +315,6 @@ const { t } = useI18n();
     min-height: 44px;
     width: 100%;
     min-width: 0;
-}
-
-.book-actions__status {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 12px;
 }
 
 .book-actions__owner {
