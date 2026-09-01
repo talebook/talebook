@@ -43,18 +43,38 @@ class SearchTaskService:
         self._tasks = {}
         self._lock = threading.Lock()
         self._executor = None
-        self._max_workers = 10
+        self._executor_lock = threading.Lock()
+        self._max_workers = 20
 
     def configure(self, max_workers):
-        self._max_workers = max(1, int(max_workers))
+        """Apply a bounded worker count, including after the first search."""
+        max_workers = max(1, min(100, int(max_workers)))
+        old_executor = None
+        with self._executor_lock:
+            if max_workers == self._max_workers:
+                return
+            self._max_workers = max_workers
+            old_executor, self._executor = self._executor, None
+        if old_executor is not None:
+            # Already submitted jobs keep running on the old pool. New tasks use
+            # the replacement immediately instead of silently keeping stale
+            # concurrency until process restart.
+            old_executor.shutdown(wait=False)
 
-    def _ensure_executor(self):
-        # 线程池惰性初始化，按配置的并发数复用
+    def _ensure_executor_locked(self):
         if self._executor is None:
             self._executor = concurrent.futures.ThreadPoolExecutor(
                 max_workers=self._max_workers, thread_name_prefix="booksearch"
             )
         return self._executor
+
+    def _submit_sources(self, task_id, source_data, key, page, cfg):
+        # Hold the lifecycle lock across all submissions so configure() cannot
+        # shut this pool down between obtaining it and executor.submit().
+        with self._executor_lock:
+            executor = self._ensure_executor_locked()
+            for item in source_data:
+                executor.submit(self._run_one, task_id, item, key, page, cfg)
 
     def create_task(self, key, page, source_data, cfg=None):
         """创建搜索任务并把各源提交到后台线程池，立即返回 task_id。
@@ -98,9 +118,7 @@ class SearchTaskService:
         with self._lock:
             self._tasks[task_id] = task
 
-        executor = self._ensure_executor()
-        for item in source_data:
-            executor.submit(self._run_one, task_id, item, key, page, cfg)
+        self._submit_sources(task_id, source_data, key, page, cfg)
         return {"task_id": task_id, "total": task["total"]}
 
     def _run_one(self, task_id, item, key, page, cfg):

@@ -130,6 +130,39 @@ class TestNetworkLibrary(TestWithUserLogin):
         content = self.json("/api/book-sources/content?source_id=%s&chapter_url=%s" % (Q(source_key), Q("http://x.com/c/1")))
         self.assertIn("正文第一段", content["content"])
 
+    def test_search_uses_legado_global_concurrency(self):
+        self.json("/api/book-sources")
+        session = get_db()
+        connection = (
+            session.query(models.PluginConnection)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .one()
+        )
+        original = dict(connection.config or {})
+        connection.config = {**original, "search_concurrency": 7}
+        session.commit()
+
+        def restore():
+            cleanup = get_db()
+            item = cleanup.get(models.PluginConnection, connection.id)
+            item.config = original
+            cleanup.commit()
+
+        self.addCleanup(restore)
+        with mock.patch("webserver.services.source_catalog.SourceCatalogService.prepare_search", return_value=[]), mock.patch(
+            "webserver.handlers.network_library.SearchTaskService.configure"
+        ) as configure, mock.patch(
+            "webserver.handlers.network_library.SearchTaskService.create_task",
+            return_value={"task_id": "configured", "total": 1},
+        ):
+            result = self.json(
+                "/api/book-sources/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid))
+            )
+
+        self.assertEqual(result["err"], "ok")
+        configure.assert_called_once_with(7)
+
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_search(self, m_session):
         m_session.return_value = self._fake()

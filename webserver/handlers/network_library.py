@@ -83,7 +83,7 @@ class NetworkSearch(NetworkBaseHandler):
 
         source_data = catalog.prepare_search(sources)
         service = SearchTaskService()
-        service.configure(CONF.get("BOOKSOURCE_MAX_WORKERS", 10))
+        service.configure(catalog.search_concurrency(sources))
         task = service.create_task(key, page, source_data, engine_config())
         return {"err": "ok", "mode": mode, **task}
 

@@ -1848,6 +1848,16 @@ const pluginDefinitions = [
     categories: ['sources', 'metadata'],
     capabilities: ['sources.browse', 'sources.search', 'sources.acquire', 'metadata.lookup'],
     actions: ['test'],
+    auth_schema: { type: 'object', properties: {} },
+    config_schema: {
+      type: 'object',
+      properties: {
+        search_result_limit: { type: 'integer', minimum: 1, maximum: 100, default: 5 },
+        search_concurrency: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+        save_concurrency: { type: 'integer', minimum: 1, maximum: 100, default: 10 },
+        private_network_protection: { type: 'boolean', default: true },
+      },
+    },
     permissions: ['books.read', 'books.write', 'network.read'],
     connection_owners: ['instance'],
     ui: { icon: 'mdi-book-cog-outline', manage_route: '/plugins/legado', configuration_mode: 'manager', primary_action: 'open' },
@@ -2265,6 +2275,19 @@ router.get('/api/admin/booksource/export', eventHandler(() => ({
     searchUrl: '/search?key={{key}}',
   }],
 })));
+
+router.post('/api/admin/booksource/import', eventHandler(async (event) => {
+  const body = await readBody(event);
+  return {
+    err: 'ok',
+    added: body?.url ? 1 : 0,
+    updated: 0,
+    skipped: 0,
+    disabled: 0,
+    failed: [],
+    checking: body?.url ? 1 : 0,
+  };
+}));
 
 router.get('/api/admin/booksource/list', eventHandler(() => ({
   err: 'ok',

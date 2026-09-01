@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 """把网络小说抓取并保存到本地书库（导出 txt / epub）。"""
 
+import concurrent.futures
 import logging
 import os
 import re
@@ -11,6 +12,8 @@ import traceback
 from webserver import loader
 from webserver.i18n import _
 from webserver.models import Item, OnlineBookMeta
+from webserver.plugins.source.legado import DEFAULT_SAVE_CONCURRENCY, SAVE_CONCURRENCY_KEY
+from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
 from webserver.services import AsyncService
 from webserver.services.background_service import BackgroundService
 from webserver.services.booksource.engine import FINISHED_KEYWORDS, SERIAL_KEYWORDS
@@ -138,12 +141,17 @@ class SaveOnlineBookService(AsyncService):
         os.makedirs(upload_dir, exist_ok=True)
         fname = "%s-%s.txt" % (_safe_filename(detail.title), int(time.time()))
         txt_path = os.path.join(upload_dir, fname)
+        chapter_reader = catalog.prepare_chapter_reader(source, extra_config={"clean": clean})
+        save_workers = 1
+        if source.plugin_key == LEGADO_PLUGIN_ID:
+            save_workers = (source.connection.config or {}).get(SAVE_CONCURRENCY_KEY, DEFAULT_SAVE_CONCURRENCY)
         assemble_from_chapters(
             detail,
             chapters,
-            lambda chapter: catalog.read(source, "get_chapter", chapter, extra_config={"clean": clean}),
+            chapter_reader,
             txt_path,
             task_id=task_id,
+            max_workers=save_workers,
         )
 
         book_id = self._import_txt(detail, txt_path)
@@ -237,28 +245,88 @@ class SaveOnlineBookService(AsyncService):
         meta.save()
 
 
-def assemble_from_chapters(detail, chapters, get_chapter, txt_path, task_id=None):
-    """通用分章组装：插件只返回章节正文，平台负责进度、部分失败与文件。"""
+def assemble_from_chapters(
+    detail,
+    chapters,
+    get_chapter,
+    txt_path,
+    task_id=None,
+    max_workers=10,
+    max_retries=2,
+):
+    """Fetch chapters concurrently, requeue failures, then preserve TOC order.
+
+    Exceptions, missing ``content`` fields and blank bodies are all failed
+    attempts. Failed chapters are retried only after the current queue drains,
+    so one flaky endpoint cannot monopolize a worker. Partial books retain the
+    historical blank-body fallback; an entirely failed download is rejected.
+    """
     total = len(chapters)
+    if total <= 0:
+        raise RuntimeError(_("未能解析到任何章节，保存终止"))
+    max_workers = max(1, min(100, int(max_workers)))
+    max_retries = max(0, min(5, int(max_retries)))
+    bodies = [""] * total
+    pending = list(range(total))
+    failures = {}
+    completed = 0
+    reported = 0
+
+    for attempt in range(1, max_retries + 2):
+        if not pending:
+            break
+        retry_queue = []
+        workers = min(max_workers, len(pending))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers, thread_name_prefix="booksave") as executor:
+            futures = {executor.submit(get_chapter, chapters[index]): index for index in pending}
+            for future in concurrent.futures.as_completed(futures):
+                index = futures[future]
+                chapter = chapters[index]
+                try:
+                    content = future.result()
+                    if content is None or not hasattr(content, "content"):
+                        raise RuntimeError("chapter response has no content")
+                    body = str(content.content or "")
+                    if not body.strip():
+                        raise RuntimeError("chapter response is empty")
+                except Exception as exc:
+                    failures[index] = exc
+                    retry_queue.append(index)
+                    logging.info(
+                        "save online: chapter attempt %d/%d failed %s: %s",
+                        attempt,
+                        max_retries + 1,
+                        chapter.external_id,
+                        exc,
+                    )
+                else:
+                    bodies[index] = body
+                    failures.pop(index, None)
+                    completed += 1
+                    if task_id and (completed - reported >= 20 or completed == total):
+                        BackgroundService().update_progress(
+                            task_id,
+                            int(completed * 100 / total),
+                            {"total": total, "done": completed},
+                        )
+                        reported = completed
+        pending = sorted(retry_queue)
+
+    if len(failures) == total:
+        raise RuntimeError(_("所有章节下载失败，保存终止"))
+    if failures:
+        logging.warning("save online: %d/%d chapters failed after retries", len(failures), total)
+
     with open(txt_path, "w", encoding="utf-8") as stream:
         author = detail.authors[0] if detail.authors else _("佚名")
         stream.write("%s\n\n作者：%s\n\n" % (detail.title, author))
         if detail.description:
             stream.write("%s\n\n" % detail.description)
         for index, chapter in enumerate(chapters):
-            try:
-                content = get_chapter(chapter)
-                body = content.content
-            except Exception as exc:
-                logging.info("save online: chapter failed %s: %s", chapter.external_id, exc)
-                body = ""
-            stream.write("\n\n%s\n\n%s\n" % (chapter.title, body))
-            if task_id and (index % 20 == 0 or index == total - 1):
-                BackgroundService().update_progress(
-                    task_id,
-                    int((index + 1) * 100 / total),
-                    {"total": total, "done": index + 1},
-                )
+            stream.write("\n\n%s\n\n%s\n" % (chapter.title, bodies[index]))
+
+    if task_id and reported < total:
+        BackgroundService().update_progress(task_id, 100, {"total": total, "done": total})
     return txt_path
 
 

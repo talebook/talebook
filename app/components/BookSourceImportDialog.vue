@@ -107,6 +107,7 @@ const emit = defineEmits(['imported']);
 // 默认书源订阅 URL，预填进输入框供用户直接使用（XIU2/Yuedu 开源书源）
 const DEFAULT_BOOKSOURCE_URL = 'https://cdn.jsdmirror.com/gh/XIU2/Yuedu/shuyuan';
 const BUILTIN_SAMPLE = 'builtin';
+const MIAOGONGZI_SAMPLE_URL = 'https://legado.miaogongzi.org/%E9%98%85%E8%AF%BB%E4%B9%A6%E6%BA%90/sy.json';
 const TICKMAO_SAMPLE_URL = 'https://cdn.jsdmirror.com/gh/tickmao/Novel@master/sources/legado/full.json';
 const SHIDAHUILANG_SAMPLE_URL = 'https://raw.githubusercontent.com/shidahuilang/shuyuan-bak/refs/heads/main/good.json';
 
@@ -117,6 +118,7 @@ const url = ref(DEFAULT_BOOKSOURCE_URL);
 const sampleSource = ref(BUILTIN_SAMPLE);
 const sampleOptions = [
     { title: t('booksource.sampleBuiltIn'), value: BUILTIN_SAMPLE, url: '' },
+    { title: t('booksource.sampleMiaogongzi'), value: MIAOGONGZI_SAMPLE_URL, url: MIAOGONGZI_SAMPLE_URL },
     { title: t('booksource.sampleTickmao'), value: TICKMAO_SAMPLE_URL, url: TICKMAO_SAMPLE_URL },
     { title: t('booksource.sampleShidahuilang'), value: SHIDAHUILANG_SAMPLE_URL, url: SHIDAHUILANG_SAMPLE_URL },
 ];

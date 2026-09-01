@@ -80,6 +80,21 @@ class TestBookSourceMetadataSearch(TestCase):
         self.assertEqual(result.failures[0]["code"], "fetch_failed")
 
     @mock.patch("webserver.services.booksource.metadata.BookSourceEngine")
+    def test_limits_results_from_each_metadata_source(self, engine_cls):
+        source = MetadataSource("builtin:many", "多结果源", {"bookSourceUrl": "https://many.example"})
+        engine_cls.return_value.search.return_value = [
+            BookSummary(name="书%d" % index, author="作者", book_url="https://many.example/book/%d" % index)
+            for index in range(4)
+        ]
+        service = BookSourceMetadataService([source], "secret", config={"BOOKSOURCE_SEARCH_RESULT_LIMIT": 2})
+        service._metadata_from_summary = mock.Mock(side_effect=lambda summary, _source: summary.name)
+
+        result = service.search("书")
+
+        self.assertEqual(result.books, ["书0", "书1"])
+        self.assertEqual(service._metadata_from_summary.call_count, 2)
+
+    @mock.patch("webserver.services.booksource.metadata.BookSourceEngine")
     def test_applies_signed_builtin_result(self, engine_cls):
         engine_cls.return_value.book_info.return_value = BookDetail(
             name="三体",
