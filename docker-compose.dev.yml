@@ -11,7 +11,7 @@ services:
       context: .
       dockerfile: Dockerfile
       target: dev
-    image: talebook/talebook:dev
+    image: ghcr.io/talebook/talebook:dev
     restart: always
     volumes:
       - /tmp/talebook-dev:/data
@@ -26,11 +26,4 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=Asia/Shanghai
-    depends_on:
-      - douban-rs-api
 
-  # optional, for meta plugins
-  # please set "http://douban-rs-api" in settings
-  douban-rs-api:
-    restart: always
-    image: ghcr.io/cxfksword/douban-api-rs

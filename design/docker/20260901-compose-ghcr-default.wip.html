@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Compose 默认使用 GHCR 镜像并取消内置豆瓣元数据服务的内部方案。" />
+    <link rel="icon" href="data:," />
+    <title>收敛 Compose 默认运行依赖 · WIP</title>
+    <style>
+      :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#5d6a7d; --line:#d7e0eb; --accent:#286f6a; --accent-soft:#e6f5f2; --warn:#8b5815; --warn-soft:#fff5df; --red:#9a3f3f; --red-soft:#fdecec; --shadow:0 12px 30px rgba(24,39,63,.08); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(145deg,#fbfdff,var(--bg)); font-family:var(--sans); line-height:1.68; }
+      .skip-link { position:fixed; top:8px; left:8px; z-index:10; padding:8px 12px; color:#fff; background:var(--ink); transform:translateY(-160%); }
+      .skip-link:focus { transform:translateY(0); }
+      a:focus-visible,[tabindex="0"]:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+      .page { width:min(1040px,calc(100vw - 32px)); margin:0 auto; padding:26px 0 56px; }
+      .hero,.card { margin-bottom:18px; padding:28px 30px; background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,46px); line-height:1.15; }
+      h2 { margin:0 0 14px; font-size:22px; }
+      h3 { margin:18px 0 8px; font-size:17px; }
+      p { margin:0 0 12px; }
+      p,li,td { color:#29374a; font-size:14px; }
+      ul,ol { margin:10px 0 0 20px; padding:0; }
+      li+li { margin-top:6px; }
+      code { padding:.1em .34em; background:#eef2f7; border-radius:4px; font-family:var(--mono); font-size:.9em; overflow-wrap:anywhere; }
+      .sub { color:var(--muted); font-size:16px; }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; }
+      .chip { padding:5px 10px; color:#536176; background:#eef2f7; border-radius:999px; font-size:12px; font-weight:700; }
+      .chip.wip { color:var(--warn); background:var(--warn-soft); }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .choice,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:14px; background:#fafbfd; }
+      .choice h3 { margin-top:0; }
+      .callout.warn { border-color:#ecd39e; background:var(--warn-soft); }
+      .callout.good { border-color:#abd8cd; background:var(--accent-soft); }
+      .callout.danger { border-color:#dfb0b0; background:var(--red-soft); }
+      .table-wrap { margin-top:14px; overflow-x:auto; border:1px solid var(--line); border-radius:13px; }
+      table { width:100%; min-width:650px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      th { color:var(--muted); background:#f7f9fc; font-size:12px; }
+      th:last-child,td:last-child { border-right:0; }
+      tr:last-child td { border-bottom:0; }
+      .pending { color:var(--warn); font-weight:800; }
+      footer { color:var(--muted); font-size:12px; text-align:center; }
+      @media(max-width:700px){ .page{width:calc(100vw - 20px);padding-top:10px}.hero,.card{padding:22px 20px;border-radius:15px}.grid{grid-template-columns:1fr} }
+      @media(prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+      @media print{ body{background:#fff}.page{width:100%;padding:0}.hero,.card{box-shadow:none;break-inside:avoid}.skip-link{display:none} }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>收敛 Compose 默认运行依赖</h1>
+        <p class="sub">让生产与开发 Compose 默认从 Talebook 自有 GHCR 拉取镜像，并把可选豆瓣元数据代理从基础拓扑中移出。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip wip">状态：WIP</span>
+          <span class="chip">创建日期：2026-09-01</span>
+          <span class="chip">所属模块：docker</span>
+          <span class="chip">影响范围：Compose / 部署文档</span>
+          <span class="chip">需求来源：用户原话</span>
+        </div>
+      </header>
+      <main id="main-content">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“把 yml 的修改提个PR”</div>
+          <p>工作区已有两份 Compose 修改：默认镜像由 Docker Hub 切到 GHCR，并删除内置的 <code>douban-rs-api</code> 服务及依赖关系。边界核查后，用户确认同步更新仍宣称 Compose 内置该服务的中文文档。</p>
+        </section>
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice"><h3>目标</h3><ul><li><code>docker-compose.yml</code> 默认使用 <code>ghcr.io/talebook/talebook</code>。</li><li>开发 Compose 使用对应的 <code>:dev</code> 标签。</li><li>Talebook 启动不再隐式拉起第三方豆瓣代理。</li><li>使用文档明确豆瓣代理需由用户自行部署。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不停止 Docker Hub 镜像发布。</li><li>不修改 Dockerfile、Makefile、CI 或 Kubernetes 清单。</li><li>不改变 Talebook 内豆瓣插件的配置接口。</li><li>不替用户选择外部代理的部署方式或网络拓扑。</li></ul></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. 现状与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>Talebook 已发布 GHCR 镜像</td><td><code>design/project/20260813-ghcr-image.active.html</code></td><td>Compose 可以消费由本仓库发布的同名 GHCR 镜像。</td></tr>
+                <tr><td>豆瓣代理是可选外部能力</td><td><code>document/README.zh_CN.md</code> 的豆瓣插件配置章节</td><td>从默认 Compose 移除不会删除插件配置入口，但现有内置服务地址说明必须同步修正。</td></tr>
+                <tr><td>两个 Compose 文件均显式依赖第三方服务</td><td><code>docker-compose.yml</code>、<code>docker-compose.dev.yml</code></td><td>需同时移除服务和 <code>depends_on</code>，避免保留失效依赖。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>只调整两份 Compose 的镜像地址和服务拓扑；文档改为说明用户需独立部署豆瓣代理并填写其可达 URL；测试从解析后的 YAML 结构验证契约。</div>
+          <div class="table-wrap" role="region" aria-label="关键决策" tabindex="0">
+            <table>
+              <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>不采用</th></tr></thead>
+              <tbody>
+                <tr><td>默认镜像源</td><td>生产与开发均使用 GHCR</td><td>镜像由同一仓库 workflow 发布，归属和代码托管一致。</td><td>不删除 Docker Hub 发布能力，也不全局替换其他构建用途引用。</td></tr>
+                <tr><td>豆瓣代理</td><td>从默认 Compose 完全移除</td><td>可选第三方能力不应成为 Talebook 基础服务的启动依赖。</td><td>不保留注释服务或 profile，以免继续暗示项目负责其生命周期。</td></tr>
+                <tr><td>文档</td><td>说明独立部署和可达 URL</td><td>避免继续提供已失效的 Compose 服务名。</td><td>不提供唯一容器编排示例，保留用户网络选择。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice"><h3>影响范围</h3><p>新下载或重新应用 Compose 配置的用户将从 GHCR 拉取 Talebook；豆瓣插件用户必须让 Talebook 容器能够访问其独立代理。</p></article>
+            <article class="choice"><h3>保持不变</h3><p>数据卷、端口、环境变量、Talebook 应用行为、既有运行中容器和 Docker Hub 发布契约均不变。</p></article>
+          </div>
+          <div class="callout danger"><strong>主要风险：</strong>GHCR 拉取可用性与用户网络环境相关；依赖 Compose 内置豆瓣代理的部署在重建后会失去该容器。文档提示迁移边界，解析测试防止服务或依赖残留。</div>
+          <div class="callout"><strong>回滚：</strong>恢复两份 Compose 的 Docker Hub 镜像地址、<code>douban-rs-api</code> 服务及 <code>depends_on</code> 即可；不涉及数据迁移。</div>
+        </section>
+        <section class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>实际命令</th><th>预期</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>配置回归</td><td><code>pytest -q tests/test_docker_persistence_config.py</code></td><td>两份 YAML 使用 GHCR、无内置豆瓣服务或依赖，持久化契约不回退。</td><td class="pending">待验证</td></tr>
+                <tr><td>Compose 解析</td><td><code>docker compose -f docker-compose.yml config -q</code> 与开发配置同类命令</td><td>两份配置均可被 Compose 解析。</td><td class="pending">待验证</td></tr>
+                <tr><td>仓库门禁</td><td><code>make check-design</code>、<code>git diff --check</code></td><td>方案结构、单文件资源及空白检查通过。</td><td class="pending">待验证</td></tr>
+                <tr><td>运行验证</td><td>不启动服务</td><td>本次不修改应用运行代码。</td><td class="pending">待说明</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+        <section class="card">
+          <h2>7. 决策记录</h2>
+          <ol>
+            <li><strong>2026-09-01：</strong>用户确认同步更新中文文档，消除 Compose 已移除服务与使用说明之间的冲突。</li>
+            <li><strong>2026-09-01：</strong>改动限于两份 Compose、直接关联文档和回归测试，不扩展修改其他镜像消费方。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · docker · WIP · 2026-09-01</footer>
+    </div>
+  </body>
+</html>
