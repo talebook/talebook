@@ -87,7 +87,7 @@
                     {{ t('book.ownerActions') }}
                 </h3>
                 <div class="book-actions__grid book-actions__grid--owner">
-                    <v-menu location="bottom start">
+                    <v-menu :location-strategy="upwardMenuLocationStrategy">
                         <template #activator="{ props: menuProps }">
                             <v-btn
                                 v-bind="menuProps"
@@ -205,7 +205,7 @@
                         </v-list>
                     </v-menu>
 
-                    <v-menu location="bottom start">
+                    <v-menu :location-strategy="upwardMenuLocationStrategy">
                         <template #activator="{ props: menuProps }">
                             <v-btn
                                 v-bind="menuProps"
@@ -262,6 +262,7 @@
 </template>
 
 <script setup>
+import { nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 defineProps({
@@ -289,6 +290,42 @@ const emit = defineEmits([
 ]);
 
 const { t } = useI18n();
+
+function upwardMenuLocationStrategy(data, _props, contentStyles) {
+    const viewportMargin = 12;
+    const menuOffset = 4;
+
+    const updateLocation = () => {
+        const target = data.target.value;
+        const content = data.contentEl.value;
+        if (!target || !content || Array.isArray(target)) {
+            return;
+        }
+
+        const targetBox = target.getBoundingClientRect();
+        const contentBox = content.getBoundingClientRect();
+        const viewportWidth = document.documentElement.clientWidth;
+        const maxLeft = Math.max(viewportMargin, viewportWidth - contentBox.width - viewportMargin);
+        const left = Math.min(Math.max(targetBox.left, viewportMargin), maxLeft);
+        const availableHeight = Math.max(0, targetBox.top - menuOffset - viewportMargin);
+        const contentHeight = Math.min(Math.max(contentBox.height, content.scrollHeight), availableHeight);
+
+        Object.assign(contentStyles.value, {
+            '--v-overlay-anchor-origin': 'top left',
+            position: 'fixed',
+            top: `${Math.round(targetBox.top - menuOffset - contentHeight)}px`,
+            left: `${Math.round(left)}px`,
+            right: 'auto',
+            minWidth: `${Math.round(targetBox.width)}px`,
+            maxWidth: `${Math.max(0, viewportWidth - viewportMargin * 2)}px`,
+            maxHeight: `${Math.round(availableHeight)}px`,
+            transformOrigin: 'bottom left',
+        });
+    };
+
+    nextTick(updateLocation);
+    return { updateLocation };
+}
 </script>
 
 <style scoped>

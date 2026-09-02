@@ -175,6 +175,8 @@
     "readingStatus": "Reading status",
     "shelfStatus": "Shelf status",
     "wantToReadStatus": "Want to read",
+    "readingStateTooltip": "Add this book to your shelf and mark it as {state}",
+    "readingStateLoginHint": "Sign in to add this book to your shelf and set its reading status.",
     "notAddedToShelf": "Not on shelf",
     "addedToShelf": "Added to shelf",
     "setAsWantToRead": "Set as want to read",

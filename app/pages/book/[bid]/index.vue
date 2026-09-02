@@ -12,6 +12,33 @@
                     @confirm="confirm_conversion"
                 />
 
+                <v-dialog
+                    v-model="showReadingLoginDialog"
+                    max-width="420"
+                >
+                    <v-card data-testid="reading-login-dialog">
+                        <v-card-title>{{ t('messages.pleaseLogin') }}</v-card-title>
+                        <v-card-text>{{ t('book.readingStateLoginHint') }}</v-card-text>
+                        <v-card-actions>
+                            <v-spacer />
+                            <v-btn
+                                variant="text"
+                                @click="showReadingLoginDialog = false"
+                            >
+                                {{ t('common.cancel') }}
+                            </v-btn>
+                            <v-btn
+                                color="primary"
+                                variant="flat"
+                                :to="loginPath"
+                                @click="showReadingLoginDialog = false"
+                            >
+                                {{ t('auth.signIn') }}
+                            </v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-dialog>
+
                 <!-- Send to Device Dialog -->
                 <v-dialog
                     v-model="dialog_send_to_device"
@@ -133,7 +160,7 @@
                     persistent
                     width="300"
                 >
-                    <v-card>
+                    <v-card data-testid="book-download-dialog">
                         <v-card-title>{{ t('book.download') }}</v-card-title>
                         <v-card-text>
                             <v-list v-if="book.files && book.files.length > 0">
@@ -540,11 +567,10 @@
                                         class="book-facts__row"
                                     >
                                         <dt>{{ t('book.field.authors') }}</dt>
-                                        <dd>
+                                        <dd class="book-chip-list">
                                             <v-chip
                                                 v-for="author in book.authors"
                                                 :key="'author-' + author"
-                                                class="mr-2 mb-2"
                                                 size="small"
                                                 color="primary"
                                                 :to="'/author/' + encodeURIComponent(author)"
@@ -563,11 +589,10 @@
                                         data-testid="book-aliases-row"
                                     >
                                         <dt>{{ t('book.alias') }}</dt>
-                                        <dd>
+                                        <dd class="book-chip-list">
                                             <v-chip
                                                 v-for="alias in book.aliases"
                                                 :key="'alias-' + alias"
-                                                class="mr-2 mb-2"
                                                 size="small"
                                                 color="secondary"
                                                 :to="'/search?name=' + encodeURIComponent(alias)"
@@ -577,25 +602,6 @@
                                                     mdi-text-box-outline
                                                 </v-icon>
                                                 {{ alias }}
-                                            </v-chip>
-                                        </dd>
-                                    </div>
-                                    <div
-                                        v-if="book.publisher"
-                                        class="book-facts__row"
-                                    >
-                                        <dt>{{ t('book.publisher') }}</dt>
-                                        <dd>
-                                            <v-chip
-                                                size="small"
-                                                color="primary"
-                                                :to="'/publisher/' + encodeURIComponent(book.publisher)"
-                                                variant="tonal"
-                                            >
-                                                <v-icon start>
-                                                    mdi-domain
-                                                </v-icon>
-                                                {{ book.publisher }}
                                             </v-chip>
                                         </dd>
                                     </div>
@@ -619,34 +625,6 @@
                                         </dd>
                                     </div>
                                     <div class="book-facts__row">
-                                        <dt>{{ t('book.field.pubdate') }}</dt>
-                                        <dd>{{ pub_year }}</dd>
-                                    </div>
-                                    <div
-                                        v-if="book.files && book.files.length > 0"
-                                        class="book-facts__row"
-                                    >
-                                        <dt>{{ t('book.format') }}</dt>
-                                        <dd class="book-format-list">
-                                            <v-chip
-                                                v-for="file in book.files"
-                                                :key="file.format"
-                                                size="small"
-                                                color="blue-grey"
-                                                variant="tonal"
-                                            >
-                                                {{ file.format }} · {{ formatFileSize(file.size) }}
-                                            </v-chip>
-                                        </dd>
-                                    </div>
-                                    <div
-                                        v-if="book.isbn"
-                                        class="book-facts__row"
-                                    >
-                                        <dt>{{ t('book.isbn') }}</dt>
-                                        <dd>{{ book.isbn }}</dd>
-                                    </div>
-                                    <div class="book-facts__row">
                                         <dt>{{ t('book.field.rating') }}</dt>
                                         <dd>
                                             <v-rating
@@ -661,87 +639,175 @@
                                         </dd>
                                     </div>
                                     <div
-                                        v-if="book.id > 0 && store.user.is_login"
+                                        v-if="book.publisher"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.publisher') }}</dt>
+                                        <dd>
+                                            <v-chip
+                                                size="small"
+                                                color="primary"
+                                                :to="'/publisher/' + encodeURIComponent(book.publisher)"
+                                                variant="tonal"
+                                            >
+                                                <v-icon start>
+                                                    mdi-domain
+                                                </v-icon>
+                                                {{ book.publisher }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div class="book-facts__row">
+                                        <dt>{{ t('book.field.pubdate') }}</dt>
+                                        <dd>{{ pub_year }}</dd>
+                                    </div>
+                                    <div
+                                        v-if="book.isbn"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.isbn') }}</dt>
+                                        <dd>{{ book.isbn }}</dd>
+                                    </div>
+                                    <div
+                                        v-if="book.files && book.files.length > 0"
+                                        class="book-facts__row"
+                                    >
+                                        <dt>{{ t('book.format') }}</dt>
+                                        <dd class="book-format-list">
+                                            <v-chip
+                                                v-for="file in book.files"
+                                                :key="file.format"
+                                                size="small"
+                                                color="blue-grey"
+                                                variant="tonal"
+                                                role="button"
+                                                :aria-label="`${t('common.download')} ${file.format}`"
+                                                :data-testid="`book-format-${file.format.toLowerCase()}`"
+                                                @click="dialog_download = true"
+                                            >
+                                                {{ file.format }} · {{ formatFileSize(file.size) }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div
+                                        v-if="bookProvenanceText"
+                                        class="book-facts__row"
+                                        data-testid="book-provenance-row"
+                                    >
+                                        <dt>{{ t('book.addedBy') }}</dt>
+                                        <dd>{{ bookProvenanceText }}</dd>
+                                    </div>
+                                    <div
+                                        v-if="book.id > 0"
                                         class="book-facts__row book-facts__row--state"
                                         data-testid="metadata-reading-row"
                                     >
                                         <dt>{{ t('book.readingStatus') }}</dt>
                                         <dd
-                                            class="book-state-control book-state-control--reading"
-                                            aria-live="polite"
-                                            role="group"
-                                            :aria-label="t('book.readingStatus')"
-                                        >
-                                            <v-chip
-                                                v-for="option in readingStateOptions"
-                                                :key="option.key"
-                                                size="small"
-                                                :color="readingState === option.value ? 'success' : 'blue-grey'"
-                                                :variant="readingState === option.value ? 'tonal' : 'outlined'"
-                                                :disabled="readingStateLoading"
-                                                class="book-reading-tag"
-                                                role="button"
-                                                :aria-pressed="readingState === option.value"
-                                                :data-testid="`metadata-reading-state-${option.key}`"
-                                                @click="setReadingState(option.value)"
-                                            >
-                                                <v-icon
-                                                    v-if="readingState === option.value"
-                                                    start
-                                                >
-                                                    mdi-check
-                                                </v-icon>
-                                                {{ option.label }}
-                                            </v-chip>
-                                        </dd>
-                                    </div>
-                                    <div
-                                        v-if="book.id > 0 && store.user.is_login"
-                                        class="book-facts__row book-facts__row--state"
-                                        data-testid="metadata-shelf-row"
-                                    >
-                                        <dt>{{ t('book.shelfStatus') }}</dt>
-                                        <dd
                                             class="book-state-control"
                                             aria-live="polite"
                                         >
-                                            <v-btn
-                                                v-if="!isInShelf"
-                                                size="small"
-                                                color="primary"
-                                                variant="text"
-                                                :loading="readingStateLoading"
-                                                data-testid="metadata-shelf-action"
-                                                @click="toggleShelf"
+                                            <div
+                                                class="book-reading-state-options"
+                                                role="group"
+                                                :aria-label="t('book.readingStatus')"
+                                                data-testid="metadata-reading-options"
                                             >
-                                                <v-icon start>
-                                                    mdi-plus
-                                                </v-icon>
-                                                {{ t('book.wantToRead') }}
-                                            </v-btn>
-                                            <template v-else>
-                                                <v-chip
-                                                    size="small"
-                                                    color="success"
-                                                    variant="tonal"
-                                                    data-testid="metadata-shelf-status"
+                                                <v-tooltip
+                                                    v-for="option in readingStateOptions"
+                                                    :key="option.key"
+                                                    location="top"
+                                                    :text="option.tooltip"
                                                 >
-                                                    <v-icon start>
-                                                        mdi-check
-                                                    </v-icon>
-                                                    {{ t('book.addedToShelf') }}
-                                                </v-chip>
+                                                    <template #activator="{ props: tooltipProps }">
+                                                        <v-chip
+                                                            v-bind="tooltipProps"
+                                                            class="book-reading-state-option"
+                                                            size="small"
+                                                            role="button"
+                                                            :color="isReadingOptionSelected(option.value) ? 'success' : 'blue-grey'"
+                                                            :variant="isReadingOptionSelected(option.value) ? 'tonal' : 'outlined'"
+                                                            :aria-pressed="isReadingOptionSelected(option.value)"
+                                                            :disabled="readingStateLoading"
+                                                            :data-testid="`metadata-reading-option-${option.key}`"
+                                                            @click="selectReadingOption(option.value)"
+                                                        >
+                                                            <v-icon
+                                                                v-if="isReadingOptionSelected(option.value)"
+                                                                start
+                                                            >
+                                                                mdi-check
+                                                            </v-icon>
+                                                            {{ option.label }}
+                                                        </v-chip>
+                                                    </template>
+                                                </v-tooltip>
+                                            </div>
+                                            <template v-if="store.user.is_login && isInShelf">
+                                                <span
+                                                    class="book-shelf-remove-divider"
+                                                    aria-hidden="true"
+                                                />
                                                 <v-btn
+                                                    class="book-shelf-remove-action"
                                                     size="small"
+                                                    color="grey-darken-1"
                                                     variant="text"
                                                     :loading="readingStateLoading"
-                                                    class="book-shelf-remove"
                                                     data-testid="metadata-shelf-action"
-                                                    @click="toggleShelf"
+                                                    @click="removeFromShelf"
                                                 >
                                                     {{ t('book.removeFromWantToRead') }}
                                                 </v-btn>
                                             </template>
+                                        </dd>
+                                    </div>
+                                    <div
+                                        v-if="hasBookLabels"
+                                        class="book-facts__row book-facts__row--tags"
+                                        data-testid="book-tags-row"
+                                    >
+                                        <dt>{{ t('book.field.tags') }}</dt>
+                                        <dd class="tag-chips">
+                                            <v-chip
+                                                v-if="book.scope === 'private'"
+                                                size="small"
+                                                color="orange"
+                                                variant="flat"
+                                                data-testid="private-scope-chip"
+                                            >
+                                                <v-icon start>
+                                                    mdi-earth-off
+                                                </v-icon>
+                                                {{ t('book.scopePrivate') }}
+                                            </v-chip>
+                                            <template v-for="tag in book.tags">
+                                                <v-chip
+                                                    v-if="tag"
+                                                    :key="'tag-' + tag"
+                                                    size="small"
+                                                    color="primary"
+                                                    :to="'/tag/' + encodeURIComponent(tag)"
+                                                    variant="tonal"
+                                                >
+                                                    <v-icon start>
+                                                        mdi-tag
+                                                    </v-icon>
+                                                    {{ tag }}
+                                                </v-chip>
+                                            </template>
+                                            <v-chip
+                                                v-if="book.media_type && book.media_type !== 'unknown'"
+                                                size="small"
+                                                :color="book.media_type === 'comic' ? 'deep-orange' : 'blue-grey'"
+                                                variant="flat"
+                                                data-testid="media-type-chip"
+                                            >
+                                                <v-icon start>
+                                                    {{ book.media_type === 'comic' ? 'mdi-image-multiple' : 'mdi-book-outline' }}
+                                                </v-icon>
+                                                {{ book.media_type === 'comic' ? t('book.mediaTypeComic') : t('book.mediaTypeEbook') }}
+                                            </v-chip>
                                         </dd>
                                     </div>
                                 </dl>
@@ -764,50 +830,6 @@
                                         {{ completedReadingText }}
                                     </v-chip>
                                 </div>
-                                <div class="tag-chips mt-4">
-                                    <template v-for="tag in book.tags">
-                                        <v-chip
-                                            v-if="tag"
-                                            :key="'tag-' + tag"
-                                            class="mr-2 mb-2"
-                                            size="small"
-                                            color="primary"
-                                            :to="'/tag/' + encodeURIComponent(tag)"
-                                            variant="tonal"
-                                        >
-                                            <v-icon start>
-                                                mdi-tag
-                                            </v-icon>
-                                            {{ tag }}
-                                        </v-chip>
-                                    </template>
-                                    <v-chip
-                                        v-if="book.media_type && book.media_type !== 'unknown'"
-                                        class="mr-2 mb-2"
-                                        size="small"
-                                        :color="book.media_type === 'comic' ? 'deep-orange' : 'blue-grey'"
-                                        variant="flat"
-                                        data-testid="media-type-chip"
-                                    >
-                                        <v-icon start>
-                                            {{ book.media_type === 'comic' ? 'mdi-image-multiple' : 'mdi-book-outline' }}
-                                        </v-icon>
-                                        {{ book.media_type === 'comic' ? t('book.mediaTypeComic') : t('book.mediaTypeEbook') }}
-                                    </v-chip>
-                                    <v-chip
-                                        v-if="book.scope"
-                                        class="mr-2 mb-2"
-                                        size="small"
-                                        :color="book.scope === 'private' ? 'orange' : 'teal'"
-                                        variant="flat"
-                                    >
-                                        <v-icon start>
-                                            {{ book.scope === 'private' ? 'mdi-earth-off' : 'mdi-earth' }}
-                                        </v-icon>
-                                        {{ book.scope === 'private' ? t('book.scopePrivate') : t('book.scopePublic') }}
-                                    </v-chip>
-                                </div>
-
                                 <v-alert
                                     v-if="book.media_type === 'comic' && !hasCompatibleFormats"
                                     type="info"
@@ -819,16 +841,6 @@
                                     {{ t('book.comicReadUnsupportedDescription') }}
                                 </v-alert>
 
-                                <div class="book-provenance mt-4">
-                                    <span v-if="book.collector">
-                                        <v-icon size="small">mdi-account</v-icon>
-                                        {{ t('book.addedBy') }}：{{ book.collector }}
-                                    </span>
-                                    <span v-if="book.timestamp">
-                                        <v-icon size="small">mdi-clock</v-icon>
-                                        {{ t('book.addedAt') }}：{{ book.timestamp }}
-                                    </span>
-                                </div>
                             </div>
                         </v-col>
                     </v-row>
@@ -914,6 +926,11 @@ const router = useRouter();
 const store = useMainStore();
 const { $backend, $backend_stream, $alert } = useNuxtApp();
 const { t } = useI18n();
+const showReadingLoginDialog = ref(false);
+const loginPath = computed(() => ({
+    path: '/login',
+    query: { next: route.fullPath },
+}));
 
 const routeBookId = computed(() => {
     return typeof route.params.bid === 'string' && route.params.bid
@@ -947,6 +964,14 @@ const book = ref({
     media_type_locked: false,
     online_readable: null
 });
+const hasBookLabels = computed(() => (
+    book.value.tags?.some(Boolean)
+    || (book.value.media_type && book.value.media_type !== 'unknown')
+    || book.value.scope === 'private'
+));
+const bookProvenanceText = computed(() => (
+    [book.value.collector, book.value.timestamp].filter(Boolean).join(' @ ')
+));
 const bookToolActions = ref([]);
 
 async function loadBookToolActions(currentBookId, isAdmin) {
@@ -1545,54 +1570,99 @@ const {
     isLogin: computed(() => store.user?.is_login),
     backend: $backend,
 });
+const readingStateOptions = computed(() => [
+    {
+        key: 'wanted',
+        value: READING_STATE.UNREAD,
+        label: t('book.wantToReadStatus'),
+        tooltip: t('book.readingStateTooltip', { state: t('book.wantToReadStatus') }),
+    },
+    {
+        key: 'reading',
+        value: READING_STATE.READING,
+        label: t('readingState.reading'),
+        tooltip: t('book.readingStateTooltip', { state: t('readingState.reading') }),
+    },
+    {
+        key: 'finished',
+        value: READING_STATE.FINISHED,
+        label: t('readingState.done'),
+        tooltip: t('book.readingStateTooltip', { state: t('readingState.done') }),
+    },
+]);
 
-const toggleShelf = async () => {
-    if (readingStateLoading.value) return;
+const isReadingOptionSelected = (state) => (
+    store.user.is_login && isInShelf.value && readingState.value === state
+);
+
+const updateShelf = async (shelf) => {
+    const rsp = await $backend(`/book/${book.value.id}/shelf`, {
+        method: 'POST',
+        body: JSON.stringify({ shelf }),
+    });
+    if (rsp.err !== 'ok') {
+        return false;
+    }
+    isInShelf.value = shelf;
+    return true;
+};
+
+const applyReadingState = async (newState) => {
+    const rsp = await $backend(`/book/${book.value.id}/readstate`, {
+        method: 'POST',
+        body: JSON.stringify({ read_state: newState }),
+    });
+    if (rsp.err !== 'ok') {
+        return false;
+    }
+
+    readingState.value = newState;
+    if (newState === READING_STATE.FINISHED) {
+        lastReadTime.value = new Date().toISOString().slice(0, 10);
+    } else if (newState === READING_STATE.UNREAD) {
+        lastReadTime.value = '';
+    }
+    return true;
+};
+
+const selectReadingOption = async (newState) => {
+    if (!store.user.is_login) {
+        showReadingLoginDialog.value = true;
+        return;
+    }
+    if (readingStateLoading.value || isReadingOptionSelected(newState)) {
+        return;
+    }
+
     readingStateLoading.value = true;
     try {
-        const rsp = await $backend(`/book/${book.value.id}/shelf`, {
-            method: 'POST',
-            body: JSON.stringify({ shelf: !isInShelf.value }),
-        });
-        if (rsp.err === 'ok') {
-            isInShelf.value = !isInShelf.value;
+        if (!isInShelf.value && !await updateShelf(true)) {
+            return;
         }
+        if (readingState.value !== newState) {
+            await applyReadingState(newState);
+        }
+    } catch (e) {
+        console.error('Reading state update error:', e);
+    } finally {
+        readingStateLoading.value = false;
+    }
+};
+
+const removeFromShelf = async () => {
+    if (readingStateLoading.value || !isInShelf.value) {
+        return;
+    }
+
+    readingStateLoading.value = true;
+    try {
+        await updateShelf(false);
     } catch (e) {
         console.error('Shelf error:', e);
     } finally {
         readingStateLoading.value = false;
     }
 };
-
-const setReadingState = async (newState) => {
-    if (readingStateLoading.value || readingState.value === newState) return;
-    readingStateLoading.value = true;
-    try {
-        const rsp = await $backend(`/book/${book.value.id}/readstate`, {
-            method: 'POST',
-            body: JSON.stringify({ read_state: newState }),
-        });
-        if (rsp.err === 'ok') {
-            readingState.value = newState;
-            if (newState === READING_STATE.FINISHED) {
-                lastReadTime.value = new Date().toISOString().slice(0, 10);
-            }
-            if (newState === READING_STATE.UNREAD) {
-                lastReadTime.value = '';
-            }
-        }
-    } catch (e) {
-        console.error('Reading state error:', e);
-    } finally {
-        readingStateLoading.value = false;
-    }
-};
-
-const readingStateOptions = computed(() => [
-    { key: 'unread', value: READING_STATE.UNREAD, label: t('readingState.none') },
-    { key: 'want', value: READING_STATE.READING, label: t('book.wantToReadStatus') },
-    { key: 'finished', value: READING_STATE.FINISHED, label: t('readingState.done') },
-]);
 
 const completedReadingText = computed(() => {
     if (readingState.value !== READING_STATE.FINISHED) return '';
@@ -1626,10 +1696,11 @@ onMounted(async () => {
 
 .book-title {
     margin: 0;
-    font-size: clamp(1.9rem, 4vw, 2.8rem);
-    font-weight: 750;
-    letter-spacing: -.025em;
-    line-height: 1.16;
+    padding-inline-start: 1em;
+    font-size: clamp(1.5rem, 3vw, 1.75rem);
+    font-weight: 700;
+    letter-spacing: -.015em;
+    line-height: 1.2;
     overflow-wrap: anywhere;
 }
 
@@ -1683,20 +1754,21 @@ onMounted(async () => {
 
 .book-metadata {
     min-width: 0;
-    padding: 24px;
+    padding: 8px 24px 24px;
 }
 
 .book-facts {
     display: grid;
-    gap: 12px;
+    gap: 8px;
     margin: 0;
 }
 
 .book-facts__row {
     display: grid;
-    grid-template-columns: minmax(88px, .24fr) minmax(0, 1fr);
-    gap: 14px;
-    align-items: start;
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 8px;
+    min-height: 28px;
+    align-items: center;
 }
 
 .book-facts dt {
@@ -1706,6 +1778,10 @@ onMounted(async () => {
 }
 
 .book-facts dd {
+    display: flex;
+    min-height: 28px;
+    flex-wrap: wrap;
+    align-items: center;
     min-width: 0;
     margin: 0;
     overflow-wrap: anywhere;
@@ -1715,35 +1791,44 @@ onMounted(async () => {
     align-items: center;
 }
 
-.book-facts__row--state + .book-facts__row--state {
-    margin-top: 10px;
+.book-facts__row--tags {
+    align-items: start;
 }
 
 .book-state-control {
-    display: grid;
-    grid-template-columns: 112px minmax(0, 1fr);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.book-state-control :deep(.v-chip) {
+    height: 26px;
+    border-radius: 999px;
+}
+
+.book-reading-state-options {
+    display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     align-items: center;
 }
 
-.book-state-control--reading {
-    grid-template-columns: repeat(3, max-content);
-}
-
-.book-state-control :deep(.v-chip) {
-    justify-content: flex-start;
-    width: 112px;
-    min-width: 112px;
-    height: 30px;
-    border-radius: 999px;
-}
-
-.book-state-control--reading :deep(.v-chip) {
+.book-reading-state-option {
     position: relative;
     justify-content: center;
-    width: auto;
     min-width: 64px;
     overflow: visible;
+}
+
+.book-reading-state-option::before {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    left: 0;
+    height: 36px;
+    content: '';
+    transform: translateY(-50%);
 }
 
 .book-state-control :deep(.v-icon) {
@@ -1757,41 +1842,35 @@ onMounted(async () => {
     padding-inline: 8px;
 }
 
-.book-state-control :deep(.v-btn)::before,
-.book-state-control--reading :deep(.v-chip)::before {
+.book-state-control :deep(.v-btn)::before {
     position: absolute;
     top: 50%;
     right: 0;
     left: 0;
-    height: 44px;
+    height: 36px;
     content: '';
     transform: translateY(-50%);
 }
 
-.book-state-control :deep(.book-shelf-remove) {
-    color: rgba(var(--v-theme-on-surface), .48);
-    font-weight: 400;
+.book-shelf-remove-divider {
+    width: 1px;
+    height: 14px;
+    flex: 0 0 1px;
+    margin-inline-start: 2px;
+    background: rgba(var(--v-theme-on-surface), .28);
+}
+
+.book-shelf-remove-action {
+    opacity: .78;
+    padding-inline: 4px !important;
 }
 
 .book-format-list,
-.tag-chips,
-.book-provenance {
+.book-chip-list,
+.tag-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-}
-
-.book-provenance {
-    flex-direction: column;
-    color: rgba(var(--v-theme-on-surface), .62);
-    font-size: .8rem;
-    overflow-wrap: anywhere;
-}
-
-.book-provenance span {
-    display: flex;
-    gap: 7px;
-    align-items: flex-start;
 }
 
 .book-introduction {
@@ -1844,7 +1923,7 @@ onMounted(async () => {
     }
 
     .book-title {
-        font-size: clamp(1.75rem, 9vw, 2.35rem);
+        font-size: clamp(1.5rem, 7vw, 1.75rem);
     }
 
     .book-cover-column,
@@ -1858,11 +1937,7 @@ onMounted(async () => {
 @media (max-width: 480px) {
     .book-facts__row {
         grid-template-columns: minmax(0, 1fr);
-        gap: 5px;
-    }
-
-    .book-facts__row--state {
-        row-gap: 15px;
+        gap: 2px;
     }
 }
 </style>

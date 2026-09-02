@@ -179,6 +179,8 @@
     "readingStatus": "阅读状态",
     "shelfStatus": "书架状态",
     "wantToReadStatus": "想读",
+    "readingStateTooltip": "将该书加入书架并设置为{state}状态",
+    "readingStateLoginHint": "登录后即可将书籍加入书架并设置阅读状态。",
     "notAddedToShelf": "未加入书架",
     "addedToShelf": "已加入书架",
     "setAsWantToRead": "设为想读",
