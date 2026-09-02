@@ -9,6 +9,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from tests.test_booksource_admin import CSS_SOURCE
+from tests.test_booksource_engine import FakeSession, text
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
 from webserver.plugins.register import SOURCE_PROVIDERS
 from webserver.plugins.runtime.domains import MetadataQuery
@@ -63,6 +65,23 @@ def context(action="preview", config=None, cursor=None, platform=None):
         "secrets": {},
         "platform": platform or {},
     }
+
+
+def test_search_executor_reloads_concurrency_after_initialization():
+    service = object.__new__(SearchTaskService)
+    service._init()
+    with service._executor_lock:
+        first = service._ensure_executor_locked()
+    service.configure(3)
+    with service._executor_lock:
+        second = service._ensure_executor_locked()
+
+    try:
+        assert first is not second
+        assert second._max_workers == 3
+    finally:
+        first.shutdown(wait=True)
+        second.shutdown(wait=True)
 
 
 def test_shared_connection_health_aggregates_all_bound_sources():
@@ -235,11 +254,15 @@ def test_legado_prepares_and_searches_metadata_only_for_the_metadata_interface()
     with mock.patch("webserver.plugins.source.legado.BookSourceMetadataService", return_value=service) as service_class:
         result = LEGADO_PROVIDER.search_books(
             MetadataQuery(title="活着", authors=("余华",)),
-            context(platform=platform),
+            context(platform=platform, config={"search_concurrency": 3, "search_result_limit": 2}),
         )
 
     assert result is outcome
-    service_class.assert_called_once_with([source], settings["cookie_secret"], config=platform["booksource_config"])
+    service_class.assert_called_once_with(
+        [source],
+        settings["cookie_secret"],
+        config={"BOOKSOURCE_METADATA_WORKERS": 3, "BOOKSOURCE_SEARCH_RESULT_LIMIT": 2},
+    )
     service.search.assert_called_once_with("活着", "余华")
 
 
@@ -307,6 +330,48 @@ def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
         SafeHttpClient(
             session=session, resolver=lambda host, *args, **kwargs: public() if host != "127.0.0.1" else private()
         ).request("GET", "https://books.example/opds")
+
+
+def test_legado_global_config_declares_safe_bounded_defaults():
+    schema = LEGADO_PROVIDER.manifest["config_schema"]["properties"]
+
+    assert schema["search_result_limit"] == {"type": "integer", "minimum": 1, "maximum": 100, "default": 5}
+    assert schema["search_concurrency"]["default"] == 20
+    assert schema["save_concurrency"]["default"] == 10
+    assert schema["private_network_protection"] == {"type": "boolean", "default": True}
+
+
+def test_legado_search_limits_each_source_result_count():
+    session = FakeSession({"/search": text("search.html")})
+    with mock.patch("webserver.plugins.source.legado.booksource_engine.build_session", return_value=session):
+        result = LEGADO_PROVIDER.search(
+            "剑来",
+            {},
+            context(config={"source_raw": CSS_SOURCE, "search_result_limit": 1}),
+        )
+
+    assert len(result.items) == 1
+    assert result.items[0].title == "剑来"
+
+
+def test_legado_admin_config_can_disable_only_the_private_address_check():
+    session = FakeSession({"/search": text("search.html")})
+    session.resolver = lambda host, port, **kwargs: [(2, 1, 6, "", ("127.0.0.1", port or 80))]
+    raw = {**CSS_SOURCE, "bookSourceUrl": "http://127.0.0.1", "searchUrl": "/search?key={{key}}"}
+
+    with mock.patch("webserver.plugins.source.legado.booksource_engine.build_session", return_value=session):
+        result = LEGADO_PROVIDER.search(
+            "剑来",
+            {},
+            context(
+                config={
+                    "source_raw": raw,
+                    "private_network_protection": False,
+                }
+            ),
+        )
+
+    assert len(result.items) == 2
 
 
 def test_legado_provider_does_not_allow_config_to_bypass_private_target_policy():

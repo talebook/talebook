@@ -558,6 +558,29 @@
                                         </dd>
                                     </div>
                                     <div
+                                        v-if="book.aliases && book.aliases.length > 0"
+                                        class="book-facts__row"
+                                        data-testid="book-aliases-row"
+                                    >
+                                        <dt>{{ t('book.alias') }}</dt>
+                                        <dd>
+                                            <v-chip
+                                                v-for="alias in book.aliases"
+                                                :key="'alias-' + alias"
+                                                class="mr-2 mb-2"
+                                                size="small"
+                                                color="secondary"
+                                                :to="'/search?name=' + encodeURIComponent(alias)"
+                                                variant="outlined"
+                                            >
+                                                <v-icon start>
+                                                    mdi-text-box-outline
+                                                </v-icon>
+                                                {{ alias }}
+                                            </v-chip>
+                                        </dd>
+                                    </div>
+                                    <div
                                         v-if="book.publisher"
                                         class="book-facts__row"
                                     >
@@ -747,7 +770,6 @@
                                         {{ completedReadingText }}
                                     </v-chip>
                                 </div>
-
                                 <div class="tag-chips mt-4">
                                     <template v-for="tag in book.tags">
                                         <v-chip
@@ -915,6 +937,7 @@ const book = ref({
     title: '',
     files: [],
     tags: [],
+    aliases: [],
     pubdate: '',
     authors: [],
     publisher: '',

@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from webserver.models import BookSourceModel, OpdsSource, PluginConnection
 from webserver.plugins.runtime.interfaces import SourceProvider
+from webserver.plugins.source.legado import DEFAULT_SEARCH_CONCURRENCY, SEARCH_CONCURRENCY_KEY
 from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
 from webserver.plugins.source.opds import PLUGIN_ID as OPDS_PLUGIN_ID
 from webserver.services.plugin_runtime import PluginRuntime, PluginRuntimeError, ensure_builtin_installations
@@ -146,6 +147,15 @@ class SourceCatalogService:
             "configured_sources": len(available_bindings),
         }
 
+    def search_concurrency(self, bindings):
+        """Return the admin-owned Legado search limit for this task."""
+        legado = next((item for item in bindings if item.plugin_key == LEGADO_PLUGIN_ID), None)
+        if legado is None:
+            value = self.settings.get("BOOKSOURCE_MAX_WORKERS", DEFAULT_SEARCH_CONCURRENCY)
+        else:
+            value = (legado.connection.config or {}).get(SEARCH_CONCURRENCY_KEY, DEFAULT_SEARCH_CONCURRENCY)
+        return max(1, min(100, int(value)))
+
     def get(self, source_key):
         value = str(source_key or "")
         # 旧 /api/network/* 的纯数字 source_id 是一版兼容别名，只在绑定层解释。
@@ -168,6 +178,31 @@ class SourceCatalogService:
             context_overrides=override,
             required_scopes=("books.read",),
         )
+
+    def prepare_chapter_reader(self, binding, extra_config=None):
+        """Prepare a session-free Legado reader safe for concurrent workers.
+
+        Generic providers keep the audited serial path because their provider
+        context may be stateful. Legado creates an engine per chapter, so one
+        immutable prepared context can be shared without exposing the
+        SQLAlchemy session to worker threads.
+        """
+        if binding.plugin_key != LEGADO_PLUGIN_ID:
+            return lambda chapter: self.read(binding, "get_chapter", chapter, extra_config=extra_config)
+        override = dict(binding.context_overrides or {})
+        if extra_config:
+            override["config"] = {**dict(override.get("config") or {}), **dict(extra_config)}
+        prepared, failures = self.runtime.prepare_read(
+            [binding.connection],
+            timeout=self.settings.get("BOOKSOURCE_HTTP_TIMEOUT", 20),
+            context_overrides={binding.connection.id: override},
+            required_scopes=("books.read",),
+            provider_method="get_chapter",
+        )
+        if failures:
+            raise failures[binding.connection.id]
+        call = prepared[0]["call"]
+        return lambda chapter: call("get_chapter", chapter)
 
     def prepare_search(self, bindings):
         """在请求线程完成 session/Secret 工作，worker 只保留网络调用。

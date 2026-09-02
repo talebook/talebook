@@ -19,6 +19,7 @@ from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
 from webserver.models import Item, Reader, ScanFile
+from webserver.services.aliases import AliasService
 from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
 from webserver.services.external_index import delete_external_index_book_record, is_external_index_book
@@ -974,6 +975,7 @@ class AdminBookDelete(BaseHandler):
 
         # 执行批量删除
         deleted_count = 0
+        alias_service = AliasService(self.session)
         for bid in idlist:
             try:
                 external_indexed = is_external_index_book(self.session, bid)
@@ -981,12 +983,13 @@ class AdminBookDelete(BaseHandler):
                     delete_external_index_book_record(self.db, bid)
                     self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
                     self.session.query(Item).filter(Item.book_id == bid).delete()
-                    self.session.commit()
                 else:
                     # 私藏书不进入 Calibre 回收站，避免管理员在回收站中看到私藏内容。
                     item = self.session.get(Item, bid)
                     permanent = bool(item and item.scope == "private")
                     self.db.delete_book(bid, permanent=permanent)
+                alias_service.delete_book_aliases(bid)
+                self.session.commit()
                 deleted_count += 1
             except Exception as e:
                 self.session.rollback()

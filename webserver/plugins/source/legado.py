@@ -21,6 +21,14 @@ from webserver.services.booksource.metadata import BookSourceMetadataService, co
 
 
 PLUGIN_ID = "talebook.source.legado"
+SEARCH_RESULT_LIMIT_KEY = "search_result_limit"
+SEARCH_CONCURRENCY_KEY = "search_concurrency"
+SAVE_CONCURRENCY_KEY = "save_concurrency"
+PRIVATE_NETWORK_PROTECTION_KEY = "private_network_protection"
+DEFAULT_SEARCH_RESULT_LIMIT = 5
+DEFAULT_SEARCH_CONCURRENCY = 20
+DEFAULT_SAVE_CONCURRENCY = 10
+
 BOOKSOURCE_METADATA_CONFIG_KEYS = (
     "BOOKSOURCE_HTTP_TIMEOUT",
     "BOOKSOURCE_MAX_TOC_PAGES",
@@ -76,6 +84,7 @@ class LegadoSourcePlugin:
         transport = SafeHttpClient(
             session=booksource_engine.build_session(source),
             max_bytes=int(engine_config.get("BOOKSOURCE_MAX_RESPONSE_BYTES") or 8 * 1024 * 1024),
+            enforce_public_address=bool(config.get(PRIVATE_NETWORK_PROTECTION_KEY, True)),
         )
         return BookSourceEngine(source, session=transport, config=engine_config)
 
@@ -105,7 +114,11 @@ class LegadoSourcePlugin:
     def search(self, query, cursor, context):
         page = max(1, int((cursor or {}).get("page", 1)))
         engine = self._engine(context)
-        items = [self._summary(item, engine.source.book_source_name) for item in engine.search(query, page)]
+        limit = max(
+            1,
+            min(100, int((context.get("config") or {}).get(SEARCH_RESULT_LIMIT_KEY, DEFAULT_SEARCH_RESULT_LIMIT))),
+        )
+        items = [self._summary(item, engine.source.book_source_name) for item in engine.search(query, page)[:limit]]
         return Page(items=items, next_cursor={"page": page + 1}, health_message="搜索到 %d 本书" % len(items))
 
     def browse(self, category_id, cursor, context):
@@ -198,7 +211,30 @@ class LegadoProvider(LegadoSourcePlugin):
                 "runtime_kind": "builtin",
                 "actions": ["test"],
                 "auth_schema": {"type": "object", "properties": {}},
-                "config_schema": {"type": "object", "properties": {}},
+                "config_schema": {
+                    "type": "object",
+                    "properties": {
+                        SEARCH_RESULT_LIMIT_KEY: {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": DEFAULT_SEARCH_RESULT_LIMIT,
+                        },
+                        SEARCH_CONCURRENCY_KEY: {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": DEFAULT_SEARCH_CONCURRENCY,
+                        },
+                        SAVE_CONCURRENCY_KEY: {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": DEFAULT_SAVE_CONCURRENCY,
+                        },
+                        PRIVATE_NETWORK_PROTECTION_KEY: {"type": "boolean", "default": True},
+                    },
+                },
                 "permissions": ["books.read", "books.write", "network.read"],
                 "data_policy": {"stores_full_text": False, "retention": "source_owned"},
                 "compatibility": {"talebook": ">=0.1.0"},
@@ -239,10 +275,20 @@ class LegadoProvider(LegadoSourcePlugin):
         if query.is_empty():
             return []
         platform = (context or {}).get("platform") or {}
+        config = dict(platform.get("booksource_config") or {})
+        plugin_config = (context or {}).get("config") or {}
+        config["BOOKSOURCE_METADATA_WORKERS"] = plugin_config.get(
+            SEARCH_CONCURRENCY_KEY,
+            config.get("BOOKSOURCE_METADATA_WORKERS", DEFAULT_SEARCH_CONCURRENCY),
+        )
+        config["BOOKSOURCE_SEARCH_RESULT_LIMIT"] = plugin_config.get(
+            SEARCH_RESULT_LIMIT_KEY,
+            DEFAULT_SEARCH_RESULT_LIMIT,
+        )
         service = BookSourceMetadataService(
             platform.get("metadata_sources") or [],
             platform.get("cookie_secret") or "talebook",
-            config=platform.get("booksource_config") or {},
+            config=config,
         )
         author = query.authors[0] if query.authors else None
         return service.search(query.title or query.isbn, author)

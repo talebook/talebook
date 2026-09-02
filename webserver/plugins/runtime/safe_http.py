@@ -15,8 +15,12 @@ class EndpointResponseTooLarge(UpstreamError):
     code = "book_source.response_too_large"
 
 
-def validate_remote_endpoint(url, allowed_hosts=(), resolver=socket.getaddrinfo):
-    """Validate one HTTP endpoint before every request and redirect."""
+def validate_remote_endpoint(url, allowed_hosts=(), resolver=socket.getaddrinfo, enforce_public_address=True):
+    """Validate one HTTP endpoint before every request and redirect.
+
+    ``enforce_public_address`` may only be disabled by platform-owned plugin
+    configuration. URL-controlled allowlists remain forbidden.
+    """
     try:
         parsed = urllib.parse.urlsplit(url)
         port = parsed.port
@@ -43,7 +47,7 @@ def validate_remote_endpoint(url, allowed_hosts=(), resolver=socket.getaddrinfo)
             ip = ipaddress.ip_address(address)
         except ValueError as exc:
             raise EndpointPolicyError("Endpoint resolved to an invalid address") from exc
-        if not ip.is_global:
+        if enforce_public_address and not ip.is_global:
             raise EndpointPolicyError("Endpoint resolves to a non-public address")
     return url
 
@@ -56,6 +60,7 @@ class SafeHttpClient:
         max_redirects=5,
         max_bytes=8 * 1024 * 1024,
         allowed_hosts=(),
+        enforce_public_address=True,
     ):
         self.session = session or requests.Session()
         self.resolver = resolver or getattr(self.session, "resolver", socket.getaddrinfo)
@@ -64,13 +69,19 @@ class SafeHttpClient:
         # Only platform/admin configuration may provide this allowlist. The
         # request target itself must never auto-whitelist its host.
         self.allowed_hosts = tuple(allowed_hosts or ())
+        self.enforce_public_address = bool(enforce_public_address)
 
     def request(self, method, url, *, allowed_hosts=None, headers=None, timeout=30, data=None, params=None, json=None):
         current = url
         origin = self._origin(url)
         allowed_hosts = self.allowed_hosts if allowed_hosts is None else tuple(allowed_hosts or ())
         for redirect_count in range(self.max_redirects + 1):
-            validate_remote_endpoint(current, allowed_hosts, self.resolver)
+            validate_remote_endpoint(
+                current,
+                allowed_hosts,
+                self.resolver,
+                enforce_public_address=self.enforce_public_address,
+            )
             if self._origin(current) != origin:
                 raise EndpointPolicyError("Cross-origin redirects are not allowed")
             response = self.session.request(

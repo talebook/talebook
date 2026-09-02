@@ -59,6 +59,97 @@
                 </a>
             </div>
         </v-alert>
+
+        <v-expansion-panels
+            v-if="configFields.length || configurationLoading || configurationError"
+            class="global-configuration mx-4 mb-2"
+            variant="accordion"
+        >
+            <v-expansion-panel>
+                <v-expansion-panel-title>
+                    <div>
+                        <div class="font-weight-medium">
+                            {{ t('booksource.globalConfiguration') }}
+                        </div>
+                        <div class="text-caption text-medium-emphasis">
+                            {{ t('booksource.globalConfigurationDescription') }}
+                        </div>
+                    </div>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
+                    <v-skeleton-loader
+                        v-if="configurationLoading"
+                        type="paragraph, actions"
+                    />
+                    <v-alert
+                        v-else-if="configurationError"
+                        type="error"
+                        variant="tonal"
+                        density="compact"
+                    >
+                        {{ t('booksource.globalConfigurationLoadError') }}
+                    </v-alert>
+                    <v-form
+                        v-else
+                        ref="configurationForm"
+                        @submit.prevent="saveConfiguration"
+                    >
+                        <div class="global-configuration__grid">
+                            <div
+                                v-for="field in configFields"
+                                :key="field.key"
+                                class="global-configuration__field"
+                            >
+                                <v-checkbox
+                                    v-if="field.schema.type === 'boolean'"
+                                    v-model="configurationValues[field.key]"
+                                    :label="configurationLabel(field.key)"
+                                    hide-details
+                                    density="compact"
+                                />
+                                <v-text-field
+                                    v-else
+                                    v-model.number="configurationValues[field.key]"
+                                    :label="configurationLabel(field.key)"
+                                    :min="field.schema.minimum"
+                                    :max="field.schema.maximum"
+                                    :rules="[value => configurationValueIsValid(field, value)
+                                        || t('booksource.globalConfigurationRangeError', {
+                                            min: field.schema.minimum,
+                                            max: field.schema.maximum,
+                                        })]"
+                                    type="number"
+                                    hide-details="auto"
+                                    density="compact"
+                                    variant="outlined"
+                                />
+                                <div class="global-configuration__hint text-caption text-medium-emphasis">
+                                    {{ configurationHint(field.key) }}
+                                </div>
+                            </div>
+                        </div>
+                        <v-alert
+                            v-if="configurationValues.private_network_protection === false"
+                            type="warning"
+                            variant="tonal"
+                            density="compact"
+                            class="private-network-warning mb-3"
+                        >
+                            {{ t('booksource.privateNetworkProtectionWarning') }}
+                        </v-alert>
+                        <v-btn
+                            color="primary"
+                            type="submit"
+                            :loading="configurationSaving"
+                            :disabled="configurationSaving"
+                        >
+                            {{ t('common.save') }}
+                        </v-btn>
+                    </v-form>
+                </v-expansion-panel-text>
+            </v-expansion-panel>
+        </v-expansion-panels>
+
         <v-card-actions class="flex-wrap">
             <v-btn
                 variant="outlined"
@@ -394,6 +485,14 @@ const loading = ref(false);
 const exporting = ref(false);
 const checkingSources = ref(false);
 const checkPollTimer = ref(null);
+const configurationLoading = ref(true);
+const configurationSaving = ref(false);
+const configurationError = ref(false);
+const configurationDefinition = ref(null);
+const configurationInstallation = ref(null);
+const configurationConnection = ref(null);
+const configurationValues = ref({});
+const configurationForm = ref(null);
 const allSelected = computed(() => items.value.length > 0 && selected.value.length === items.value.length);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const enabledFilter = computed(() => (sourceTab.value === 'invalid' ? 'false' : 'true'));
@@ -405,6 +504,79 @@ const testDialog = ref(false);
 const testing = ref(false);
 const testRsp = ref({});
 const testKey = ref('剑来');
+const configFields = computed(() => Object.entries(configurationDefinition.value?.config_schema?.properties || {})
+    .map(([key, schema]) => ({ key, schema })));
+
+const configurationLabel = key => t(`booksource.config_${key}`);
+const configurationHint = key => t(`booksource.config_${key}_hint`);
+const configurationValueIsValid = (field, value) => {
+    if (field.schema.type !== 'integer' && field.schema.type !== 'number') return true;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return false;
+    if (field.schema.type === 'integer' && !Number.isInteger(number)) return false;
+    return number >= Number(field.schema.minimum) && number <= Number(field.schema.maximum);
+};
+
+const loadConfiguration = async () => {
+    configurationLoading.value = true;
+    configurationError.value = false;
+    try {
+        const [pluginRsp, connectionRsp] = await Promise.all([
+            $backend('/admin/plugins'),
+            $backend('/admin/plugins/connections'),
+        ]);
+        if (pluginRsp.err !== 'ok' || connectionRsp.err !== 'ok') throw new Error('configuration load failed');
+        configurationDefinition.value = (pluginRsp.definitions || [])
+            .find(item => item.plugin_key === 'talebook.source.legado') || null;
+        configurationInstallation.value = (pluginRsp.installations || [])
+            .find(item => item.plugin_key === 'talebook.source.legado') || null;
+        configurationConnection.value = (connectionRsp.connections || [])
+            .find(item => item.installation_id === configurationInstallation.value?.id) || null;
+        configurationValues.value = Object.fromEntries(configFields.value.map(field => [
+            field.key,
+            configurationConnection.value?.config?.[field.key] ?? field.schema.default
+                ?? (field.schema.type === 'boolean' ? false : ''),
+        ]));
+    } catch {
+        configurationError.value = true;
+    } finally {
+        configurationLoading.value = false;
+    }
+};
+
+const saveConfiguration = async () => {
+    if (!configurationInstallation.value) return;
+    const validation = await configurationForm.value?.validate();
+    if (validation && !validation.valid) return;
+    configurationSaving.value = true;
+    try {
+        const config = { ...(configurationConnection.value?.config || {}) };
+        for (const field of configFields.value) {
+            config[field.key] = field.schema.type === 'integer' || field.schema.type === 'number'
+                ? Number(configurationValues.value[field.key])
+                : configurationValues.value[field.key];
+        }
+        const rsp = await $backend('/admin/plugins/connections', {
+            method: 'POST',
+            body: JSON.stringify({
+                installation_id: configurationInstallation.value.id,
+                name: configurationConnection.value?.name || configurationDefinition.value?.name || 'Legado',
+                role: configurationConnection.value?.role || 'builtin',
+                config,
+            }),
+        });
+        if (rsp.err !== 'ok') {
+            if ($alert) $alert('error', rsp.msg || rsp.err);
+            return;
+        }
+        configurationConnection.value = rsp.connection;
+        if ($alert) $alert('success', t('booksource.globalConfigurationSaved'));
+    } catch {
+        if ($alert) $alert('error', t('booksource.globalConfigurationSaveError'));
+    } finally {
+        configurationSaving.value = false;
+    }
+};
 
 const clearCheckPoll = () => {
     if (checkPollTimer.value) {
@@ -601,7 +773,10 @@ watch(sourceTab, () => {
     load();
 });
 
-onMounted(load);
+onMounted(() => {
+    load();
+    loadConfiguration();
+});
 onBeforeUnmount(clearCheckPoll);
 
 useHead(() => ({ title: t('booksource.workbenchTitle') }));
@@ -628,5 +803,28 @@ useHead(() => ({ title: t('booksource.workbenchTitle') }));
 }
 .check-tags {
     line-height: 1.5;
+}
+.global-configuration__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin-bottom: 16px;
+}
+.global-configuration__field {
+    min-width: 0;
+}
+.private-network-warning :deep(.v-alert__content),
+.private-network-warning :deep(.v-alert__prepend) {
+    color: rgb(var(--v-theme-on-surface));
+}
+.global-configuration__hint {
+    margin-block-start: 4px;
+    padding-inline: 16px;
+    line-height: 1.4;
+}
+@media (max-width: 600px) {
+    .global-configuration__grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>

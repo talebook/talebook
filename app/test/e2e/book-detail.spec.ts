@@ -41,6 +41,16 @@ test.describe('Book Detail Page', () => {
         if (apiBook.book.publisher) {
             await expect(page.getByText(apiBook.book.publisher).first()).toBeVisible();
         }
+
+        // Check title aliases stay in the structured metadata area after merging upstream changes.
+        if (apiBook.book.aliases && apiBook.book.aliases.length > 0) {
+            const aliasesRow = page.getByTestId('book-aliases-row');
+            await expect(aliasesRow).toContainText('又名');
+            await expect(aliasesRow.getByRole('link', { name: apiBook.book.aliases[0] })).toHaveAttribute(
+                'href',
+                `/search?name=${encodeURIComponent(apiBook.book.aliases[0])}`,
+            );
+        }
     
         // Check reading button（“阅读”按钮，exact 避免匹配“在线阅读”菜单项）
         await expect(page.getByText('阅读', { exact: true })).toBeVisible();

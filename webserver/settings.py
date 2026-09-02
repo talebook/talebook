@@ -189,7 +189,7 @@ settings = {
     'BOOKSOURCE_HTTP_TIMEOUT': 20,           # 单次请求超时(秒)
     'BOOKSOURCE_MAX_TOC_PAGES': 1000,        # 目录翻页上限（select 分页站点每页仅 20 章，长篇书目录分页可达数百页）
     'BOOKSOURCE_MAX_CONTENT_PAGES': 20,      # 单章正文翻页上限
-    'BOOKSOURCE_MAX_WORKERS': 6,             # 多书源搜索并发数
+    'BOOKSOURCE_MAX_WORKERS': 20,            # 非 Legado 书源搜索并发回退值；Legado 由插件全局配置控制
     'BOOKSOURCE_SEARCH_TIMEOUT': 15,         # 单书源搜索超时(秒)
     'BOOKSOURCE_MAX_SAVE_CHAPTERS': 5000,    # 保存到本地时的最大章节数
     'BOOKSOURCE_RESUME_PENDING_CHECK_ON_START': True,  # 启动时重排"已启用但上次体检未通过"的书源，让失效源被禁用
