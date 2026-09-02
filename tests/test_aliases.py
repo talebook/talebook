@@ -4,7 +4,7 @@
 import json
 from unittest import mock
 
-from tests.test_main import BID_EPUB, BID_MOBI, Q, TestWithUserLogin, get_db
+from tests.test_main import BID_EPUB, BID_MOBI, Q, TestWithUserLogin, get_db, temporary_book_scope
 from tests.test_main import setUpModule as init
 from webserver.handlers.meta import routes as meta_routes
 from webserver.models import AuthorAlias, BookAlias
@@ -129,6 +129,20 @@ class TestAliasService(TestWithUserLogin):
         self.assertFalse(any("author-aliases" in pattern for pattern in route_map))
         self.assertEqual(response["err"], "ok")
         self.assertEqual(response["author"]["canonical"], "安徒生")
+
+    def test_guest_author_alias_count_excludes_private_books(self):
+        AliasService(self.session).replace_author_group(
+            "安徒生",
+            "安徒生",
+            ["加西亚·马尔克斯"],
+        )
+
+        with temporary_book_scope(BID_EPUB, "private", collector_id=1):
+            with mock.patch("webserver.handlers.base.BaseHandler.user_id", return_value=None):
+                response = self.json("/api/author/" + Q("安徒生") + "/alias")
+
+        self.assertEqual(response["err"], "ok")
+        self.assertEqual(response["author"]["book_count"], 1)
 
     def test_book_edit_persists_aliases(self):
         body = {"title": "百年孤独", "aliases": ["One Hundred Years of Solitude"]}

@@ -29,6 +29,11 @@ def get_author_book_ids(handler, names):
     return ids
 
 
+def get_visible_author_book_count(handler, names):
+    book_ids = get_author_book_ids(handler, names)
+    return len(book_ids - handler._get_private_book_ids())
+
+
 class AuthorBooksUpdate(ListHandler):
     def post(self, name):
         category = "authors"
@@ -173,7 +178,7 @@ class AuthorAliases(ListHandler):
     def get(self, name):
         alias_service = AliasService(self.session)
         group = alias_service.get_author_group(name)
-        group["book_count"] = len(get_author_book_ids(self, group["names"]))
+        group["book_count"] = get_visible_author_book_count(self, group["names"])
         group["can_edit"] = bool(self.current_user and self.current_user.can_edit() and self.is_admin())
         return {"err": "ok", "author": group}
 
@@ -217,7 +222,7 @@ class AuthorAliases(ListHandler):
                 except Exception:
                     logging.exception("Failed to merge Calibre authors %s", sorted(rename_map))
                     merge_result["failed"] = sorted(affected_books)
-        group["book_count"] = len(get_author_book_ids(self, group["names"]))
+        group["book_count"] = get_visible_author_book_count(self, group["names"])
         return {
             "err": "ok",
             "author": group,
