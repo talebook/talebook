@@ -850,6 +850,20 @@
                                         {{ author }}
                                     </v-chip>
                                     <v-chip
+                                        v-for="alias in book.aliases"
+                                        :key="'alias-' + alias"
+                                        class="ma-1"
+                                        size="small"
+                                        color="secondary"
+                                        :to="'/search?name=' + encodeURIComponent(alias)"
+                                        variant="outlined"
+                                    >
+                                        <v-icon start>
+                                            mdi-text-box-outline
+                                        </v-icon>
+                                        {{ t('book.alias') }}：{{ alias }}
+                                    </v-chip>
+                                    <v-chip
                                         v-if="book.publisher"
                                         class="ma-1"
                                         size="small"
@@ -1158,6 +1172,7 @@ const book = ref({
     title: '',
     files: [],
     tags: [],
+    aliases: [],
     pubdate: '',
     authors: [],
     publisher: '',

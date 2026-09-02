@@ -139,6 +139,20 @@ def set_metadata_preserving_external_paths(db, session, book_id, mi, **kwargs):
                 set_external_format_record(db, book_id, path, fmt)
 
 
+def rename_items_preserving_external_paths(db, session, field, rename_map, book_ids):
+    """Use Calibre's category rename/merge API without moving externally indexed files."""
+    paths_by_book = {int(book_id): paths for book_id in book_ids if (paths := external_index_format_paths(session, book_id))}
+    for book_id in paths_by_book:
+        clear_book_path(db, book_id)
+    try:
+        return db.new_api.rename_items(field, rename_map)
+    finally:
+        for book_id, paths in paths_by_book.items():
+            for fmt, path in paths.items():
+                if os.path.exists(path):
+                    set_external_format_record(db, book_id, path, fmt)
+
+
 def remove_formats_preserving_external_files(db, session, book_id, formats):
     formats = [(fmt or "").upper() for fmt in formats if fmt]
     external_paths = external_index_format_paths(session, book_id)

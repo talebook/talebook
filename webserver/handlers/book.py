@@ -39,6 +39,7 @@ from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.plugins.runtime.domains import MetadataQuery
 from webserver.plugins.runtime.protocol import UpstreamError
 from webserver.plugins.runtime.triggers import TRIGGER_AUTO, trigger_of
+from webserver.services.aliases import AliasService, clean_aliases
 from webserver.services.async_service import AsyncService
 from webserver.services.autofill import AutoFillService
 from webserver.services.booksource.metadata import (
@@ -134,6 +135,7 @@ class BookDetail(BaseHandler):
             return {"err": "book.not_found", "msg": _("书籍不存在")}
         book = self.get_book(book_id)
         book_info = utils.BookFormatter(self, book).format(with_files=True, with_perms=True)
+        book_info["aliases"] = AliasService(self.session).get_book_aliases(book_id)
         reading_state = None
         user_id = self.user_id()
         if user_id:
@@ -836,6 +838,12 @@ class BookEdit(BaseHandler):
 
         # 处理常规编辑
         data = tornado.escape.json_decode(self.request.body)
+        aliases = None
+        if "aliases" in data:
+            try:
+                aliases = clean_aliases(data["aliases"], excluded=[data.get("title") or book["title"]])
+            except ValueError:
+                return {"err": "params.aliases.invalid", "msg": _("别名参数无效")}
         mi = self.db.get_metadata(bid, index_is_id=True)
         KEYS = [
             "authors",
@@ -888,6 +896,8 @@ class BookEdit(BaseHandler):
             self.db.set_tags(bid, [])
 
         set_metadata_preserving_external_paths(self.db, self.session, bid, mi)
+        if aliases is not None:
+            AliasService(self.session).replace_book_aliases(bid, aliases, title=mi.title)
         return {"err": "ok", "msg": _("更新成功")}
 
     def upload_cover(self, bid):
@@ -1004,6 +1014,7 @@ class BookDelete(BaseHandler):
         from webserver.models import ScanFile
 
         self.session.query(ScanFile).filter(ScanFile.book_id == bid).delete()
+        AliasService(self.session).delete_book_aliases(bid)
         if external_indexed:
             self.session.query(Item).filter(Item.book_id == bid).delete()
         self.session.commit()
@@ -1158,19 +1169,27 @@ class SearchBook(ListHandler):
             return {"err": "params.invalid", "msg": _("请输入搜索关键字")}
 
         title = _("搜索：%(name)s") % {"name": name}
-        ids = self.cache.search(name)
-        ids = self.sort_ids_by_title_relevance(ids, name)
+        alias_service = AliasService(self.session)
+        ids = set(self.cache.search(name))
+        title_alias_ids = alias_service.find_book_ids(name)
+        ids.update(title_alias_ids)
+        for author_name in alias_service.matching_author_names(name):
+            author_id = self.cache.get_item_id("authors", author_name)
+            if author_id:
+                ids.update(self.db.get_books_for_category("authors", author_id))
+        ids = self.sort_ids_by_title_relevance(ids, name, title_alias_ids=title_alias_ids)
         return self.render_book_list([], ids=ids, title=title)
 
-    def sort_ids_by_title_relevance(self, ids, keyword):
+    def sort_ids_by_title_relevance(self, ids, keyword, title_alias_ids=None):
         """calibre 的 cache.search() 返回的是未排序的匹配集合，书名命中和简介、标签等其他字段
         命中的结果混杂在一起。这里把书名命中的结果排到前面，同一优先级内按 id 从大到小排列。
         """
         keyword = (keyword or "").strip().lower()
+        title_alias_ids = title_alias_ids or set()
 
         def sort_key(book_id):
             book_title = (self.cache.field_for("title", book_id) or "").lower()
-            title_matched = bool(keyword) and keyword in book_title
+            title_matched = (bool(keyword) and keyword in book_title) or book_id in title_alias_ids
             return (0 if title_matched else 1, -book_id)
 
         return sorted(ids, key=sort_key)
