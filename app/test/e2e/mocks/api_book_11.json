@@ -4,6 +4,9 @@
   "book": {
     "id": 11,
     "title": "罪与罚",
+    "aliases": [
+      "Crime and Punishment"
+    ],
     "rating": 9,
     "timestamp": "2022-02-04 12:09:40.055992+00:00",
     "pubdate": "2021-05-01 00:00:00+00:00",
