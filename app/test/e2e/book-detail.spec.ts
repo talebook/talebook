@@ -82,8 +82,11 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('open-online-reader')).toHaveCount(1);
         await expect(page.getByTestId('book-action-download')).toHaveCount(1);
         await expect(page.getByTestId('book-action-send')).toHaveCount(1);
-        await expect(page.getByTestId('metadata-reading-action')).toHaveCount(1);
+        for (const state of ['unread', 'want', 'finished']) {
+            await expect(page.getByTestId(`metadata-reading-state-${state}`)).toHaveCount(1);
+        }
         await expect(page.getByTestId('metadata-shelf-action')).toHaveCount(1);
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
         await expect(page.getByTestId('book-action-shelf')).toHaveCount(0);
         await expect(page.getByTestId('book-action-reading-state')).toHaveCount(0);
         await expect(page.getByTestId('book-action-process')).toHaveCount(1);
@@ -93,37 +96,55 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('book-content-section')).toContainText(apiBook.book.comments.slice(0, 20));
     });
 
-    test('keeps reading and shelf state in metadata without duplicate action entries', async ({ page }) => {
+    test('allows direct selection of every reading state and keeps shelf actions independent', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
 
-        await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
-        await expect(page.getByTestId('metadata-reading-action')).toContainText('设为在读');
-        await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
+        const readingStates = [
+            ['unread', '未读'],
+            ['want', '想读'],
+            ['finished', '已读'],
+        ];
+        for (const [key, label] of readingStates) {
+            const state = page.getByTestId(`metadata-reading-state-${key}`);
+            await expect(state).toBeVisible();
+            await expect(state).toContainText(label);
+            await expect(state).toHaveAttribute('aria-pressed', key === 'unread' ? 'true' : 'false');
+        }
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
         await expect(page.getByTestId('metadata-shelf-action')).toContainText('加入书架');
         await expect(page.getByTestId('book-action-shelf')).toHaveCount(0);
         await expect(page.getByTestId('book-action-reading-state')).toHaveCount(0);
 
+        await page.getByTestId('metadata-reading-state-want').click();
+        await expect(page.getByTestId('metadata-reading-state-want')).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'false');
+
+        // The finished tag is a direct action, not a step in a status cycle.
+        await page.getByTestId('metadata-reading-state-finished').click();
+        await expect(page.getByTestId('metadata-reading-state-finished')).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.getByTestId('metadata-reading-state-want')).toHaveAttribute('aria-pressed', 'false');
+
+        await page.getByTestId('metadata-reading-state-unread').click();
+        await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.getByTestId('metadata-reading-state-finished')).toHaveAttribute('aria-pressed', 'false');
+
         await page.getByTestId('metadata-shelf-action').click();
         await expect(page.getByTestId('metadata-shelf-status')).toHaveText('已加入书架');
-        await expect(page.getByTestId('metadata-shelf-action')).toContainText('移除书架');
+        await expect(page.getByTestId('metadata-shelf-action')).toContainText('移出书架');
+        await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'true');
 
-        await page.getByTestId('metadata-reading-action').click();
-        await expect(page.getByTestId('metadata-reading-status')).toHaveText('在读');
-        await expect(page.getByTestId('metadata-reading-action')).toContainText('标记读完');
-        await expect(page.getByTestId('metadata-shelf-status')).toHaveText('已加入书架');
-
-        await page.getByTestId('metadata-reading-action').click();
-        await expect(page.getByTestId('metadata-reading-status')).toHaveText('已读');
-        await expect(page.getByTestId('metadata-reading-action')).toContainText('设为想读');
-
-        await page.getByTestId('metadata-reading-action').click();
-        await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
+        await page.getByTestId('metadata-shelf-action').click();
+        await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
+        await expect(page.getByTestId('metadata-shelf-action')).toContainText('加入书架');
+        await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'true');
     });
 
-    test('uses one aligned field-status-action structure for both metadata state rows', async ({ page }) => {
+    test('keeps state tags aligned and their 44px hit areas isolated', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+        await page.getByTestId('metadata-shelf-action').click();
+        await expect(page.getByTestId('metadata-shelf-status')).toBeVisible();
 
         for (const viewport of [
             { width: 1280, height: 900 },
@@ -133,12 +154,13 @@ test.describe('Book Detail Page', () => {
             await page.waitForTimeout(100);
             await page.getByTestId('metadata-reading-row').scrollIntoViewIfNeeded();
             const layout = await page.evaluate(() => {
-                const collect = (rowTestId, statusTestId, actionTestId) => {
+                const collect = (rowTestId, statusSelector, actionSelector) => {
                     const row = document.querySelector(`[data-testid="${rowTestId}"]`);
                     const label = row?.querySelector('dt');
                     const control = row?.querySelector('dd');
-                    const status = document.querySelector(`[data-testid="${statusTestId}"]`);
-                    const action = document.querySelector(`[data-testid="${actionTestId}"]`);
+                    const statuses = Array.from(row?.querySelectorAll(statusSelector) || []);
+                    const status = statuses[0];
+                    const action = row?.querySelector(actionSelector);
                     const icon = status?.querySelector('.v-icon');
                     if (!row || !label || !control || !status || !action || !icon) return null;
                     const labelRect = label.getBoundingClientRect();
@@ -155,6 +177,17 @@ test.describe('Book Detail Page', () => {
                             bottom: row.getBoundingClientRect().bottom,
                             height: row.getBoundingClientRect().height,
                         },
+                        statuses: statuses.map((item) => ({
+                            left: item.getBoundingClientRect().left,
+                            top: item.getBoundingClientRect().top,
+                            width: item.getBoundingClientRect().width,
+                            height: item.getBoundingClientRect().height,
+                            borderRadius: getComputedStyle(item).borderRadius,
+                            iconSize: item.querySelector('.v-icon')
+                                ? getComputedStyle(item.querySelector('.v-icon')).fontSize
+                                : null,
+                            targetHeight: Number.parseFloat(getComputedStyle(item, '::before').height),
+                        })),
                         label: { left: labelRect.left, right: labelRect.right, top: labelRect.top, bottom: labelRect.bottom },
                         control: { left: controlRect.left, top: controlRect.top, bottom: controlRect.bottom, height: controlRect.height },
                         status: { left: statusRect.left, top: statusRect.top, width: statusRect.width, height: statusRect.height },
@@ -181,22 +214,14 @@ test.describe('Book Detail Page', () => {
                 const referenceControlHeights = referenceRows
                     .map(row => row.querySelector('dd')?.getBoundingClientRect().height)
                     .filter(height => typeof height === 'number');
-                const hitsExpandedTarget = (selector, edge) => {
-                    const action = document.querySelector(selector);
-                    if (!action) return false;
-                    const rect = action.getBoundingClientRect();
-                    const x = rect.left + rect.width / 2;
-                    const y = edge === 'top' ? rect.top - 6 : rect.bottom + 6;
-                    return document.elementFromPoint(x, y)?.closest(selector) === action;
-                };
                 const stateActionSelector = [
-                    '[data-testid="metadata-reading-action"]',
+                    '[data-testid^="metadata-reading-state-"]',
                     '[data-testid="metadata-shelf-action"]',
                 ].join(', ');
                 const stateActionAt = (x, y) => document.elementFromPoint(x, y)
                     ?.closest(stateActionSelector)
                     ?.getAttribute('data-testid') ?? null;
-                const readingAction = document.querySelector('[data-testid="metadata-reading-action"]');
+                const readingAction = document.querySelector('[data-testid="metadata-reading-state-unread"]');
                 const shelfAction = document.querySelector('[data-testid="metadata-shelf-action"]');
                 const targetBounds = (action) => {
                     const rect = action.getBoundingClientRect();
@@ -209,14 +234,14 @@ test.describe('Book Detail Page', () => {
                 };
                 const readingTarget = targetBounds(readingAction);
                 const shelfTarget = targetBounds(shelfAction);
-                const interfaceX = (
-                    Math.max(readingAction.getBoundingClientRect().left, shelfAction.getBoundingClientRect().left)
-                    + Math.min(readingAction.getBoundingClientRect().right, shelfAction.getBoundingClientRect().right)
-                ) / 2;
-                const interfaceHits = Array.from({ length: 7 }, (_, index) => stateActionAt(
-                    interfaceX,
-                    readingTarget.bottom + ((shelfTarget.top - readingTarget.bottom) * (index + 1) / 8),
-                ));
+                const overlapLeft = Math.max(readingAction.getBoundingClientRect().left, shelfAction.getBoundingClientRect().left);
+                const overlapRight = Math.min(readingAction.getBoundingClientRect().right, shelfAction.getBoundingClientRect().right);
+                const interfaceHits = overlapRight <= overlapLeft
+                    ? []
+                    : Array.from({ length: 7 }, (_, index) => stateActionAt(
+                        (overlapLeft + overlapRight) / 2,
+                        readingTarget.bottom + ((shelfTarget.top - readingTarget.bottom) * (index + 1) / 8),
+                    ));
                 const labelHits = [
                     ['metadata-reading-row', readingAction],
                     ['metadata-shelf-row', shelfAction],
@@ -230,17 +255,13 @@ test.describe('Book Detail Page', () => {
                     ));
                 });
                 return {
-                    reading: collect('metadata-reading-row', 'metadata-reading-status', 'metadata-reading-action'),
-                    shelf: collect('metadata-shelf-row', 'metadata-shelf-status', 'metadata-shelf-action'),
+                    reading: collect('metadata-reading-row', '[data-testid^="metadata-reading-state-"]', '[data-testid^="metadata-reading-state-"]'),
+                    shelf: collect('metadata-shelf-row', '[data-testid="metadata-shelf-status"]', '[data-testid="metadata-shelf-action"]'),
                     reference: {
                         rowMin: Math.min(...referenceRowHeights),
                         rowMax: Math.max(...referenceRowHeights),
                         controlMin: Math.min(...referenceControlHeights),
                         controlMax: Math.max(...referenceControlHeights),
-                    },
-                    expandedTarget: {
-                        readingTop: hitsExpandedTarget('[data-testid="metadata-reading-action"]', 'top'),
-                        shelfBottom: hitsExpandedTarget('[data-testid="metadata-shelf-action"]', 'bottom'),
                     },
                     safety: {
                         stateRowGap: document.querySelector('[data-testid="metadata-shelf-row"]').getBoundingClientRect().top
@@ -257,38 +278,28 @@ test.describe('Book Detail Page', () => {
             const reading = layout.reading!;
             const shelf = layout.shelf!;
             expect(reading.display).toBe('grid');
-            expect(reading.columns).toBe(shelf.columns);
+            expect(reading.statuses).toHaveLength(3);
+            expect(reading.columns.split(' ')).toHaveLength(3);
             expect(Math.abs(reading.status.left - shelf.status.left)).toBeLessThanOrEqual(1);
-            expect(Math.abs(reading.status.width - shelf.status.width)).toBeLessThanOrEqual(1);
             expect(Math.abs(reading.status.height - shelf.status.height)).toBeLessThanOrEqual(1);
-            expect(Math.abs(reading.action.left - shelf.action.left)).toBeLessThanOrEqual(1);
-            expect(Math.abs((reading.status.top + reading.status.height / 2) - (reading.action.top + reading.action.height / 2))).toBeLessThanOrEqual(1);
             expect(Math.abs((shelf.status.top + shelf.status.height / 2) - (shelf.action.top + shelf.action.height / 2))).toBeLessThanOrEqual(1);
-            expect(reading.borderRadius).toBe(shelf.borderRadius);
-            expect(reading.iconSize).toBe('18px');
+            expect(reading.statuses.map(status => status.height)).toEqual([30, 30, 30]);
+            expect(reading.statuses.map(status => status.targetHeight)).toEqual([44, 44, 44]);
+            expect(reading.statuses.map(status => status.borderRadius)).toEqual(Array(3).fill(shelf.borderRadius));
+            expect(reading.statuses.map(status => status.iconSize)).toEqual(['18px', null, null]);
             expect(shelf.iconSize).toBe('18px');
-            expect(reading.status.height).toBe(30);
             expect(shelf.status.height).toBe(30);
-            expect(reading.control.height).toBe(reading.status.height);
             expect(shelf.control.height).toBe(shelf.status.height);
-            expect(reading.control.height).toBeGreaterThanOrEqual(layout.reference.controlMin);
-            expect(reading.control.height).toBeLessThanOrEqual(layout.reference.controlMax);
             expect(shelf.control.height).toBeGreaterThanOrEqual(layout.reference.controlMin);
             expect(shelf.control.height).toBeLessThanOrEqual(layout.reference.controlMax);
-            expect(reading.action.height).toBeLessThan(44);
             expect(shelf.action.height).toBeLessThan(44);
-            expect(reading.actionTargetHeight).toBe(44);
             expect(shelf.actionTargetHeight).toBe(44);
-            expect(reading.actionOverflow).toBe('visible');
             expect(shelf.actionOverflow).toBe('visible');
-            expect(layout.expandedTarget.readingTop).toBe(true);
-            expect(layout.expandedTarget.shelfBottom).toBe(true);
+            expect(reading.control.height).toBe(30);
             expect(layout.safety.stateRowGap).toBeGreaterThanOrEqual(22);
             expect(layout.safety.targetGap).toBeGreaterThanOrEqual(8);
-            expect(layout.safety.interfaceHits).toEqual(Array(7).fill(null));
-            expect(reading.actionBackground).toBe('rgba(0, 0, 0, 0)');
+            expect(layout.safety.interfaceHits).toEqual([]);
             expect(shelf.actionBackground).toBe('rgba(0, 0, 0, 0)');
-            expect(reading.actionBorder).toBe('0px');
             expect(shelf.actionBorder).toBe('0px');
 
             if (viewport.width <= 480) {
@@ -305,7 +316,7 @@ test.describe('Book Detail Page', () => {
         }
     });
 
-    test('isolates state hit-area edges from labels and the neighboring operation', async ({ page, request }) => {
+    test('switches each state from the edge of its expanded hit area on desktop and mobile', async ({ page, request }) => {
         const clickExpandedEdge = async (testId, edge) => {
             const point = await page.getByTestId(testId).evaluate((action, requestedEdge) => {
                 const rect = action.getBoundingClientRect();
@@ -330,15 +341,16 @@ test.describe('Book Detail Page', () => {
             });
             await page.setViewportSize(viewport);
             await page.goto(`/book/${bookId}`);
-            await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
-            await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
+            await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'true');
+            await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
             await page.getByTestId('metadata-reading-row').scrollIntoViewIfNeeded();
 
             if (viewport.width <= 480) {
                 for (const rowTestId of ['metadata-reading-row', 'metadata-shelf-row']) {
                     const point = await page.getByTestId(rowTestId).evaluate((row) => {
                         const label = row.querySelector('dt');
-                        const action = row.querySelector('[data-testid$="-action"]');
+                        const action = row.querySelector('[data-testid^="metadata-reading-state-"]')
+                            || row.querySelector('[data-testid="metadata-shelf-action"]');
                         const labelRect = label.getBoundingClientRect();
                         const actionRect = action.getBoundingClientRect();
                         return {
@@ -348,25 +360,25 @@ test.describe('Book Detail Page', () => {
                     });
                     await page.mouse.click(point.x, point.y);
                 }
-                await expect(page.getByTestId('metadata-reading-status')).toHaveText('想读');
-                await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
+                await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'true');
+                await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
             }
 
-            await clickExpandedEdge('metadata-reading-action', 'top');
-            await expect(page.getByTestId('metadata-reading-status')).toHaveText('在读');
-            await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
+            await clickExpandedEdge('metadata-reading-state-want', 'top');
+            await expect(page.getByTestId('metadata-reading-state-want')).toHaveAttribute('aria-pressed', 'true');
+            await expect(page.getByTestId('metadata-reading-state-unread')).toHaveAttribute('aria-pressed', 'false');
 
-            await clickExpandedEdge('metadata-reading-action', 'bottom');
-            await expect(page.getByTestId('metadata-reading-status')).toHaveText('已读');
-            await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
+            await clickExpandedEdge('metadata-reading-state-finished', 'bottom');
+            await expect(page.getByTestId('metadata-reading-state-finished')).toHaveAttribute('aria-pressed', 'true');
+            await expect(page.getByTestId('metadata-reading-state-want')).toHaveAttribute('aria-pressed', 'false');
 
             await clickExpandedEdge('metadata-shelf-action', 'top');
             await expect(page.getByTestId('metadata-shelf-status')).toHaveText('已加入书架');
-            await expect(page.getByTestId('metadata-reading-status')).toHaveText('已读');
+            await expect(page.getByTestId('metadata-reading-state-finished')).toHaveAttribute('aria-pressed', 'true');
 
             await clickExpandedEdge('metadata-shelf-action', 'bottom');
-            await expect(page.getByTestId('metadata-shelf-status')).toHaveText('未加入书架');
-            await expect(page.getByTestId('metadata-reading-status')).toHaveText('已读');
+            await expect(page.getByTestId('metadata-shelf-status')).toHaveCount(0);
+            await expect(page.getByTestId('metadata-reading-state-finished')).toHaveAttribute('aria-pressed', 'true');
         }
     });
 
@@ -472,14 +484,18 @@ test.describe('Book Detail Page', () => {
             'book-action-download',
             'book-action-send',
             'metadata-shelf-action',
-            'metadata-reading-action',
+            'metadata-reading-state-unread',
+            'metadata-reading-state-want',
+            'metadata-reading-state-finished',
             'open-audiobook',
             'book-action-process',
             'book-action-manage',
         ];
         const compactMetadataActions = new Set([
             'metadata-shelf-action',
-            'metadata-reading-action',
+            'metadata-reading-state-unread',
+            'metadata-reading-state-want',
+            'metadata-reading-state-finished',
         ]);
         for (const testId of actionTestIds) {
             const action = page.getByTestId(testId);

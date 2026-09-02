@@ -175,7 +175,7 @@
     "deleteFailed": "删除失败",
     "confirmDelete": "确定要删除这本书吗？",
     "wantToRead": "加入书架",
-    "removeFromWantToRead": "移除书架",
+    "removeFromWantToRead": "移出书架",
     "readingStatus": "阅读状态",
     "shelfStatus": "书架状态",
     "wantToReadStatus": "想读",

@@ -667,33 +667,32 @@
                                     >
                                         <dt>{{ t('book.readingStatus') }}</dt>
                                         <dd
-                                            class="book-state-control"
+                                            class="book-state-control book-state-control--reading"
                                             aria-live="polite"
+                                            role="group"
+                                            :aria-label="t('book.readingStatus')"
                                         >
                                             <v-chip
+                                                v-for="option in readingStateOptions"
+                                                :key="option.key"
                                                 size="small"
-                                                :color="readingStateDisplay.color"
-                                                variant="tonal"
-                                                data-testid="metadata-reading-status"
+                                                :color="readingState === option.value ? 'success' : 'blue-grey'"
+                                                :variant="readingState === option.value ? 'tonal' : 'outlined'"
+                                                :disabled="readingStateLoading"
+                                                class="book-reading-tag"
+                                                role="button"
+                                                :aria-pressed="readingState === option.value"
+                                                :data-testid="`metadata-reading-state-${option.key}`"
+                                                @click="setReadingState(option.value)"
                                             >
-                                                <v-icon start>
-                                                    {{ readingStateDisplay.icon }}
+                                                <v-icon
+                                                    v-if="readingState === option.value"
+                                                    start
+                                                >
+                                                    mdi-check
                                                 </v-icon>
-                                                {{ readingStateDisplay.label }}
+                                                {{ option.label }}
                                             </v-chip>
-                                            <v-btn
-                                                size="small"
-                                                :color="readingStateText.color"
-                                                variant="text"
-                                                :loading="readingStateLoading"
-                                                data-testid="metadata-reading-action"
-                                                @click="handleReadingStateChange"
-                                            >
-                                                <v-icon start>
-                                                    {{ readingStateText.icon }}
-                                                </v-icon>
-                                                {{ readingStateText.label }}
-                                            </v-btn>
                                         </dd>
                                     </div>
                                     <div
@@ -706,54 +705,49 @@
                                             class="book-state-control"
                                             aria-live="polite"
                                         >
-                                            <v-chip
-                                                size="small"
-                                                :color="isInShelf ? 'success' : 'blue-grey'"
-                                                variant="tonal"
-                                                data-testid="metadata-shelf-status"
-                                            >
-                                                <v-icon start>
-                                                    mdi-bookshelf
-                                                </v-icon>
-                                                {{ isInShelf ? t('book.addedToShelf') : t('book.notAddedToShelf') }}
-                                            </v-chip>
                                             <v-btn
+                                                v-if="!isInShelf"
                                                 size="small"
-                                                :color="isInShelf ? 'orange-darken-2' : 'primary'"
+                                                color="primary"
                                                 variant="text"
                                                 :loading="readingStateLoading"
                                                 data-testid="metadata-shelf-action"
                                                 @click="toggleShelf"
                                             >
                                                 <v-icon start>
-                                                    {{ isInShelf ? 'mdi-book-remove-outline' : 'mdi-plus' }}
+                                                    mdi-plus
                                                 </v-icon>
-                                                {{ isInShelf ? t('book.removeFromWantToRead') : t('book.wantToRead') }}
+                                                {{ t('book.wantToRead') }}
                                             </v-btn>
+                                            <template v-else>
+                                                <v-chip
+                                                    size="small"
+                                                    color="success"
+                                                    variant="tonal"
+                                                    data-testid="metadata-shelf-status"
+                                                >
+                                                    <v-icon start>
+                                                        mdi-check
+                                                    </v-icon>
+                                                    {{ t('book.addedToShelf') }}
+                                                </v-chip>
+                                                <v-btn
+                                                    size="small"
+                                                    variant="text"
+                                                    :loading="readingStateLoading"
+                                                    class="book-shelf-remove"
+                                                    data-testid="metadata-shelf-action"
+                                                    @click="toggleShelf"
+                                                >
+                                                    {{ t('book.removeFromWantToRead') }}
+                                                </v-btn>
+                                            </template>
                                         </dd>
                                     </div>
                                 </dl>
 
                                 <div
-                                    v-if="readingState === READING_STATE.READING"
-                                    class="mt-3"
-                                >
-                                    <v-chip
-                                        size="small"
-                                        color="primary"
-                                        variant="tonal"
-                                    >
-                                        <v-icon
-                                            size="small"
-                                            start
-                                        >
-                                            mdi-book-open
-                                        </v-icon>
-                                        {{ readingDaysText }}
-                                    </v-chip>
-                                </div>
-                                <div
-                                    v-else-if="readingState === READING_STATE.FINISHED"
+                                    v-if="readingState === READING_STATE.FINISHED"
                                     class="mt-3"
                                 >
                                     <v-chip
@@ -1545,7 +1539,6 @@ const readingStateLoading = ref(false);
 const {
     isInShelf,
     readingState,
-    readDays,
     lastReadTime,
 } = useBookReadingState({
     bookId: computed(() => Number(bookid.value) || 0),
@@ -1554,6 +1547,7 @@ const {
 });
 
 const toggleShelf = async () => {
+    if (readingStateLoading.value) return;
     readingStateLoading.value = true;
     try {
         const rsp = await $backend(`/book/${book.value.id}/shelf`, {
@@ -1570,31 +1564,20 @@ const toggleShelf = async () => {
     }
 };
 
-const handleReadingStateChange = async () => {
+const setReadingState = async (newState) => {
+    if (readingStateLoading.value || readingState.value === newState) return;
     readingStateLoading.value = true;
     try {
-        let newState = READING_STATE.READING;
-        if (readingState.value === READING_STATE.READING) {
-            newState = READING_STATE.FINISHED;
-        } else if (readingState.value === READING_STATE.FINISHED) {
-            newState = READING_STATE.UNREAD;
-        }
-
         const rsp = await $backend(`/book/${book.value.id}/readstate`, {
             method: 'POST',
             body: JSON.stringify({ read_state: newState }),
         });
         if (rsp.err === 'ok') {
             readingState.value = newState;
-            if (newState === READING_STATE.READING) {
-                readDays.value = 0;
-            }
             if (newState === READING_STATE.FINISHED) {
-                readDays.value = 0;
                 lastReadTime.value = new Date().toISOString().slice(0, 10);
             }
             if (newState === READING_STATE.UNREAD) {
-                readDays.value = 0;
                 lastReadTime.value = '';
             }
         }
@@ -1605,34 +1588,11 @@ const handleReadingStateChange = async () => {
     }
 };
 
-const readingStateDisplay = computed(() => {
-    if (readingState.value === READING_STATE.READING) {
-        return { label: t('readingState.reading'), icon: 'mdi-book-open-outline', color: 'primary' };
-    }
-    if (readingState.value === READING_STATE.FINISHED) {
-        return { label: t('readingState.done'), icon: 'mdi-check-circle-outline', color: 'success' };
-    }
-    return { label: t('book.wantToReadStatus'), icon: 'mdi-bookmark-outline', color: 'blue-grey' };
-});
-
-const readingStateText = computed(() => {
-    if (readingState.value === READING_STATE.UNREAD) {
-        return { label: t('book.setAsReading'), icon: 'mdi-book-open-outline', color: 'primary' };
-    }
-    if (readingState.value === READING_STATE.READING) {
-        return { label: t('book.markAsFinished'), icon: 'mdi-check-circle-outline', color: 'success' };
-    }
-    return { label: t('book.setAsWantToRead'), icon: 'mdi-bookmark-outline', color: 'primary' };
-});
-
-const readingDaysText = computed(() => {
-    if (readingState.value !== READING_STATE.READING) return '';
-    const days = readDays.value;
-    if (days === 0) {
-        return t('readingState.readingWithinOneDay');
-    }
-    return t('readingState.readingDays', { days });
-});
+const readingStateOptions = computed(() => [
+    { key: 'unread', value: READING_STATE.UNREAD, label: t('readingState.none') },
+    { key: 'want', value: READING_STATE.READING, label: t('book.wantToReadStatus') },
+    { key: 'finished', value: READING_STATE.FINISHED, label: t('readingState.done') },
+]);
 
 const completedReadingText = computed(() => {
     if (readingState.value !== READING_STATE.FINISHED) return '';
@@ -1766,12 +1726,24 @@ onMounted(async () => {
     align-items: center;
 }
 
+.book-state-control--reading {
+    grid-template-columns: repeat(3, max-content);
+}
+
 .book-state-control :deep(.v-chip) {
     justify-content: flex-start;
     width: 112px;
     min-width: 112px;
     height: 30px;
     border-radius: 999px;
+}
+
+.book-state-control--reading :deep(.v-chip) {
+    position: relative;
+    justify-content: center;
+    width: auto;
+    min-width: 64px;
+    overflow: visible;
 }
 
 .book-state-control :deep(.v-icon) {
@@ -1785,7 +1757,8 @@ onMounted(async () => {
     padding-inline: 8px;
 }
 
-.book-state-control :deep(.v-btn)::before {
+.book-state-control :deep(.v-btn)::before,
+.book-state-control--reading :deep(.v-chip)::before {
     position: absolute;
     top: 50%;
     right: 0;
@@ -1793,6 +1766,11 @@ onMounted(async () => {
     height: 44px;
     content: '';
     transform: translateY(-50%);
+}
+
+.book-state-control :deep(.book-shelf-remove) {
+    color: rgba(var(--v-theme-on-surface), .48);
+    font-weight: 400;
 }
 
 .book-format-list,
