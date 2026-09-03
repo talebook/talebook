@@ -52,6 +52,26 @@ def test_local_build_uses_lazy_branch_version_for_tags_and_build_arg():
     assert "talebook/talebook:feature-docker-slim" in result.stdout
 
 
+def test_local_build_tags_match_compose_image_names():
+    cases = (
+        ("build-spa", "talebook/talebook:latest", "ghcr.io/talebook/talebook:latest"),
+        ("build-dev", "talebook/talebook:dev", "ghcr.io/talebook/talebook:dev"),
+    )
+
+    for target, legacy_image, compose_image in cases:
+        result = subprocess.run(
+            [shutil.which("make"), "-n", target, "VER=feature-compose-ghcr"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        assert result.returncode == 0
+        assert f"-t {legacy_image}" in result.stdout
+        assert f"-t {compose_image}" in result.stdout
+
+
 def test_makefile_exposes_no_push_targets_or_commands():
     makefile = MAKEFILE.read_text(encoding="utf-8")
 
