@@ -57,7 +57,7 @@
           <span class="chip">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-09-01</span>
           <span class="chip">所属模块：docker</span>
-          <span class="chip">影响范围：Compose / 部署文档</span>
+          <span class="chip">影响范围：Compose / Makefile / 双语部署文档</span>
           <span class="chip">需求来源：用户原话</span>
         </div>
       </header>
@@ -65,13 +65,13 @@
         <section class="card">
           <h2>1. 原始诉求</h2>
           <div class="callout warn">“把 yml 的修改提个PR”</div>
-          <p>工作区已有两份 Compose 修改：默认镜像由 Docker Hub 切到 GHCR，并删除内置的 <code>douban-rs-api</code> 服务及依赖关系。边界核查后，用户确认同步更新仍宣称 Compose 内置该服务的中文文档。</p>
+          <p>工作区已有两份 Compose 修改：默认镜像由 Docker Hub 切到 GHCR，并删除内置的 <code>douban-rs-api</code> 服务及依赖关系。边界核查后，用户确认同步更新仍宣称 Compose 内置该服务的部署文档；PR 评审进一步指出本地构建标签与新 Compose 镜像名不匹配，且英文文档仍保留旧地址。</p>
         </section>
         <section class="card">
           <h2>2. 目标与边界</h2>
           <div class="grid">
-            <article class="choice"><h3>目标</h3><ul><li><code>docker-compose.yml</code> 默认使用 <code>ghcr.io/talebook/talebook</code>。</li><li>开发 Compose 使用对应的 <code>:dev</code> 标签。</li><li>Talebook 启动不再隐式拉起第三方豆瓣代理。</li><li>使用文档明确豆瓣代理需由用户自行部署。</li></ul></article>
-            <article class="choice"><h3>非目标</h3><ul><li>不停止 Docker Hub 镜像发布。</li><li>不修改 Dockerfile、Makefile、CI 或 Kubernetes 清单。</li><li>不改变 Talebook 内豆瓣插件的配置接口。</li><li>不替用户选择外部代理的部署方式或网络拓扑。</li></ul></article>
+            <article class="choice"><h3>目标</h3><ul><li><code>docker-compose.yml</code> 默认使用 <code>ghcr.io/talebook/talebook</code>。</li><li>开发 Compose 使用对应的 <code>:dev</code> 标签。</li><li>本地生产与开发构建同时产生 Compose 可直接消费的 GHCR 标签。</li><li>Talebook 启动不再隐式拉起第三方豆瓣代理。</li><li>中英文使用文档明确豆瓣代理需由用户自行部署。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不停止 Docker Hub 镜像发布或移除既有本地标签。</li><li>不修改 Dockerfile、CI 或 Kubernetes 清单。</li><li>不改变 Talebook 内豆瓣插件的配置接口。</li><li>不替用户选择外部代理的部署方式或网络拓扑。</li></ul></article>
           </div>
         </section>
         <section class="card">
@@ -81,22 +81,24 @@
               <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
               <tbody>
                 <tr><td>Talebook 已发布 GHCR 镜像</td><td><code>design/project/20260813-ghcr-image.active.html</code></td><td>Compose 可以消费由本仓库发布的同名 GHCR 镜像。</td></tr>
-                <tr><td>豆瓣代理是可选外部能力</td><td><code>document/README.zh_CN.md</code> 的豆瓣插件配置章节</td><td>从默认 Compose 移除不会删除插件配置入口，但现有内置服务地址说明必须同步修正。</td></tr>
+                <tr><td>豆瓣代理是可选外部能力</td><td><code>document/README.zh_CN.md</code>、<code>document/README.en_US.md</code> 的豆瓣插件配置章节</td><td>从默认 Compose 移除不会删除插件配置入口，但中英文内置服务地址说明必须同步修正。</td></tr>
                 <tr><td>两个 Compose 文件均显式依赖第三方服务</td><td><code>docker-compose.yml</code>、<code>docker-compose.dev.yml</code></td><td>需同时移除服务和 <code>depends_on</code>，避免保留失效依赖。</td></tr>
+                <tr><td>本地构建标签与新 Compose 镜像名不匹配</td><td><code>Makefile</code> 的 <code>build-spa</code>、<code>build-dev</code></td><td>若只切换 Compose 镜像名，<code>make build &amp;&amp; make up</code> 会忽略刚构建的本地镜像并尝试使用远程 GHCR 镜像。</td></tr>
               </tbody>
             </table>
           </div>
         </section>
         <section class="card">
           <h2>4. 方案</h2>
-          <div class="callout good"><strong>方案结论：</strong>只调整两份 Compose 的镜像地址和服务拓扑；文档改为说明用户需独立部署豆瓣代理并填写其可达 URL；测试从解析后的 YAML 结构验证契约。</div>
+          <div class="callout good"><strong>方案结论：</strong>调整两份 Compose 的镜像地址和服务拓扑；为本地生产与开发构建补充相同的 GHCR 标签，同时保留既有标签；中英文文档改为说明用户需独立部署豆瓣代理并填写其可达 URL；测试覆盖 YAML 结构、双语文档和 Makefile 展开的构建命令。</div>
           <div class="table-wrap" role="region" aria-label="关键决策" tabindex="0">
             <table>
               <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>不采用</th></tr></thead>
               <tbody>
                 <tr><td>默认镜像源</td><td>生产与开发均使用 GHCR</td><td>镜像由同一仓库 workflow 发布，归属和代码托管一致。</td><td>不删除 Docker Hub 发布能力，也不全局替换其他构建用途引用。</td></tr>
+                <tr><td>本地构建标签</td><td><code>build-spa</code> 和 <code>build-dev</code> 额外写入 Compose 对应的 GHCR 标签</td><td>保证 <code>make build &amp;&amp; make up</code> 与 <code>make dev</code> 能复用刚构建的镜像。</td><td>不移除原有 Docker Hub 风格标签，避免破坏其他本地与自动化消费者。</td></tr>
                 <tr><td>豆瓣代理</td><td>从默认 Compose 完全移除</td><td>可选第三方能力不应成为 Talebook 基础服务的启动依赖。</td><td>不保留注释服务或 profile，以免继续暗示项目负责其生命周期。</td></tr>
-                <tr><td>文档</td><td>说明独立部署和可达 URL</td><td>避免继续提供已失效的 Compose 服务名。</td><td>不提供唯一容器编排示例，保留用户网络选择。</td></tr>
+                <tr><td>文档</td><td>中英文均说明独立部署和可达 URL</td><td>避免任一语言继续提供已失效的 Compose 服务名。</td><td>不提供唯一容器编排示例，保留用户网络选择。</td></tr>
               </tbody>
             </table>
           </div>
@@ -104,12 +106,12 @@
         <section class="card">
           <h2>5. 影响范围、风险与回滚</h2>
           <div class="grid">
-            <article class="choice"><h3>影响范围</h3><p>新下载或重新应用 Compose 配置的用户将从 GHCR 拉取 Talebook；豆瓣插件用户必须让 Talebook 容器能够访问其独立代理。</p></article>
-            <article class="choice"><h3>保持不变</h3><p>数据卷、端口、环境变量、Talebook 应用行为、既有运行中容器和 Docker Hub 发布契约均不变。</p></article>
+            <article class="choice"><h3>影响范围</h3><p>新下载或重新应用 Compose 配置的用户将从 GHCR 拉取 Talebook；本地构建会额外产生 GHCR 标签；豆瓣插件用户必须让 Talebook 容器能够访问其独立代理。</p></article>
+            <article class="choice"><h3>保持不变</h3><p>数据卷、端口、环境变量、Talebook 应用行为、既有运行中容器、原有本地镜像标签和 Docker Hub 发布契约均不变。</p></article>
           </div>
           <div class="callout danger"><strong>主要风险：</strong>GHCR 拉取可用性与用户网络环境相关；依赖 Compose 内置豆瓣代理的部署在重建后会失去该容器。文档提示迁移边界，解析测试防止服务或依赖残留。</div>
           <div class="callout"><strong>回滚：</strong>恢复两份 Compose 的 Docker Hub 镜像地址、<code>douban-rs-api</code> 服务及 <code>depends_on</code> 即可；不涉及数据迁移。</div>
-          <div class="callout good"><strong>界面审查豁免：</strong>本次只修改 Compose 配置、部署文档和配置回归测试，不改变 Talebook 页面、交互、文案资源或其他前端消费者，因此无界面影响，不执行 <code>interface-review</code>。剩余风险集中在不同网络环境中的 GHCR 拉取与外部豆瓣代理连通性。</div>
+          <div class="callout good"><strong>界面审查豁免：</strong>本次只修改 Compose 配置、Makefile、部署文档和配置回归测试，不改变 Talebook 页面、交互、文案资源或其他前端消费者，因此无界面影响，不执行 <code>interface-review</code>。剩余风险集中在不同网络环境中的 GHCR 拉取与外部豆瓣代理连通性。</div>
         </section>
         <section class="card">
           <h2>6. 测试计划与结果</h2>
@@ -117,13 +119,14 @@
             <table>
               <thead><tr><th>验证层</th><th>实际命令</th><th>预期</th><th>结果</th></tr></thead>
               <tbody>
-                <tr><td>配置回归</td><td><code>python3 -m pytest -q tests/test_docker_persistence_config.py</code></td><td>两份 YAML 使用 GHCR、无内置豆瓣服务或依赖，持久化契约不回退。</td><td>通过：4 项测试全部通过。</td></tr>
-                <tr><td>完整后端测试</td><td><code>make test</code></td><td>Docker 测试环境中的完整测试套件通过。</td><td>通过：1249 项通过、20 项跳过，产生 26 条既有弃用或 SQLAlchemy 警告。</td></tr>
+                <tr><td>配置与构建回归</td><td><code>python3 -m pytest -q tests/test_docker_persistence_config.py tests/test_makefile.py</code></td><td>两份 YAML 使用 GHCR、无内置豆瓣服务或依赖；双语文档无旧地址；本地构建同时生成原有标签和 Compose 对应的 GHCR 标签。</td><td>通过：10 项测试全部通过。</td></tr>
+                <tr><td>完整后端测试</td><td><code>make test</code></td><td>Docker 测试环境中的完整测试套件通过。</td><td>通过：1250 项通过、20 项跳过，产生 26 条既有弃用或 SQLAlchemy 警告。</td></tr>
                 <tr><td>宿主机测试尝试</td><td><code>python3 -m pytest tests -v --cov=webserver --cov-report=term-missing</code></td><td>补充验证完整测试套件。</td><td>未作为验收结果：宿主机 Python 3.9 无法解析项目使用的 Python 3.10 联合类型语法，且缺少 <code>txt2epub_next</code>、<code>quickjs</code>，收集阶段出现 50 项环境错误；随后使用仓库标准 Docker 测试入口完成全量验证。</td></tr>
+                <tr><td>本地构建命令</td><td><code>make -n build-spa VER=feature-compose-ghcr</code> 与 <code>make -n build-dev VER=feature-compose-ghcr</code></td><td>展开命令同时包含原有标签和 Compose 使用的 GHCR 标签。</td><td>通过：生产命令包含 <code>talebook/talebook:latest</code> 和 <code>ghcr.io/talebook/talebook:latest</code>；开发命令包含两者的 <code>:dev</code> 标签。</td></tr>
                 <tr><td>Compose 解析</td><td><code>docker compose -f docker-compose.yml config -q</code> 与 <code>docker compose -f docker-compose.dev.yml config -q</code></td><td>两份配置均可被 Compose 解析。</td><td>通过；仅报告两份文件原有 <code>version</code> 字段已过时的警告。</td></tr>
-                <tr><td>Python 格式与静态检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>后端 Python 文件无需修正且检查通过。</td><td>通过：175 个文件格式未变，Ruff 检查无问题。</td></tr>
-                <tr><td>仓库门禁</td><td><code>make check-design</code>、<code>git diff --check HEAD^</code></td><td>方案结构、单文件资源及空白检查通过。</td><td>通过。</td></tr>
-                <tr><td>运行验证</td><td>未启动服务</td><td>本次不修改应用运行代码。</td><td>未执行：当前环境无法访问 Docker daemon；已用 Compose 静态解析和 YAML 回归测试替代。剩余风险为未在本地实际拉取 GHCR 镜像并启动容器。</td></tr>
+                <tr><td>Python 格式与静态检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、<code>ruff check tests/test_docker_persistence_config.py tests/test_makefile.py --no-cache</code> 与对应格式检查</td><td>后端及本次测试文件无需修正且检查通过。</td><td>通过：175 个后端文件及 2 个测试文件格式未变，Ruff 检查无问题。</td></tr>
+                <tr><td>仓库门禁</td><td><code>make check-design</code>、<code>git diff --check HEAD</code></td><td>方案结构、单文件资源及空白检查通过。</td><td>通过。</td></tr>
+                <tr><td>运行验证</td><td>未启动 Talebook 服务</td><td>本次不修改应用运行代码。</td><td>未执行应用启动；已通过 Makefile 命令展开、Compose 静态解析、配置回归与 Docker 全量测试验证。剩余风险为未实际执行生产镜像构建后再由 Compose 启动。</td></tr>
               </tbody>
             </table>
           </div>
@@ -134,6 +137,8 @@
             <li><strong>2026-09-01：</strong>用户确认同步更新中文文档，消除 Compose 已移除服务与使用说明之间的冲突。</li>
             <li><strong>2026-09-01：</strong>改动限于两份 Compose、直接关联文档和回归测试，不扩展修改其他镜像消费方。</li>
             <li><strong>2026-09-03：</strong>配置回归、两份 Compose 静态解析、设计门禁和空白检查完成；方案转为 ACTIVE。</li>
+            <li><strong>2026-09-03：</strong>根据 PR 评审重新进入 WIP：补齐本地构建的 GHCR 标签，保持原标签兼容，并同步英文部署文档与测试。</li>
+            <li><strong>2026-09-03：</strong>评审修复完成；针对性测试 10 项、Docker 全量测试 1250 项及各项静态门禁通过，方案重新转为 ACTIVE。</li>
           </ol>
         </section>
       </main>

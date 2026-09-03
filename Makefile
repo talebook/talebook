@@ -4,6 +4,8 @@ VER = $(shell git branch --show-current | tr '/' '-')
 IMAGE = talebook/talebook:$(VER)
 REPO1 := talebook/talebook:latest
 REPO2 := talebook/calibre-webserver:latest
+GHCR_REPO1 := ghcr.io/talebook/talebook:latest
+GHCR_DEV := ghcr.io/talebook/talebook:dev
 TAG1 := talebook/talebook:server-side-render
 TAG2 = talebook/talebook:server-side-render-$(VER)
 
@@ -18,7 +20,7 @@ build: test build-spa build-ssr
 
 build-spa:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
-		-f Dockerfile -t $(IMAGE) -t $(REPO1) --target production -t $(REPO2) .
+		-f Dockerfile -t $(IMAGE) -t $(REPO1) -t $(GHCR_REPO1) --target production -t $(REPO2) .
 
 build-ssr:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN --build-arg GIT_VERSION=$(VER) \
@@ -26,7 +28,7 @@ build-ssr:
 
 build-dev:
 	docker build --no-cache=false --build-arg BUILD_COUNTRY=CN \
-		-f Dockerfile -t talebook/talebook:dev --target dev .
+		-f Dockerfile -t talebook/talebook:dev -t $(GHCR_DEV) --target dev .
 
 test:
 	rm -f unittest.log

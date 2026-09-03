@@ -67,9 +67,9 @@ If you find that uploading large files fails, there may be two reasons:
 Therefore, it is recommended that users check if there are other nginx proxy forwarding configured outside this project and adjust the configuration accordingly.
 
 ### How to configure Douban plugin?
-You need to enable the [cxfksword/douban-api-rs](https://github.com/cxfksword/douban-api-rs) service, and then fill in the corresponding URL address (e.g., `http://10.0.0.1:8080`) into the advanced configuration item.
+You need to deploy the [cxfksword/douban-api-rs](https://github.com/cxfksword/douban-api-rs) service yourself, and then enter a URL reachable from the Talebook container (e.g., `http://10.0.0.1:8080`) in the advanced configuration.
 
-For those started with docker-compose (e.g., using the built-in `docker-compose.yml` configuration in this project), the URL address is: `http://douban-rs-api:80/`, because according to the docker-compose documentation, the service name can resolve to the corresponding IP address.
+The built-in `docker-compose.yml` no longer bundles this service. If you add the Douban proxy to the same Compose network yourself, use its custom service name and port as the URL; otherwise, enter the proxy address that the Talebook container can actually reach.
 
 Common Issue Troubleshooting
 ===============

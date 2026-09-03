@@ -47,8 +47,13 @@ def test_compose_uses_ghcr_without_bundling_optional_douban_service():
 
 
 def test_douban_docs_require_an_explicit_external_service_address():
-    content = read("document/README.zh_CN.md")
+    docs = {
+        "document/README.zh_CN.md": ("需自行部署", "docker-compose.yml` 不再内置该服务"),
+        "document/README.en_US.md": ("service yourself", "docker-compose.yml` no longer bundles this service"),
+    }
 
-    assert "需自行部署" in content
-    assert "docker-compose.yml` 不再内置该服务" in content
-    assert "http://douban-rs-api:80/" not in content
+    for relative_path, expected_phrases in docs.items():
+        content = read(relative_path)
+
+        assert all(phrase in content for phrase in expected_phrases)
+        assert "http://douban-rs-api:80/" not in content
