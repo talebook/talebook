@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Talebook Compose 默认使用 GHCR 镜像并取消内置豆瓣元数据服务的内部方案。" />
     <link rel="icon" href="data:," />
-    <title>收敛 Compose 默认运行依赖 · WIP</title>
+    <title>收敛 Compose 默认运行依赖 · ACTIVE</title>
     <style>
       :root { color-scheme: light; --bg:#f4f7fb; --panel:#fff; --ink:#172033; --muted:#5d6a7d; --line:#d7e0eb; --accent:#286f6a; --accent-soft:#e6f5f2; --warn:#8b5815; --warn-soft:#fff5df; --red:#9a3f3f; --red-soft:#fdecec; --shadow:0 12px 30px rgba(24,39,63,.08); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
       * { box-sizing:border-box; }
@@ -54,7 +54,7 @@
         <h1>收敛 Compose 默认运行依赖</h1>
         <p class="sub">让生产与开发 Compose 默认从 Talebook 自有 GHCR 拉取镜像，并把可选豆瓣元数据代理从基础拓扑中移出。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip wip">状态：WIP</span>
+          <span class="chip">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-09-01</span>
           <span class="chip">所属模块：docker</span>
           <span class="chip">影响范围：Compose / 部署文档</span>
@@ -109,6 +109,7 @@
           </div>
           <div class="callout danger"><strong>主要风险：</strong>GHCR 拉取可用性与用户网络环境相关；依赖 Compose 内置豆瓣代理的部署在重建后会失去该容器。文档提示迁移边界，解析测试防止服务或依赖残留。</div>
           <div class="callout"><strong>回滚：</strong>恢复两份 Compose 的 Docker Hub 镜像地址、<code>douban-rs-api</code> 服务及 <code>depends_on</code> 即可；不涉及数据迁移。</div>
+          <div class="callout good"><strong>界面审查豁免：</strong>本次只修改 Compose 配置、部署文档和配置回归测试，不改变 Talebook 页面、交互、文案资源或其他前端消费者，因此无界面影响，不执行 <code>interface-review</code>。剩余风险集中在不同网络环境中的 GHCR 拉取与外部豆瓣代理连通性。</div>
         </section>
         <section class="card">
           <h2>6. 测试计划与结果</h2>
@@ -116,10 +117,13 @@
             <table>
               <thead><tr><th>验证层</th><th>实际命令</th><th>预期</th><th>结果</th></tr></thead>
               <tbody>
-                <tr><td>配置回归</td><td><code>pytest -q tests/test_docker_persistence_config.py</code></td><td>两份 YAML 使用 GHCR、无内置豆瓣服务或依赖，持久化契约不回退。</td><td class="pending">待验证</td></tr>
-                <tr><td>Compose 解析</td><td><code>docker compose -f docker-compose.yml config -q</code> 与开发配置同类命令</td><td>两份配置均可被 Compose 解析。</td><td class="pending">待验证</td></tr>
-                <tr><td>仓库门禁</td><td><code>make check-design</code>、<code>git diff --check</code></td><td>方案结构、单文件资源及空白检查通过。</td><td class="pending">待验证</td></tr>
-                <tr><td>运行验证</td><td>不启动服务</td><td>本次不修改应用运行代码。</td><td class="pending">待说明</td></tr>
+                <tr><td>配置回归</td><td><code>python3 -m pytest -q tests/test_docker_persistence_config.py</code></td><td>两份 YAML 使用 GHCR、无内置豆瓣服务或依赖，持久化契约不回退。</td><td>通过：4 项测试全部通过。</td></tr>
+                <tr><td>完整后端测试</td><td><code>make test</code></td><td>Docker 测试环境中的完整测试套件通过。</td><td>通过：1249 项通过、20 项跳过，产生 26 条既有弃用或 SQLAlchemy 警告。</td></tr>
+                <tr><td>宿主机测试尝试</td><td><code>python3 -m pytest tests -v --cov=webserver --cov-report=term-missing</code></td><td>补充验证完整测试套件。</td><td>未作为验收结果：宿主机 Python 3.9 无法解析项目使用的 Python 3.10 联合类型语法，且缺少 <code>txt2epub_next</code>、<code>quickjs</code>，收集阶段出现 50 项环境错误；随后使用仓库标准 Docker 测试入口完成全量验证。</td></tr>
+                <tr><td>Compose 解析</td><td><code>docker compose -f docker-compose.yml config -q</code> 与 <code>docker compose -f docker-compose.dev.yml config -q</code></td><td>两份配置均可被 Compose 解析。</td><td>通过；仅报告两份文件原有 <code>version</code> 字段已过时的警告。</td></tr>
+                <tr><td>Python 格式与静态检查</td><td><code>make lint-py-fix</code>、<code>make lint-py</code></td><td>后端 Python 文件无需修正且检查通过。</td><td>通过：175 个文件格式未变，Ruff 检查无问题。</td></tr>
+                <tr><td>仓库门禁</td><td><code>make check-design</code>、<code>git diff --check HEAD^</code></td><td>方案结构、单文件资源及空白检查通过。</td><td>通过。</td></tr>
+                <tr><td>运行验证</td><td>未启动服务</td><td>本次不修改应用运行代码。</td><td>未执行：当前环境无法访问 Docker daemon；已用 Compose 静态解析和 YAML 回归测试替代。剩余风险为未在本地实际拉取 GHCR 镜像并启动容器。</td></tr>
               </tbody>
             </table>
           </div>
@@ -129,10 +133,11 @@
           <ol>
             <li><strong>2026-09-01：</strong>用户确认同步更新中文文档，消除 Compose 已移除服务与使用说明之间的冲突。</li>
             <li><strong>2026-09-01：</strong>改动限于两份 Compose、直接关联文档和回归测试，不扩展修改其他镜像消费方。</li>
+            <li><strong>2026-09-03：</strong>配置回归、两份 Compose 静态解析、设计门禁和空白检查完成；方案转为 ACTIVE。</li>
           </ol>
         </section>
       </main>
-      <footer>Talebook internal design · docker · WIP · 2026-09-01</footer>
+      <footer>Talebook internal design · docker · ACTIVE · 2026-09-01</footer>
     </div>
   </body>
 </html>
