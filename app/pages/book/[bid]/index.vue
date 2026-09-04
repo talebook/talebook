@@ -1934,10 +1934,4 @@ onMounted(async () => {
     .device-target__network { grid-template-columns:1fr; }
 }
 
-@media (max-width: 480px) {
-    .book-facts__row {
-        grid-template-columns: minmax(0, 1fr);
-        gap: 2px;
-    }
-}
 </style>
