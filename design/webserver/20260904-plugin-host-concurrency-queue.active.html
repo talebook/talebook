@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 插件按 plugin 与 host 公平排队的并发控制方案。" />
+    <link rel="icon" href="data:," />
+    <title>插件请求按 plugin + host 排队 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f5f7fb; --panel:#fff; --ink:#172033; --muted:#58657a; --line:#d8e0ec; --accent:#176b87; --soft:#e9f5f8; --warn:#fff5dd; --good:#e7f6ed; --shadow:0 12px 30px rgba(23,32,51,.08); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; } body { margin:0; color:var(--ink); background:linear-gradient(145deg,#fafdff,var(--bg)); font-family:var(--sans); line-height:1.65; }
+      .page { width:min(1080px,calc(100vw - 28px)); margin:auto; padding:26px 0 52px; } .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:var(--shadow); }
+      .hero { padding:30px 32px; margin-bottom:18px; border-top:5px solid var(--accent); } h1 { margin:0 0 10px; font-size:clamp(28px,4vw,44px); line-height:1.15; } .sub { margin:0; color:var(--muted); }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 11px; border-radius:999px; background:#eef2f7; color:#4c5a70; font-size:12px; font-weight:700; } .chip.active { color:#176238; background:var(--good); }
+      .card { padding:24px 27px; margin-bottom:18px; } h2 { margin:0 0 13px; font-size:22px; } h3 { margin:20px 0 8px; font-size:16px; } p { margin:0 0 12px; } p,li,td,th { font-size:14px; } ul,ol { margin:8px 0 0 21px; padding:0; } li + li { margin-top:5px; }
+      code { padding:.1em .35em; border-radius:4px; background:#edf2f7; font-family:var(--mono); overflow-wrap:anywhere; } .callout { padding:14px 16px; border:1px solid var(--line); border-radius:13px; background:#f8fafc; } .callout.good { background:var(--good); border-color:#b9dcc7; } .callout.warn { background:var(--warn); border-color:#ead4a5; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; } .choice { padding:16px; border:1px solid var(--line); border-radius:14px; } .choice h3 { margin-top:0; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; } .step { padding:15px; border:1px solid var(--line); border-radius:14px; background:#fbfcfe; } .step b { display:block; margin-bottom:5px; } .step span { color:var(--accent); font:700 11px var(--mono); }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:13px; } table { width:100%; min-width:680px; border-collapse:collapse; } th,td { padding:10px 11px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f6f8fb; color:#4d5b70; } th:last-child,td:last-child { border-right:0; } tr:last-child td { border-bottom:0; }
+      .passed { color:#176238; font-weight:800; } footer { color:var(--muted); text-align:center; font-size:12px; } .skip { position:absolute; left:-9999px; } .skip:focus { left:8px; top:8px; background:#fff; padding:8px; z-index:2; }
+      @media (max-width:720px) { .page { width:calc(100vw - 18px); padding-top:10px; } .hero,.card { padding:21px 18px; border-radius:14px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } } @media print { body { background:#fff; } .page { width:100%; } .hero,.card { box-shadow:none; break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>插件请求按 plugin + host 排队</h1>
+        <p class="sub">把网络书库的并发约束从 connection 互斥改为真实 HTTP 出口上的共享 host 队列；搜索、浏览与保存在达到上限后等待，而不是立即失败。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-09-04</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：插件运行时、网络书库</span><span class="chip">需求来源：TB-198</span>
+        </div>
+      </header>
+      <main id="main">
+        <section class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“之前的 PR 已经合并了。你优化一下，按照 plugin+host 来排队，并且对于搜索、保存场景，应该是【限频后排队等待】而不是立刻失败报错。”</div>
+          <p>PR 1034 已让并发 read 绕过 connection lease，消除了点击搜索结果时的误拒绝；但它没有建立上游站点级限流，而且第一个 read 仍会持有 connection lease。</p>
+        </section>
+        <section class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice"><h3>目标</h3><ul><li>以 <code>(plugin_key, hostname, effective_port)</code> 为唯一排队键。</li><li>同键请求按 FIFO 等待空位，等待计入能力调用总 deadline。</li><li>搜索、详情、目录、章节与封面请求共用同一 host 上限。</li><li>read 不再取得 connection lease；有副作用能力保持互斥。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>本次不实现 QPS/token-bucket；限制的是同时在途 HTTP 数。</li><li>不新增数据库表或迁移，队列作用域为当前服务进程。</li><li>不改变 HTTP API、前端交互和书源协议。</li><li>不移除搜索及保存线程池的进程资源上限。</li></ul></article>
+          </div>
+        </section>
+        <section class="card">
+          <h2>3. 现状与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0"><table><thead><tr><th>现状</th><th>证据</th><th>影响</th></tr></thead><tbody>
+            <tr><td>lease 键是 <code>connection_id</code></td><td><code>webserver/services/plugin_runtime.py</code> 的 <code>_begin_capability_run</code></td><td>Legado 的多个 host 共用一条 connection，粒度过粗。</td></tr>
+            <tr><td>搜索池是进程全局池</td><td><code>webserver/services/booksource_search.py</code></td><td>只有总 worker 上限，没有单 host 共享队列。</td></tr>
+            <tr><td>整书保存每任务建池</td><td><code>webserver/services/booksource/save_service.py</code></td><td>多个保存任务的同 host 请求可以叠加。</td></tr>
+            <tr><td>所有 Legado HTTP 已经过安全客户端</td><td><code>webserver/plugins/source/legado.py</code></td><td>在 <code>SafeHttpClient</code> 出口排队可覆盖实际 URL 和多种业务入口。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>结论：</strong>运行时在调用 provider 时注入 plugin 身份与 host 并发配置，<code>SafeHttpClient</code> 按实际请求 URL 归一化 host 并进入进程级 FIFO 队列；请求完成或异常时在 <code>finally</code> 释放 slot。</div>
+          <div class="flow" aria-label="排队流程">
+            <article class="step"><span>IDENTIFY</span><b>绑定 plugin</b><p>运行时以 manifest id 标识当前 provider。</p></article>
+            <article class="step"><span>GROUP</span><b>归一化 host</b><p>URL 转为小写 hostname 与有效端口。</p></article>
+            <article class="step"><span>QUEUE</span><b>FIFO 等待</b><p>同键达到上限后等待，保留跨键独立性。</p></article>
+            <article class="step"><span>RELEASE</span><b>完成后唤醒</b><p>成功、HTTP 错误或异常均释放并唤醒队首。</p></article>
+          </div>
+          <h3>配置与兼容性</h3>
+          <ul>
+            <li>新增运行时连接配置 <code>host_concurrency</code>，默认 10，允许 1–100；Legado schema 显式展示该项。</li>
+            <li><code>search_concurrency</code> 继续控制搜索生产者线程池，<code>save_concurrency</code> 继续控制单个保存任务的章节 worker；二者不再冒充 host 上限。</li>
+            <li>未通过 <code>SafeHttpClient</code> 发出的非插件网络请求不进入此队列，避免无 plugin 身份时错误合并。</li>
+            <li>队列等到总 deadline 耗尽时返回 timeout 类错误，不返回 <code>plugin.concurrent_run</code>。</li>
+          </ul>
+        </section>
+        <section class="card">
+          <h2>5. 影响、风险与回滚</h2>
+          <div class="grid"><article class="choice"><h3>影响范围</h3><p><code>safe_http.py</code> 新增公平队列；<code>plugin_runtime.py</code> 注入策略并移除 read lease；Legado 暴露 host 上限；保存封面显式携带 plugin 身份。</p></article><article class="choice"><h3>保持不变</h3><p>写、同步和 execute 的 connection lease；429 重试；搜索结果协议；保存任务去重；SSRF、重定向和响应大小校验。</p></article></div>
+          <div class="callout warn"><strong>风险：</strong>同步等待会占用调用线程；现有有界 worker 池提供进程容量上限。FIFO、不同 key 不互阻、异常释放、deadline 退出与多入口共享必须用并发测试锁定。</div>
+          <p><strong>回滚：</strong>整项改动无数据迁移，可按提交回滚；旧连接没有新字段时自动使用默认值。</p>
+        </section>
+        <section class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>计划命令</th><th>关键断言</th><th>结果</th></tr></thead><tbody>
+            <tr><td>队列单元</td><td><code>pytest -q tests/test_book_source_plugins.py tests/test_plugin_capability_lookup.py tests/test_plugin_runtime.py tests/test_booksource_engine.py</code></td><td>同 plugin+host FIFO 等待；不同 plugin/host 独立；超时保留 typed error。</td><td class="passed">通过：143 passed</td></tr>
+            <tr><td>运行时</td><td><code>pytest -q tests/test_book_source_plugins.py tests/test_plugin_capability_lookup.py tests/test_plugin_runtime.py tests/test_booksource_engine.py</code></td><td>read 不持 lease；write/sync 仍互斥；deadline 正确。</td><td class="passed">通过：143 passed</td></tr>
+            <tr><td>官方 Docker 全量</td><td><code>make test</code></td><td>网络书库、保存、插件 API 与全仓回归。</td><td class="passed">通过：1271 passed, 20 skipped</td></tr>
+            <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>ruff check</code>、<code>git diff --check</code>、<code>make check-design</code></td><td>格式、静态检查、补丁完整性与方案门禁。</td><td class="passed">通过</td></tr>
+          </tbody></table></div>
+          <p>纯后端调度改动，不修改页面、布局、交互或前端消费者；无需界面渲染审查。配置项由既有插件 schema 表单承载，API 结构保持不变。</p>
+        </section>
+        <section class="card">
+          <h2>7. 决策记录</h2>
+          <ol><li><strong>2026-09-04：</strong>用户确认排队键为 plugin+host，并明确搜索、保存达到上限后等待而非快速失败。</li><li><strong>2026-09-04：</strong>选择实际 HTTP 出口排队，避免仅在搜索/保存入口限流而漏掉详情、目录、分页和封面。</li><li><strong>2026-09-04：</strong>官方 Docker 全量回归与质量门禁通过，方案状态固化为 ACTIVE。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-09-04</footer>
+    </div>
+  </body>
+</html>
