@@ -476,7 +476,13 @@ def test_typed_retry_uses_connection_timeout_as_one_wall_clock_budget(db_session
     assert connection.lease_until is not None
 
 
-def test_typed_call_rejects_an_active_connection_lease(db_session):
+def test_typed_read_proceeds_while_another_run_holds_the_lease(db_session):
+    """TB-198 回归：连接租约被其他 run 占用时，只读能力调用不得报 concurrent_run。
+
+    网络书库里同一连接会同时承载搜索批量与详情/目录抓取；搜索尚未结束或读超时
+    宽限期内，用户点击搜索结果应能正常打开浏览页，而不是看到
+    “Another run is active for this connection”。
+    """
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.typed-lease", "metadata.lookup")
     registry.register(plugin)
@@ -487,13 +493,87 @@ def test_typed_call_rejects_an_active_connection_lease(db_session):
     connection.lease_until = datetime.datetime.now() + datetime.timedelta(minutes=1)
     db_session.commit()
 
-    with pytest.raises(PluginRuntimeError) as exc:
-        PluginRuntime(db_session, SETTINGS, registry=registry).read(connection, "search_books", "三体")
+    result = PluginRuntime(db_session, SETTINGS, registry=registry).read(connection, "search_books", "三体")
 
-    assert exc.value.code == "plugin.concurrent_run"
+    assert result[0]["title"] == "三体"
     run = db_session.query(PluginRun).filter(PluginRun.connection_id == connection.id).one()
-    assert run.status == "failed"
-    assert run.error_code == "plugin.concurrent_run"
+    assert run.status == "succeeded"
+    db_session.refresh(connection)
+    # 宽容读不带租约执行，收口时不得清掉租约持有者
+    assert connection.lease_token == "other-worker"
+    assert connection.lease_until is not None
+
+
+def test_read_during_timeout_grace_is_not_rejected(db_session):
+    """TB-198 回归：读超时保留宽限租约（防不可取消 future 重叠）期间，用户重试的读仍成功。"""
+    registry = PluginRegistry()
+    plugin = _plugin("talebook.test.grace-read", "metadata.lookup")
+    registry.register(plugin)
+    import time as _time
+
+    calls = {"count": 0}
+
+    def slow_first(title, context):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            _time.sleep(0.3)
+        return [{"title": title}]
+
+    plugin.search_books = slow_first
+    connection = _install(db_session, registry, plugin)
+    connection.config = {"timeout_seconds": 0.05, "max_retries": 0, "backoff_seconds": 0}
+    db_session.commit()
+    runtime = PluginRuntime(db_session, SETTINGS, registry=registry)
+
+    with pytest.raises(PluginRuntimeError) as exc:
+        runtime.read(connection, "search_books", "三体")
+    assert exc.value.code == "plugin.timeout"
+    db_session.refresh(connection)
+    assert connection.lease_token
+    assert connection.lease_until is not None
+
+    # 宽限窗口内的下一次读（如重新点击搜索结果）必须成功且不干扰宽限租约
+    result = runtime.read(connection, "search_books", "三体")
+    assert result[0]["title"] == "三体"
+    db_session.refresh(connection)
+    assert connection.lease_token
+    runs = (
+        db_session.query(PluginRun)
+        .filter(PluginRun.connection_id == connection.id)
+        .order_by(PluginRun.id)
+        .all()
+    )
+    assert [run.status for run in runs] == ["failed", "succeeded"]
+    assert runs[0].error_code == "plugin.timeout"
+
+
+def test_second_read_batch_proceeds_while_first_batch_holds_the_lease(db_session):
+    """搜索批量并发宽容：前一批仍占用连接时，新搜索批量不再整批 concurrent_run。"""
+    registry = PluginRegistry()
+    plugin = _plugin("talebook.test.batch-overlap", "metadata.lookup")
+    registry.register(plugin)
+    connection = _install(db_session, registry, plugin)
+    runtime = PluginRuntime(db_session, SETTINGS, registry=registry)
+
+    first = runtime.begin_read_batch(connection, timeout=1, requested_by=1)
+    assert first["lease_token"]
+    second = runtime.begin_read_batch(connection, timeout=1, requested_by=1)
+    # 第二条宽容批量：不带租约，但审计 run 照常记录
+    assert second["lease_token"] == ""
+    assert second["run_id"] != first["run_id"]
+
+    runtime.finish_read_batch(first, {"source:1": {"count": 1}})
+    runtime.finish_read_batch(second, {"source:2": {"count": 1}})
+
+    db_session.refresh(connection)
+    assert connection.lease_token == ""
+    runs = (
+        db_session.query(PluginRun)
+        .filter(PluginRun.connection_id == connection.id)
+        .order_by(PluginRun.id)
+        .all()
+    )
+    assert [run.status for run in runs] == ["succeeded", "succeeded"]
 
 
 def test_read_pages_continues_from_page_cursor_without_overloading_sync_watermark(db_session):

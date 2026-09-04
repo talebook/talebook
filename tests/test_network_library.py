@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 """网络书库用户接口测试。"""
 
+import datetime
 import json
 import time
 import urllib.parse
@@ -298,6 +299,42 @@ class TestNetworkLibrary(TestWithUserLogin):
         session.expire_all()
         src = session.query(models.BookSourceModel).filter(models.BookSourceModel.id == self.sid).first()
         self.assertEqual(src.weight, 1)
+
+    @mock.patch("webserver.services.booksource.engine.build_session")
+    def test_browse_succeeds_while_connection_lease_is_held(self, m_session):
+        """TB-198 回归：搜索批量/超时宽限占用连接租约时，点击结果进入浏览页不得报 concurrent_run。"""
+        m_session.return_value = self._fake()
+        session = get_db()
+        connection = (
+            session.query(models.PluginConnection)
+            .join(models.PluginInstallation, models.PluginInstallation.id == models.PluginConnection.installation_id)
+            .filter(models.PluginInstallation.plugin_key == "talebook.source.legado")
+            .one()
+        )
+        original = (connection.lease_token, connection.lease_until)
+
+        def restore():
+            cleanup = get_db()
+            item = cleanup.get(models.PluginConnection, connection.id)
+            item.lease_token, item.lease_until = original
+            cleanup.commit()
+
+        self.addCleanup(restore)
+        connection.lease_token = "simulated-search-batch"
+        connection.lease_until = datetime.datetime.now() + datetime.timedelta(minutes=1)
+        session.commit()
+
+        book = self.json("/api/book-sources/book?source_id=%d&book_url=%s" % (self.sid, Q("/book/1001")))
+        self.assertEqual(book["err"], "ok", book)
+        self.assertEqual(book["book"]["name"], "剑来")
+        toc = self.json("/api/book-sources/toc?source_id=%d&book_url=%s" % (self.sid, Q("/book/1001")))
+        self.assertEqual(toc["err"], "ok", toc)
+        self.assertEqual(len(toc["chapters"]), 3, toc)
+
+        session = get_db()
+        item = session.get(models.PluginConnection, connection.id)
+        # 宽容读不带租约，收口后不得干扰租约持有者
+        self.assertEqual(item.lease_token, "simulated-search-batch")
 
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_book(self, m_session):

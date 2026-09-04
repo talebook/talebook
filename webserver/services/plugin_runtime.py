@@ -923,25 +923,36 @@ class PluginRuntime:
                 synchronize_session=False,
             )
         )
+        # read 型能力调用（网络书库搜索批量、详情/目录/正文抓取等）只是远端只读
+        # 请求，运行时内部本就允许同一连接上的并发读（一次搜索批量会并发执行多个
+        # 书源）。若把连接租约当作互斥锁强加给读，搜索批量占用的租约——或读超时
+        # 后保留的宽限租约——会让「点击搜索结果进入详情页」等后续读直接报
+        # concurrent_run。读遇忙时改为不带租约并发执行：不阻塞任何其他调用，也
+        # 不会在收口时误清持有者的租约（token 为空时清理语句匹配不到任何 token）。
+        # write/sync/execute 等有副作用的模式保持互斥，仍然快速失败。
+        tolerate = not acquired and mode == "read"
+        refused = not acquired and not tolerate
+        if tolerate:
+            token = ""
         run = PluginRun(
             connection_id=connection.id,
             action=mode,
             trigger="capability",
-            status="running" if acquired else "failed",
+            status="failed" if refused else "running",
             requested_by=requested_by,
             counts=dict(DEFAULT_COUNTS),
             cursor_before=dict(connection.cursor or {}),
             cursor_after=dict(connection.cursor or {}),
             input_data=dict(audit_data or {}),
-            error_code="" if acquired else "plugin.concurrent_run",
-            error_message="" if acquired else "Another run is active for this connection",
+            error_code="" if not refused else "plugin.concurrent_run",
+            error_message="" if not refused else "Another run is active for this connection",
             create_time=now,
-            started_at=now if acquired else None,
-            finished_at=None if acquired else now,
+            started_at=None if refused else now,
+            finished_at=now if refused else None,
         )
         self.session.add(run)
         self.session.commit()
-        if not acquired:
+        if refused:
             raise PluginRuntimeError("plugin.concurrent_run", "Another run is active for this connection")
         return run, token
 
