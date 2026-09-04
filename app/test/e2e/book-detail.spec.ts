@@ -302,6 +302,40 @@ test.describe('Book Detail Page', () => {
         }
     });
 
+    test('keeps metadata labels beside their values on mobile viewports', async ({ page }) => {
+        for (const viewport of [
+            { width: 390, height: 844 },
+            { width: 320, height: 800 },
+        ]) {
+            await page.setViewportSize(viewport);
+            await page.goto(`/book/${bookId}`);
+            await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
+
+            const rowPositions = await page.locator('.book-facts__row').evaluateAll(rows => rows.map((row) => {
+                const label = row.querySelector(':scope > dt');
+                const value = row.querySelector(':scope > dd');
+                if (!label || !value) return null;
+                const labelBounds = label.getBoundingClientRect();
+                const valueBounds = value.getBoundingClientRect();
+                return {
+                    label: label.textContent?.trim(),
+                    labelRight: labelBounds.right,
+                    valueLeft: valueBounds.left,
+                };
+            }));
+
+            expect(rowPositions.length).toBeGreaterThan(0);
+            for (const position of rowPositions) {
+                expect(position, `missing metadata cells at ${viewport.width}px`).not.toBeNull();
+                expect(
+                    position!.valueLeft,
+                    `${position!.label} value should remain beside its label at ${viewport.width}px`,
+                ).toBeGreaterThan(position!.labelRight);
+            }
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+        }
+    });
+
     test('aligns the title with the cover and lets the introduction use the full width', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
         await expect(page.getByRole('heading', { level: 1, name: apiBook.book.title })).toBeVisible({ timeout: 15_000 });
