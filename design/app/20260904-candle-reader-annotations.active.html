@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="将阅读笔记 UI 收归 candle-reader，并由 Talebook 注入持久化回调。" />
+  <link rel="icon" href="data:," />
+  <title>Candle Reader 笔记能力收口与 Talebook 回调接入 · ACTIVE</title>
+  <style>
+    :root { color-scheme: light; --bg:#f4f7f8; --panel:#fff; --ink:#20333f; --muted:#5b6972; --line:#d9e2e6; --accent:#315f7d; --good:#176443; --warn:#8a5500; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:linear-gradient(145deg,#eef4f7,#faf7ef); font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+    a { color:var(--accent); } a:focus-visible,[tabindex="0"]:focus-visible { outline:3px solid #e5a52b; outline-offset:3px; }
+    code { padding:.1em .35em; background:#edf2f4; border-radius:4px; overflow-wrap:anywhere; }
+    .skip { position:absolute; left:10px; top:-80px; padding:8px 12px; color:#fff; background:var(--ink); } .skip:focus { top:10px; }
+    .page { width:min(1040px,calc(100vw - 28px)); margin:auto; padding:28px 0 54px; }
+    header,.card { margin-bottom:18px; padding:26px 30px; background:var(--panel); border:1px solid var(--line); border-radius:18px; box-shadow:0 10px 28px rgba(32,51,63,.08); }
+    h1 { margin:0 0 8px; font-size:clamp(28px,4vw,44px); line-height:1.15; } h2 { margin:0 0 14px; font-size:22px; } h3 { margin:18px 0 8px; font-size:17px; }
+    p { margin:0 0 12px; } ul,ol { margin:8px 0 0 22px; padding:0; } li+li { margin-top:6px; }
+    .sub,.muted { color:var(--muted); } .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 10px; color:#43545f; background:#edf2f4; border-radius:999px; font-size:12px; font-weight:700; } .chip.active { color:var(--good); background:#eaf7f1; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; } .box,.callout { padding:15px 17px; border:1px solid var(--line); border-radius:13px; } .callout { margin:12px 0; background:#f6f9fa; } .good { color:var(--good); background:#eaf7f1; border-color:#bcddcf; }
+    .table { overflow-x:auto; border:1px solid var(--line); border-radius:12px; } table { width:100%; min-width:700px; border-collapse:collapse; } th,td { padding:10px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f5f8f9; } th:last-child,td:last-child { border-right:0; } tr:last-child td { border-bottom:0; }
+    pre { overflow:auto; padding:14px 16px; color:#edf7fb; background:#20333f; border-radius:12px; }
+    .pending { color:var(--warn); font-weight:700; } .verified { color:var(--good); font-weight:700; } footer { color:var(--muted); text-align:center; font-size:12px; }
+    @media(max-width:680px){ .page{width:calc(100vw - 18px);padding-top:10px}.grid{grid-template-columns:1fr}header,.card{padding:21px 18px;border-radius:14px} }
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+    @media print { body{background:#fff}.page{width:100%;padding:0}header,.card{box-shadow:none;break-inside:avoid}.skip{display:none} }
+  </style>
+</head>
+<body>
+<a class="skip" href="#main">跳到正文</a>
+<div class="page">
+<header>
+  <h1>Candle Reader 笔记能力收口与 Talebook 回调接入</h1>
+  <p class="sub">由 candle-reader 独占划线与笔记交互，宿主仅通过稳定回调提供数据持久化；未接宿主时保持浏览器本地闭环。</p>
+  <div class="chips" aria-label="方案元信息"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-09-04</span><span class="chip">所属模块：app / candle-reader</span><span class="chip">影响范围：阅读器 UI、注释回调、静态发行包</span><span class="chip">需求来源：TB-199</span></div>
+</header>
+<main id="main">
+<section class="card"><h2>1. 原始诉求</h2><div class="callout">“candle-reader 自身闭环实现所有的 UI，提供划线笔记的 UI、功能、框架，并且设置选项里允许关闭；对外提供 callback，让 Talebook 注入读取、写入笔记，未注入时默认写浏览器 localStorage。”</div><p>现状是 Talebook 的 <code>creader.html</code> 在阅读器外再次实现选择工具栏、笔记编辑器、浮动入口、列表侧栏和 EPUB 高亮，随后替换 candle-reader 的 selected 监听，形成两套 UI 和事件所有权冲突。</p></section>
+<section class="card"><h2>2. 目标与边界</h2><div class="grid"><article class="box"><h3>目标</h3><ul><li>选择文本、划线、写笔记、查看与定位均由 candle-reader UI 完成。</li><li>提供异步 <code>load</code> / <code>save</code> 回调契约，Talebook 只负责接 API。</li><li>无回调时按书隔离写入 localStorage。</li><li>设置可关闭笔记入口、选区动作和标记加载。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不改变 Talebook 注释后端的数据模型和 HTTP API。</li><li>本次不新增删除、编辑、冲突合并与离线服务端同步。</li><li>不改章评、评论、有声书及旧阅读器。</li></ul></article></div></section>
+<section class="card"><h2>3. 方案</h2><div class="callout good"><strong>结论：</strong>candle-reader 暴露 <code>annotation_callbacks</code>，内部统一标准化回调结果、渲染标记与反馈。Talebook 登录态注入 API 适配器；游客不注入并自然使用本地存储。</div><h3>回调契约</h3><pre><code>annotation_callbacks: {
+  load: async ({ book_id, book_url, chapter }) =&gt; Annotation[] | { annotations: Annotation[] },
+  save: async (annotation) =&gt; Annotation | { annotation: Annotation }
+}</code></pre><h3>数据流</h3><ol><li>章节变化或用户打开笔记面板时，阅读器调用 <code>load</code>；未注入则读取按书隔离的 localStorage。</li><li>用户选择文字后由阅读器展示工具栏，划线直接保存，笔记经阅读器对话框编辑后保存。</li><li>保存成功后阅读器渲染 EPUB CFI 高亮并刷新列表；宿主错误只通过阅读器统一反馈，不静默降级到本地。</li><li>Talebook 模板删除外挂 DOM/CSS/事件替换，仅保留 API 回调和现有社区兼容代理。</li></ol></section>
+<section class="card"><h2>4. 兼容性、风险与回滚</h2><div class="table" role="region" aria-label="兼容性矩阵" tabindex="0"><table><thead><tr><th>场景</th><th>行为</th><th>兼容策略</th></tr></thead><tbody><tr><td>独立 candle-reader</td><td>本地读取、保存、显示笔记</td><td>新参数可选，旧初始化代码无需修改</td></tr><tr><td>Talebook 登录用户</td><td>回调访问现有 annotations API</td><td>沿用现有字段、权限、cookie 与错误语义</td></tr><tr><td>Talebook 游客</td><td>无服务端回调，使用本地存储</td><td>不再渲染可能泄露私密内容的外挂 iframe</td></tr><tr><td>关闭笔记功能</td><td>隐藏笔记入口和选区动作，不加载标记</td><td>不删除已有数据，重新开启即可恢复</td></tr></tbody></table></div><div class="callout"><strong>主要风险：</strong>两个仓库必须按“先发布 candle-reader，再更新 Talebook 静态包”交付；以 Talebook 内同步构建产物和模板测试避免回调先于运行时代码上线。回滚以两个仓库各自提交为单位，不涉及数据迁移。</div></section>
+<section class="card"><h2>5. 测试计划与结果</h2><div class="table" role="region" aria-label="测试结果" tabindex="0"><table><thead><tr><th>验证层</th><th>实际命令 / 页面</th><th>覆盖</th><th>结果</th></tr></thead><tbody><tr><td>candle-reader E2E</td><td><code>npm run test:e2e -- --workers=1</code></td><td>本地回退、回调注入、空/加载/错误状态、设置关闭及既有阅读行为</td><td class="verified">42 passed</td></tr><tr><td>candle-reader 质量</td><td><code>npm run lint</code><br><code>npm run build</code></td><td>ESLint 与 Vite 发行包</td><td class="verified">通过</td></tr><tr><td>Talebook 注释集成</td><td><code>docker run … talebook/talebook:master … pytest -q tests/test_annotations.py</code></td><td>登录/游客模板、回调字段、移除外挂 UI 与既有注释 API</td><td class="verified">22 passed；1 条既有 SQLAlchemy warning</td></tr><tr><td>Talebook 质量</td><td><code>ruff check tests/test_annotations.py --no-cache</code><br><code>make check-design</code></td><td>测试代码与方案门禁</td><td class="verified">通过</td></tr><tr><td>实际渲染</td><td>Playwright Chromium，测试 EPUB，320×720 与 414×896</td><td>列表、仅章节定位、编辑框、工具栏、导航、安全区、键盘焦点与窄屏</td><td class="verified">无横向溢出；导航目标 53×56；引用文本 WCAG 对比度约 7.24:1；无页面错误</td></tr></tbody></table></div><div class="callout warn"><strong>并行测试说明：</strong><code>npm run test:e2e</code> 的 2-worker 运行出现过既有 audiobook 自动播放高亮时序超时（最终一次 41 passed / 1 failed）；同一完整套件串行运行 42 passed，且失败用例单独重跑通过。本次没有修改有声书定位实现，剩余风险是高负载下该既有用例仍可能波动。</div><div class="callout good"><strong>界面审查：</strong>按 <code>interface-review full working</code> 流程审查两个仓库的全部本地变更，排除生成 bundle、测试 fixture 与截图，展开到 Reader 入口、设置面板、笔记详情定位入口及 Talebook 模板。Accessibility、layout、writing、typography、colors、UI 六域均无遗留 HIGH/MEDIUM 问题，结论为 Approve。审查中已修复窄屏导航裁切、隐藏工具栏仍可聚焦、弹窗引用低对比度、错误提示自动消失、CFI 缺失笔记被错误置灰及 reduced-motion 回归。</div><div class="callout"><strong>环境限制：</strong>当前运行环境未提供 Chrome DevTools MCP，无法执行该专用工具；替代验证使用本机 Playwright Chromium 实际渲染、像素尺寸/溢出断言、焦点断言和截图人工检查。未将 mock 页面作为对外体验环境。</div></section>
+<section class="card"><h2>6. 决策记录</h2><ol><li><strong>2026-09-04：</strong>选择可选回调对象而非 Talebook 专用 provider，避免 candle-reader 依赖宿主 HTTP 细节。</li><li><strong>2026-09-04：</strong>回调已注入但失败时不落本地，避免服务端与本地形成不可见双写分叉。</li><li><strong>2026-09-04：</strong>设置关闭只控制能力展示和加载，不做破坏性清理。</li></ol></section>
+</main>
+<footer>Talebook internal design · app · ACTIVE · 2026-09-04</footer>
+</div>
+</body>
+</html>
