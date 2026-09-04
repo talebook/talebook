@@ -80,9 +80,11 @@ class TestAnnotationAuthentication(TestApp):
         d = self.json("/api/book/%d/annotations" % BID_EPUB)
         self.assertEqual(d["err"], "user.need_login")
 
-    def test_guest_reader_does_not_render_private_annotation_panel(self):
+    def test_guest_reader_uses_candle_reader_local_annotation_fallback(self):
         rsp = self.fetch("/read/%d" % BID_EPUB)
-        self.assertNotIn('/book/%d/annotations?reader=1' % BID_EPUB, rsp.body.decode("utf-8"))
+        body = rsp.body.decode("utf-8")
+        self.assertNotIn('/book/%d/annotations' % BID_EPUB, body)
+        self.assertNotIn("annotation_callbacks", body)
 
 
 class TestAnnotations(TestWithUserLogin):
@@ -156,34 +158,28 @@ class TestAnnotations(TestWithUserLogin):
             body=json.dumps(data),
         )
 
-    def test_reader_hosts_the_authenticated_annotation_panel(self):
+    def test_reader_injects_annotation_callbacks_for_authenticated_users(self):
         rsp = self.fetch("/read/%d" % BID_EPUB)
         body = rsp.body.decode("utf-8")
-        self.assertIn('/book/%d/annotations?reader=1' % BID_EPUB, body)
-        self.assertIn("talebook:annotation-locate", body)
-        self.assertIn('aria-hidden="true"', body)
-        self.assertIn("shell.inert = !open", body)
-
-    def test_reader_hosts_local_selection_actions_and_chapter_annotation_rendering(self):
-        rsp = self.fetch("/read/%d" % BID_EPUB)
-        body = rsp.body.decode("utf-8")
-        self.assertIn('id="talebook-selection-toolbar"', body)
-        self.assertIn('data-action="highlight"', body)
-        self.assertIn('data-action="note"', body)
-        self.assertIn("rendition.off('selected', proxy.on_select_content)", body)
+        self.assertIn("const annotationCallbacks", body)
+        self.assertIn("annotation_callbacks: annotationCallbacks", body)
         self.assertIn("/api/book/%d/annotations" % BID_EPUB, body)
-        self.assertIn("rendition.annotations.highlight", body)
-        self.assertIn("current_toc_title", body)
+        self.assertIn("new URLSearchParams({ scope: 'visible' })", body)
+        self.assertIn("async load({ chapter })", body)
+        self.assertIn("async save(annotation)", body)
+        self.assertIn("credentials: 'same-origin'", body)
+        self.assertIn("new URLSearchParams(window.location.search).get('cfi')", body)
+
+    def test_reader_leaves_annotation_ui_and_rendering_to_candle_reader(self):
+        rsp = self.fetch("/read/%d" % BID_EPUB)
+        body = rsp.body.decode("utf-8")
+        self.assertNotIn('id="talebook-selection-toolbar"', body)
+        self.assertNotIn('id="annotation-editor"', body)
+        self.assertNotIn('id="annotation-shell"', body)
+        self.assertNotIn("rendition.off('selected'", body)
+        self.assertNotIn("rendition.annotations.highlight", body)
         self.assertIn("server: window.location.origin", body)
         self.assertIn("legacyCommunityResponse", body)
-        self.assertIn("clientId: clientId()", body)
-        self.assertIn("client_id: passage.clientId", body)
-        self.assertIn("if (!selectedPassage || annotationSaveInFlight) return", body)
-        save_start = body.index("async function saveAnnotation")
-        self.assertLess(
-            body.index("hideSelectionToolbar();", save_start),
-            body.index("await fetch", save_start),
-        )
 
     def test_source_upsert_is_idempotent_and_uses_prefixed_source_fields(self):
         first = self._post_source()
