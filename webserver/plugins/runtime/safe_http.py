@@ -1,10 +1,115 @@
+import collections
+import contextlib
 import ipaddress
 import socket
+import threading
+import time
 import urllib.parse
 
 import requests
 
 from .protocol import UpstreamAuthError, UpstreamError, UpstreamRateLimitError
+
+
+HOST_CONCURRENCY_CONFIG_KEY = "host_concurrency"
+DEFAULT_HOST_CONCURRENCY = 10
+
+
+class HostQueueTimeout(UpstreamError):
+    code = "plugin.host_queue_timeout"
+
+    def __init__(self, message="Plugin host queue deadline expired", *, error_type="timeout", status_code=None):
+        # Keep the normal UpstreamError constructor shape so runtime redaction
+        # can rebuild this typed error without losing its public error code.
+        super().__init__(message, error_type=error_type, status_code=status_code)
+
+
+class _PluginHostQueue:
+    """Process-local fair queue keyed only by plugin and normalized host."""
+
+    def __init__(self):
+        self._condition = threading.Condition()
+        self._states = {}
+
+    @staticmethod
+    def _key(plugin_key, url):
+        parsed = urllib.parse.urlsplit(url)
+        hostname = (parsed.hostname or "").rstrip(".").lower()
+        if not plugin_key or not hostname:
+            return None
+        default_port = 443 if parsed.scheme.lower() == "https" else 80
+        return str(plugin_key), hostname, parsed.port or default_port
+
+    @contextlib.contextmanager
+    def slot(self, plugin_key, url, limit, deadline=None):
+        key = self._key(plugin_key, url)
+        if key is None:
+            yield
+            return
+
+        limit = max(1, min(100, int(limit)))
+        waiter = object()
+        acquired = False
+        with self._condition:
+            state = self._states.get(key)
+            if state is None:
+                state = {"active": 0, "limit": limit, "waiters": collections.deque()}
+                self._states[key] = state
+            else:
+                # A plugin configuration change must not temporarily exceed the
+                # stricter value while an older request is still in flight.
+                state["limit"] = min(state["limit"], limit)
+            state["waiters"].append(waiter)
+            while state["waiters"][0] is not waiter or state["active"] >= state["limit"]:
+                remaining = None if deadline is None else deadline - time.monotonic()
+                if remaining is not None and remaining <= 0:
+                    state["waiters"].remove(waiter)
+                    if not state["waiters"] and state["active"] == 0:
+                        self._states.pop(key, None)
+                    self._condition.notify_all()
+                    raise HostQueueTimeout()
+                self._condition.wait(remaining)
+            state["waiters"].popleft()
+            state["active"] += 1
+            acquired = True
+
+        try:
+            yield
+        finally:
+            if acquired:
+                with self._condition:
+                    state = self._states.get(key)
+                    if state is not None:
+                        state["active"] -= 1
+                        if not state["waiters"] and state["active"] == 0:
+                            self._states.pop(key, None)
+                    self._condition.notify_all()
+
+
+_PLUGIN_HOST_QUEUE = _PluginHostQueue()
+_PLUGIN_HTTP_POLICY = threading.local()
+
+
+@contextlib.contextmanager
+def plugin_http_policy(plugin_key, max_concurrency=DEFAULT_HOST_CONCURRENCY, deadline=None):
+    """Bind runtime-owned plugin identity to SafeHttpClient calls in this thread."""
+
+    previous = getattr(_PLUGIN_HTTP_POLICY, "value", None)
+    _PLUGIN_HTTP_POLICY.value = {
+        "plugin_key": str(plugin_key or ""),
+        "max_concurrency": max(1, min(100, int(max_concurrency))),
+        "deadline": deadline,
+    }
+    try:
+        yield
+    finally:
+        if previous is None:
+            try:
+                del _PLUGIN_HTTP_POLICY.value
+            except AttributeError:
+                pass
+        else:
+            _PLUGIN_HTTP_POLICY.value = previous
 
 
 class EndpointPolicyError(UpstreamError):
@@ -61,6 +166,8 @@ class SafeHttpClient:
         max_bytes=8 * 1024 * 1024,
         allowed_hosts=(),
         enforce_public_address=True,
+        plugin_key="",
+        max_concurrency=None,
     ):
         self.session = session or requests.Session()
         self.resolver = resolver or getattr(self.session, "resolver", socket.getaddrinfo)
@@ -70,11 +177,24 @@ class SafeHttpClient:
         # request target itself must never auto-whitelist its host.
         self.allowed_hosts = tuple(allowed_hosts or ())
         self.enforce_public_address = bool(enforce_public_address)
+        self.plugin_key = str(plugin_key or "")
+        self.max_concurrency = max_concurrency
 
     def request(self, method, url, *, allowed_hosts=None, headers=None, timeout=30, data=None, params=None, json=None):
         current = url
         origin = self._origin(url)
         allowed_hosts = self.allowed_hosts if allowed_hosts is None else tuple(allowed_hosts or ())
+        policy = getattr(_PLUGIN_HTTP_POLICY, "value", None) or {}
+        plugin_key = self.plugin_key or policy.get("plugin_key", "")
+        max_concurrency = self.max_concurrency
+        if max_concurrency is None:
+            max_concurrency = policy.get("max_concurrency", DEFAULT_HOST_CONCURRENCY)
+        max_concurrency = max(1, min(100, int(max_concurrency)))
+        deadline = policy.get("deadline")
+        timeout_seconds = self._timeout_seconds(timeout)
+        if plugin_key and timeout_seconds is not None:
+            request_deadline = time.monotonic() + timeout_seconds
+            deadline = request_deadline if deadline is None else min(deadline, request_deadline)
         for redirect_count in range(self.max_redirects + 1):
             validate_remote_endpoint(
                 current,
@@ -84,16 +204,18 @@ class SafeHttpClient:
             )
             if self._origin(current) != origin:
                 raise EndpointPolicyError("Cross-origin redirects are not allowed")
-            response = self.session.request(
-                method,
-                current,
-                headers=dict(headers or {}),
-                data=data,
-                params=params,
-                json=json,
-                timeout=timeout,
-                allow_redirects=False,
-            )
+            with _PLUGIN_HOST_QUEUE.slot(plugin_key, current, max_concurrency, deadline):
+                request_timeout = self._remaining_timeout(timeout, deadline) if plugin_key else timeout
+                response = self.session.request(
+                    method,
+                    current,
+                    headers=dict(headers or {}),
+                    data=data,
+                    params=params,
+                    json=json,
+                    timeout=request_timeout,
+                    allow_redirects=False,
+                )
             if response.status_code in {301, 302, 303, 307, 308}:
                 if redirect_count >= self.max_redirects:
                     raise EndpointPolicyError("Endpoint exceeded the redirect limit")
@@ -142,3 +264,23 @@ class SafeHttpClient:
         parsed = urllib.parse.urlsplit(url)
         default_port = 443 if parsed.scheme == "https" else 80
         return parsed.scheme.lower(), (parsed.hostname or "").lower(), parsed.port or default_port
+
+    @staticmethod
+    def _timeout_seconds(timeout):
+        if isinstance(timeout, (int, float)):
+            return max(0.0, float(timeout))
+        if isinstance(timeout, (tuple, list)) and timeout:
+            values = [float(value) for value in timeout if isinstance(value, (int, float))]
+            return sum(max(0.0, value) for value in values) if values else None
+        return None
+
+    @staticmethod
+    def _remaining_timeout(timeout, deadline):
+        if deadline is None:
+            return timeout
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise HostQueueTimeout()
+        if isinstance(timeout, (int, float)):
+            return max(0.001, min(float(timeout), remaining))
+        return timeout

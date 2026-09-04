@@ -208,7 +208,7 @@ class SourceCatalogService:
         """在请求线程完成 session/Secret 工作，worker 只保留网络调用。
 
         多个 Legado/OPDS 事实 binding 可以共用同一条插件连接。这里按
-        connection 分组，一组只建一个 lease/run；每个 binding 仍有自己的
+        connection 分组，一组只建一个 audit run；每个 binding 仍有自己的
         config 与总 deadline。任务完成后由预绑定的独立 session 立即调用
         ``finish_read_batch`` 收口；status 请求与 TTL cleanup 只负责失败重试。
         """

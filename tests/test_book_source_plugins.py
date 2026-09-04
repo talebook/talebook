@@ -2,6 +2,7 @@ import hashlib
 import json
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 from unittest import mock
 
@@ -13,9 +14,14 @@ from tests.test_booksource_admin import CSS_SOURCE
 from tests.test_booksource_engine import FakeSession, text
 from webserver.models import Base, PluginRunItem, PluginSourceRecord
 from webserver.plugins.register import SOURCE_PROVIDERS
-from webserver.plugins.runtime.domains import MetadataQuery
+from webserver.plugins.runtime.domains import MetadataQuery, SourceChapter
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderItem, ProviderResult
-from webserver.plugins.runtime.safe_http import EndpointPolicyError, SafeHttpClient, validate_remote_endpoint
+from webserver.plugins.runtime.safe_http import (
+    EndpointPolicyError,
+    HostQueueTimeout,
+    SafeHttpClient,
+    validate_remote_endpoint,
+)
 from webserver.plugins.source.base import OPDSProvider
 from webserver.plugins.source.internet_archive import InternetArchiveProvider
 from webserver.plugins.source.legado import PROVIDER as LEGADO_PROVIDER
@@ -332,12 +338,96 @@ def test_endpoint_policy_rejects_private_credentials_and_redirect_targets():
         ).request("GET", "https://books.example/opds")
 
 
+class BlockingHttpSession:
+    def __init__(self, started=None, release=None):
+        self.started = started or threading.Event()
+        self.release = release
+
+    @staticmethod
+    def resolver(host, port, **kwargs):
+        return [(2, 1, 6, "", ("93.184.216.34", port or 443))]
+
+    def request(self, *args, **kwargs):
+        self.started.set()
+        if self.release is not None:
+            assert self.release.wait(2), "blocked HTTP request was not released"
+        return response({"ok": True})
+
+
+def test_plugin_host_queue_waits_and_keeps_other_keys_independent():
+    release = threading.Event()
+    first_started = threading.Event()
+    second_started = threading.Event()
+    first = SafeHttpClient(
+        session=BlockingHttpSession(first_started, release),
+        plugin_key="talebook.test.queue",
+        max_concurrency=1,
+    )
+    second = SafeHttpClient(
+        session=BlockingHttpSession(second_started),
+        plugin_key="talebook.test.queue",
+        max_concurrency=1,
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_future = executor.submit(first.request, "GET", "https://books.example/first")
+        assert first_started.wait(1)
+        second_future = executor.submit(second.request, "GET", "https://books.example/second")
+        assert not second_started.wait(0.05), "same plugin+host request must wait for a slot"
+
+        # The same host under another plugin and another host under the same
+        # plugin are distinct queues and must not be held behind the first call.
+        other_plugin = SafeHttpClient(
+            session=BlockingHttpSession(),
+            plugin_key="talebook.test.other",
+            max_concurrency=1,
+        )
+        other_host = SafeHttpClient(
+            session=BlockingHttpSession(),
+            plugin_key="talebook.test.queue",
+            max_concurrency=1,
+        )
+        assert other_plugin.request("GET", "https://books.example/other-plugin").status_code == 200
+        assert other_host.request("GET", "https://catalog.example/other-host").status_code == 200
+
+        release.set()
+        assert first_future.result(timeout=1).status_code == 200
+        assert second_future.result(timeout=1).status_code == 200
+        assert second_started.is_set()
+
+
+def test_plugin_host_queue_waits_until_request_deadline_before_timing_out():
+    release = threading.Event()
+    first_started = threading.Event()
+    first = SafeHttpClient(
+        session=BlockingHttpSession(first_started, release),
+        plugin_key="talebook.test.deadline",
+        max_concurrency=1,
+    )
+    waiting = SafeHttpClient(
+        session=BlockingHttpSession(),
+        plugin_key="talebook.test.deadline",
+        max_concurrency=1,
+    )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first_future = executor.submit(first.request, "GET", "https://books.example/first")
+        assert first_started.wait(1)
+        started = time.monotonic()
+        with pytest.raises(HostQueueTimeout):
+            waiting.request("GET", "https://books.example/waiting", timeout=0.05)
+        assert time.monotonic() - started >= 0.04
+        release.set()
+        assert first_future.result(timeout=1).status_code == 200
+
+
 def test_legado_global_config_declares_safe_bounded_defaults():
     schema = LEGADO_PROVIDER.manifest["config_schema"]["properties"]
 
     assert schema["search_result_limit"] == {"type": "integer", "minimum": 1, "maximum": 100, "default": 5}
     assert schema["search_concurrency"]["default"] == 20
     assert schema["save_concurrency"]["default"] == 10
+    assert schema["host_concurrency"] == {"type": "integer", "minimum": 1, "maximum": 100, "default": 10}
     assert schema["private_network_protection"] == {"type": "boolean", "default": True}
 
 
@@ -352,6 +442,36 @@ def test_legado_search_limits_each_source_result_count():
 
     assert len(result.items) == 1
     assert result.items[0].title == "剑来"
+
+
+def test_legado_search_and_save_reads_share_the_plugin_host_queue():
+    search_started = threading.Event()
+    chapter_started = threading.Event()
+    release_search = threading.Event()
+
+    class QueuedLegadoSession(FakeSession):
+        def request(self, method, url, **kwargs):
+            if "/search" in url:
+                search_started.set()
+                assert release_search.wait(2), "search request was not released"
+            elif "/chapter" in url:
+                chapter_started.set()
+            return super().request(method, url, **kwargs)
+
+    session = QueuedLegadoSession({"/search": text("search.html"), "/chapter": text("content.html")})
+    config = {"source_raw": CSS_SOURCE, "host_concurrency": 1}
+    chapter = SourceChapter(external_id="http://x.com/chapter", title="第一章")
+
+    with mock.patch("webserver.plugins.source.legado.booksource_engine.build_session", return_value=session):
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            search_future = executor.submit(LEGADO_PROVIDER.search, "剑来", {}, context(config=config))
+            assert search_started.wait(1)
+            chapter_future = executor.submit(LEGADO_PROVIDER.get_chapter, chapter, context(config=config))
+            assert not chapter_started.wait(0.05), "save chapter must queue behind search for the same plugin+host"
+            release_search.set()
+            assert search_future.result(timeout=1).items
+            assert chapter_future.result(timeout=1).content
+            assert chapter_started.is_set()
 
 
 def test_legado_admin_config_can_disable_only_the_private_address_check():
