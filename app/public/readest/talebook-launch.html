@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN" data-talebook-readest-launcher>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="same-origin" />
+    <link rel="icon" href="data:," />
+    <title>正在启动 Readest</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      body { display: grid; min-height: 100vh; margin: 0; place-items: center; background: Canvas; color: CanvasText; }
+      main { width: min(36rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid color-mix(in srgb, CanvasText 28%, transparent); border-radius: .8rem; text-align: center; }
+      .spinner { width: 2rem; height: 2rem; margin: 0 auto 1rem; border: .22rem solid color-mix(in srgb, CanvasText 20%, transparent); border-top-color: CanvasText; border-radius: 50%; animation: spin .8s linear infinite; }
+      nav { display: flex; flex-wrap: wrap; gap: .7rem; justify-content: center; margin-top: 1.25rem; }
+      a { padding: .55rem .8rem; border: 1px solid color-mix(in srgb, CanvasText 35%, transparent); border-radius: .45rem; color: inherit; text-decoration: none; }
+      a:focus-visible { outline: 3px solid Highlight; outline-offset: 2px; }
+      [hidden] { display: none !important; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+    </style>
+    <script type="module" src="/readest/legacy-worker-cleanup.js"></script>
+    <script type="module" src="/readest/talebook-launch.js"></script>
+  </head>
+  <body>
+    <main>
+      <div class="spinner" data-launch-spinner aria-hidden="true"></div>
+      <h1 data-launch-heading>正在启动 Readest</h1>
+      <p data-launch-status role="status">正在验证书籍权限与 EPUB 资源…</p>
+      <nav data-launch-actions aria-label="恢复操作" hidden>
+        <a data-action="retry" href="/">重试</a>
+        <a data-action="back" href="/">返回书籍页</a>
+        <a data-action="fallback" href="/">改用 Candle</a>
+        <a data-action="login" href="/login" hidden>重新登录</a>
+      </nav>
+      <noscript><p>浏览器已禁用 JavaScript，请返回书籍页并改用 Candle 阅读器。</p></noscript>
+    </main>
+  </body>
+</html>
