@@ -2,12 +2,10 @@ diff --git a/apps/readest-app/src/utils/file.ts b/apps/readest-app/src/utils/fil
 index 23908d2..c682f70 100644
 --- a/apps/readest-app/src/utils/file.ts
 +++ b/apps/readest-app/src/utils/file.ts
-@@ -1,4 +1,5 @@
+@@ -1,2 +1,3 @@
  import { FileHandle, open, BaseDirectory, SeekMode } from '@tauri-apps/plugin-fs';
 +import { isTauriAppPlatform } from '@/services/environment';
  import { getOSPlatform } from './misc';
- 
- class DeferredBlob extends Blob {
 @@ -428,8 +429,9 @@ export class RemoteFile extends File implements ClosableFile {
      if (this.#queryRange) {
        return this._open_with_query();
