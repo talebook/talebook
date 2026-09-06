@@ -1,6 +1,7 @@
 import { cpSync, existsSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { updateLauncherPreloads } from './preload.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const target = path.join(root, 'app/public/readest');
@@ -50,4 +51,12 @@ function normalizeText(directory) {
   }
 }
 normalizeText(target);
+const launcherPath = path.join(target, 'talebook-launch.html');
+if (existsSync(launcherPath)) {
+  writeFileSync(launcherPath, updateLauncherPreloads(
+    readFileSync(launcherPath, 'utf8'),
+    readFileSync(path.join(target, 'reader.html'), 'utf8'),
+    target,
+  ));
+}
 console.log(`Synced Reader export; retained ${retained.size} host/provenance files`);

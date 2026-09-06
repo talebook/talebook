@@ -39,3 +39,18 @@ READEST_BASE_URL=http://127.0.0.1:39211 READEST_USERNAME=admin READEST_RESULT_PA
 ```
 
 基准依赖真实后端中书籍10（本任务的《西游记》，4,680,179字节），其他环境需先修改脚本书号；不创建书籍/账号。Android UA，412×915，Chromium，10 Mbps，附加延迟0/100 ms各3轮，冷开使用全新context；暖开是在同一context停留2秒后重新进入，不强制导航缓存命中。计时从进入 `/read/10?reader=readest` 到出现页码，目录/正文交互另行验证。结果包含资源时间线但不包含Cookie或密码。测量会正常记录阅读历史，不应用于不允许产生访问记录的书库。
+
+## 启动页预加载
+
+`sync.mjs` 会从本次导出的 `reader.html` 自动刷新 `talebook-launch.html` 的 preload 区块。只选择同源、现存的两个小型 framework/main 入口脚本（各不超过256 KiB），以低优先级与权限校验并行下载；不执行 Reader，不请求 EPUB，不等待 preload 成功再跳转。升级时不要手写哈希路径。缺少符合条件的脚本时自然退化为原启动流程。
+
+真实 A/B 实测中，最初预取7个大资源会争用连接，已舍弃。最终两个脚本均在 bootstrap 结束前下载完毕，跳转后命中缓存；总开书时间仅有小幅变化，不能宣称大幅提速。逐轮数据与限制见 `document/readest-preload-tb204.json` 。
+
+```bash
+node --test scripts/readest/preload.test.mjs scripts/readest/sync.test.mjs
+READEST_BASE_URL=http://127.0.0.1:39211 node --test scripts/readest/preload-browser.test.cjs
+# READEST_PASSWORD 由安全环境注入，两个地址必须连接相同书籍内容的真实后端
+READEST_BASELINE_URL=http://127.0.0.1:39209 READEST_CANDIDATE_URL=http://127.0.0.1:39211 READEST_RESULT_PATH=./preload-results.json node scripts/readest/preload-benchmark.cjs
+```
+
+浏览器用例中的拒绝/延迟 bootstrap 是故障注入，不是性能基准或体验环境；A/B 基准不拦截请求，保留 HTTP 缓存。仅测试 Chromium，其他浏览器可能忽略 preload 优先级。
