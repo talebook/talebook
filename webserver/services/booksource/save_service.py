@@ -6,6 +6,7 @@ import concurrent.futures
 import logging
 import os
 import re
+import tempfile
 import time
 import traceback
 
@@ -177,25 +178,26 @@ class SaveOnlineBookService(AsyncService):
         filename = _safe_filename(book_file.filename or detail.title)
         if not filename.lower().endswith(".%s" % format_name.lower()):
             filename = "%s.%s" % (filename, format_name.lower())
-        path = os.path.join(upload_dir, "%s-%s" % (int(time.time()), filename))
-        with open(path, "wb") as stream:
-            stream.write(book_file.content)
+        with tempfile.TemporaryDirectory(prefix="online-save-", dir=upload_dir) as temporary:
+            path = os.path.join(temporary, filename)
+            with open(path, "wb") as stream:
+                stream.write(book_file.content)
 
-        metadata = _build_metadata(detail)
-        same_author_book_id = None
-        try:
-            books = self.db.books_with_same_title(metadata)
-            for book in self.db.get_data_as_dict(ids=books) if books else []:
-                if set(book.get("authors", [])) == set(metadata.authors):
-                    same_author_book_id = book.get("id")
-                    if format_name in (book.get("available_formats", "") or ""):
-                        return same_author_book_id
-        except Exception as exc:
-            logging.info("save online: dedupe check failed: %s", exc)
-        if same_author_book_id:
-            self.db.add_format(same_author_book_id, format_name, path, True)
-            return same_author_book_id
-        return self.db.import_book(metadata, [path])
+            metadata = _build_metadata(detail)
+            same_author_book_id = None
+            try:
+                books = self.db.books_with_same_title(metadata)
+                for book in self.db.get_data_as_dict(ids=books) if books else []:
+                    if set(book.get("authors", [])) == set(metadata.authors):
+                        same_author_book_id = book.get("id")
+                        if format_name in (book.get("available_formats", "") or ""):
+                            return same_author_book_id
+            except Exception as exc:
+                logging.info("save online: dedupe check failed: %s", exc)
+            if same_author_book_id:
+                self.db.add_format(same_author_book_id, format_name, path, True)
+                return same_author_book_id
+            return self.db.import_book(metadata, [path])
 
     def _import_txt(self, detail, txt_path):
         mi = _build_metadata(detail)

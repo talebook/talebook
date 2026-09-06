@@ -322,6 +322,7 @@
     "disabled": "未启用"
   },
   "network": {
+    "noBrowseSource": "暂无支持分类浏览的书源，请切换到搜索。",
     "title": "网络书库",
     "search": "搜索网络小说",
     "searchPlaceholder": "输入书名或作者，回车搜索",
@@ -1908,6 +1909,8 @@
     "field_endpoint": "服务地址",
     "field_allowed_hosts": "私网主机白名单（逗号分隔）",
     "field_path": "监听目录",
+    "field_binary_path": "下载器绝对路径",
+    "field_timeout_seconds": "操作超时时间（秒）",
     "field_recursive": "包含子目录",
     "field_api_url": "API 地址",
     "field_api_key": "API 密钥",
