@@ -55,7 +55,8 @@ export function buildReadestReaderUrl(bootstrap, { bookId, origin }) {
   target.searchParams.set('file', validated.resource);
   target.searchParams.set('moke', '1');
   target.searchParams.set('mokeBookId', String(bookId));
-  target.searchParams.set('mokeReturnTo', validated.back);
+  target.searchParams.set('mokeSourceServerUrl', origin);
+  target.searchParams.set('mokeReturnTo', '/library');
   return { target: target.href, ...validated };
 }
 

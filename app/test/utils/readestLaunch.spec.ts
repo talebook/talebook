@@ -61,7 +61,8 @@ describe('Talebook Readest launcher', () => {
         );
         expect(target.searchParams.get('moke')).toBe('1');
         expect(target.searchParams.get('mokeBookId')).toBe('1');
-        expect(target.searchParams.get('mokeReturnTo')).toBe('/book/1');
+        expect(target.searchParams.get('mokeSourceServerUrl')).toBe('http://127.0.0.1:9000');
+        expect(target.searchParams.get('mokeReturnTo')).toBe('/library');
     });
 
     it('rejects cross-origin, unversioned, and mismatched resources', () => {

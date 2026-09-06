@@ -72,7 +72,9 @@ export default defineNuxtConfig({
         },
         '/readest/**': {
             headers: {
-                'Content-Security-Policy': "default-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data:; object-src 'none'; frame-src blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+                'Content-Security-Policy': "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' data:; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline' blob:; font-src 'self' data:; object-src 'none'; frame-src blob:; worker-src 'self' blob:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+                'Cross-Origin-Opener-Policy': 'same-origin',
+                'Cross-Origin-Embedder-Policy': 'require-corp',
                 'X-Content-Type-Options': 'nosniff',
             },
         },
