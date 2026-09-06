@@ -3,11 +3,12 @@ import path from 'node:path';
 
 const START = '<!-- readest-preload:start -->';
 const END = '<!-- readest-preload:end -->';
-const PREFIX = '/readest/_next/static/';
+
 
 // Only parser-discovered assets from this export; never evaluate the HTML or
 // preload book URLs, runtime-configured hosts, optional dialogs, or polyfills.
-export function readerPreloads(readerHtml, exportRoot) {
+export function readerPreloads(readerHtml, exportRoot, embeddedBasePath = '/readest') {
+  const PREFIX = embeddedBasePath + '/_next/static/';
   const assets = new Map();
   const root = realpathSync(exportRoot);
   for (const [tag] of readerHtml.matchAll(/<(?:script|link)\b[^>]*>/gi)) {
@@ -19,7 +20,7 @@ export function readerPreloads(readerHtml, exportRoot) {
     if (href.split('/').some(part => part === '.' || part === '..')) continue;
     const as = script ? 'script' : 'style';
     if (!href.endsWith(script ? '.js' : '.css')) continue;
-    const filename = realpathSync(path.join(root, href.slice('/readest/'.length)));
+    const filename = realpathSync(path.join(root, href.slice((embeddedBasePath + '/').length)));
     if (!filename.startsWith(root + path.sep)) throw new Error('Preload asset escapes Reader export');
     const stat = statSync(filename);
     if (!stat.isFile()) throw new Error('Preload asset is not a file');
@@ -28,12 +29,12 @@ export function readerPreloads(readerHtml, exportRoot) {
   // Two small shell scripts leave connections for the launcher and bootstrap.
   // Large reader/CSS bundles may be cancelled on navigation and waste bytes.
   return [...assets.values()].filter(asset => asset.as === 'script' &&
-    /^\/(?:readest\/_next\/static\/chunks)\/(?:framework|main)-[a-zA-Z0-9]+\.js$/.test(asset.href) &&
+    /^(?:framework|main)-[a-zA-Z0-9]+\.js$/.test(path.basename(asset.href)) &&
     asset.size <= 256 * 1024).slice(0, 2).map(({ href, as }) => ({ href, as }));
 }
 
-export function updateLauncherPreloads(launcherHtml, readerHtml, exportRoot) {
-  const links = readerPreloads(readerHtml, exportRoot).map(({ href, as }) =>
+export function updateLauncherPreloads(launcherHtml, readerHtml, exportRoot, embeddedBasePath = '/readest') {
+  const links = readerPreloads(readerHtml, exportRoot, embeddedBasePath).map(({ href, as }) =>
     `    <link rel="preload" href="${href}" as="${as}" fetchpriority="low" />`);
   const block = `${START}\n${links.join('\n')}\n    ${END}`;
   const start = launcherHtml.indexOf(START);

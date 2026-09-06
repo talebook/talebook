@@ -20,6 +20,10 @@ export async function cleanupLegacyReadestWorker({
   reload = () => globalThis.location.reload(),
   forceCacheCleanup = false,
 } = {}) {
+  // Subpath installs never shipped the legacy root worker. Do not delete
+  // caches or registrations belonging to the host application.
+  const moduleUrl = new URL(import.meta.url);
+  if (/^https?:$/.test(moduleUrl.protocol) && moduleUrl.pathname !== '/readest/legacy-worker-cleanup.js') return false;
   if (!serviceWorker?.getRegistrations) return false;
 
   const registrations = await serviceWorker.getRegistrations();

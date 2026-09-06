@@ -26,6 +26,10 @@ const readProxyHandler = async (event: any) => {
     }
 
     const config = useRuntimeConfig(event);
+    const basePath = String(config.app.baseURL || '/').replace(/\/$/, '');
+    if (basePath && requestUrl.pathname.startsWith(basePath + '/')) {
+        requestUrl.pathname = requestUrl.pathname.slice(basePath.length);
+    }
     const target = buildReadProxyTarget(String(config.api_url), requestUrl);
     const headers = buildReadProxyRequestHeaders(requestHeaders, requestUrl);
 

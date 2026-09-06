@@ -67,3 +67,17 @@ READEST_BASELINE_URL=http://127.0.0.1:39209 READEST_CANDIDATE_URL=http://127.0.0
 ```
 
 基准要求页码和实际章节 iframe 内容均出现；不是只测启动页面消失，也不是完整导航索引耗时。书籍10《西游记》有12个章节文件、101项目录，首屏时0个片段索引，随后11个章节索引补全。上游 main 已另行合入 TB-205 的在线导航跳过策略；这里仍固定来源 SHA 加显式补丁，不将不同策略混入已验证构建。
+
+## 子路径反代测试分支
+
+在 0003 后应用 `0004-reverse-proxy-base-path.patch`，运行：
+
+```sh
+NEXT_PUBLIC_APP_PLATFORM=web NEXT_PUBLIC_EMBEDDED_BASE_PATH=/readest-test/readest npx --yes pnpm@11.1.1 build
+NEXT_PUBLIC_EMBEDDED_BASE_PATH=/readest-test/readest node scripts/readest/sync.mjs /path/to/readest-reader/out/readest
+TALEBOOK_BASE_PATH=/readest-test npm --prefix app run build-spa
+```
+
+补丁允许服务器地址携带经过严格校验的 ASCII 路径；资源仍必须精确匹配该服务器的 `/read/resource/{bookId}.epub` 和单个 revision 参数。字体由 webpack 输出为带哈希资源，语言包从实际嵌入路径读取。启动页按自己的模块 URL 获取部署前缀。子路径环境不清理根域名的旧 Readest 缓存或 service worker；tombstone 的允许作用域限定在前缀之下。
+
+本分支的导出固定为 `/readest-test/readest`，不是直接替换根路径部署的发布包。改变路径需重新构建 Readest 与 Talebook，并同步来源清单；不要手改压缩产物。Talebook 通用说明见 `document/reverse-proxy.md`。

@@ -22,9 +22,9 @@
       <p>{{ message }}</p>
       <p class="code">{{ error }}</p>
       <nav aria-label="恢复操作">
-        <a href="/read/{{ book.id }}?reader=readest">重试</a>
-        <a href="/book/{{ book.id }}">返回书籍页</a>
-        <a href="/read/{{ book.id }}?reader=candle">改用 Candle</a>
+        <a href="{{BASE_PATH}}/read/{{ book.id }}?reader=readest">重试</a>
+        <a href="{{BASE_PATH}}/book/{{ book.id }}">返回书籍页</a>
+        <a href="{{BASE_PATH}}/read/{{ book.id }}?reader=candle">改用 Candle</a>
       </nav>
     </main>
   </body>

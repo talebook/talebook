@@ -12,6 +12,10 @@ if (!process.argv[2] || source === target || source.startsWith(target + path.sep
   throw new Error('Pass the upstream Reader-only export directory (out/readest)');
 }
 const manifest = JSON.parse(readFileSync(path.join(target, 'TALEBOOK_SOURCE.json'), 'utf8'));
+const embeddedBasePath = process.env.NEXT_PUBLIC_EMBEDDED_BASE_PATH || manifest.build.embeddedBasePath;
+if (!/^(?:\/[A-Za-z0-9_-]+)+$/.test(embeddedBasePath)) throw new Error('Invalid embedded base path');
+const exportedHtml = readFileSync(path.join(source, 'reader.html'), 'utf8');
+if (!exportedHtml.includes(embeddedBasePath + '/_next/')) throw new Error('Reader export base path does not match');
 const retained = new Set([...manifest.hostFiles, 'TALEBOOK_SOURCE.json', 'LICENSE', 'THIRD_PARTY_NOTICES.md']);
 const existingText = new Map();
 function rememberText(directory) {
@@ -32,7 +36,7 @@ for (const name of readdirSync(source)) {
 for (const name of ['reader.html', '404.html']) {
   const filename = path.join(target, name);
   const html = readFileSync(filename, 'utf8');
-  const cleanup = '<script type="module" src="/readest/legacy-worker-cleanup.js"></script>';
+  const cleanup = `<script type="module" src="${embeddedBasePath}/legacy-worker-cleanup.js"></script>`;
   writeFileSync(filename, html.replace('<head>', `<head>${cleanup}`));
 }
 // Preserve the exact bytes of unchanged hashed assets, including historical
@@ -57,6 +61,9 @@ if (existsSync(launcherPath)) {
     readFileSync(launcherPath, 'utf8'),
     readFileSync(path.join(target, 'reader.html'), 'utf8'),
     target,
+    embeddedBasePath,
   ));
 }
+manifest.build.embeddedBasePath = embeddedBasePath;
+writeFileSync(path.join(target, 'TALEBOOK_SOURCE.json'), JSON.stringify(manifest, null, 2) + '\n');
 console.log(`Synced Reader export; retained ${retained.size} host/provenance files`);
