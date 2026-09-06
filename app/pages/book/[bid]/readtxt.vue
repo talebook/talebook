@@ -271,6 +271,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -386,7 +387,7 @@ const openPreferredReader = async () => {
         const rsp = await $backend(`/book/${bookid}`);
         const formats = rsp.book?.files?.map(file => String(file.format).toLowerCase()) || [];
         if (rsp.err === 'ok' && formats.includes('epub')) {
-            window.location.replace(`/read/${bookid}`);
+            window.location.replace(withBasePath(`/read/${bookid}`));
             return;
         }
     } catch (e) {

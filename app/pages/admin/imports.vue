@@ -283,7 +283,7 @@
                 <a
                     v-else
                     target="_blank"
-                    :href="`/book/${item.book_id}`"
+                    :href="withBasePath(`/book/${item.book_id}`)"
                 >{{ item.title }}</a> <br>
                 {{ t('admin.imports.label.author') }}：{{ item.author }}
             </template>
@@ -550,6 +550,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';

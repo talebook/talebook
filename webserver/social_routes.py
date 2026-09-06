@@ -2,12 +2,13 @@ from social_tornado.handlers import AuthHandler, CompleteHandler, DisconnectHand
 from tornado.web import url
 
 from webserver import demo_mode, loader
+from webserver.base_path import PublicPathMixin
 
 
 CONF = loader.get_settings()
 
 
-class DemoModeDisabledMixin:
+class DemoModeDisabledMixin(PublicPathMixin):
     def prepare(self):
         if demo_mode.is_demo_mode(CONF):
             self.set_status(403)
