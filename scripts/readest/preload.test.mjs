@@ -29,6 +29,8 @@ test('preloads only bounded, existing modern public build assets; refresh is ide
       { href: '/readest/_next/static/chunks/framework-abc.js', as: 'script' },
       { href: '/readest/_next/static/chunks/main-123.js', as: 'script' },
     ]);
+    const prefixed = html.replaceAll('/readest/', '/team/books/readest/');
+    assert.deepEqual(readerPreloads(prefixed, root, '/team/books/readest'), assets.map(a => ({...a,href: '/team/books' + a.href})));
     const launcher = '<html><head></head><body>正在启动</body></html>';
     const updated = updateLauncherPreloads(launcher, html, root);
     assert.equal((updated.match(/fetchpriority="low"/g) || []).length, 2);

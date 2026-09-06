@@ -1,0 +1,120 @@
+diff --git a/apps/readest-app/src/services/mokeRemoteSource.ts b/apps/readest-app/src/services/mokeRemoteSource.ts
+--- a/apps/readest-app/src/services/mokeRemoteSource.ts
++++ b/apps/readest-app/src/services/mokeRemoteSource.ts
+@@ -57,21 +57,22 @@
+   return new MokeRemoteSourceError('online.network', status);
+ }
+ 
+-function parseServerOrigin(value: string): string | null {
++function parseServerBase(value: string): { origin: string; path: string } | null {
+   try {
+     const url = new URL(value);
++    const path = url.pathname.replace(/\/$/, '');
+     if (
+       !['http:', 'https:'].includes(url.protocol) ||
+       url.username ||
+       url.password ||
+-      url.pathname !== '/' ||
++      (path !== '' && !/^(?:\/[A-Za-z0-9_-]+)+$/.test(path)) ||
+       url.search ||
+       url.hash ||
+-      url.origin !== value.replace(/\/$/, '')
++      url.origin + path !== value.replace(/\/$/, '')
+     ) {
+       return null;
+     }
+-    return url.origin;
++    return { origin: url.origin, path };
+   } catch {
+     return null;
+   }
+@@ -87,8 +88,8 @@
+   serverUrl: string,
+   bookId: string,
+ ): MokeRemoteSourceContext {
+-  const origin = parseServerOrigin(serverUrl);
+-  if (!origin || !/^\d+$/.test(bookId)) {
++  const server = parseServerBase(serverUrl);
++  if (!server || !/^\d+$/.test(bookId)) {
+     throw new MokeRemoteSourceError('online.response_invalid');
+   }
+ 
+@@ -102,11 +103,11 @@
+   const revisionValues = source.searchParams.getAll('revision');
+   const queryKeys = [...source.searchParams.keys()];
+   if (
+-    source.origin !== origin ||
++    source.origin !== server.origin ||
+     source.username ||
+     source.password ||
+     source.hash ||
+-    source.pathname !== `/read/resource/${bookId}.epub` ||
++    source.pathname !== `${server.path}/read/resource/${bookId}.epub` ||
+     queryKeys.length !== 1 ||
+     queryKeys[0] !== 'revision' ||
+     revisionValues.length !== 1 ||
+diff --git a/apps/readest-app/src/i18n/i18n.ts b/apps/readest-app/src/i18n/i18n.ts
+--- a/apps/readest-app/src/i18n/i18n.ts
++++ b/apps/readest-app/src/i18n/i18n.ts
+@@ -9,7 +9,7 @@
+ const isBrowser = typeof window !== 'undefined';
+ // Moke ships Readest beneath `/readest`; i18next's absolute URL would
+ // otherwise escape that prefix and request the host app's nonexistent locales.
+-const publicBasePath = process.env['NEXT_PUBLIC_APP_PLATFORM'] === 'tauri' ? '/readest' : '';
++const publicBasePath = process.env['NEXT_PUBLIC_EMBEDDED_BASE_PATH'] || '/readest';
+ 
+ const initI18n = async () => {
+   if (isBrowser) {
+diff --git a/apps/readest-app/src/styles/globals.css b/apps/readest-app/src/styles/globals.css
+--- a/apps/readest-app/src/styles/globals.css
++++ b/apps/readest-app/src/styles/globals.css
+@@ -4,7 +4,7 @@
+ 
+ @font-face {
+   font-family: 'Inter';
+-  src: url('/fonts/InterVariable.woff2') format('woff2');
++  src: url('../../public/fonts/InterVariable.woff2') format('woff2');
+   font-weight: 100 900;
+   font-style: normal;
+   font-display: swap;
+@@ -12,7 +12,7 @@
+ 
+ @font-face {
+   font-family: 'Inter';
+-  src: url('/fonts/InterVariable-Italic.woff2') format('woff2');
++  src: url('../../public/fonts/InterVariable-Italic.woff2') format('woff2');
+   font-weight: 100 900;
+   font-style: italic;
+   font-display: swap;
+diff --git a/apps/readest-app/src/__tests__/services/remoteSourceBasePath.test.ts b/apps/readest-app/src/__tests__/services/remoteSourceBasePath.test.ts
+new file mode 100644
+--- /dev/null
++++ b/apps/readest-app/src/__tests__/services/remoteSourceBasePath.test.ts
+@@ -0,0 +1,27 @@
++import { describe, expect, it } from 'vitest';
++import { validateMokeRemoteSource } from '@/services/mokeRemoteSource';
++
++describe('remote EPUB source base path', () => {
++  it('accepts an exact resource under the server base path', () => {
++    const url = 'https://example.test/team/books/read/resource/2.epub?revision=v1';
++    expect(validateMokeRemoteSource(url, 'https://example.test/team/books/', '2').url).toBe(url);
++  });
++  it.each([
++    'https://example.test/team/../books',
++    'https://example.test/team%2Fbooks',
++    'https://example.test/team/books?x=1',
++    'https://example.test//team/books',
++    'https://example.test/team/books#x',
++  ])('rejects ambiguous server base %s', (server) => {
++    expect(() => validateMokeRemoteSource('https://example.test/team/books/read/resource/2.epub?revision=v1', server, '2')).toThrow();
++  });
++  it.each([
++    'https://example.test/read/resource/2.epub?revision=v1',
++    'https://example.test/team/books-evil/read/resource/2.epub?revision=v1',
++    'https://other.test/team/books/read/resource/2.epub?revision=v1',
++    'https://example.test/team/books/read/resource/3.epub?revision=v1',
++    'https://example.test/team/books/read/resource/2.epub?revision=v1&other=1',
++  ])('rejects resources outside the exact delegation %s', (url) => {
++    expect(() => validateMokeRemoteSource(url, 'https://example.test/team/books', '2')).toThrow();
++  });
++});

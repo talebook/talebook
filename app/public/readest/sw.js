@@ -5,9 +5,10 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const cacheNames = await caches.keys();
-    const staleCacheNames = cacheNames.filter(
+    const isRootEmbed = new URL(self.location.href).pathname === '/readest/sw.js';
+    const staleCacheNames = isRootEmbed ? cacheNames.filter(
       (name) => name.startsWith('serwist-') || LEGACY_CACHE_NAMES.has(name),
-    );
+    ) : [];
     await Promise.all(staleCacheNames.map((name) => caches.delete(name)));
     await self.registration.unregister();
     const windows = await clients.matchAll({ type: 'window' });

@@ -124,3 +124,22 @@ describe('Talebook Readest launcher', () => {
         })).rejects.toMatchObject({ login: true });
     });
 });
+
+
+describe('Readest behind a path proxy', () => {
+    it('requires the exact prefixed resource and keeps the host base URL', () => {
+        const basePath = '/team/books';
+        const payload = { ...bootstrap, resource: { ...bootstrap.resource, url: basePath + bootstrap.resource.url }, navigation: {} };
+        const launch = buildReadestReaderUrl(payload, { bookId: '1', origin: 'https://example.test', basePath });
+        const target = new URL(launch.target);
+        expect(target.pathname).toBe('/team/books/readest/reader.html');
+        expect(target.searchParams.get('mokeSourceServerUrl')).toBe('https://example.test/team/books');
+        expect(launch.back).toBe('/team/books/book/1');
+        expect(() => buildReadestReaderUrl(bootstrap, { bookId: '1', origin: 'https://example.test', basePath })).toThrow(/同源/);
+    });
+    it('fetches bootstrap under the configured prefix', async () => {
+        const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify(bootstrap), { headers: { 'Content-Type': 'application/json' } }));
+        await fetchReadestBootstrap({ bookId: '1', origin: 'https://example.test', basePath: '/team/books', fetchImpl });
+        expect(fetchImpl.mock.calls[0][0]).toBe('/team/books/api/book/1/reader-bootstrap?engine=readest');
+    });
+});

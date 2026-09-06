@@ -16,7 +16,7 @@ test('sync preserves host files and immutable bytes, refreshes HTML and rejects 
     mkdirSync(path.join(source, '_next/static'), {recursive:true});
     cpSync(new URL('./sync.mjs', import.meta.url), script);
     cpSync(new URL('./preload.mjs', import.meta.url), path.join(path.dirname(script), 'preload.mjs'));
-    writeFileSync(path.join(target,'TALEBOOK_SOURCE.json'), JSON.stringify({hostFiles:['sw.js','talebook-launch.html']}));
+    writeFileSync(path.join(target,'TALEBOOK_SOURCE.json'), JSON.stringify({hostFiles:['sw.js','talebook-launch.html'],build:{embeddedBasePath:'/readest'}}));
     writeFileSync(path.join(target,'talebook-launch.html'), '<html><head></head><body>host launcher</body></html>');
     writeFileSync(path.join(target,'sw.js'),'host worker');
     writeFileSync(path.join(target,'old.js'),'stale chunk');

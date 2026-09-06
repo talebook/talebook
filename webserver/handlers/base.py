@@ -16,6 +16,7 @@ from sqlalchemy import func as sql_func
 from tornado import web
 
 from webserver import demo_mode, loader, utils
+from webserver.base_path import BASE_PATH, PublicPathMixin, public_url
 from webserver.i18n import _, set_language
 
 # import social_tornado.handlers
@@ -99,7 +100,7 @@ def is_admin(func):
     return do
 
 
-class BaseHandler(web.RequestHandler):
+class BaseHandler(PublicPathMixin, web.RequestHandler):
     _path_to_env = {}
     # 添加一个锁来保护数据库连接的访问
     _db_lock = threading.Lock()
@@ -205,15 +206,15 @@ class BaseHandler(web.RequestHandler):
     def set_hosts(self):
         # site_url为完整路径，用于发邮件等
         host = self.request.headers.get("X-Forwarded-Host", self.request.host)
-        self.site_url = self.request.protocol + "://" + host
+        self.site_url = self.request.protocol + "://" + host + BASE_PATH
 
         # 默认情况下，访问站内资源全部采用相对路径
-        self.api_url = ""  # API动态请求地址
-        self.cdn_url = ""  # 可缓存的资源，图片，文件
+        self.api_url = BASE_PATH  # API动态请求地址
+        self.cdn_url = BASE_PATH  # 可缓存的资源，图片，文件
 
         # 如果设置有static_host配置，则改为绝对路径
         if CONF["static_host"]:
-            self.api_url = self.request.protocol + "://" + host
+            self.api_url = self.request.protocol + "://" + host + BASE_PATH
             self.cdn_url = self.request.protocol + "://" + CONF["static_host"]
 
     def prepare(self):
@@ -403,6 +404,8 @@ class BaseHandler(web.RequestHandler):
         t = env.get_template(template_name)
         namespace = self.get_template_namespace()
         namespace.update(kwargs)
+        namespace["public_url"] = public_url
+        namespace["BASE_PATH"] = BASE_PATH
         return t.render(**namespace)
 
     def html_page(self, template, *args, **kwargs):
@@ -425,6 +428,7 @@ class BaseHandler(web.RequestHandler):
             "count_all_users": self.session.query(sql_func.count(Reader.id)).scalar(),
             "count_hot_users": self.session.query(sql_func.count(Reader.id)).filter(Reader.access_time > last_week).scalar(),
             "IMG": self.cdn_url,
+            "RES": self.api_url,
             "SITE_TITLE": CONF["site_title"],
         }
         vals = dict(*args, **kwargs)

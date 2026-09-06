@@ -50,12 +50,13 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, onMounted } from 'vue';
 import { useRequestURL, useNuxtApp } from 'nuxt/app';
 import { useI18n } from 'vue-i18n';
 
 const url = useRequestURL();
-const webdavUrl = `${url.protocol}//${url.host}/books/`;
+const webdavUrl = `${url.protocol}//${url.host}${withBasePath('/books/')}`;
 const { $backend } = useNuxtApp();
 const { t } = useI18n();
 const webdavEnabled = ref(true);

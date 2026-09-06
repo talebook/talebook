@@ -17,6 +17,7 @@ import tornado.escape
 from tornado import web
 
 from webserver import demo_mode, loader, utils
+from webserver.base_path import public_url
 from webserver.constants import (
     CALIBRE_ERROR_FLAG,
     MEDIA_TYPE_COMIC,
@@ -1827,13 +1828,13 @@ class BookReaderBootstrap(BaseHandler):
             },
             "resource": {
                 "kind": "authorized-epub-url",
-                "url": "/read/resource/%d.epub?revision=%s" % (book["id"], revision),
+                "url": public_url("/read/resource/%d.epub?revision=%s" % (book["id"], revision)),
                 "mime": "application/epub+zip",
                 "range": True,
             },
             "navigation": {
-                "back": "/book/%d" % book["id"],
-                "fallback": "/read/%d?reader=candle" % book["id"],
+                "back": public_url("/book/%d" % book["id"]),
+                "fallback": public_url("/read/%d?reader=candle" % book["id"]),
             },
             "capabilities": {
                 "readerCore": True,

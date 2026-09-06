@@ -20,11 +20,11 @@
       @keyframes spin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
     </style>
-    <script type="module" src="/readest/legacy-worker-cleanup.js"></script>
-    <script type="module" src="/readest/talebook-launch.js"></script>
+    <script type="module" src="./legacy-worker-cleanup.js"></script>
+    <script type="module" src="./talebook-launch.js"></script>
   <!-- readest-preload:start -->
-    <link rel="preload" href="/readest/_next/static/chunks/framework-803b9476910ff7dc.js" as="script" fetchpriority="low" />
-    <link rel="preload" href="/readest/_next/static/chunks/main-fa3b8f89dca32434.js" as="script" fetchpriority="low" />
+    <link rel="preload" href="/readest-test/readest/_next/static/chunks/framework-803b9476910ff7dc.js" as="script" fetchpriority="low" />
+    <link rel="preload" href="/readest-test/readest/_next/static/chunks/main-b13d748f84721701.js" as="script" fetchpriority="low" />
     <!-- readest-preload:end -->
   </head>
   <body>
@@ -33,10 +33,10 @@
       <h1 data-launch-heading>正在启动 Readest</h1>
       <p data-launch-status role="status">正在验证书籍权限与 EPUB 资源…</p>
       <nav data-launch-actions aria-label="恢复操作" hidden>
-        <a data-action="retry" href="/">重试</a>
-        <a data-action="back" href="/">返回书籍页</a>
-        <a data-action="fallback" href="/">改用 Candle</a>
-        <a data-action="login" href="/login" hidden>重新登录</a>
+        <a data-action="retry" href="../">重试</a>
+        <a data-action="back" href="../">返回书籍页</a>
+        <a data-action="fallback" href="../">改用 Candle</a>
+        <a data-action="login" href="../login" hidden>重新登录</a>
       </nav>
       <noscript><p>浏览器已禁用 JavaScript，请返回书籍页并改用 Candle 阅读器。</p></noscript>
     </main>

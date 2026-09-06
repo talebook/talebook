@@ -1,8 +1,12 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 import { readFileSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { normalizeBasePath, withBasePath } from './utils/base-path'
+
+const basePath = normalizeBasePath(process.env.TALEBOOK_BASE_PATH || '')
 
 export default defineNuxtConfig({
+    vite: { define: { 'import.meta.env.TALEBOOK_BASE_PATH': JSON.stringify(basePath) } },
     compatibilityDate: '2024-04-03',
     devtools: { enabled: true },
     ignore: [
@@ -67,7 +71,7 @@ export default defineNuxtConfig({
         '/readest/sw.js': {
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Service-Worker-Allowed': '/',
+                'Service-Worker-Allowed': basePath + '/',
             },
         },
         '/readest/**': {
@@ -86,6 +90,7 @@ export default defineNuxtConfig({
         '/static/themes/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/static/themes/**' },
     },
     app: {
+        baseURL: basePath + "/",
         head: {
             title: 'talebook',
             titleTemplate: '%s | talebook',
@@ -99,10 +104,10 @@ export default defineNuxtConfig({
                 },
             ],
             link: [
-                { rel: 'shortcut icon', type: 'image/x-icon', href: '/logo/favicon.ico' }
+                { rel: 'shortcut icon', type: 'image/x-icon', href: withBasePath('/logo/favicon.ico', basePath) }
             ],
             script: [
-                { type: 'module', src: '/readest/legacy-worker-cleanup.js' }
+                { type: 'module', src: withBasePath('/readest/legacy-worker-cleanup.js', basePath) }
             ]
         }
     },

@@ -1,3 +1,9 @@
+// Derive deployment location from this owned module, never from request headers.
+const moduleUrl = new URL(import.meta.url);
+const DEPLOYMENT_BASE = /^https?:$/.test(moduleUrl.protocol)
+  ? moduleUrl.pathname.replace(/\/readest\/talebook-launch\.js$/, '') : '';
+function publicPath(path, basePath = DEPLOYMENT_BASE) { return basePath + path; }
+
 const BOOK_ID_PATTERN = /^[1-9][0-9]*$/;
 const BOOTSTRAP_SCHEMA = 'talebook.reader.bootstrap.v1';
 
@@ -19,7 +25,7 @@ function localNavigationPath(value, fallback) {
   return value;
 }
 
-export function validateReadestBootstrap(payload, { bookId, origin }) {
+export function validateReadestBootstrap(payload, { bookId, origin, basePath = DEPLOYMENT_BASE }) {
   if (!payload || typeof payload !== 'object') throw new ReadestLaunchError('阅读器启动响应无效');
   if (payload.err !== 'ok') throw new ReadestLaunchError(payload.msg || payload.err || '暂时无法启动 Readest');
   if (payload.schema !== BOOTSTRAP_SCHEMA || payload.engine !== 'readest') {
@@ -35,7 +41,7 @@ export function validateReadestBootstrap(payload, { bookId, origin }) {
   }
 
   const resource = new URL(payload.resource?.url || '', origin);
-  if (resource.origin !== origin || resource.pathname !== `/read/resource/${bookId}.epub`) {
+  if (resource.origin !== origin || resource.pathname !== publicPath(`/read/resource/${bookId}.epub`, basePath)) {
     throw new ReadestLaunchError('EPUB 资源不是受信任的同源地址');
   }
   if (resource.searchParams.get('revision') !== revision) {
@@ -44,30 +50,30 @@ export function validateReadestBootstrap(payload, { bookId, origin }) {
 
   return {
     resource: resource.href,
-    back: localNavigationPath(payload.navigation?.back, `/book/${bookId}`),
-    fallback: localNavigationPath(payload.navigation?.fallback, `/read/${bookId}?reader=candle`),
+    back: localNavigationPath(payload.navigation?.back, publicPath(`/book/${bookId}`, basePath)),
+    fallback: localNavigationPath(payload.navigation?.fallback, publicPath(`/read/${bookId}?reader=candle`, basePath)),
   };
 }
 
-export function buildReadestReaderUrl(bootstrap, { bookId, origin }) {
-  const validated = validateReadestBootstrap(bootstrap, { bookId, origin });
-  const target = new URL('/readest/reader.html', origin);
+export function buildReadestReaderUrl(bootstrap, { bookId, origin, basePath = DEPLOYMENT_BASE }) {
+  const validated = validateReadestBootstrap(bootstrap, { bookId, origin, basePath });
+  const target = new URL(publicPath('/readest/reader.html', basePath), origin);
   target.searchParams.set('file', validated.resource);
   target.searchParams.set('moke', '1');
   target.searchParams.set('mokeBookId', String(bookId));
-  target.searchParams.set('mokeSourceServerUrl', origin);
+  target.searchParams.set('mokeSourceServerUrl', origin + basePath);
   target.searchParams.set('mokeReturnTo', '/library');
   return { target: target.href, ...validated };
 }
 
-export async function fetchReadestBootstrap({ bookId, origin, fetchImpl = fetch }) {
-  const response = await fetchImpl(`/api/book/${bookId}/reader-bootstrap?engine=readest`, {
+export async function fetchReadestBootstrap({ bookId, origin, fetchImpl = fetch, basePath = DEPLOYMENT_BASE }) {
+  const response = await fetchImpl(publicPath(`/api/book/${bookId}/reader-bootstrap?engine=readest`, basePath), {
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
     redirect: 'follow',
   });
   const contentType = response.headers.get('content-type') || '';
-  if (response.redirected && new URL(response.url, origin).pathname === '/login') {
+  if (response.redirected && new URL(response.url, origin).pathname === publicPath('/login', basePath)) {
     throw new ReadestLaunchError('登录状态已失效，请重新登录', { login: true });
   }
   if (!contentType.toLowerCase().includes('application/json')) {
@@ -90,9 +96,9 @@ function configureActions(document, bookId, navigation = {}) {
   const back = document.querySelector('[data-action="back"]');
   const fallback = document.querySelector('[data-action="fallback"]');
   const retry = document.querySelector('[data-action="retry"]');
-  if (back) back.href = navigation.back || `/book/${bookId}`;
-  if (fallback) fallback.href = navigation.fallback || `/read/${bookId}?reader=candle`;
-  if (retry) retry.href = `/readest/talebook-launch.html?bookId=${encodeURIComponent(bookId)}`;
+  if (back) back.href = navigation.back || publicPath(`/book/${bookId}`);
+  if (fallback) fallback.href = navigation.fallback || publicPath(`/read/${bookId}?reader=candle`);
+  if (retry) retry.href = publicPath(`/readest/talebook-launch.html?bookId=${encodeURIComponent(bookId)}`);
 }
 
 export async function runReadestLauncher({ window, document, fetchImpl = fetch }) {
