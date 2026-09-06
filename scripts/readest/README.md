@@ -54,3 +54,16 @@ READEST_BASELINE_URL=http://127.0.0.1:39209 READEST_CANDIDATE_URL=http://127.0.0
 ```
 
 浏览器用例中的拒绝/延迟 bootstrap 是故障注入，不是性能基准或体验环境；A/B 基准不拦截请求，保留 HTTP 缓存。仅测试 Chromium，其他浏览器可能忽略 preload 优先级。
+
+## 正文优先初始化（TB-204）
+
+在 0002 后应用 `0003-progressive-navigation.patch` 。仅在线嵌入、非固定版式且原始目录不稀疏、未排序的 EPUB 启用：先整理原始目录与章节位置，不读取全书片段；首次实际 relocate 后 100ms 再以两个并发任务补齐目录锚点。每段之间让出主线程。关闭或重新打开取消旧任务，结果原子补齐且保留 Foliate 目录对象、ID、标签与阅读位置。完整缓存命中直接复用；稀疏目录等情况保留旧流程。
+
+真实后端回归及 A/B（凭据仅由环境注入）：
+
+```bash
+READEST_BASE_URL=http://127.0.0.1:39211 node scripts/readest/progressive-browser.test.cjs
+READEST_BASELINE_URL=http://127.0.0.1:39209 READEST_CANDIDATE_URL=http://127.0.0.1:39211 READEST_RESULT_PATH=./progressive-results.json node scripts/readest/progressive-benchmark.cjs
+```
+
+基准要求页码和实际章节 iframe 内容均出现；不是只测启动页面消失，也不是完整导航索引耗时。书籍10《西游记》有12个章节文件、101项目录，首屏时0个片段索引，随后11个章节索引补全。上游 main 已另行合入 TB-205 的在线导航跳过策略；这里仍固定来源 SHA 加显式补丁，不将不同策略混入已验证构建。
