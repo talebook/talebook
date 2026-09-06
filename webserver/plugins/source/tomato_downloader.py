@@ -2,16 +2,21 @@
 
 import datetime
 import hashlib
+import io
 import json
 import os
 import platform
+import posixpath
 import re
 import secrets
 import socket
 import subprocess
 import tempfile
 import time
+import zipfile
 from pathlib import Path
+from urllib.parse import unquote
+from xml.etree import ElementTree
 
 import requests
 
@@ -30,6 +35,50 @@ RELEASE_HASHES = {
 MAX_BOOK_BYTES = 64 * 1024 * 1024
 
 
+def output_format(context):
+    value = (context.get("config") or {}).get("output_format", "epub")
+    if value not in ("epub", "txt"):
+        raise UpstreamError("番茄下载格式仅支持 EPUB 或 TXT")
+    return value
+
+
+def validate_epub(content):
+    """Check the bounded archive and reading order without extracting files."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as archive:
+            entries = archive.infolist()
+            names = {entry.filename for entry in entries}
+            if len(names) != len(entries) or sum(entry.file_size for entry in entries) > MAX_BOOK_BYTES * 4:
+                raise ValueError("invalid archive size or duplicate entries")
+            if archive.testzip() is not None or archive.read("mimetype") != b"application/epub+zip":
+                raise ValueError("invalid EPUB archive")
+            container = ElementTree.fromstring(archive.read("META-INF/container.xml"))
+            rootfile = container.find("{*}rootfiles/{*}rootfile")
+            package_path = rootfile.attrib["full-path"]
+            package = ElementTree.fromstring(archive.read(package_path))
+            if package.tag != "{http://www.idpf.org/2007/opf}package":
+                raise ValueError("invalid package")
+            manifest = {item.attrib["id"]: item.attrib["href"] for item in package.findall("{*}manifest/{*}item")}
+            spine = package.findall("{*}spine/{*}itemref")
+            if not spine:
+                raise ValueError("empty spine")
+            for item in spine:
+                href = unquote(manifest[item.attrib["idref"]].split("#", 1)[0])
+                path = posixpath.normpath(posixpath.join(posixpath.dirname(package_path), href))
+                if path not in names or archive.getinfo(path).file_size == 0:
+                    raise ValueError("missing reading content")
+    except (
+        zipfile.BadZipFile,
+        KeyError,
+        ValueError,
+        AttributeError,
+        ElementTree.ParseError,
+        RuntimeError,
+        NotImplementedError,
+    ):
+        raise UpstreamError("番茄 EPUB 文件损坏或阅读目录不完整，未入库") from None
+
+
 def book_id(value):
     value = str(value or "").strip()
     match = re.fullmatch(r"(?:https://fanqienovel\.com/page/)?([0-9]{10,25})/?", value)
@@ -43,6 +92,7 @@ class DownloaderSession:
 
     def __init__(self, context):
         self.config = context.get("config") or {}
+        self.format = output_format(context)
         seconds = min(3600, max(5, float(self.config.get("timeout_seconds", 600))))
         if context.get("deadline"):
             remaining = (datetime.datetime.fromisoformat(context["deadline"]) - datetime.datetime.now()).total_seconds()
@@ -88,7 +138,7 @@ class DownloaderSession:
         self.output.mkdir()
         config = {
             "save_path": str(self.output),
-            "novel_format": "txt",
+            "novel_format": self.format,
             "bulk_files": False,
             "use_official_api": True,
             "api_endpoints": [],
@@ -190,14 +240,22 @@ class DownloaderSession:
             or record.get("failed_chapters") != 0
         ):
             raise UpstreamError("番茄下载缺章或完整性无法确认，未入库；请稍后重试")
-        files = list(self.output.glob("*.txt"))
+        files = list(self.output.glob("*." + self.format))
         if len(files) != 1 or files[0].is_symlink() or not files[0].is_file():
-            raise UpstreamError("番茄下载器未生成唯一的 TXT 文件，未入库")
+            raise UpstreamError("番茄下载器未生成唯一的 %s 文件，未入库" % self.format.upper())
         with files[0].open("rb") as stream:
             content = stream.read(MAX_BOOK_BYTES + 1)
         if not content or len(content) > MAX_BOOK_BYTES:
             raise UpstreamError("番茄下载文件为空或超过 64 MiB，未入库")
-        return BookFile(filename=identity + ".txt", content=content, format="txt", media_type="text/plain")
+        if self.format == "epub":
+            validate_epub(content)
+        self.remaining()
+        return BookFile(
+            filename=identity + "." + self.format,
+            content=content,
+            format=self.format,
+            media_type="application/epub+zip" if self.format == "epub" else "text/plain",
+        )
 
     def __exit__(self, *_args):
         try:
@@ -217,12 +275,13 @@ class TomatoDownloaderProvider(SourceBase):
     manifest = _manifest(
         "talebook.source.tomato-downloader",
         source_name,
-        "搜索番茄小说或输入书籍 ID，下载完整 TXT 到本地书库。需安装下载器，依赖上游在线服务。",
+        "搜索番茄小说或输入书籍 ID，下载完整 EPUB 或 TXT 到本地书库。需安装下载器，依赖上游在线服务。",
         ["sources.search", "sources.acquire"],
         {
             "type": "object",
             "properties": {
                 "binary_path": {"type": "string", "title": "下载器绝对路径", "default": "/opt/tomato/downloader"},
+                "output_format": {"type": "string", "title": "下载格式", "enum": ["epub", "txt"], "default": "epub"},
                 "timeout_seconds": {
                     "type": "number",
                     "title": "操作超时时间（秒）",
@@ -258,7 +317,7 @@ class TomatoDownloaderProvider(SourceBase):
                     authors=(str(item["author"]),) if item.get("author") else (),
                     source=self.source_name,
                     source_url="https://fanqienovel.com/page/" + identity,
-                    format="txt",
+                    format=output_format(context),
                     access="download",
                     license="作品版权归原权利人所有",
                 )
@@ -282,7 +341,7 @@ class TomatoDownloaderProvider(SourceBase):
             categories=tuple(item.get("tags") or []),
             source_url="https://fanqienovel.com/page/" + identity,
             source=self.source_name,
-            format="txt",
+            format=output_format(context),
             downloadable=True,
         )
 

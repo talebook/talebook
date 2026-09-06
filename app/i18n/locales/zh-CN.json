@@ -1910,6 +1910,7 @@
     "field_allowed_hosts": "私网主机白名单（逗号分隔）",
     "field_path": "监听目录",
     "field_binary_path": "下载器绝对路径",
+    "field_output_format": "下载格式",
     "field_timeout_seconds": "操作超时时间（秒）",
     "field_recursive": "包含子目录",
     "field_api_url": "API 地址",

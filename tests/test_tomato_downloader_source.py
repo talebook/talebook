@@ -1,8 +1,10 @@
 import datetime
 import hashlib
+import io
 import json
 import os
 import time
+import zipfile
 from types import SimpleNamespace
 from unittest import mock
 
@@ -31,15 +33,17 @@ def test_book_id_rejects_untrusted_paths_and_commands(value):
         tomato.book_id(value)
 
 
-def test_search_detail_and_acquire_use_existing_typed_contract():
+@pytest.mark.parametrize("fmt", ["epub", "txt"])
+def test_search_detail_and_acquire_use_existing_typed_contract(fmt):
+    context = {"config": {"output_format": fmt}}
     provider = tomato.TomatoDownloaderProvider()
     with mock.patch.object(tomato, "DownloaderSession") as factory:
         session = factory.return_value.__enter__.return_value
         session.request.return_value = {"items": [{"book_id": IDENTITY, "title": "西游记", "author": "吴承恩"}]}
-        page = provider.search("西游记", {}, {})
+        page = provider.search("西游记", {}, context)
         assert page.items[0].external_id == IDENTITY
         assert page.items[0].access == "download"
-        assert page.items[0].format == "txt"
+        assert page.items[0].format == fmt
         session.request.assert_called_once_with("GET", "/api/search", params={"q": "西游记"})
         session.request.return_value = {
             "book_id": IDENTITY,
@@ -49,12 +53,12 @@ def test_search_detail_and_acquire_use_existing_typed_contract():
             "description": "百回本",
             "cover_url": "/api/preview-cover/private",
         }
-        detail = provider.get_book(IDENTITY, {})
+        detail = provider.get_book(IDENTITY, context)
         assert detail.title == "西游记"
-        assert detail.downloadable and detail.format == "txt"
+        assert detail.downloadable and detail.format == fmt
         assert not detail.cover_url  # Ephemeral authenticated URLs must not escape to the browser.
-        assert provider.search(IDENTITY, {}, {}).items[0].title == "西游记"
-        assert provider.download(detail, {}) is session.download.return_value
+        assert provider.search(IDENTITY, {}, context).items[0].title == "西游记"
+        assert provider.download(detail, context) is session.download.return_value
         session.download.assert_called_once_with(IDENTITY)
         assert provider.search("西游记", {"page": 2}, {}).items == []
 
@@ -68,7 +72,7 @@ def test_search_malformed_response_is_failure(payload):
 
 
 def download_session(tmp_path, state="done", failed=0):
-    session = tomato.DownloaderSession({})
+    session = tomato.DownloaderSession({"config": {"output_format": "txt"}})
     session.output = tmp_path
     (tmp_path / "西游记.txt").write_text("西游记\n第一回\n测试正文", encoding="utf-8")
     session.request = mock.Mock(
@@ -90,6 +94,58 @@ def test_download_complete_file(tmp_path):
     assert result.filename == IDENTITY + ".txt"
     assert result.format == "txt"
     assert "测试正文" in result.content.decode("utf-8")
+
+
+def epub_fixture(spine="chapter", chapter=True):
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, "w") as archive:
+        archive.writestr("mimetype", "application/epub+zip")
+        archive.writestr(
+            "META-INF/container.xml",
+            '<container><rootfiles><rootfile full-path="OEBPS/book.opf"/></rootfiles></container>',
+        )
+        archive.writestr(
+            "OEBPS/book.opf",
+            '<package xmlns="http://www.idpf.org/2007/opf"><manifest>'
+            '<item id="chapter" href="chapter.xhtml"/></manifest>'
+            '<spine><itemref idref="%s"/></spine></package>' % spine,
+        )
+        if chapter:
+            archive.writestr("OEBPS/chapter.xhtml", '<html xmlns="http://www.w3.org/1999/xhtml"><body>正文</body></html>')
+    return output.getvalue()
+
+
+def test_epub_download_returns_native_archive(tmp_path):
+    session = download_session(tmp_path)
+    session.format = "epub"
+    content = epub_fixture()
+    (tmp_path / "西游记.epub").write_bytes(content)
+    result = session.download(IDENTITY)
+    assert result.filename == IDENTITY + ".epub"
+    assert result.media_type == "application/epub+zip"
+    assert result.content == content
+
+
+@pytest.mark.parametrize("content", [b"not a zip", epub_fixture(spine="missing"), epub_fixture(chapter=False)])
+def test_damaged_epub_is_not_importable(tmp_path, content):
+    session = download_session(tmp_path)
+    session.format = "epub"
+    (tmp_path / "西游记.epub").write_bytes(content)
+    with pytest.raises(UpstreamError, match="EPUB 文件损坏"):
+        session.download(IDENTITY)
+
+
+def test_epub_expansion_limit(monkeypatch):
+    monkeypatch.setattr(tomato, "MAX_BOOK_BYTES", 1)
+    with pytest.raises(UpstreamError, match="EPUB 文件损坏"):
+        tomato.validate_epub(epub_fixture())
+
+
+def test_invalid_format_fails_before_starting_process():
+    with mock.patch.object(tomato.subprocess, "Popen") as popen:
+        with pytest.raises(UpstreamError, match="仅支持"):
+            tomato.DownloaderSession({"config": {"output_format": "pdf"}})
+        popen.assert_not_called()
 
 
 def test_incomplete_book_is_never_returned(tmp_path):
@@ -161,6 +217,7 @@ def test_process_is_reaped_and_temp_files_removed_on_timeout(tmp_path, monkeypat
                 directory = session.root
                 config = json.loads((directory / "config.yml").read_text())
                 assert config["api_endpoints"] == [] and config["use_official_api"]
+                assert config["novel_format"] == "epub"
                 session.deadline = time.monotonic() - 1
                 session.remaining()
     proc.kill.assert_called_once()
@@ -214,15 +271,21 @@ def test_catalog_download_uses_connection_budget_but_search_remains_bounded():
 
 
 @pytest.mark.skipif(not os.environ.get("TOMATO_TEST_BINARY"), reason="requires a verified release and live upstream")
-def test_live_release_search_detail_and_complete_download(tmp_path, monkeypatch):
+@pytest.mark.parametrize("fmt", ["epub", "txt"])
+def test_live_release_search_detail_and_complete_download(tmp_path, monkeypatch, fmt):
     provider = tomato.TomatoDownloaderProvider()
-    context = {"config": {"binary_path": os.environ["TOMATO_TEST_BINARY"], "timeout_seconds": 180}}
+    context = {"config": {"binary_path": os.environ["TOMATO_TEST_BINARY"], "timeout_seconds": 180, "output_format": fmt}}
     page = provider.search("西游记", {}, context)
     assert any(item.external_id == IDENTITY for item in page.items)
     detail = provider.get_book(IDENTITY, context)
     assert detail.title == "西游记"
     result = provider.download(detail, context)
-    assert "西游记" in result.content.decode("utf-8")
+    assert result.format == fmt
+    if fmt == "epub":
+        tomato.validate_epub(result.content)
+    else:
+        assert "西游记" in result.content.decode("utf-8")
+    print("Live download:", fmt, len(result.content), "bytes")
 
     from webserver import main
 
@@ -238,7 +301,7 @@ def test_live_release_search_detail_and_complete_download(tmp_path, monkeypatch)
     try:
         imported = service._import_file(detail, result)
         assert db.get_metadata(imported, index_is_id=True).title == "西游记"
-        assert db.format(imported, "TXT", index_is_id=True) == result.content
+        assert db.format(imported, fmt.upper(), index_is_id=True) == result.content
         assert list((tmp_path / "uploads").iterdir()) == []
     finally:
         db.close()

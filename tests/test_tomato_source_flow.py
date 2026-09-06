@@ -7,6 +7,7 @@ import pytest
 
 from tests.test_main import TestWithUserLogin, get_db
 from tests.test_main import setUpModule as init
+from tests.test_tomato_downloader_source import epub_fixture
 from webserver import models
 from webserver.plugins.runtime.domains import BookFile, SourceBookDetail
 from webserver.plugins.runtime.protocol import UpstreamError
@@ -58,14 +59,16 @@ class TestTomatoSourceFlow(TestWithUserLogin):
         remote.request.side_effect = lambda _method, path, **_kwargs: (
             {"items": [{"book_id": IDENTITY, "title": "西游记", "author": "吴承恩"}]} if path == "/api/search" else DETAIL
         )
-        remote.download.return_value = BookFile(filename=IDENTITY + ".txt", content=CONTENT, format="txt")
+        epub = epub_fixture()
+        remote.download.return_value = BookFile(filename=IDENTITY + ".epub", content=epub, format="epub")
         paths = []
 
         def import_file(metadata, filenames):
             self.assertEqual(metadata.title, "西游记")
             self.assertEqual(metadata.authors, ["吴承恩"])
             paths.extend(filenames)
-            self.assertEqual(Path(filenames[0]).read_bytes(), CONTENT)
+            self.assertEqual(Path(filenames[0]).suffix, ".epub")
+            self.assertEqual(Path(filenames[0]).read_bytes(), epub)
             return 909091
 
         importer.side_effect = import_file

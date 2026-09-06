@@ -1904,6 +1904,7 @@
     "field_allowed_hosts": "Private host allowlist (comma-separated)",
     "field_path": "Folder path",
     "field_binary_path": "Downloader executable path",
+    "field_output_format": "Download format",
     "field_timeout_seconds": "Operation timeout (seconds)",
     "field_recursive": "Include subfolders",
     "field_api_url": "API URL",

@@ -384,6 +384,15 @@
                                 density="compact"
                                 hide-details
                             />
+                            <v-select
+                                v-else-if="field.schema.type === 'string' && field.schema.enum"
+                                v-model="connectionConfig[field.key]"
+                                :label="connectionFieldLabel(field.key)"
+                                :items="field.schema.enum"
+                                :required="field.required"
+                                density="compact"
+                                variant="outlined"
+                            />
                             <v-text-field
                                 v-else
                                 v-model="connectionConfig[field.key]"
