@@ -92,3 +92,5 @@ Readest 源码扫描 1065 files，退出 2，36 项（critical 10 / high 19 / me
 - 停止：`docker stop talebook-readest-subpath`（会使该体验地址暂时不可用）。
 - Caddy 仅增加 `/readest-test` 的 308 跳转和去前缀 handle_path，已 validate + reload；备份 `/etc/caddy/Caddyfile.before-readest-subpath-20260906`。回滚应移除新增的对应规则后 validate/reload，避免覆盖随后其他人的配置改动。
 - 数据：`/srv/talebook-readest-subpath/data`；无需依赖任务目录。
+
+源码 `git diff --check`（排除上游生成 `_next` 和 patch 格式）通过；原始 Next 产物有尾空白，patch 的空上下文行亦会触发 whitespace 报告，保留原生成字节与可应用补丁，未手改压缩产物。通用功能 PR： https://github.com/talebook/talebook/pull/1039 。

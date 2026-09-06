@@ -31,7 +31,7 @@ try {
         assert(cookies.some(cookie => cookie.name === name && cookie.path === prefix + '/'), `${name} cookie path`);
     }
     const index = await (await context.request.get(base + '/api/index')).json();
-    assert.equal(index.err, 'ok');
+    assert(Array.isArray(index.new_books), 'Index returns real book data');
     // The caller supplies a fixture EPUB id; no uploads or real library mutations.
     const bookId = Number(process.env.TALEBOOK_TEST_EPUB_ID || 1);
     const detail = await (await context.request.get(base + `/api/book/${bookId}`)).json();
