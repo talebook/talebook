@@ -4,6 +4,9 @@
   "monorepoVersion": "0.1.0",
   "readerAppVersion": "0.12.1",
   "license": "AGPL-3.0-only",
+  "patches": [
+    "scripts/readest/0001-android-web-head.patch"
+  ],
   "build": {
     "packageManager": "pnpm@11.1.1",
     "command": "NEXT_PUBLIC_APP_PLATFORM=web pnpm build",
