@@ -7,6 +7,8 @@
     <link rel="icon" href="data:," />
     <title>正在启动 Readest</title>
     <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      main { min-width: 0; overflow-wrap: anywhere; }
       :root { color-scheme: light dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
       body { display: grid; min-height: 100vh; margin: 0; place-items: center; background: Canvas; color: CanvasText; }
       main { width: min(36rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid color-mix(in srgb, CanvasText 28%, transparent); border-radius: .8rem; text-align: center; }

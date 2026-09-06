@@ -6,6 +6,8 @@
     <meta name="referrer" content="same-origin" />
     <title>{{ book.title }} · Readest</title>
     <style>
+      *, *::before, *::after { box-sizing: border-box; }
+      main { min-width: 0; overflow-wrap: anywhere; }
       body { display: grid; min-height: 100vh; margin: 0; place-items: center; color: #241f1a; background: #fffdf8; font: 16px/1.6 system-ui, sans-serif; }
       main { width: min(34rem, calc(100% - 2rem)); padding: 1.5rem; border: 1px solid #241f1a38; border-radius: .75rem; text-align: center; }
       .code { color: #6b6259; font-family: ui-monospace, monospace; }
