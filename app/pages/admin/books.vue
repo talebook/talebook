@@ -155,7 +155,7 @@
                 <a
                     class="press-content"
                     target="_blank"
-                    :href="`/book/${item.id}`"
+                    :href="withBasePath(`/book/${item.id}`)"
                 >{{ item.id }}</a>
             </template>
             
@@ -498,6 +498,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';

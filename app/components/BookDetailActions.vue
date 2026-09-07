@@ -19,7 +19,7 @@
                     v-if="book.id > 0 && hasCompatibleFormats"
                     color="primary"
                     variant="flat"
-                    :href="readerPath"
+                    :href="withBasePath(readerPath)"
                     target="_blank"
                     data-testid="open-online-reader"
                 >
@@ -262,6 +262,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { nextTick } from 'vue';
 import { useI18n } from 'vue-i18n';
 

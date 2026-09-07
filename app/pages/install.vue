@@ -198,6 +198,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
@@ -258,7 +259,7 @@ const rules = {
 };
 
 const check_install = () => {
-    fetch('/api/index').then( rsp => {
+    fetch(withBasePath('/api/index')).then( rsp => {
         if ( rsp.status == 200 ) {
             tips.value += `<br/>${$t('install.apiServiceNormal')}<br/>${$t('install.installSuccessRedirect')}`;
             
@@ -268,7 +269,7 @@ const check_install = () => {
             setTimeout(() => {
                 store.setNavbar(true);
                 // We might need to reload sys info in store
-                window.location.href = '/';
+                window.location.href = withBasePath('/');
             }, 1000);
         } else {
             retry -= 1;
