@@ -6,7 +6,7 @@ import { chromium } from '@playwright/test';
 const base = process.env.TALEBOOK_TEST_URL?.replace(/\/$/, '');
 assert(base && process.env.TALEBOOK_TEST_CREDENTIALS, 'Set TALEBOOK_TEST_URL and TALEBOOK_TEST_CREDENTIALS (JSON file)');
 const credentials = JSON.parse(fs.readFileSync(process.env.TALEBOOK_TEST_CREDENTIALS, 'utf8'));
-const prefix = new URL(base).pathname;
+const prefix = new URL(base).pathname.replace(/\/$/, '');
 const origin = new URL(base).origin;
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium', args: ['--no-sandbox'] });
 const failures = [];
@@ -16,7 +16,7 @@ try {
     page.on('pageerror', error => failures.push(error.message));
     page.on('response', response => {
         const url = new URL(response.url());
-        if (url.origin !== origin) return;
+        if (!['http:', 'https:'].includes(url.protocol) || url.origin !== origin) return;
         if (!url.pathname.startsWith(prefix + '/') || response.status() >= 400) {
             failures.push(`${response.status()} ${url.pathname}`);
         }
@@ -32,6 +32,8 @@ try {
     }
     const index = await (await context.request.get(base + '/api/index')).json();
     assert(Array.isArray(index.new_books), 'Index returns real book data');
+    const info = await (await context.request.get(base + '/api/user/info')).json();
+    assert(info.sys.sidebar_extra_html.includes(`src="${prefix}/logo/link.png"`), 'Default sidebar logo follows deployment');
     // The caller supplies a fixture EPUB id; no uploads or real library mutations.
     const bookId = Number(process.env.TALEBOOK_TEST_EPUB_ID || 1);
     const detail = await (await context.request.get(base + `/api/book/${bookId}`)).json();
@@ -41,6 +43,14 @@ try {
     await page.goto(base + `/book/${bookId}`);
     const read = page.locator(`a[href="${prefix}/read/${bookId}"]`).first();
     await read.waitFor();
+    const help = page.getByRole('button', { name: 'Open help and about menu' });
+    if (!(await help.isVisible())) await page.locator('.v-app-bar-nav-icon').click();
+    await help.click();
+    const sidebarLogo = page.locator('[data-testid="sidebar-help-logo"] img');
+    await sidebarLogo.waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-testid="sidebar-help-logo"] img')?.naturalWidth > 0);
+    assert.equal(await sidebarLogo.getAttribute('src'), prefix + '/logo/link.png');
+    await page.keyboard.press('Escape');
     await page.reload();
     await read.waitFor();
     await page.setViewportSize({ width: 390, height: 844 });
@@ -51,7 +61,7 @@ try {
     assert(reader.url().startsWith(base + '/'));
     const requests = await reader.evaluate(() => performance.getEntriesByType('resource').map(entry => entry.name));
     assert(requests.some(url => url.includes(prefix + '/get/extract/')), 'Reader requests prefixed EPUB resources');
-    assert(!requests.some(url => url.startsWith(origin + '/get/')), 'No unprefixed EPUB request');
+    if (prefix) assert(!requests.some(url => url.startsWith(origin + '/get/')), 'No unprefixed EPUB request');
     if (process.env.TALEBOOK_SCREENSHOT) await page.screenshot({ path: process.env.TALEBOOK_SCREENSHOT, fullPage: true });
     const logout = await context.request.get(base + '/api/user/sign_out');
     assert.equal((await logout.json()).err, 'ok');

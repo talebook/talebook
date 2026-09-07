@@ -1,12 +1,14 @@
 # 带子路径的反向代理
 
-Talebook 默认部署在 `/` 。需要在已有站点下使用 `/readest-test/` 等路径时，使用 `TALEBOOK_BASE_PATH` 构建专用镜像：
+此功能是 Talebook 通用部署能力，不依赖 Readest，也不需要合并 Readest 的功能分支。
+
+Talebook 默认部署在 `/` 。保持原来的镜像构建和启动方式即可，无需新增配置。需要在已有站点下使用 `/talebook/` 等路径时，使用 `TALEBOOK_BASE_PATH` 构建专用镜像：
 
 ```sh
-docker build --build-arg TALEBOOK_BASE_PATH=/readest-test \
-  --target production -t talebook:readest-test .
-docker run -d --name talebook-readest-test --restart unless-stopped \
-  -p 127.0.0.1:39209:80 -v talebook-readest-test-data:/data talebook:readest-test
+docker build --build-arg TALEBOOK_BASE_PATH=/talebook \
+  --target production -t talebook:subpath .
+docker run -d --name talebook-subpath --restart unless-stopped \
+  -p 127.0.0.1:39209:80 -v talebook-subpath-data:/data talebook:subpath
 ```
 
 路径支持英文、数字、`-` 和 `_` 组成的单级或多级目录，例如 `/team/books` 。空值或 `/` 表示默认根路径；尾斜线会归一化。不接受完整 URL、查询参数、片段、编码路径或 `.` / `..` 。
@@ -19,9 +21,9 @@ docker run -d --name talebook-readest-test --restart unless-stopped \
 
 ```caddyfile
 miu.rexliao.cn {
-    @readest_root path /readest-test
-    redir @readest_root /readest-test/ 308
-    handle_path /readest-test/* {
+    @readest_root path /talebook
+    redir @readest_root /talebook/ 308
+    handle_path /talebook/* {
         reverse_proxy 127.0.0.1:39209
     }
     handle {
@@ -37,11 +39,11 @@ miu.rexliao.cn {
 以下配置放入已有 HTTPS `server` 中：
 
 ```nginx
-location = /readest-test {
-    return 308 /readest-test/$is_args$args;
+location = /talebook {
+    return 308 /talebook/$is_args$args;
 }
-location ^~ /readest-test/ {
-    # 尾斜线不可省略：移除 /readest-test/ 前缀。
+location ^~ /talebook/ {
+    # 尾斜线不可省略：移除 /talebook/ 前缀。
     proxy_pass http://127.0.0.1:39209/;
     proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-Host $http_host;
@@ -61,9 +63,9 @@ location ^~ /readest-test/ {
 - 首页、登录、书籍详情、直接刷新和新标签页链接均应停留在配置路径下。
 - 检查浏览器网络请求：Talebook 的 API、`_nuxt`、封面与阅读资源不应落到宿主站点根路径。
 - 登录与退出使用相同的 cookie Path。切换已有站点的部署路径后需要重新登录。
-- OPDS 地址为 `/readest-test/opds/`，WebDAV 地址为 `/readest-test/books/`；社交登录服务商需要登记带前缀的回调 URL。
+- OPDS 地址为 `/talebook/opds/`，WebDAV 地址为 `/talebook/books/`；社交登录服务商需要登记带前缀的回调 URL。
 - 管理员自定义 HTML（公告、页脚、侧栏）、外部主题自带的硬编码 URL、显式 `static_host` / `opds_url_prefix` 属于自定义配置，需要同步改为正确的公开地址。外部完整 URL 不会被自动改写。
 - 子路径共享同一个浏览器 origin，并非独立安全边界；需要隔离存储或不受信任应用时使用不同域名。
-- Readest 集成尚在 PR #977，其 Next.js 导出也必须使用 `NEXT_PUBLIC_EMBEDDED_BASE_PATH=/readest-test/readest`，并同步适配宿主启动页与资源契约；不能直接复用固定 `/readest` 的旧导出。此主干功能不自动下载或重写第三方构建产物。
+- Readest 集成尚在 PR #977，其 Next.js 导出也必须使用 `NEXT_PUBLIC_EMBEDDED_BASE_PATH=/talebook/readest`，并同步适配宿主启动页与资源契约；不能直接复用固定 `/readest` 的旧导出。此主干功能不自动下载或重写第三方构建产物。
 
 自动化：`pytest tests/test_base_path.py tests/test_reverse_proxy_integration.py`；前端：`cd app && npx vitest run test/utils/base-path.spec.ts`。真实浏览器验收脚本见 `app/test/scripts/reverse-proxy-live.mjs`，仅连接指定的测试实例。

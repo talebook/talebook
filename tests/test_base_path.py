@@ -45,7 +45,7 @@ class Probe(PublicPathMixin, web.RequestHandler):
             self.clear_cookie('user_id')
         else:
             self.set_secure_cookie('user_id', '1')
-        self.redirect(self.get_argument('next', self.reverse_url('home')))
+        self.redirect(self.settings.get('test_redirect_target') or self.reverse_url('home'))
 
 
 class TestPublicPathHTTP(AsyncHTTPTestCase):
@@ -63,7 +63,8 @@ class TestPublicPathHTTP(AsyncHTTPTestCase):
 
     def test_external_redirect_and_default_deployment(self):
         with mock.patch('webserver.base_path.BASE_PATH', ''):
-            response = self.fetch('/login?next=https://example.org/callback', follow_redirects=False)
+            self._app.settings['test_redirect_target'] = 'https://example.org/callback'
+            response = self.fetch('/login', follow_redirects=False)
             assert response.headers['Location'] == 'https://example.org/callback'
             assert 'Path=/' in response.headers['Set-Cookie']
 

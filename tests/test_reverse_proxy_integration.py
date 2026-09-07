@@ -43,3 +43,18 @@ class TestReverseProxyURLs(TestWithAdminUser):
         response = self.fetch('/opds/')
         assert response.code == 200
         assert b'/team/books/opds' in response.body
+
+    def test_default_sidebar_logo_has_public_prefix(self):
+        from webserver.handlers.user import CONF, default_settings
+
+        with mock.patch.dict(CONF, {'SIDEBAR_EXTRA_HTML': default_settings['SIDEBAR_EXTRA_HTML']}):
+            data = self.json('/api/user/info')
+            assert 'src="/team/books/logo/link.png"' in data['sys']['sidebar_extra_html']
+
+    def test_custom_sidebar_html_is_preserved(self):
+        from webserver.handlers.user import CONF
+
+        custom = '<a href="https://example.org">Custom</a>'
+        with mock.patch.dict(CONF, {'SIDEBAR_EXTRA_HTML': custom}):
+            data = self.json('/api/user/info')
+            assert data['sys']['sidebar_extra_html'] == custom
