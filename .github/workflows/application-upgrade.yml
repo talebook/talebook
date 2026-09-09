@@ -1,0 +1,104 @@
+name: Build signed application upgrade
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full reviewed commit SHA
+        required: true
+      version:
+        description: Application version (for example v26.09.10)
+        required: true
+      publish:
+        description: Publish immutable packages and advance app-stable (requires release environment approval)
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: application-upgrade-release
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    environment: application-upgrade
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+          - platform: linux/arm64
+            arch: arm64
+          - platform: linux/arm/v7
+            arch: armv7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+      - name: Validate immutable inputs
+        env:
+          RELEASE_COMMIT: ${{ inputs.commit }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          assert re.fullmatch('[0-9a-f]{40}', os.environ['RELEASE_COMMIT'])
+          assert re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}', os.environ['RELEASE_VERSION'])
+          assert subprocess.check_output(['git', 'rev-parse', 'HEAD']).decode().strip() == os.environ['RELEASE_COMMIT']
+          PY
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/master
+          echo "SEQUENCE=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build candidate and export application
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_COMMIT: ${{ inputs.commit }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker buildx build --load --platform "$PLATFORM" --target production --build-arg "GIT_VERSION=$RELEASE_VERSION" --build-arg "GIT_COMMIT=$RELEASE_COMMIT" --build-arg "UPGRADE_SEQUENCE=$SEQUENCE" -t upgrade-candidate .
+          container=$(docker create --platform "$PLATFORM" upgrade-candidate)
+          mkdir -p export/app output
+          docker cp "$container:/var/www/talebook/server.py" export/
+          docker cp "$container:/var/www/talebook/webserver" export/
+          docker cp "$container:/var/www/talebook/app/dist" export/app/
+          docker cp "$container:/opt/talebook-upgrade/image.json" image.json
+          docker rm "$container"
+          git log -1 --format=%B > notes.txt
+      - name: Sign package
+        env:
+          UPGRADE_SIGNING_KEY: ${{ secrets.UPGRADE_SIGNING_KEY }}
+          UPGRADE_KEY_ID: ${{ vars.UPGRADE_KEY_ID }}
+        run: |
+          python3 -m pip install 'cryptography>=38'
+          python3 scripts/upgrade/package.py --root export --image image.json --output output --key-id "$UPGRADE_KEY_ID" --notes notes.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application-upgrade-${{ matrix.arch }}
+          path: output/
+  publish:
+    if: inputs.publish
+    needs: package
+    runs-on: ubuntu-latest
+    environment: application-upgrade-publish
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: application-upgrade-*
+          merge-multiple: true
+          path: output
+      - name: Publish immutable resources, then channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPGRADE_TRUSTED_KEYS: ${{ vars.UPGRADE_TRUSTED_KEYS }}
+          RELEASE_COMMIT: ${{ inputs.commit }}
+        run: |
+          python3 -m pip install 'cryptography>=38'
+          python3 scripts/upgrade/github_publish.py

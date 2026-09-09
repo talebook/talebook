@@ -1,0 +1,164 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="data:,"><title>容器内应用升级 · ACTIVE</title><style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style></head><body><main class="page"><header class="hero"><h1>容器内应用升级</h1><p>2026-09-09 · docker / webserver / app / scripts · ACTIVE · TB-213</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>管理后台检查、下载校验并安装 Python 与预编译 SPA，不更换容器；发布同字节签名资源至 GitHub 与可配置国内源。首次安装加载器仍需更新一次镜像，升级短暂中断服务。目标分支 feat/upgrade，中文 PR，不合并、不正式发布。</p></section>
+<section class="card"><h2>设计决策与边界（grill 自审）</h2><p>开发者已授权实施细节自行决定。仓库没有 grill 技能，逐项自审而不重复询问。仅支持生产 SPA、非 root 应用账号、默认本地 SQLite 与默认书库；SSR、开发、外部数据库、目录自定义及数据库结构变化拒绝安装并要求更新镜像。独立 root 执行器属于可信镜像，不从升级包加载；通过权限受限 Unix socket 接收管理员 API 的固定操作，普通请求不能传 URL、命令或路径。无需 Docker socket。</p><p>运行时指纹记录实际 Python、Calibre、系统包、Python distributions 和基础启动协议文件；数据库指纹包含 models.py、migrate_db.py。发布包绑定架构、SPA、提交、序号、大小、哈希、签名。私钥仅发布端持有；可信公钥和源由只读服务器配置注入，默认没有密钥则禁用安装。</p></section>
+<section class="card"><h2>方案与状态转换</h2><p>最终一致性审查补充：预编译 index.html 标记应用版本；统一 backend() 携带该版本，后端在任何业务处理前拒绝旧版本请求（409），客户端刷新。维护闸门覆盖切换窗口，版本校验覆盖恢复服务后的旧标签页，避免旧前端继续向新后端提交操作。</p><p>真实容器暴露 Calibre notes/FTS 的专用 tokenizer，需要可信镜像中的 Calibre 扩展校验备份。同步收紧启动边界：bootstrap 自检脚本复制到镜像只读加载器目录，生产启动不再把 Calibre 运行时目录 chown 给应用账号；服务器信任配置拒绝非 root 或组/其他可写的文件。</p><p>检查所有配置源的已签名 stable 清单 → 选择最高序号并持久化防回放水位 → 固定提交下载（源间回退同一 SHA）→ 限额/哈希校验 → 拒绝链接与特殊文件的安全解包 → 维护闸门阻止所有外部流量 → 等待后台任务排空 → 停止应用进程及子进程 → 一致性 SQLite backup → 原子切换统一前后端目录 → 启动与健康检查 → 成功持久化并开放流量；失败切回旧代码。日志和事务状态持久化；中断恢复使用已记录的上个应用，不自动恢复数据库。恢复阶段失败保持维护状态供运维修复。</p><p>/data/updates 与 /data/books 分离，root 独占写权限；/run/talebook-release/current 为整套前后端链接。镜像带序号与指纹；仅加载比内置版本更新且兼容的已验证持久化版本。镜像升级可越过旧持久化版本。首次部署与变更 runtime 后走镜像升级。升级不运行 pip、apt、git pull；不会修改插件和书库文件。</p></section>
+<section class="card"><h2>分发与部署取舍</h2><table><thead><tr><th>源</th><th>覆盖与运维</th><th>条件与费用</th></tr></thead><tbody><tr><td>GitHub Releases</td><td>官方默认源，签名固定版本；大陆可能超时</td><td>GitHub 配额与政策；不承诺国内可达</td></tr><tr><td>阿里云 OSS / 腾讯云 COS + 大陆 CDN</td><td>推荐国内源，同字节镜像与最后发布渠道清单</td><td>云账号、域名、备案、HTTPS、存储和出流量账单；不编造报价</td></tr><tr><td>香港节点</td><td>无大陆备案时备选，跨境链路质量需实测</td><td>存储和流量费用；不等同大陆 CDN 可用性</td></tr></tbody></table><p>不使用公共 GitHub 代理，不将 Cloudflare/R2 当大陆稳定性保证。未提供云资源，本次仅实现配置、同步脚本和发布工作流。固定资源一年 immutable，stable TTL 60 秒；历史至少保留最近 3 个兼容版本及 90 天，删除前核对客户安装情况。所有资源逐个校验并同步后最后替换 stable 清单；镜像落后显示诊断，不降级。</p></section>
+<section class="card"><h2>测试结果</h2><p>浏览器复核：异步获取版本后才出现安装按钮，固定 selector 激活器会错过该按钮；改为响应式按钮引用，并为延迟返回的版本检查增加组件回归测试。确认前不发送安装，Escape 关闭后恢复按钮焦点。</p><p>验证迭代：隔离环境实际启用 SQLite 备份与默认书库；health 排空还覆盖持久化的有声书和插件任务。首次构建发现 slim 镜像没有 calibre GUI 命令，指纹改用 calibredb --version。无可用 grill 技能，自审记录在本页。全量测试发现旧网络书库用例调用未 mock 的公共书源，限定到用例内的 Legado 源以消除外网依赖，保留原断言。</p><p>interface-review full 的渲染复核发现新安装按钮沿用 warning 橙底白字，对比不足；改用现有 primary 主操作色，检查版本改为中性文字描边次操作（深色主题也满足对比），发布说明链接继承主题正文色并保留下划线，重新构建并做真实浏览器复验。</p><p id="validation">已验证：容器内 make pytest：1322 passed、20 skipped、覆盖率 73%；最后后端小改动后相关集 87 passed。协议独立集 49 passed，覆盖签名/哈希、归档穿越/链接/大小限制、架构与运行时、权限、并发/幂等、源回退/滞后、防回放、超时、磁盘不足、WAL 备份及手动恢复、schema 拒绝、中断和启动失败。真实 Calibre tokenizer 备份验证通过。make lint-py-fix、make lint-py 已执行通过；升级脚本/测试 Ruff 通过。</p>
+<p>前端最终执行 npm run generate 成功；node node_modules/vitest/vitest.mjs run --config test/upgrade.vitest.config.ts：4 passed（含异步候选按钮）；npm run lint：0 errors、429 条既有 warnings。TALEBOOK_UPGRADE_URL / TALEBOOK_UPGRADE_EXPECTED_VERSION=v10 / TALEBOOK_UPGRADE_CREDENTIALS 配置下执行 node app/node_modules/@playwright/test/cli.js test --config app/test/upgrade.browser.config.ts：1 passed。验证真实登录、书库、阅读、管理设置、旧标签页 409 自动刷新、320px 无水平溢出、明暗主题、Enter 开确认、Escape 关闭并恢复焦点。截图随 PR 与事项附件提供。</p>
+<p>真实 amd64 Docker：同一容器 88ea69c56c71a230f7e870ebfeab505fd46c04c8a5f122d1d014ca54b5a7b096 完成 v1→v2→v4→v6→v8；3 个数据库备份。故意启动失败的已签名 v7 包安装后 phase=rolled_back，恢复 v6，书库保留。docker restart 后 v8 保留；以增加 LABEL 的兼容镜像重建（不同镜像 ID、同一运行时指纹和数据）后 v8、登录、书库与阅读保留。重建容器再次成功安装最终界面包 v10。包下载、TLS、签名、校验、Supervisor 切换、数据库均真实执行。</p>
+<p>限制：测试镜像基于已有本地运行时，未完成生产 Dockerfile 从零构建；仅测试 fixture 将公共 IP 连接适配到 loopback TLS，生产下载器无绕过开关，不能当作公网/CDN/大陆测速。未实测 arm64/armv7、实际 OSS/COS 服务、原生屏幕阅读器与浏览器菜单 200% 缩放。Chrome DevTools MCP 共享 profile 已占用，未终止共享浏览器，改用独立 Playwright Chromium 验证。全量测试以 8GiB tmpfs 工作目录运行以避免主机低磁盘触发既有有声书空间保护；测试 mock 仅覆盖隔离单元集，真实容器验收无 mock 后端。</p></section><section class="card"><h2>interface-review full · Scope and Coverage</h2>
+<p>依据项目 .agents/skills/interface-review/SKILL.md 与 better-interface 及六个领域技能执行。Nuxt 4 / Vue 3 / Vuetify，遵循 AGENTS.md、app/CLAUDE.md 与现有主题和 backend() 调用约定。对变更增删两侧与直接消费者进行审查，后端正确性和安全结论另列。</p>
+<table><tr><th>字段</th><th>范围</th></tr><tr><td>Target</td><td>feat/upgrade 相对默认分支 master 的整个分支及全部未提交内容</td></tr><tr><td>Base / Head</td><td>origin/master merge-base 与审查时 HEAD 均为 26d8dd74c1b33109668fed4cbf1611cfc459688a；0 个已提交变更，37 个未提交文本文件</td></tr><tr><td>排除</td><td>app/test-results 生成结果、.deepsec 机器报告、构建输出、依赖与截图二进制；截图单独做渲染证据</td></tr><tr><td>直接消费者</td><td>GeneralSettingsContent、MetadataAutomationSettings、ImageCaptchaWidget、BookSourceImportDialog、GlobalDeviceSettings；共享 backend 的其余 55 个 Vue 消费者未扩展（最多 5 个消费者），新 ApplicationUpgrade 自身完整审查</td></tr></table>
+<table><tr><th>领域</th><th>证据</th><th>结果</th></tr><tr><td>Accessibility</td><td>有名按钮、状态 live region、错误 alert、确认/取消、焦点与键盘、减弱动画规则；实际 Enter/Escape 和恢复焦点</td><td>Clear（限定已验证范围）</td></tr><tr><td>Layout</td><td>管理设置、确认弹窗、320px 包裹换行与可达操作</td><td>Clear</td></tr><tr><td>Writing</td><td>中英文、首次换镜像、禁用原因、版本/说明、维护重连、失败恢复文案</td><td>Clear</td></tr><tr><td>Typography</td><td>现有字号、长说明换行、确认正文、不截断关键内容</td><td>Clear</td></tr><tr><td>Colors</td><td>明暗截图和 computed style：主按钮白字/蓝底 #1976d2 为 4.60:1；检查按钮明 16.07:1（alpha 合成）/暗 18.73:1；焦点黑/白 2px</td><td>Clear</td></tr><tr><td>UI</td><td>Vuetify 状态/禁用、进度、无过场确认弹窗、重连</td><td>Clear</td></tr></table>
+<h3>Findings</h3><p>No actionable interface findings in this change. 复审前问题已修复：Introduced / HIGH：异步按钮无法激活弹窗，改响应式 activator 并实测；Introduced / HIGH：安装橙底白字与深色次按钮对比不足，改现有 primary 主操作和中性描边；Regression / MEDIUM：无加载器时原镜像检查入口消失，补回检查镜像与发布说明；旧客户端跨版本操作通过 409 刷新保护（正确性审查）。最终无未解决 HIGH / MEDIUM。</p>
+<h3>Considered but Rejected</h3><table><tr><th>位置</th><th>候选</th><th>不采纳原因</th></tr><tr><td>ApplicationUpgrade 说明</td><td>恢复 rich Markdown 展示</td><td>纯文本完整保留说明、可换行，当前流程无需富文本</td></tr><tr><td>进度</td><td>显示百分比</td><td>下载后还需停机/备份/启动，无可靠总进度；阶段文案与不定进度更准确</td></tr><tr><td>确认弹窗</td><td>增加过场动画</td><td>操作低频且重要，无动画清晰、兼容减弱动态偏好</td></tr></table>
+<h3>Pre-existing</h3><p>既有通用设置的回收站按钮及宣传条配色不属于本次新界面，未扩大修改；不据此声明整个管理页面符合 WCAG。</p>
+<h3>Verification</h3><p>gh repo view --json defaultBranchRef -q .defaultBranchRef.name → master；git symbolic-ref refs/remotes/origin/HEAD 缺失；git fetch origin master feat/upgrade --no-tags 是本轮审查唯一写 .git 的范围刷新操作。git merge-base origin/master HEAD → 上述基线；git rev-list --count 基线..HEAD → 0；git diff 基线、git diff --name-status HEAD 和 git ls-files --others --exclude-standard 合并范围。没有 checkout/stash。此前按钮与配色问题修复后重新读取整份差异并复验。真实浏览器命令、截图及计算对比见测试结果；屏幕阅读器/原生 200% 缩放标记 Not verified，未当作通过。</p>
+<h3>Verdict</h3><p>Approve：变更范围内无剩余可操作界面问题，结论限定上述证据和消费者边界。</p></section><section class="card"><h2>DeepSec 最终结果与限制</h2><p>DeepSec 0.2.0；命令 <code>deepsec shield scan . --layer l1,l2 --include-tests --format json --output -</code>；最后代码修改后扫描 talebook 仓库，含脚本与测试，共 774 文件，L1/L2，退出码 2。有效报告 123 项：32 critical、70 high、21 medium；不是参数失败，也不能声明安全全通过。</p><p>改动文件 4 项：fingerprint.py:34 固定 argv 的 dpkg-query 命令执行误报；self_check.py:64 既有固定参数运行器误报；update_checker.py:110 固定 GitHub URL 的 SSRF 误报（已启用 TLS 验证）；test_network_library.py:325 既有测试假 token。其余 119 项位于既有未修改模块或 vendor，未全部判定或修复。</p><p>只运行本地 Shield，无 Spear、无远程源码上传。Vue/Shell/Dockerfile 不受扫描器语言支持，已用人工/构建/lint/浏览器补充。默认不扫描依赖与生成文件，目录软链接不递归。原始 JSON、stderr、退出码本地保留；交付附件去掉源码证据与绝对路径。</p></section></main></body></html>

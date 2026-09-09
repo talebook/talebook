@@ -1,0 +1,96 @@
+# 容器内应用升级与资源分发
+
+此功能替换 Python 应用和已编译 SPA，重启应用进程，容器本身不重建。服务会短暂中断，阅读、下载和管理请求可能需要重试。
+
+历史镜像不含可信加载器，**首次启用必须升级一次容器镜像**。目前尚未发布官方升级签名公钥、渠道或国内域名；代码合并不代表这些资源已经上线。没有可信密钥时安装功能默认关闭。
+
+## 支持范围
+
+- 生产 SPA，非零 `PUID`，默认 `/data/books/library` 书库和 `sqlite:////data/books/calibre-webserver.db` 数据库。自动导入目录监听须关闭，升级期间不得有容器外的程序写入书库。
+- SSR、开发模式、外部数据库、自定义书库路径不支持应用内安装，使用镜像更新。
+- Python、Calibre、系统软件包、实际安装的 Python distributions、CPU 架构、加载器和启动配置共同决定 runtime 指纹。依赖或启动协议改变必须更新镜像；不会在后台执行 pip、apt 或 git pull。
+- 数据库 `models.py` / `migrate_db.py` 指纹必须相同，清单必须声明 `migration: none`。数据库结构变动走备份与镜像迁移流程。签名发布者仍须审查其他代码是否包含隐式数据迁移；指纹不能替代迁移评审。
+- 发布工作流分别构建 amd64、arm64、armv7 包。清单架构必须匹配；首轮本地真实容器验证以 amd64 为范围，不代表其他架构已经实测。
+
+## 首次部署
+
+1. 使用可信镜像；镜像构建需携带 `GIT_COMMIT`（完整 40 位 SHA）、`GIT_VERSION`、`UPGRADE_SEQUENCE`（该提交的 Unix commit 时间，正整数）。仓库镜像发布 workflow 已设置这些参数。手工构建也应设置；缺少元信息时关闭应用内升级，避免重建后旧持久化版本覆盖未知镜像。
+2. 持久化挂载整个 `/data`。`/data/updates` 保存已安装应用、备份和事务状态，与书库 `/data/books` 分离。挂载父目录 `/data` 及 `/data/updates` 必须由 root 拥有且不能被组/其他账号写入，防止整个升级目录被替换；不符合时禁用升级并继续使用内置应用，不自动修改宿主目录所有权。不应只挂载 `/data/books` 后期待升级版本保留，也不要让应用账号或其他容器拥有 `/data/updates` 写权限。
+3. 在可信部署端获取并核对发布公钥的指纹，创建 root 拥有、应用账号不可写的配置，挂载到 `/etc/talebook-upgrade.json:ro`。不要从正在校验的升级镜像源下载并信任公钥。
+
+```json
+{
+  "keys": {
+    "release-2026": "由可信发布者提供的 Ed25519 原始32字节公钥的Base64"
+  },
+  "sources": [
+    "https://github.com/talebook/talebook/releases/download"
+  ]
+}
+```
+
+配置示例中的公钥必须替换，不能直接启用。每个源根目录须拥有同样布局：
+
+```text
+app-stable/stable-amd64.json
+app-COMMIT/package-amd64.tar.gz
+app-COMMIT/stable-amd64.json
+```
+
+国内/自建源可放在 `sources` 前面作为优先下载源，GitHub 留作回退。源必须为标准 443 端口的公共 HTTPS，证书与主机名均校验。禁止用户名、密码、查询参数、片段和私网地址；每次连接解析全部 DNS 地址并拒绝非公网 IP，连接固定到已验证 IP，避免二次解析重绑定。默认不使用环境代理、不携带 Cookie/Authorization。重定向只允许同域名，以及 GitHub 到 `release-assets.githubusercontent.com` 的固定例外。对象桶保持公开只读；私有桶带凭证/签名 URL 不适合作为客户端源。
+
+连接及每次读取超时 10 秒，单次清单下载总时限 30 秒，包下载 180 秒；字节上限分别为 128 KiB 和 512 MiB，展开上限 2 GiB / 50000 个文件。系统 DNS 解析仍受操作系统 resolver 超时影响。中途下载失败会从其他源重新下载同一 SHA 对应的完整包，不继续混合分片。
+
+## 使用与恢复
+
+在管理后台「通用设置 → 系统更新」检查版本、阅读说明，然后选择「下载并安装」，确认服务中断。普通账号或未登录请求不能执行检查/安装；请求不能改变源、命令或目录。
+
+检查会验证所有配置源，选择最高签名序号，持久化防回放水位。同一序号内容冲突会报错。镜像落后会显示诊断，不能静默降级。下载回退必须得到相同提交、相同哈希的包。
+
+安装流程：下载 → 校验/安全解包 → 维护闸门 → 等待 HTTP 请求、后台队列、有声书及插件任务结束 → 停止 Tornado 和子进程 → SQLite 一致性备份 → 原子切换整套前后端 → 重启与健康检查。维护期间后台暂时不可达，现有页面自动重连；新版本启动后，旧标签页请求携带的前端版本若与后端不一致，会在业务处理前返回 409 并自动刷新；也可使用按钮手动刷新页面以加载新的前端。
+
+`/data/updates/state.json` 是持久化结果；`/data/log/upgrade.log` 保存执行器日志并轮转。操作具有全局互斥，同一版本的重复安装请求返回已有状态。启动器在进程崩溃或容器重启后处理未完成事务；下载/校验中断保持现有版本，切换阶段中断恢复记录的上一版本。
+
+镜像重建时，只有**比内置序号更新且运行时兼容**的持久化版本被选中。内置镜像更新、序号未知或运行时不兼容时优先内置镜像，旧版本保留用于诊断。升级目录不应跨不同书库实例共用。勿并发启动两个容器使用同一 `/data`；执行器有进程锁，但它不能把共享 Calibre 书库变成多实例数据库。
+
+健康检查失败会尝试恢复上一应用。**应用回退不会自动恢复数据库**。所有备份包含独立 SQLite 文件及 `inventory.json` 哈希清单，目录位于 `/data/updates/backups/`，仅 root 可读。恢复数据库是独立运维操作：停止所有访问和写进程，保留当前库的副本，核实需要舍弃哪些备份之后的新数据，再使用 SQLite backup API 恢复到新路径并校验 `PRAGMA integrity_check`，确认后替换文件。绝不能在恢复服务、产生新数据后自动覆盖数据库。
+
+自动恢复失败会保持维护状态。先读取状态与日志，确认 Tornado 是否运行及 `/run/talebook-release/current` 的目标；使用 `supervisorctl stop talebook:tornado` 停止后选择已知安全的应用或更新镜像，再验证本地健康检查。人工处理恢复失败时不要删除 `active.json` 或数据库来“试一下”。维护状态文件只能在恢复确认后由部署管理员移除。外部数据库和跨 schema 回退需要单独制定恢复方案。
+
+应用安装版本和数据库备份默认不自动删除，避免误删可恢复数据。运维应监控容量，保留当前、上一版本、至少最近 3 个兼容版本和 90 天备份；依据实际恢复目标归档，删除前确认没有事务引用。磁盘不足会拒绝下载或备份。
+
+## 发布、轮换与国内同步
+
+`.github/workflows/application-upgrade.yml` 仅支持手动触发。输入完整已审查的 `master` 提交、版本；默认 `publish=false`，只上传构建产物，不创建 Releases、不更新正式渠道。提交必须是 master 祖先。`publish=true` 才进入单独的发布环境。请为以下环境设置人工审核和受保护分支：
+
+- `application-upgrade`：secret `UPGRADE_SIGNING_KEY`，Ed25519 PKCS8 PEM 私钥；variable `UPGRADE_KEY_ID`。
+- `application-upgrade-publish`：variable `UPGRADE_TRUSTED_KEYS`（key_id 到原始公钥 Base64 的 JSON）；仓库 `GITHUB_TOKEN` 仅此 job 授予 contents:write。
+
+密钥轮换顺序：通过可信镜像或只读部署配置先发放新旧公钥 → 重启加载新配置 → 发布端切换 `UPGRADE_KEY_ID` 和私钥 → 观察旧客户端覆盖 → 移除旧公钥。若私钥泄漏，立即暂停渠道发布并更新可信配置/镜像；仅在镜像站放一个新公钥无法建立新信任。不要将私钥提交到 Git、下载包、容器或日志。
+
+打包脚本从候选生产镜像提取应用与预编译前端，生成固定提交、版本、运行时、架构、大小、SHA-256、说明和签名的清单。发布脚本逐个上传并读回验证固定资源，所有架构完成后最后替换 `app-stable` 清单。相同提交内容不同会拒绝覆盖；渠道不得倒退。构建产物尚无正式版本和公钥时，不应手工启用客户端绕过验证。
+
+国内资源尚未配置，本次没有创建云账号、桶、CDN、域名或付费资源。推荐选择阿里云 OSS 或腾讯云 COS 配合大陆 CDN：需要账号、实名/备案域名、证书、公开读/发布身份写权限和流量预算。存储、回源、CDN 流量及跨区复制费用以云厂商当前报价与实际用量评估，不提供假设报价或未经测量的大陆测速结论。无大陆备案可评估香港节点，但跨境链路不等同大陆 CDN；Cloudflare/R2 不作为大陆稳定访问保证。
+
+同步与原始发布使用同一份下载产物和可信公钥文件，不重新压缩或重新签名。部署端凭据只保留在受保护 job 环境中：
+
+- `MIRROR_ACCESS_KEY_ID`、`MIRROR_ACCESS_KEY_SECRET`（限制到专用桶前缀写权限）；
+- `MIRROR_BUCKET`；OSS 还需 `MIRROR_ENDPOINT`（HTTPS），COS 需 `MIRROR_REGION`；
+- 独立的可信 `keys.json` 公钥表，以及产物目录。
+
+```sh
+# 在发布机的独立 venv 中按所选提供商安装 SDK，不在 Talebook 应用内安装。
+python -m pip install 'cryptography>=38' oss2
+python scripts/upgrade/mirror.py --provider oss --directory output --keys keys.json
+# 或安装 cos-python-sdk-v5 后使用 --provider cos
+```
+
+同步脚本校验本地签名/大小/哈希，拒绝固定资源覆盖，上传并读回校验全部版本文件，然后最后推进渠道清单。每个桶的发布任务须串行执行（CI concurrency group 或部署锁）；脚本不是分布式锁。CDN 固定资源设置一年 `immutable` 缓存，渠道 60 秒；更新渠道后按提供商流程刷新对应渠道 URL，不能缓存 404。保留历史不可变包至少 90 天并确认无人引用后才回收。镜像失效时客户端自动回退；国内只有包、没有渠道清单的部署不合格。
+
+上线清单：配置并验证公钥/发布 secret、保护发布环境、准备真实域名与 HTTPS、测试源布局、验证所有架构完整上传、验证渠道 TTL/失效缓存、确认大陆真实网络检查及下载都可达、演练失败回退与数据库恢复，然后再向开发者开放升级入口。
+
+## 本地验证工具
+
+`pytest tests/test_application_upgrade.py` 可独立验证协议和恢复状态机；`tests/test_upgrade_api.py` 需要 Calibre 测试环境。前端运行 `npx vitest run --config test/upgrade.vitest.config.ts`。
+
+`scripts/upgrade/smoke_container.py --work <专用空目录> --frontend app/.output/public` 构造一次性测试镜像，基于本机已有可信运行时和真实后端。它生成隔离 HTTPS 签名资源，**仅测试 fixture 的公共 IP 连接检查被替换为 loopback TLS**；生产下载器不提供此开关。必须在报告中注明该边界，不能把它说成公网/大陆源可用性验证。测试用密钥、Cookie 和账号文件不得交付，测试结束后停止并删除专用容器。

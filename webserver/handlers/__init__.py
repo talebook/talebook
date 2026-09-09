@@ -21,11 +21,13 @@ def routes():
         plugins,
         scan,
         theme,
+        upgrade,
         user,
     )
 
     routes = []
     routes += admin.routes()
+    routes += upgrade.routes()
     routes += scan.routes()
     routes += opds.routes()
     routes += book.routes()

@@ -108,7 +108,7 @@ def check_nginx_config():
 
 
 def check_syncdb():
-    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), os.path.join(SERVER_DIR, "server.py"), "--syncdb"]
+    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), "python3", os.path.join(SERVER_DIR, "server.py"), "--syncdb"]
     return (True, None) if run(cmd) else (False, "syncdb_failed")
 
 
@@ -118,7 +118,7 @@ def check_migrate():
 
 
 def check_update_config():
-    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), os.path.join(SERVER_DIR, "server.py"), "--update-config"]
+    cmd = ["gosu", "%s:%s" % (RUN_USER, RUN_USER), "python3", os.path.join(SERVER_DIR, "server.py"), "--update-config"]
     return (True, None) if run(cmd) else (False, "update_config_failed")
 
 
