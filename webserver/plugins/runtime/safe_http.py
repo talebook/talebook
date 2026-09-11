@@ -53,17 +53,17 @@ class _PluginHostQueue:
         with self._condition:
             state = self._states.get(key)
             if state is None:
-                state = {"active": 0, "limit": limit, "waiters": collections.deque()}
+                state = {"active": 0, "limits": collections.Counter(), "waiters": collections.deque()}
                 self._states[key] = state
-            else:
-                # A plugin configuration change must not temporarily exceed the
-                # stricter value while an older request is still in flight.
-                state["limit"] = min(state["limit"], limit)
+            # Keep the strictest limit only while its requests are waiting or
+            # in flight, so a busy host can recover after a low-limit request.
+            state["limits"][limit] += 1
             state["waiters"].append(waiter)
-            while state["waiters"][0] is not waiter or state["active"] >= state["limit"]:
+            while state["waiters"][0] is not waiter or state["active"] >= min(state["limits"]):
                 remaining = None if deadline is None else deadline - time.monotonic()
                 if remaining is not None and remaining <= 0:
                     state["waiters"].remove(waiter)
+                    self._remove_limit(state, limit)
                     if not state["waiters"] and state["active"] == 0:
                         self._states.pop(key, None)
                     self._condition.notify_all()
@@ -72,6 +72,9 @@ class _PluginHostQueue:
             state["waiters"].popleft()
             state["active"] += 1
             acquired = True
+            # Advancing the FIFO head can make another waiter eligible even
+            # before any in-flight request finishes when multiple slots are free.
+            self._condition.notify_all()
 
         try:
             yield
@@ -81,9 +84,16 @@ class _PluginHostQueue:
                     state = self._states.get(key)
                     if state is not None:
                         state["active"] -= 1
+                        self._remove_limit(state, limit)
                         if not state["waiters"] and state["active"] == 0:
                             self._states.pop(key, None)
                     self._condition.notify_all()
+
+    @staticmethod
+    def _remove_limit(state, limit):
+        state["limits"][limit] -= 1
+        if state["limits"][limit] == 0:
+            del state["limits"][limit]
 
 
 _PLUGIN_HOST_QUEUE = _PluginHostQueue()

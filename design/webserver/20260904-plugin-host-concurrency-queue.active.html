@@ -63,6 +63,9 @@
             <article class="step"><span>QUEUE</span><b>FIFO 等待</b><p>同键达到上限后等待，保留跨键独立性。</p></article>
             <article class="step"><span>RELEASE</span><b>完成后唤醒</b><p>成功、HTTP 错误或异常均释放并唤醒队首。</p></article>
           </div>
+          <h3>评审修订（2026-09-12）</h3>
+          <p>PR 1035 尚未合并，本轮在同一方案中修订。有效并发上限取所有等待及在途请求配置的最小值；使用按配置值计数的集合，在请求完成、异常或排队超时时移除对应限制，避免旧低值在持续繁忙时永久生效。等待中的低值也约束新请求，让已有请求排空后再按严格上限执行。</p>
+          <p>队首取得槽位后立即通知其他等待者，确保还有空位时下一位无需等到无关请求完成。保留 FIFO、跨键隔离和总 deadline；不引入新配置。验证计划：低值请求结束及超时后恢复吞吐、在途低值仍受保护、多槽位漏唤醒的确定性调度回归、全量测试及本地 DeepSec L1/L2。队列验证：新增 5 项全部通过；用原实现运行同一组测试为 4 failed、1 passed，证明可复现两条评审缺陷。全量复验：1276 passed、20 skipped。</p>
           <h3>配置与兼容性</h3>
           <ul>
             <li>新增运行时连接配置 <code>host_concurrency</code>，默认 10，允许 1–100；Legado schema 显式展示该项。</li>
@@ -79,6 +82,8 @@
         </section>
         <section class="card">
           <h2>6. 测试计划与结果</h2>
+          <p><strong>2026-09-12 评审复验：</strong><code>python3 -m pytest -q tests/test_plugin_host_queue.py</code>：5 passed；<code>make lint-py-fix</code>、<code>make lint-py</code>、新增测试 <code>ruff check</code> 通过。本轮在现有 <code>talebook/talebook:v26.08.11</code> 容器中补装 <code>pytest==7.4.4</code>、分支要求的 <code>rarfile==4.2</code> 后执行 <code>pytest -q tests</code>：1276 passed、20 skipped（74.76 秒）。<code>make pytest</code> 的覆盖率运行曾出现 <code>test_search_weight_increment</code> 五秒等待超时（1275 passed、20 skipped、1 failed，整体覆盖率 73%）；上述无覆盖率全量复验通过，保留此时序敏感风险。标准 <code>make test</code> 在 Debian 软件源下载阶段长时间无进展后取消，替代镜像不是本分支新构建的 test 镜像。最初替代镜像缺少 rarfile 引起的 8 项失败已通过补装声明依赖消除。<code>make check-design</code> 与 <code>git diff --check</code> 通过。下面原有测试表记录 2026-09-04 的首次验证。</p>
+          <p>DeepSec 0.2.0（fff031fc01fb36b95348214c8ee359f6ede8aa8b），执行 <code>deepsec shield scan . --layer l1,l2 --include-tests --format json --output -</code>，全仓 520 个支持的文件，L1/L2，退出码 2，stderr 为空。122 项发现（32 critical、69 high、21 medium）；队列代码与新增测试无发现。涉及 PR 文件的 2 项为测试固定 lease token 误报，另外 120 项位于与 merge-base 相同的文件，未在本次评审中修复或完整审计，不能视为全仓安全通过。所有改动 Python 均在覆盖范围，HTML 方案使用 check-design 检查；未使用远程 LLM。</p>
           <div class="table-wrap" role="region" aria-label="测试计划" tabindex="0"><table><thead><tr><th>验证层</th><th>计划命令</th><th>关键断言</th><th>结果</th></tr></thead><tbody>
             <tr><td>队列单元</td><td><code>pytest -q tests/test_book_source_plugins.py tests/test_plugin_capability_lookup.py tests/test_plugin_runtime.py tests/test_booksource_engine.py</code></td><td>同 plugin+host FIFO 等待；不同 plugin/host 独立；超时保留 typed error。</td><td class="passed">通过：143 passed</td></tr>
             <tr><td>运行时</td><td><code>pytest -q tests/test_book_source_plugins.py tests/test_plugin_capability_lookup.py tests/test_plugin_runtime.py tests/test_booksource_engine.py</code></td><td>read 不持 lease；write/sync 仍互斥；deadline 正确。</td><td class="passed">通过：143 passed</td></tr>
@@ -89,7 +94,7 @@
         </section>
         <section class="card">
           <h2>7. 决策记录</h2>
-          <ol><li><strong>2026-09-04：</strong>用户确认排队键为 plugin+host，并明确搜索、保存达到上限后等待而非快速失败。</li><li><strong>2026-09-04：</strong>选择实际 HTTP 出口排队，避免仅在搜索/保存入口限流而漏掉详情、目录、分页和封面。</li><li><strong>2026-09-04：</strong>官方 Docker 全量回归与质量门禁通过，方案状态固化为 ACTIVE。</li></ol>
+          <ol><li><strong>2026-09-04：</strong>用户确认排队键为 plugin+host，并明确搜索、保存达到上限后等待而非快速失败。</li><li><strong>2026-09-04：</strong>选择实际 HTTP 出口排队，避免仅在搜索/保存入口限流而漏掉详情、目录、分页和封面。</li><li><strong>2026-09-04：</strong>官方 Docker 全量回归与质量门禁通过，方案首次转为 ACTIVE（尚未合并）。</li><li><strong>2026-09-12：</strong>修复低值并发上限残留和多槽位漏唤醒；完成确定性回归、全量复验和安全扫描记录，同一方案恢复 ACTIVE。无界面影响：仅修订后端队列内部调度和测试，不修改页面、API 或配置表单；本轮豁免界面审查。</li></ol>
         </section>
       </main>
       <footer>Talebook internal design · webserver · ACTIVE · 2026-09-04</footer>
