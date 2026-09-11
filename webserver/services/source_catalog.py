@@ -167,6 +167,8 @@ class SourceCatalogService:
         return binding
 
     def read(self, binding, method, *args, timeout=None, extra_config=None):
+        if method == "download" and timeout is None:
+            timeout = (binding.connection.config or {}).get("timeout_seconds")
         override = dict(binding.context_overrides or {})
         if extra_config:
             override["config"] = {**dict(override.get("config") or {}), **dict(extra_config)}

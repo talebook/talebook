@@ -317,6 +317,7 @@
     "disabled": "Disabled"
   },
   "network": {
+    "noBrowseSource": "No sources support browsing. Switch to Search.",
     "title": "Network Library",
     "search": "Search web novels",
     "searchPlaceholder": "Enter title or author, press Enter to search",
@@ -1902,6 +1903,9 @@
     "field_endpoint": "Endpoint",
     "field_allowed_hosts": "Private host allowlist (comma-separated)",
     "field_path": "Folder path",
+    "field_binary_path": "Downloader executable path",
+    "field_output_format": "Download format",
+    "field_timeout_seconds": "Operation timeout (seconds)",
     "field_recursive": "Include subfolders",
     "field_api_url": "API URL",
     "field_api_key": "API key",

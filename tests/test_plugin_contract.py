@@ -50,6 +50,7 @@ def test_all_book_source_plugins_use_the_source_namespace():
         "talebook.source.internet-archive",
         "talebook.source.webdav",
         "talebook.source.watch-folder",
+        "talebook.source.tomato-downloader",
     }
 
     source_providers = [
@@ -252,6 +253,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "talebook.source.internet-archive": "webserver.plugins.source.internet_archive",
         "talebook.source.webdav": "webserver.plugins.source.webdav",
         "talebook.source.watch-folder": "webserver.plugins.source.watch_folder",
+        "talebook.source.tomato-downloader": "webserver.plugins.source.tomato_downloader",
         "talebook.combo.open-library": "webserver.plugins.combo.open_library",
         "talebook.meta.douban-v2": "webserver.plugins.meta.douban_v2.plugin",
         "talebook.meta.baike": "webserver.plugins.meta.baike.api",

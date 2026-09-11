@@ -384,13 +384,25 @@
                                 density="compact"
                                 hide-details
                             />
+                            <v-select
+                                v-else-if="field.schema.type === 'string' && field.schema.enum"
+                                v-model="connectionConfig[field.key]"
+                                :label="connectionFieldLabel(field.key)"
+                                :items="field.schema.enum"
+                                :required="field.required"
+                                density="compact"
+                                variant="outlined"
+                            />
                             <v-text-field
                                 v-else
                                 v-model="connectionConfig[field.key]"
                                 :label="connectionFieldLabel(field.key)"
                                 :required="field.required"
                                 :name="field.key"
-                                :type="field.schema.format === 'uri' ? 'url' : 'text'"
+                                :type="['number', 'integer'].includes(field.schema.type) ? 'number' : field.schema.format === 'uri' ? 'url' : 'text'"
+                                :min="field.schema.minimum"
+                                :max="field.schema.maximum"
+                                :step="field.schema.type === 'integer' ? 1 : 'any'"
                                 density="compact"
                                 variant="outlined"
                             />
@@ -812,7 +824,9 @@ async function saveConnection() {
             const value = connectionConfig.value[field.key];
             config[field.key] = field.schema.type === 'array'
                 ? String(value || '').split(',').map(item => item.trim()).filter(Boolean)
-                : value;
+                : ['number', 'integer'].includes(field.schema.type) && value !== ''
+                    ? Number(value)
+                    : value;
         }
         const credentials = Object.fromEntries(Object.entries(connectionCredentials.value).filter(([, value]) => value));
         const rsp = await $backend('/admin/plugins/connections', {
