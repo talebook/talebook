@@ -43,6 +43,39 @@ app-COMMIT/stable-amd64.json
 
 ## 使用与恢复
 
+### 删除容器后重建，如何保留升级和数据
+
+**复用同一个 `/data` 持久化目录或命名卷，重建后会保留已安装的兼容升级。** `/data/books` 保存书库、账号数据库、配置与插件资源；`/data/updates` 保存应用版本、升级状态和备份。容器内的 `/run/talebook-release/current` 只是临时指针，每次启动都会根据持久化记录重新生成。
+
+官方 `docker-compose.yml` 已挂载整个 `/data`。建议在 Compose 同目录的 `.env` 中固定**已有数据目录的绝对路径**，避免移动 Compose 文件后误用新的空目录：
+
+```dotenv
+TALEBOOK_DATA_DIR=/srv/talebook/data
+```
+
+这里的路径是示例，必须替换成当前实际目录。重建前用以下命令核对正在运行的容器挂载，并保存 `/data` 的 Source（bind 目录）或 Name（命名卷）：
+
+```sh
+docker inspect --format '{{json .Mounts}}' "$(docker compose ps -q talebook)"
+docker compose config
+```
+
+核实 Compose 将继续使用同一份数据，且升级可信配置 `/etc/talebook-upgrade.json:ro` 的挂载仍在后，可以停止、删除并重建应用容器：
+
+```sh
+docker compose stop talebook
+docker compose rm -f talebook
+docker compose up -d talebook
+```
+
+该操作不删除数据目录或数据卷；不需要再次下载已安装的升级。不要同时启动两个容器读写同一份 `/data`。如果使用命名卷，应固定卷名；也可将已有卷声明为 `external: true`，使其生命周期独立于 Compose 项目。不要删除卷、清空宿主目录或使用 `docker compose down -v`。重建后重新登录，核对后台当前应用版本、书库和阅读是否正常。
+
+**仅挂载 `/data/books` 不足以保留应用升级。** 镜像的 `VOLUME /data` 声明也不保证独立 `docker run` 重建时复用原匿名卷。已有这类部署时，在删除旧容器前停止全部写入，备份并复制完整 `/data`（包括 books、updates、隐藏文件及权限）到固定持久化目录，再调整挂载并核验。若保留现有 `/data/books` 单独挂载，必须另外为 `/data/updates` 配置固定持久化挂载，并满足前述 root 所有权要求。不要将空卷覆盖到唯一数据副本上；已经删除的旧容器无法替你找回被删除的卷。
+
+同一镜像或运行时兼容且内置序号较旧的镜像会继续运行持久化升级；更新的内置镜像优先。运行时不兼容时使用内置版本，保留旧升级文件供诊断，并非删除数据。更换镜像不代表任意旧代码都能读取新数据库，数据库迁移仍遵守后文的备份与恢复边界。
+
+### 安装与故障恢复
+
 在管理后台「通用设置 → 系统更新」检查版本、阅读说明，然后选择「下载并安装」，确认服务中断。普通账号或未登录请求不能执行检查/安装；请求不能改变源、命令或目录。
 
 检查会验证所有配置源，选择最高签名序号，持久化防回放水位。同一序号内容冲突会报错。镜像落后会显示诊断，不能静默降级。下载回退必须得到相同提交、相同哈希的包。
@@ -94,3 +127,14 @@ python scripts/upgrade/mirror.py --provider oss --directory output --keys keys.j
 `pytest tests/test_application_upgrade.py` 可独立验证协议和恢复状态机；`tests/test_upgrade_api.py` 需要 Calibre 测试环境。前端运行 `npx vitest run --config test/upgrade.vitest.config.ts`。
 
 `scripts/upgrade/smoke_container.py --work <专用空目录> --frontend app/.output/public` 构造一次性测试镜像，基于本机已有可信运行时和真实后端。它生成隔离 HTTPS 签名资源，**仅测试 fixture 的公共 IP 连接检查被替换为 loopback TLS**；生产下载器不提供此开关。必须在报告中注明该边界，不能把它说成公网/大陆源可用性验证。测试用密钥、Cookie 和账号文件不得交付，测试结束后停止并删除专用容器。
+
+`tests/test_upgrade_recreation.py` 提供显式启用的真实 Docker 重建回归：先复制一份已完成升级的隔离测试数据，再启动容器、验证登录和版本、停止并删除容器，分别用同一镜像和兼容镜像重建。检查容器 ID 已改变、前后端版本及书目保持、应用文件/书库文件/配置/插件文件哈希保持。不会改写原始 fixture；禁止提供生产数据。
+
+```sh
+TALEBOOK_RECREATE_FIXTURE=/path/to/disposable-upgraded-fixture \
+TALEBOOK_RECREATE_IMAGE=talebook:tb213-smoke \
+TALEBOOK_RECREATE_COMPATIBLE_IMAGE=talebook:tb213-compatible \
+python3 -m pytest tests/test_upgrade_recreation.py -v -s --tb=short
+```
+
+fixture 目录须包含 `data/updates/active.json`、已安装包和真实书库，以及 `fixture/config.json`、`fixture/credentials.json`。测试镜像须与该包运行时兼容。未配置 fixture 时跳过这两项，不算完成容器验收。主机磁盘不足时可将 pytest 的 `--basetemp` 和 `TMPDIR` 指向足够大的 tmpfs，并设置 `TALEBOOK_RECREATE_COPY_APP=1`：每次从对应镜像重新复制内置应用到临时目录再挂载，避免启动时 chown 触发磁盘 copy-up。这个测试适配不改生产加载器，且不会把前一个容器的内置应用带到重建容器；应在报告注明未验证默认磁盘 overlay 的限制。
