@@ -94,10 +94,61 @@ docker compose up -d talebook
 
 ## 发布、轮换与国内同步
 
-`.github/workflows/application-upgrade.yml` 仅支持手动触发。输入完整已审查的 `master` 提交、版本；默认 `publish=false`，只上传构建产物，不创建 Releases、不更新正式渠道。提交必须是 master 祖先。`publish=true` 才进入单独的发布环境。请为以下环境设置人工审核和受保护分支：
+`.github/workflows/application-upgrade.yml` 在发布正式 `v*` GitHub Release（`published` 事件、非草稿、非预发布）后自动构建并上传应用更新资源。先把 tag 解析为固定 commit，并确认属于 `master` 历史；签名和发布分别经过受保护环境。`app-COMMIT` 与 `app-stable` 属于资源预发布，不会递归触发。
+
+保留手动入口：输入完整已审查的 `master` 提交和版本，默认 `publish=false` 仅上传 Actions 构建产物，不修改 Releases 或渠道；选择 `publish=true` 后才上传客户端资源。可选 `release_tag` 指定已有正式 Release，须与版本名及 commit 完全一致；留空仅发布 `app-COMMIT` / `app-stable`。请为以下环境设置人工审核和受保护分支/tag：
 
 - `application-upgrade`：secret `UPGRADE_SIGNING_KEY`，Ed25519 PKCS8 PEM 私钥；variable `UPGRADE_KEY_ID`。
 - `application-upgrade-publish`：variable `UPGRADE_TRUSTED_KEYS`（key_id 到原始公钥 Base64 的 JSON）；仓库 `GITHUB_TOKEN` 仅此 job 授予 contents:write。
+
+### 第一次让客户端获取升级包
+
+PR 合并前这些工作流还没有进入默认分支；当前已有历史 Release 不会因合并而自动补包。此处说明操作流程，本次开发没有生成正式私钥、修改仓库 secrets 或发布版本。
+
+1. 在可信发布管理机离线生成一次 Ed25519 密钥，私钥只交给签名环境，不上传 Release，也不放入容器。以下命令只打印公钥 JSON；私钥文件权限为 600：
+
+   ```sh
+   umask 077
+   openssl genpkey -algorithm ED25519 -out release-signing.pem
+   openssl pkey -in release-signing.pem -pubout -outform DER -out release-public.der
+   python3 - <<'PY'
+   import base64, json
+   from pathlib import Path
+   public = Path('release-public.der').read_bytes()
+   assert public[:12] == bytes.fromhex('302a300506032b6570032100') and len(public) == 44
+   keys = {'release-2026': base64.b64encode(public[12:]).decode()}
+   Path('upgrade-keys.json').write_text(json.dumps(keys))
+   Path('talebook-upgrade.json').write_text(json.dumps({
+       'keys': keys,
+       'sources': ['https://github.com/talebook/talebook/releases/download']
+   }, indent=2))
+   print(json.dumps(keys))
+   PY
+   ```
+
+2. 在 GitHub Settings → Environments 创建 `application-upgrade`：添加 secret `UPGRADE_SIGNING_KEY`（`release-signing.pem` 全文）及 variable `UPGRADE_KEY_ID=release-2026`。在 `application-upgrade-publish` 添加 variable `UPGRADE_TRUSTED_KEYS`（`upgrade-keys.json` 的 JSON 全文）。配置审核人，并允许经过审核的 `v*` tag 和手动入口所用分支。`GITHUB_TOKEN` 自动提供，无需额外 PAT。缺少配置会失败，不会悄悄发布无签名包。
+3. 容器首次换成包含本功能的可信镜像；通过可信管理渠道核对公钥，将生成的 `talebook-upgrade.json` 以 root 所有、644 权限放到固定宿主路径，并在 Compose 加入只读挂载。继续保留整个 `/data`，配置 `PUID=1000` / `PGID=1000`：
+
+   ```yaml
+   services:
+     talebook:
+       volumes:
+         - "${TALEBOOK_DATA_DIR:-./data}:/data"
+         - "/srv/talebook/talebook-upgrade.json:/etc/talebook-upgrade.json:ro"
+   ```
+
+4. 对包含本功能的已审查 `master` 提交发布正式 `v*` Release。在 Actions 完成签名与发布环境审核后，该 Release 附上 `package-amd64.tar.gz`、`package-arm64.tar.gz`、`package-armv7.tar.gz` 及对应三个 `stable-架构.json` 签名清单；同时创建客户端需要的固定资源路径，并最后更新渠道。
+5. 如需为**已有且包含本功能的 Release**补包，在 Actions 手动运行本工作流，填写对应完整 commit、相同 version 和 `release_tag`，勾选 `publish`。由其他 workflow 的 `GITHUB_TOKEN` 创建的 Release 通常不会触发第二个 workflow，亦使用此手动入口；仅推送 tag、仅保存草稿或预发布不会自动推进稳定渠道。更早的提交没有加载器/打包脚本，不能直接补出可安装包。
+6. 在后台点击“检查版本”。以 amd64 为例，客户端实际读取以下地址，而不是 GitHub 自动生成的 Source code 压缩包：
+
+   ```text
+   https://github.com/talebook/talebook/releases/download/app-stable/stable-amd64.json
+   https://github.com/talebook/talebook/releases/download/app-完整40位提交/package-amd64.tar.gz
+   ```
+
+   普通版本 Release 中的附件是同一份字节的可见入口，不能只上传附件就省略 `app-stable`。无新版本时显示当前版本是正常结果；包必须比当前序号新且运行时/数据库兼容才能安装。新依赖、Calibre 或启动布局变化仍需镜像升级；自动发布附件不等于强制允许不兼容安装。GitHub 访问受限时按后文配置国内源。
+
+同一次构建产生的 artifacts 可以安全重试发布；已有固定资产内容不同会拒绝覆盖。重新构建不保证得到完全相同的 gzip/前端/运行时字节，失败后优先重跑失败的 publish job 复用原始产物；不要删除不可变资产来绕过冲突。多架构任一构建失败都不会启动 publish；上传中断不会先推进渠道。
 
 密钥轮换顺序：通过可信镜像或只读部署配置先发放新旧公钥 → 重启加载新配置 → 发布端切换 `UPGRADE_KEY_ID` 和私钥 → 观察旧客户端覆盖 → 移除旧公钥。若私钥泄漏，立即暂停渠道发布并更新可信配置/镜像；仅在镜像站放一个新公钥无法建立新信任。不要将私钥提交到 Git、下载包、容器或日志。
 
