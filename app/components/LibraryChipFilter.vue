@@ -40,6 +40,7 @@
 
             <button
                 v-if="remainingCount > 0"
+                ref="pickerActivator"
                 type="button"
                 class="library-filter-control library-filter-more"
                 :data-testid="`library-filter-${filterKey}-more`"
@@ -55,6 +56,7 @@
             :fullscreen="xs"
             max-width="860"
             scrollable
+            @after-leave="pickerActivator?.focus()"
         >
             <v-card
                 class="library-filter-picker"
@@ -63,8 +65,11 @@
                 <v-card-title class="library-filter-picker__header">
                     <div class="library-filter-picker__heading">
                         <span>{{ t('library.selectFilter', { label }) }}</span>
-                        <small>
-                            {{ pickerSummary }}
+                        <small
+                            role="status"
+                            aria-live="polite"
+                        >
+                            {{ remoteLoading ? t('book.loading') : remoteFailed ? '' : pickerSummary }}
                         </small>
                     </div>
                     <v-btn
@@ -107,9 +112,32 @@
 
                 <v-divider />
 
-                <v-card-text class="library-filter-picker__body">
+                <v-card-text
+                    class="library-filter-picker__body"
+                    :aria-busy="remoteLoading"
+                >
+                    <v-progress-linear
+                        v-if="remoteLoading"
+                        indeterminate
+                        color="primary"
+                        :aria-label="t('book.loading')"
+                    />
+                    <v-alert
+                        v-else-if="remoteFailed"
+                        type="error"
+                        variant="tonal"
+                        role="alert"
+                    >
+                        {{ t('errors.networkError') }}
+                        <v-btn
+                            variant="text"
+                            @click="reloadRemote"
+                        >
+                            {{ t('common.retry') }}
+                        </v-btn>
+                    </v-alert>
                     <div
-                        v-if="pickerItems.length > 0"
+                        v-else-if="pickerItems.length > 0"
                         class="library-filter-picker__chips"
                         role="group"
                         :aria-label="t('library.selectFilter', { label })"
@@ -157,7 +185,8 @@
                         v-model="pickerPage"
                         :data-testid="`library-filter-${filterKey}-pagination`"
                         :length="pickerPageCount"
-                        :total-visible="5"
+                        :disabled="remoteLoading"
+                        :total-visible="xs ? 3 : 5"
                         density="compact"
                     />
                 </v-card-actions>
@@ -169,6 +198,7 @@
 <script setup>
 import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
+import { useMetadataPage } from '@/composables/useMetadataPage';
 
 const props = defineProps({
     modelValue: {
@@ -194,6 +224,14 @@ const props = defineProps({
     pageSize: {
         type: Number,
         default: 100
+    },
+    total: {
+        type: Number,
+        default: null
+    },
+    loadPage: {
+        type: Function,
+        default: null
     }
 });
 
@@ -201,8 +239,15 @@ const emit = defineEmits(['update:modelValue']);
 const { t } = useI18n();
 const { xs } = useDisplay();
 const pickerOpen = ref(false);
-const pickerPage = ref(1);
-const searchQuery = ref('');
+const pickerActivator = ref(null);
+const {
+    page: pickerPage, query: searchQuery, items: remoteItems, total: remoteTotal,
+    pages: remotePages, loading: remoteLoading, failed: remoteFailed, reload: reloadRemote
+} = useMetadataPage((page, query, size) => props.loadPage(page, query, size), {
+    key: () => props.filterKey,
+    enabled: () => pickerOpen.value && !!props.loadPage,
+    pageSize: () => props.pageSize
+});
 
 const visibleItems = computed(() => {
     const items = props.items.slice(0, props.initialLimit);
@@ -210,11 +255,13 @@ const visibleItems = computed(() => {
         return items;
     }
 
-    const selected = props.items.find(item => item.name === props.modelValue);
+    const selected = props.items.find(item => item.name === props.modelValue)
+        || (props.loadPage ? { id: `selected-${props.modelValue}`, name: props.modelValue } : null);
     return selected ? [...items, selected] : items;
 });
 
-const remainingCount = computed(() => Math.max(props.items.length - visibleItems.value.length, 0));
+const optionTotal = computed(() => props.total ?? props.items.length);
+const remainingCount = computed(() => Math.max(optionTotal.value - visibleItems.value.length, 0));
 const normalizedSearchQuery = computed(() => String(searchQuery.value || '').trim().toLocaleLowerCase());
 const filteredItems = computed(() => {
     if (!normalizedSearchQuery.value) {
@@ -223,15 +270,17 @@ const filteredItems = computed(() => {
 
     return props.items.filter(item => item.name.toLocaleLowerCase().includes(normalizedSearchQuery.value));
 });
-const pickerPageCount = computed(() => Math.max(1, Math.ceil(filteredItems.value.length / props.pageSize)));
+const pickerPageCount = computed(() => props.loadPage
+    ? remotePages.value : Math.max(1, Math.ceil(filteredItems.value.length / props.pageSize)));
 const pickerItems = computed(() => {
+    if (props.loadPage) return remoteItems.value;
     const start = (pickerPage.value - 1) * props.pageSize;
     return filteredItems.value.slice(start, start + props.pageSize);
 });
 const pickerSummary = computed(() => {
     const params = {
-        count: filteredItems.value.length,
-        total: props.items.length,
+        count: props.loadPage ? remoteTotal.value : filteredItems.value.length,
+        total: optionTotal.value,
         page: pickerPage.value,
         pages: pickerPageCount.value
     };
@@ -242,7 +291,7 @@ const pickerSummary = computed(() => {
 });
 
 watch(() => props.items.length, () => {
-    pickerPage.value = Math.min(pickerPage.value, pickerPageCount.value);
+    if (!props.loadPage) pickerPage.value = Math.min(pickerPage.value, pickerPageCount.value);
 });
 
 const select = (value) => {
@@ -251,7 +300,7 @@ const select = (value) => {
 
 const openPicker = () => {
     searchQuery.value = '';
-    const selectedIndex = props.modelValue
+    const selectedIndex = props.modelValue && !props.loadPage
         ? props.items.findIndex(item => item.name === props.modelValue)
         : -1;
     pickerPage.value = selectedIndex >= 0
