@@ -2147,6 +2147,8 @@
       "delete_backup": "Database snapshot deleted.",
       "retention": "Retention saved and cleanup completed."
     },
-    "installedSize": "Application size: about {size} MB"
+    "installedSize": "Application size: about {size} MB",
+    "history": "Manage version history",
+    "closeHistory": "Close"
   }
 }

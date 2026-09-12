@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { flushPromises, mount } from '@vue/test-utils';
+import { DOMWrapper, flushPromises, mount } from '@vue/test-utils';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
@@ -16,6 +16,12 @@ function render() {
     const wrapper = mount(ApplicationUpgrade, { attachTo: document.body, props: { backend }, global: { plugins: [vuetify] } });
     mounted.push(wrapper);
     return wrapper;
+}
+async function openHistory(wrapper: ReturnType<typeof mount>) {
+    expect(wrapper.find('.upgrade-items').exists()).toBe(false);
+    await wrapper.findAll('button').find(b => b.text() === 'upgrade.history')!.trigger('click');
+    await flushPromises();
+    return new DOMWrapper(document.querySelector('[aria-labelledby="upgrade-history-title"]')!);
 }
 describe('application upgrade', () => {
     beforeEach(() => {
@@ -68,8 +74,9 @@ describe('application upgrade', () => {
             { id: 'image', version: 'v1', builtin: true, current: true },
             { id: 'b'.repeat(40), version: 'v0', protected: true, can_delete: false, can_activate: false, incompatible: 'database' },
         ], backups: [] } });
-        const wrapper = render();
+        const root = render();
         await flushPromises();
+        const wrapper = await openHistory(root);
         expect(wrapper.text()).toContain('upgrade.error.database');
         expect(wrapper.find('[aria-label="upgrade.useVersion"]').attributes('disabled')).toBeDefined();
         expect(wrapper.find('[aria-label="upgrade.deleteVersion"]').attributes('disabled')).toBeDefined();
@@ -80,8 +87,9 @@ describe('application upgrade', () => {
         backend.mockResolvedValue({ err: 'ok', status: { ...available, keep: 3, releases: [
             { id, version: 'v0', can_delete: true, can_activate: true },
         ], backups: [{ id, source: { version: 'v0' }, target: { version: 'v1' }, created_at: 1 }] } });
-        const wrapper = render();
+        const root = render();
         await flushPromises();
+        const wrapper = await openHistory(root);
         const label = action === 'activate' ? 'useVersion' : action === 'delete' ? 'deleteVersion' : 'deleteSnapshot';
         await wrapper.find(`[aria-label="upgrade.${label}"]`).trigger('click');
         await flushPromises();
@@ -94,8 +102,9 @@ describe('application upgrade', () => {
     });
     it('keeps invalid retention in the dialog and sends a valid count', async () => {
         backend.mockResolvedValue({ err: 'ok', status: { ...available, keep: 3, releases: [], backups: [] } });
-        const wrapper = render();
+        const root = render();
         await flushPromises();
+        const wrapper = await openHistory(root);
         await wrapper.findAll('button').find(b => b.text() === 'upgrade.keep')!.trigger('click');
         await flushPromises();
         const cancel = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'upgrade.cancel')!;

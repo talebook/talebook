@@ -31,6 +31,7 @@
             {{ t('upgrade.noDomestic') }}
         </p>
         <div
+            v-if="!historyOpen"
             role="status"
             aria-live="polite"
             aria-atomic="true"
@@ -48,7 +49,7 @@
             />
         </div>
         <v-alert
-            v-if="error || status.error"
+            v-if="!historyOpen && (error || status.error)"
             type="error"
             variant="tonal"
             class="mb-3"
@@ -97,6 +98,13 @@
                 {{ t('upgrade.install') }}
             </v-btn>
             <v-btn
+                v-if="status.releases"
+                ref="historyTrigger"
+                variant="outlined"
+            >
+                {{ t('upgrade.history') }}
+            </v-btn>
+            <v-btn
                 v-if="reconnecting"
                 variant="outlined"
                 :disabled="pending"
@@ -136,165 +144,216 @@
                 rel="noopener noreferrer"
             >{{ t('upgrade.imageDetails') }}</a>
         </div>
-        <section
-            v-if="status.releases"
-            class="mt-6"
-            :aria-label="t('upgrade.library')"
+        <v-dialog
+            v-model="historyOpen"
+            :activator="historyTrigger?.$el"
+            :transition="false"
+            scrollable
+            max-width="880"
+            aria-labelledby="upgrade-history-title"
         >
-            <h4 class="text-h6 mb-2">
-                {{ t('upgrade.library') }}
-            </h4>
-            <p class="mb-2 text-body-2">
-                {{ t('upgrade.rebuildRule') }}
-            </p>
-            <p class="mb-3 text-body-2">
-                {{ t(status.pinned ? 'upgrade.pinned' : 'upgrade.automatic') }}
-            </p>
-            <v-alert
-                v-if="status.cleanup_error"
-                type="warning"
-                variant="tonal"
-                class="mb-3"
-            >
-                {{ t('upgrade.cleanupFailed') }} {{ errorText(status.cleanup_error) }}
-            </v-alert>
-            <v-btn
-                ref="libraryTrigger"
-                variant="outlined"
-                :disabled="busy || pending || !!status.disabled"
-                class="mb-3"
-                aria-haspopup="dialog"
-                @click="openManagement('retention', null, $event)"
-            >
-                {{ t('upgrade.keep', { count: status.keep }) }}
-            </v-btn>
-            <ul class="upgrade-items">
-                <li
-                    v-for="item in status.releases"
-                    :key="item.id"
-                    class="upgrade-item"
+            <v-card>
+                <v-card-title
+                    id="upgrade-history-title"
+                    class="text-wrap"
                 >
-                    <h5 class="text-subtitle-1 font-weight-bold">
-                        {{ item.version || t('upgrade.unknownVersion') }}
-                    </h5>
-                    <p class="text-body-2 upgrade-identifier">
-                        {{ item.commit || item.id }}
-                    </p>
-                    <div class="d-flex flex-wrap ga-2 my-2">
-                        <v-chip
-                            v-if="item.current"
-                            size="small"
-                        >
-                            {{ t('upgrade.inUse') }}
-                        </v-chip>
-                        <v-chip
-                            v-if="item.builtin"
-                            size="small"
-                        >
-                            {{ t('upgrade.builtin') }}
-                        </v-chip>
-                        <v-chip
-                            v-if="item.protected"
-                            size="small"
-                        >
-                            {{ t('upgrade.protected') }}
-                        </v-chip>
-                        <span
-                            v-if="item.size"
-                            class="text-body-2"
-                        >{{ t('upgrade.installedSize', { size: Math.ceil(item.size / 1024 / 1024) }) }}</span>
+                    {{ t('upgrade.history') }}
+                </v-card-title>
+                <v-card-text>
+                    <div
+                        role="status"
+                        aria-live="polite"
+                        class="mb-3"
+                    >
+                        <p v-if="notice">
+                            {{ notice }}
+                        </p>
+                        <p>
+                            {{ reconnecting ? t('upgrade.reconnecting') : t(`upgrade.phase.${status.phase}`) }}
+                        </p>
+                        <v-progress-linear
+                            v-if="busy || pending"
+                            indeterminate
+                            :aria-label="t('upgrade.progress')"
+                        />
                     </div>
-                    <p
-                        v-if="item.incompatible"
-                        class="text-body-2 mb-2"
+                    <v-alert
+                        v-if="error || status.error"
+                        type="error"
+                        variant="tonal"
+                        role="alert"
+                        class="mb-3"
                     >
-                        {{ errorText(item.incompatible) }}
-                    </p>
-                    <div class="d-flex flex-wrap ga-2">
-                        <v-btn
-                            v-if="!item.current"
-                            variant="outlined"
-                            :disabled="!item.can_activate || busy || pending || !!status.disabled"
-                            :aria-label="t('upgrade.useVersion', { version: item.version || item.id })"
-                            aria-haspopup="dialog"
-                            @click="openManagement('activate', item, $event)"
+                        {{ errorText(error || status.error) }}
+                    </v-alert>
+                    <section
+                        v-if="status.releases"
+                        class="upgrade-library"
+                        :aria-label="t('upgrade.library')"
+                    >
+                        <h4 class="text-h6 mb-2">
+                            {{ t('upgrade.library') }}
+                        </h4>
+                        <p class="mb-2 text-body-2">
+                            {{ t('upgrade.rebuildRule') }}
+                        </p>
+                        <p class="mb-3 text-body-2">
+                            {{ t(status.pinned ? 'upgrade.pinned' : 'upgrade.automatic') }}
+                        </p>
+                        <v-alert
+                            v-if="status.cleanup_error"
+                            type="warning"
+                            variant="tonal"
+                            class="mb-3"
                         >
-                            {{ t('upgrade.use') }}
-                        </v-btn>
+                            {{ t('upgrade.cleanupFailed') }} {{ errorText(status.cleanup_error) }}
+                        </v-alert>
                         <v-btn
-                            v-if="!item.builtin"
+                            ref="libraryTrigger"
                             variant="outlined"
-                            color="error"
-                            :disabled="!item.can_delete || busy || pending || !!status.disabled"
-                            :aria-label="t('upgrade.deleteVersion', { version: item.version || item.id })"
+                            :disabled="busy || pending || !!status.disabled"
+                            class="mb-3"
                             aria-haspopup="dialog"
-                            @click="openManagement('delete', item, $event)"
+                            @click="openManagement('retention', null, $event)"
                         >
-                            {{ t('upgrade.delete') }}
+                            {{ t('upgrade.keep', { count: status.keep }) }}
                         </v-btn>
-                    </div>
-                </li>
-            </ul>
-            <h4 class="text-h6 mt-5 mb-2">
-                {{ t('upgrade.backups') }}
-            </h4>
-            <p class="text-body-2 mb-3">
-                {{ t('upgrade.databaseRule') }}
-            </p>
-            <p v-if="!status.backups?.length">
-                {{ t('upgrade.noBackups') }}
-            </p>
-            <ul
-                v-else
-                class="upgrade-items"
-            >
-                <li
-                    v-for="item in status.backups"
-                    :key="item.id"
-                    class="upgrade-item"
-                >
-                    <p class="font-weight-bold">
-                        {{ item.source?.version || t('upgrade.legacyBackup') }} → {{ item.target?.version || '—' }}
-                    </p>
-                    <p class="text-body-2">
-                        {{ formatDate(item.created_at) }} · {{ t('upgrade.databaseCount', { count: item.databases ?? '—' }) }}
-                    </p>
-                    <p class="text-body-2 upgrade-identifier">
-                        {{ item.id }}
-                    </p>
-                    <p
-                        v-if="item.database"
-                        class="text-body-2 upgrade-identifier"
-                    >
-                        {{ t('upgrade.databaseFingerprint') }}: {{ item.database }}
-                    </p>
-                    <p
-                        v-if="item.legacy"
-                        class="text-body-2"
-                    >
-                        {{ t('upgrade.legacyBackupHelp') }}
-                    </p>
-                    <v-chip
-                        v-if="item.protected"
-                        size="small"
-                        class="my-2"
-                    >
-                        {{ t('upgrade.protected') }}
-                    </v-chip>
-                    <v-btn
-                        variant="outlined"
-                        color="error"
-                        class="mt-2"
-                        :disabled="item.protected || busy || pending || !!status.disabled"
-                        :aria-label="t('upgrade.deleteSnapshot', { id: item.id })"
-                        aria-haspopup="dialog"
-                        @click="openManagement('delete_backup', item, $event)"
-                    >
-                        {{ t('upgrade.delete') }}
+                        <ul class="upgrade-items">
+                            <li
+                                v-for="item in status.releases"
+                                :key="item.id"
+                                class="upgrade-item"
+                            >
+                                <h5 class="text-subtitle-1 font-weight-bold">
+                                    {{ item.version || t('upgrade.unknownVersion') }}
+                                </h5>
+                                <p class="text-body-2 upgrade-identifier">
+                                    {{ item.commit || item.id }}
+                                </p>
+                                <div class="d-flex flex-wrap ga-2 my-2">
+                                    <v-chip
+                                        v-if="item.current"
+                                        size="small"
+                                    >
+                                        {{ t('upgrade.inUse') }}
+                                    </v-chip>
+                                    <v-chip
+                                        v-if="item.builtin"
+                                        size="small"
+                                    >
+                                        {{ t('upgrade.builtin') }}
+                                    </v-chip>
+                                    <v-chip
+                                        v-if="item.protected"
+                                        size="small"
+                                    >
+                                        {{ t('upgrade.protected') }}
+                                    </v-chip>
+                                    <span
+                                        v-if="item.size"
+                                        class="text-body-2"
+                                    >{{ t('upgrade.installedSize', { size: Math.ceil(item.size / 1024 / 1024) }) }}</span>
+                                </div>
+                                <p
+                                    v-if="item.incompatible"
+                                    class="text-body-2 mb-2"
+                                >
+                                    {{ errorText(item.incompatible) }}
+                                </p>
+                                <div class="d-flex flex-wrap ga-2">
+                                    <v-btn
+                                        v-if="!item.current"
+                                        variant="outlined"
+                                        :disabled="!item.can_activate || busy || pending || !!status.disabled"
+                                        :aria-label="t('upgrade.useVersion', { version: item.version || item.id })"
+                                        aria-haspopup="dialog"
+                                        @click="openManagement('activate', item, $event)"
+                                    >
+                                        {{ t('upgrade.use') }}
+                                    </v-btn>
+                                    <v-btn
+                                        v-if="!item.builtin"
+                                        variant="outlined"
+                                        color="error"
+                                        :disabled="!item.can_delete || busy || pending || !!status.disabled"
+                                        :aria-label="t('upgrade.deleteVersion', { version: item.version || item.id })"
+                                        aria-haspopup="dialog"
+                                        @click="openManagement('delete', item, $event)"
+                                    >
+                                        {{ t('upgrade.delete') }}
+                                    </v-btn>
+                                </div>
+                            </li>
+                        </ul>
+                        <h4 class="text-h6 mt-5 mb-2">
+                            {{ t('upgrade.backups') }}
+                        </h4>
+                        <p class="text-body-2 mb-3">
+                            {{ t('upgrade.databaseRule') }}
+                        </p>
+                        <p v-if="!status.backups?.length">
+                            {{ t('upgrade.noBackups') }}
+                        </p>
+                        <ul
+                            v-else
+                            class="upgrade-items"
+                        >
+                            <li
+                                v-for="item in status.backups"
+                                :key="item.id"
+                                class="upgrade-item"
+                            >
+                                <p class="font-weight-bold">
+                                    {{ item.source?.version || t('upgrade.legacyBackup') }} → {{ item.target?.version || '—' }}
+                                </p>
+                                <p class="text-body-2">
+                                    {{ formatDate(item.created_at) }} · {{ t('upgrade.databaseCount', { count: item.databases ?? '—' }) }}
+                                </p>
+                                <p class="text-body-2 upgrade-identifier">
+                                    {{ item.id }}
+                                </p>
+                                <p
+                                    v-if="item.database"
+                                    class="text-body-2 upgrade-identifier"
+                                >
+                                    {{ t('upgrade.databaseFingerprint') }}: {{ item.database }}
+                                </p>
+                                <p
+                                    v-if="item.legacy"
+                                    class="text-body-2"
+                                >
+                                    {{ t('upgrade.legacyBackupHelp') }}
+                                </p>
+                                <v-chip
+                                    v-if="item.protected"
+                                    size="small"
+                                    class="my-2"
+                                >
+                                    {{ t('upgrade.protected') }}
+                                </v-chip>
+                                <v-btn
+                                    variant="outlined"
+                                    color="error"
+                                    class="mt-2"
+                                    :disabled="item.protected || busy || pending || !!status.disabled"
+                                    :aria-label="t('upgrade.deleteSnapshot', { id: item.id })"
+                                    aria-haspopup="dialog"
+                                    @click="openManagement('delete_backup', item, $event)"
+                                >
+                                    {{ t('upgrade.delete') }}
+                                </v-btn>
+                            </li>
+                        </ul>
+                    </section>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn @click="historyOpen = false">
+                        {{ t('upgrade.closeHistory') }}
                     </v-btn>
-                </li>
-            </ul>
-        </section>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
         <v-dialog
             v-model="managementOpen"
             :transition="false"
@@ -400,6 +459,8 @@ const imageRelease = ref('');
 const confirm = ref(false);
 const installTrigger = ref(null);
 const reconnecting = ref(false);
+const historyOpen = ref(false);
+const historyTrigger = ref(null);
 const managementOpen = ref(false);
 const managementAction = ref('activate');
 const managementItem = ref(null);
@@ -513,6 +574,8 @@ onBeforeUnmount(() => { disposed = true; clearTimeout(timer); });
 :deep(.v-btn:focus-visible) { outline: 2px solid rgb(var(--v-theme-on-surface)); outline-offset: 3px; }
 a { color: rgb(var(--v-theme-on-surface)); text-decoration: underline; }
 .upgrade-notes { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; max-height: 20rem; overflow-y: auto; }
+.upgrade-library :deep(.v-btn) { max-width: 100%; height: auto; min-height: 36px; }
+.upgrade-library :deep(.v-btn__content) { white-space: normal; }
 .upgrade-items { list-style: none; padding: 0; display: grid; gap: 12px; }
 .upgrade-item { padding: 16px; border: 1px solid rgba(var(--v-theme-on-surface), .25); border-radius: 8px; min-width: 0; }
 .upgrade-identifier { overflow-wrap: anywhere; }

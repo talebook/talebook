@@ -2153,6 +2153,8 @@
       "delete_backup": "已删除数据库快照。",
       "retention": "保留数量已保存，清理已完成。"
     },
-    "installedSize": "应用大小约 {size} MB"
+    "installedSize": "应用大小约 {size} MB",
+    "history": "管理历史版本",
+    "closeHistory": "关闭"
   }
 }
