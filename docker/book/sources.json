@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "generated_on": "2026-07-23",
+  "schema_version": 3,
+  "generated_on": "2026-09-04",
   "artifact_policy": "Download URLs may change over time; source_sha256 pins the retrieved source artifact and sha256 pins the committed final-format artifact.",
   "jurisdiction_notice": "Public-domain status can differ by jurisdiction. The records below retain the source edition's rights notices and identify the basis used for this preset collection.",
   "chinese_conversion": {
@@ -15,7 +15,8 @@
     "version": "8.5.0",
     "runtime": "talebook/talebook:dev",
     "source_format": "EPUB",
-    "metadata_limit": "Calibre imports the converted TXT and PDF titles, but reports their authors as Unknown and their languages as empty. The TXT's visible metadata header and this manifest retain those fields."
+    "artifact_formats": ["EPUB", "MOBI", "AZW3"],
+    "metadata_policy": "Preset books use formats that preserve author, language, cover and publication metadata when imported by Calibre; source EPUBs remain EPUB unless a MOBI or AZW3 example is intentional."
   },
   "books": [
     {
@@ -29,14 +30,17 @@
       "download_url": "https://www.gutenberg.org/ebooks/24264.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "cca1a10b5302d42378eac8e601497983cc545e845d98f261a0348e72538b3b4f",
-      "sha256": "fa12595ec7717270c41de1c9471fd9a6c113e4454fe3c0a3f350a4c5edf73ad3",
+      "sha256": "06be938bf2d1be096eb01c83545c4a365b60ad191266157c94eb0273a71fc398",
       "chapter_count": 120,
+      "series": "中国四大名著",
+      "series_index": 4,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
         "Rebuilt EPUB navigation from 120 source chapter headings",
-        "Replaced default cover image with the selected B2 person ink-wash design"
+        "Replaced default cover image with the selected B2 person ink-wash design",
+        "Added EPUB 3 collection and Calibre series metadata: 中国四大名著 [4]"
       ]
     },
     {
@@ -50,14 +54,17 @@
       "download_url": "https://www.gutenberg.org/ebooks/23962.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "b229817ffc91e7cea1c092cd576bf1bb0bc8a43f20d6429ee4d3ca5da8095371",
-      "sha256": "a94879c4c6c8b18b609323fbebe6f4533bcdcc3dd0990d817fee43e564cc4aeb",
+      "sha256": "715977d4b80c13304e981a0d3ff008edf9c6d96840b49a13cf47a02af7dd3443",
       "chapter_count": 100,
+      "series": "中国四大名著",
+      "series_index": 3,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
         "Rebuilt EPUB navigation from 100 source chapter headings",
-        "Replaced default cover image with the selected B2 person ink-wash design"
+        "Replaced default cover image with the selected B2 person ink-wash design",
+        "Added EPUB 3 collection and Calibre series metadata: 中国四大名著 [3]"
       ]
     },
     {
@@ -71,14 +78,17 @@
       "download_url": "https://www.gutenberg.org/ebooks/23950.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "e6f7ac2b2f2888067c3680900afb371f3f2c415cdcaa44a9fe9bfbc87397f592",
-      "sha256": "cfc59cf83542b2747d8e04b1c93965c10acedb850281eb4ec0ac927dc93a1a9a",
+      "sha256": "c7e0ef0265e624c0c3e12470e0df48b5e971a33cdac831d56ce9a5b23dc4f047",
       "chapter_count": 120,
+      "series": "中国四大名著",
+      "series_index": 1,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
         "Rebuilt EPUB navigation from 120 source chapter headings",
-        "Replaced default cover image with the selected B2 person ink-wash design"
+        "Replaced default cover image with the selected B2 person ink-wash design",
+        "Added EPUB 3 collection and Calibre series metadata: 中国四大名著 [1]"
       ]
     },
     {
@@ -92,14 +102,17 @@
       "download_url": "https://www.gutenberg.org/ebooks/23863.epub3.images",
       "retrieved_on": "2026-07-23",
       "source_sha256": "30dfc12741580629cc0b32af58175294d3d7acb4823a3e382a790ca73501e100",
-      "sha256": "a9b74d94858266e09654f74b4867458f089f03f6471d4bbb4fd30552880adf56",
+      "sha256": "1d0b13d8399f044d0a847b3a1db17f7986bde669d1a11aed7dc3cc510918acec",
       "chapter_count": 70,
+      "series": "中国四大名著",
+      "series_index": 2,
       "rights": "Public domain in the USA; Project Gutenberg license and trademark notice retained.",
       "transformations": [
         "Traditional Chinese to Simplified Chinese with OpenCC t2s",
         "Normalized title, author and language metadata",
         "Rebuilt EPUB navigation from 70 source chapter headings",
-        "Replaced default cover image with the selected B2 person ink-wash design"
+        "Replaced default cover image with the selected B2 person ink-wash design",
+        "Added EPUB 3 collection and Calibre series metadata: 中国四大名著 [2]"
       ]
     },
     {
@@ -142,8 +155,8 @@
       ]
     },
     {
-      "filename": "alices-adventures-in-wonderland.pdf",
-      "format": "PDF",
+      "filename": "alices-adventures-in-wonderland.epub",
+      "format": "EPUB",
       "title": "Alice’s Adventures in Wonderland",
       "author": "Lewis Carroll",
       "language": "en-GB",
@@ -152,22 +165,21 @@
       "download_url": "https://standardebooks.org/ebooks/lewis-carroll/alices-adventures-in-wonderland/john-tenniel/downloads/lewis-carroll_alices-adventures-in-wonderland_john-tenniel.epub?source=download",
       "retrieved_on": "2026-07-23",
       "source_sha256": "ee036cd4da21ea84aa9f17cbdd75a476e1f69ee5f51136ef5469e85b008fe17d",
-      "sha256": "967270f907c5a687cf651ad63b7ba8665c6b1d57ba7e723f7b8888da489843ea",
-      "page_count": 102,
+      "sha256": "ee036cd4da21ea84aa9f17cbdd75a476e1f69ee5f51136ef5469e85b008fe17d",
+      "minimum_navigation_entries": 13,
       "calibre_import": {
         "title": "Alice’s Adventures in Wonderland",
-        "author": "Unknown",
-        "language": null
+        "author": "Lewis Carroll",
+        "language": "eng",
+        "publisher": "Standard Ebooks",
+        "minimum_tag_count": 1
       },
       "rights": "Text and illustrations are public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
-      "transformations": [
-        "Converted from the pinned source EPUB to an A4 illustrated PDF with Calibre 8.5.0",
-        "Command: ebook-convert source.epub output.pdf --paper-size a4 --title \"Alice’s Adventures in Wonderland\" --authors \"Lewis Carroll\" --language en-GB"
-      ]
+      "transformations": []
     },
     {
-      "filename": "frankenstein.txt",
-      "format": "TXT",
+      "filename": "frankenstein.epub",
+      "format": "EPUB",
       "title": "Frankenstein",
       "author": "Mary Shelley",
       "language": "en-GB",
@@ -176,19 +188,17 @@
       "download_url": "https://standardebooks.org/ebooks/mary-shelley/frankenstein/downloads/mary-shelley_frankenstein.epub?source=download",
       "retrieved_on": "2026-07-23",
       "source_sha256": "9ef7e1a6138d8bf64e6c529e6c981a169a70f7455455598aba031da482ec6c8f",
-      "sha256": "67ad6b4e703df2bd268f9cfe5a259b2f4b634de8008c6d6673a1152f38af6677",
-      "line_count": 2087,
+      "sha256": "9ef7e1a6138d8bf64e6c529e6c981a169a70f7455455598aba031da482ec6c8f",
+      "minimum_navigation_entries": 32,
       "calibre_import": {
-        "title": "Frankenstein",
-        "author": "Unknown",
-        "language": null
+        "title": "Frankenstein: Or, the Modern Prometheus",
+        "author": "Mary Shelley",
+        "language": "eng",
+        "publisher": "Standard Ebooks",
+        "minimum_tag_count": 5
       },
       "rights": "Text is public domain in the USA; Standard Ebooks production is dedicated to the public domain under CC0 1.0.",
-      "transformations": [
-        "Converted from the pinned source EPUB to UTF-8 plain text with a visible metadata header using Calibre 8.5.0",
-        "Command: ebook-convert source.epub output.txt --txt-output-formatting plain --newline unix --insert-metadata --title Frankenstein --authors \"Mary Shelley\" --language en-GB",
-        "Normalized non-semantic indentation whitespace and trailing blank lines for a Git-stable text artifact"
-      ]
+      "transformations": []
     },
     {
       "filename": "the-picture-of-dorian-gray.azw3",

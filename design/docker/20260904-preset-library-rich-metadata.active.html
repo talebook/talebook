@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook Docker 预置书库格式收敛与四大名著丛书元数据方案。" />
+    <link rel="icon" href="data:," />
+    <title>预置书库收敛为富元数据格式 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f1ea;
+        --panel: #fffdf8;
+        --ink: #20261f;
+        --muted: #667063;
+        --line: #d9d8cc;
+        --accent: #8b3f2f;
+        --accent-soft: #f8e9e2;
+        --green: #2f684a;
+        --green-soft: #e7f2ea;
+        --warn: #8a5a16;
+        --warn-soft: #fff5dc;
+        --shadow: 0 16px 38px rgba(51, 48, 39, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(145deg, #eeeae0, var(--bg) 42%, #f8f6f0); font-family: var(--sans); line-height: 1.68; }
+      a { color: var(--accent); text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code { padding: .12em .36em; border-radius: 5px; background: #eeece5; font: .9em var(--mono); overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 30; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+      .page { width: min(1120px, calc(100vw - 32px)); margin: 0 auto; padding: 28px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { margin-bottom: 18px; padding: 34px; border-top: 5px solid var(--accent); }
+      h1 { margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.03em; }
+      .sub { max-width: 900px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { padding: 5px 11px; color: #596256; background: #eeece5; border-radius: 999px; font-size: 12px; font-weight: 750; }
+      .chip.wip { color: var(--warn); background: var(--warn-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      h2 { margin: 0 0 14px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 20px 0 9px; font-size: 17px; }
+      p { margin: 0 0 12px; }
+      p, li { color: #344034; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+      .choice, .callout { padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.good, .callout.good { border-color: #b8d1bf; background: var(--green-soft); }
+      .callout.warn { border-color: #ead29b; background: var(--warn-soft); }
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+      .step { min-height: 124px; padding: 16px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+      .step b { display: block; margin-bottom: 6px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+      .table-wrap { margin-top: 13px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #596256; background: #f3f2ed; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #f2f4ee; background: #2c342d; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: var(--warn); font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+      .toc { position: sticky; top: 0; z-index: 10; display: flex; gap: 5px; margin-bottom: 18px; padding: 8px; overflow-x: auto; background: rgba(255, 253, 248, .95); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(8px); }
+      .toc a { flex: 0 0 auto; padding: 7px 10px; color: var(--muted); border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 700; }
+      .toc a:hover { color: var(--accent); background: var(--accent-soft); }
+      footer { color: var(--muted); font-size: 12px; text-align: center; }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .toc, .skip-link { display: none; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>预置书库收敛为富元数据格式</h1>
+        <p class="sub">移除会丢失作者与语言信息的 PDF、TXT 种子格式，以原始 EPUB 替换；同时让四大名著在 Calibre 与 EPUB 3 中组成可识别、可排序的“中国四大名著”丛书。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-09-04</span>
+          <span class="chip">所属模块：docker</span>
+          <span class="chip">影响范围：Docker 预置书库、来源清单、测试</span>
+          <span class="chip">需求来源：用户对话 2026-09-03 至 2026-09-04</span>
+        </div>
+      </header>
+
+      <nav class="toc" aria-label="章节目录">
+        <a href="#request">原始诉求</a><a href="#goals">目标与边界</a><a href="#evidence">现状证据</a><a href="#design">方案</a><a href="#impact">风险</a><a href="#tests">测试</a><a href="#decisions">决策</a>
+      </nav>
+
+      <main id="main-content">
+        <section id="request" class="card">
+          <h2>1. 原始诉求</h2>
+          <div class="callout warn">“data 是 docker 运行目录吧？要加入到 .gitignore里面。docker book里的种子书籍调整一下，只保留epub+mobi+azw3，因为这些导入时能识别出丰富的信息，体现出talebook的优势，去掉 txt + pdf。然后，四部名著要在epub文件里添加‘丛书：中国四大名著’的信息。”</div>
+          <p>代码核对表明，默认 Compose 已将仓库 <code>data/</code> 挂载到容器 <code>/data</code>，且根 <code>.gitignore</code> 已存在 <code>data/</code> 规则。因此该项是现状确认，不新增重复规则。</p>
+        </section>
+
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="choice good"><h3>目标</h3><ul><li>默认书库保持 10 本、中英文各 5 本。</li><li>种子书仅包含 EPUB、MOBI、AZW3，Alice 与 Frankenstein 使用同名 EPUB 替换。</li><li>四大名著导入 Calibre 后共享丛书“中国四大名著”，并具有稳定序号。</li><li>来源、许可证、转换和最终制品哈希可审计。</li></ul></article>
+            <article class="choice"><h3>非目标</h3><ul><li>不改写或清理当前 <code>data/</code> 持久化书库。</li><li>不在升级时删除用户已有 PDF、TXT 图书。</li><li>不改变上传接口、扫描逻辑或其他格式支持能力。</li><li>不调整封面、正文、章节导航和阅读器界面。</li></ul></article>
+          </div>
+        </section>
+
+        <section id="evidence" class="card">
+          <h2>3. 现状、根因与证据</h2>
+          <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+            <table>
+              <thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead>
+              <tbody>
+                <tr><td>Docker 默认运行目录</td><td><code>docker-compose.yml</code> 使用 <code>${TALEBOOK_DATA_DIR:-./data}:/data</code>；<code>.gitignore</code> 已含 <code>data/</code></td><td>无需重复修改忽略规则。</td></tr>
+                <tr><td>PDF、TXT 元数据贫化</td><td><code>sources.json</code> 记录 Alice 与 Frankenstein 经 Calibre 导入后作者为 Unknown、语言为空。</td><td>换回来源 EPUB 可展示作者、语言、封面、标识符等丰富字段。</td></tr>
+                <tr><td>来源 EPUB 可复用</td><td>Git 历史保存两份来源 EPUB；其文件路径和来源哈希可与清单交叉验证。</td><td>优先复用已经审计的固定制品，不依赖变化中的远端下载。</td></tr>
+                <tr><td>现有四部 EPUB 为 EPUB 3</td><td>四个 <code>OEBPS/content.opf</code> 的 package version 均为 3.0。</td><td>可同时写入 EPUB 3 collection 和 Calibre 兼容元数据。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="design" class="card">
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>方案结论：</strong>以历史中固定的 Standard Ebooks EPUB 替换两种贫元数据格式；四大名著在 OPF 中同时写入标准 collection 语义和 Calibre 系列字段；清单与测试共同定义可审计契约。</div>
+          <div class="flow" aria-label="预置书处理流程">
+            <article class="step"><span class="label">Source</span><b>复用固定 EPUB</b><p>从 Git 历史读取 Alice 与 Frankenstein，并验证来源 SHA-256。</p></article>
+            <article class="step"><span class="label">Metadata</span><b>写入双轨丛书字段</b><p>四大名著同时包含 EPUB 3 collection 与 Calibre series/index。</p></article>
+            <article class="step"><span class="label">Contract</span><b>更新来源清单</b><p>格式、文件名、哈希、转换记录和元数据策略保持一致。</p></article>
+            <article class="step"><span class="label">Verify</span><b>真实导入校验</b><p>使用隔离临时书库导入，检查作者、语言、封面、丛书与序号。</p></article>
+          </div>
+
+          <h3>丛书顺序</h3>
+          <div class="table-wrap" role="region" aria-label="四大名著丛书顺序" tabindex="0">
+            <table>
+              <thead><tr><th>序号</th><th>书名</th><th>文件</th><th>写入值</th></tr></thead>
+              <tbody>
+                <tr><td>1</td><td>三国志演义</td><td><code>san-guo-zhi-yan-yi.epub</code></td><td>中国四大名著 [1]</td></tr>
+                <tr><td>2</td><td>水浒传</td><td><code>shui-hu-zhuan.epub</code></td><td>中国四大名著 [2]</td></tr>
+                <tr><td>3</td><td>西游记</td><td><code>xi-you-ji.epub</code></td><td>中国四大名著 [3]</td></tr>
+                <tr><td>4</td><td>红楼梦</td><td><code>hong-lou-meng.epub</code></td><td>中国四大名著 [4]</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>OPF 契约</h3>
+          <pre aria-label="OPF 元数据示例"><code>&lt;meta id="collection" property="belongs-to-collection"&gt;中国四大名著&lt;/meta&gt;
+&lt;meta refines="#collection" property="collection-type"&gt;series&lt;/meta&gt;
+&lt;meta refines="#collection" property="group-position"&gt;1&lt;/meta&gt;
+&lt;meta name="calibre:series" content="中国四大名著"/&gt;
+&lt;meta name="calibre:series_index" content="1"/&gt;</code></pre>
+        </section>
+
+        <section id="impact" class="card">
+          <h2>5. 影响范围、风险与回滚</h2>
+          <div class="grid">
+            <article class="choice good"><h3>影响范围</h3><p><code>docker/book/</code> 的二进制种子、<code>sources.json</code>、预置书契约测试，以及 Dockerfile 构建生成的全新预置书库。</p></article>
+            <article class="choice"><h3>保持不变</h3><p>现有持久化 <code>data/</code>、运行时导入与格式支持、书籍正文、公开 API 和前端交互均不改变。</p></article>
+          </div>
+          <div class="callout warn"><strong>主要风险：</strong>直接重打包 EPUB 可能破坏 mimetype 首项与不压缩约束，或让清单哈希失配。测试必须逐包校验 ZIP、XML、封面、导航、哈希及实际 Calibre 导入结果。</div>
+          <div class="callout"><strong>回滚：</strong>以本次提交为单位恢复两个旧格式文件、四个原 EPUB、来源清单与测试；本次不迁移持久化数据，因此没有数据回滚步骤。</div>
+        </section>
+
+        <section id="tests" class="card">
+          <h2>6. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>实际命令或检查</th><th>验收重点</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>定向测试</td><td><code>.venv/bin/pytest -q tests/test_preset_books.py tests/test_docker_persistence_config.py</code></td><td>10 本、仅三种格式、哈希、EPUB 完整性、富元数据与双轨丛书字段。</td><td class="verified">通过：32 passed in 0.27s</td></tr>
+                <tr><td>真实 Calibre 导入</td><td>临时挂载种子目录后执行 <code>calibredb add --library-path=/library -r /books/</code>，再用 <code>calibredb list</code> 和 SQLite 查询</td><td>10 本均成功；Alice 与 Frankenstein 的作者、语言、出版者和标签正确；四大名著丛书及序号正确。</td><td class="verified">通过：Added book ids 1–10；四大名著为中国四大名著 [1–4]</td></tr>
+                <tr><td>完整测试</td><td><code>make test</code></td><td>在包含 Calibre 8.5 的 Docker 测试镜像中执行完整测试。</td><td class="verified">通过：1275 passed，20 skipped，25 warnings，53.14s</td></tr>
+                <tr><td>Python 质量门禁</td><td><code>make lint-py-fix</code>；<code>make lint-py</code></td><td>后端代码无意外格式变化，lint 通过。</td><td class="verified">通过：176 files unchanged / already formatted，All checks passed</td></tr>
+                <tr><td>静态与二进制审计</td><td><code>git diff --check</code>、JSON 解析、逐 ZIP entry 与 <code>HEAD</code> 比较</td><td>无空白错误；清单合法；四个中文 EPUB 仅 OPF 变化。</td><td class="verified">通过：正文、封面、导航条目均未改变</td></tr>
+                <tr><td>宿主机诊断</td><td><code>make pytest</code>；<code>.venv/bin/pytest tests -v --cov=webserver --cov-report=term-missing</code></td><td>记录非 Docker 环境限制，不冒充通过。</td><td>首条因 PATH 未激活找不到 pytest；第二条收集 1209 项后因宿主机缺少 Calibre 模块出现 5 个收集错误。已由 <code>make test</code> 的完整 Docker 结果替代。</td></tr>
+                <tr><td>界面审查</td><td>不执行</td><td>确认是否影响页面、交互或其他前端消费者。</td><td class="verified">豁免：仅调整 Docker 新装种子制品和测试，无界面代码及运行时 API 变化</td></tr>
+                <tr><td>方案门禁</td><td><code>make check-design</code></td><td>ACTIVE 路径、HTML 结构和单文件资源约束通过。</td><td class="verified">通过：140 design document(s) passed</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="callout good"><strong>验证结论：</strong>文件级契约、Calibre 8.5 真实导入和完整 Docker 测试均通过。该改动无界面影响，剩余风险仅为已有持久化书库不会自动获得新种子；这是明确的兼容边界。</div>
+        </section>
+
+        <section id="decisions" class="card">
+          <h2>7. 决策记录</h2>
+          <ol>
+            <li><strong>2026-09-04：</strong>确认 <code>data/</code> 是默认 Docker 持久化目录，且已被 Git 忽略，不重复添加规则。</li>
+            <li><strong>2026-09-04：</strong>不删除 Alice 与 Frankenstein，而是换成同名 EPUB，保持 10 本及中英文各 5 本。</li>
+            <li><strong>2026-09-04：</strong>四大名著按《三国志演义》《水浒传》《西游记》《红楼梦》排列为 1 至 4。</li>
+            <li><strong>2026-09-04：</strong>只影响新构建镜像和全新数据目录，不自动修改当前或用户已有 <code>data/</code>。</li>
+            <li><strong>2026-09-04：</strong>实际导入发现 Standard Ebooks 为 Frankenstein 提供主标题与副标题；Calibre 正确合成为“Frankenstein: Or, the Modern Prometheus”，作为富元数据验收结果记录。</li>
+          </ol>
+        </section>
+      </main>
+
+      <footer>Talebook internal design · docker · ACTIVE · 2026-09-04</footer>
+    </div>
+  </body>
+</html>
