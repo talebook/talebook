@@ -16,7 +16,11 @@ from webserver.plugins.runtime.domains import (
     SourceContent,
 )
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, ProviderResult, UpstreamError
-from webserver.plugins.runtime.safe_http import SafeHttpClient
+from webserver.plugins.runtime.safe_http import (
+    DEFAULT_HOST_CONCURRENCY,
+    HOST_CONCURRENCY_CONFIG_KEY,
+    SafeHttpClient,
+)
 from webserver.services.booksource.metadata import BookSourceMetadataService, collect_metadata_sources
 
 
@@ -85,6 +89,8 @@ class LegadoSourcePlugin:
             session=booksource_engine.build_session(source),
             max_bytes=int(engine_config.get("BOOKSOURCE_MAX_RESPONSE_BYTES") or 8 * 1024 * 1024),
             enforce_public_address=bool(config.get(PRIVATE_NETWORK_PROTECTION_KEY, True)),
+            plugin_key=PLUGIN_ID,
+            max_concurrency=config.get(HOST_CONCURRENCY_CONFIG_KEY, DEFAULT_HOST_CONCURRENCY),
         )
         return BookSourceEngine(source, session=transport, config=engine_config)
 
@@ -231,6 +237,12 @@ class LegadoProvider(LegadoSourcePlugin):
                             "minimum": 1,
                             "maximum": 100,
                             "default": DEFAULT_SAVE_CONCURRENCY,
+                        },
+                        HOST_CONCURRENCY_CONFIG_KEY: {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": DEFAULT_HOST_CONCURRENCY,
                         },
                         PRIVATE_NETWORK_PROTECTION_KEY: {"type": "boolean", "default": True},
                     },

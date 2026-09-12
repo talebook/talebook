@@ -118,12 +118,14 @@ class TestPluginsApi(TestWithAdminUser):
         self.assertEqual(properties["search_result_limit"]["default"], 5)
         self.assertEqual(properties["search_concurrency"]["default"], 20)
         self.assertEqual(properties["save_concurrency"]["default"], 10)
+        self.assertEqual(properties["host_concurrency"]["default"], 10)
         self.assertTrue(properties["private_network_protection"]["default"])
 
         config = {
             "search_result_limit": 7,
             "search_concurrency": 4,
             "save_concurrency": 3,
+            "host_concurrency": 2,
             "private_network_protection": False,
         }
         saved = self.json(
@@ -146,7 +148,7 @@ class TestPluginsApi(TestWithAdminUser):
                     "installation_id": installation["id"],
                     "role": connection["role"],
                     "name": connection["name"],
-                    "config": {**config, "save_concurrency": 0},
+                    "config": {**config, "host_concurrency": 0},
                 }
             ),
         )

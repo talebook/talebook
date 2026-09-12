@@ -4,6 +4,7 @@ import asyncio
 import inspect
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from unittest import mock
 
 import pytest
@@ -14,6 +15,7 @@ from webserver.models import Base, PluginRun
 from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.plugins.runtime.domains import CheckReport, Page, Review
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, UpstreamAuthError, UpstreamRateLimitError
+from webserver.plugins.runtime.safe_http import HostQueueTimeout, SafeHttpClient
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
@@ -288,7 +290,7 @@ def test_push_route_creates_personal_connection_and_uses_sync_runtime(db_session
     assert connection.lease_until is None
 
 
-def test_read_batch_timeout_keeps_the_grace_lease(db_session):
+def test_read_batch_timeout_never_creates_a_connection_lease(db_session):
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.batch-timeout", "metadata.lookup")
     registry.register(plugin)
@@ -305,8 +307,9 @@ def test_read_batch_timeout_keeps_the_grace_lease(db_session):
     db_session.refresh(connection)
     assert run.status == "failed"
     assert run.error_code == "plugin.timeout"
-    assert connection.lease_token == batch["lease_token"]
-    assert connection.lease_until is not None
+    assert batch["lease_token"] == ""
+    assert connection.lease_token == ""
+    assert connection.lease_until is None
 
 
 def test_prepare_read_returns_callables_that_never_touch_the_session(db_session):
@@ -327,8 +330,125 @@ def test_prepare_read_returns_callables_that_never_touch_the_session(db_session)
     assert unit["call"]("search_books", "标题")[0]["title"] == "标题"
 
 
-def test_external_pool_bridge_uses_lease_retry_and_durable_audit(db_session):
-    """既有流式线程池桥接也必须继承 typed runtime 的租约、重试与审计。"""
+def test_prepared_reads_inject_plugin_identity_into_the_shared_host_queue(db_session):
+    registry = PluginRegistry()
+    plugin = _plugin("talebook.test.host-queue", "metadata.lookup")
+    registry.register(plugin)
+    instance_connection = _install(db_session, registry, plugin)
+    user_connection = save_connection(
+        db_session,
+        SETTINGS,
+        instance_connection.installation_id,
+        "user",
+        42,
+        {},
+        config={"host_concurrency": 1},
+        name="个人连接",
+    )
+    instance_connection.config = {"host_concurrency": 1}
+    db_session.commit()
+
+    first_started = threading.Event()
+    second_started = threading.Event()
+    release = threading.Event()
+    lock = threading.Lock()
+    calls = {"count": 0}
+
+    class Session:
+        @staticmethod
+        def resolver(host, port, **kwargs):
+            return [(2, 1, 6, "", ("93.184.216.34", port or 443))]
+
+        def request(self, *args, **kwargs):
+            with lock:
+                calls["count"] += 1
+                number = calls["count"]
+            if number == 1:
+                first_started.set()
+                assert release.wait(2), "first plugin HTTP request was not released"
+            else:
+                second_started.set()
+            return mock.Mock(status_code=200, headers={}, content=b"{}")
+
+    client = SafeHttpClient(session=Session())
+
+    def queued_search(title, context):
+        client.request("GET", "https://books.example/search", timeout=1)
+        return [{"title": title}]
+
+    plugin.search_books = queued_search
+    runtime = PluginRuntime(db_session, SETTINGS, registry=registry)
+    prepared, failures = runtime.prepare_read([instance_connection, user_connection], timeout=1)
+    assert failures == {}
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(prepared[0]["call"], "search_books", "第一本")
+        assert first_started.wait(1)
+        second = executor.submit(prepared[1]["call"], "search_books", "第二本")
+        assert not second_started.wait(0.05), "runtime must group connections by plugin+host, not connection id"
+        release.set()
+        assert first.result(timeout=1)[0]["title"] == "第一本"
+        assert second.result(timeout=1)[0]["title"] == "第二本"
+
+
+def test_host_queue_timeout_keeps_its_typed_runtime_error(db_session):
+    plugin_id = "talebook.test.host-queue-timeout"
+    registry = PluginRegistry()
+    plugin = _plugin(plugin_id, "metadata.lookup")
+    registry.register(plugin)
+    connection = _install(db_session, registry, plugin)
+    connection.config = {"host_concurrency": 1}
+    db_session.commit()
+
+    release = threading.Event()
+    first_started = threading.Event()
+
+    class BlockingSession:
+        @staticmethod
+        def resolver(host, port, **kwargs):
+            return [(2, 1, 6, "", ("93.184.216.34", port or 443))]
+
+        def request(self, *args, **kwargs):
+            first_started.set()
+            assert release.wait(2), "blocking request was not released"
+            return mock.Mock(status_code=200, headers={}, content=b"{}")
+
+    class WaitingSession:
+        @staticmethod
+        def resolver(host, port, **kwargs):
+            return [(2, 1, 6, "", ("93.184.216.34", port or 443))]
+
+        @staticmethod
+        def request(*args, **kwargs):
+            return mock.Mock(status_code=200, headers={}, content=b"{}")
+
+    blocker = SafeHttpClient(session=BlockingSession(), plugin_key=plugin_id, max_concurrency=1)
+    client = SafeHttpClient(session=WaitingSession())
+    plugin.search_books = lambda title, context: client.request(
+        "GET",
+        "https://books.example/search",
+        timeout=0.03,
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        blocked = executor.submit(blocker.request, "GET", "https://books.example/block")
+        assert first_started.wait(1)
+        try:
+            with pytest.raises(HostQueueTimeout) as exc:
+                PluginRuntime(db_session, SETTINGS, registry=registry).read(
+                    connection,
+                    "search_books",
+                    "三体",
+                    timeout=1,
+                )
+            assert exc.value.code == "plugin.host_queue_timeout"
+        finally:
+            release.set()
+        assert blocked.result(timeout=1).status_code == 200
+
+
+def test_external_pool_bridge_uses_retry_and_durable_audit(db_session):
+    """既有流式线程池桥接也必须继承 typed runtime 的重试与审计。"""
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.external-pool", "metadata.lookup", behaviour="retry")
     registry.register(plugin)
@@ -379,7 +499,7 @@ def test_read_rejects_missing_mode_scope_before_dispatch(db_session):
     assert connection.health == "degraded"
 
 
-def test_typed_read_uses_lease_retry_and_durable_audit(db_session):
+def test_typed_read_uses_retry_and_durable_audit(db_session):
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.audited-read", "metadata.lookup", behaviour="retry")
     registry.register(plugin)
@@ -472,8 +592,8 @@ def test_typed_retry_uses_connection_timeout_as_one_wall_clock_budget(db_session
     assert 1 <= run.attempt <= 2
     assert run.status == "failed"
     db_session.refresh(connection)
-    assert connection.lease_token
-    assert connection.lease_until is not None
+    assert connection.lease_token == ""
+    assert connection.lease_until is None
 
 
 def test_typed_read_proceeds_while_another_run_holds_the_lease(db_session):
@@ -499,13 +619,13 @@ def test_typed_read_proceeds_while_another_run_holds_the_lease(db_session):
     run = db_session.query(PluginRun).filter(PluginRun.connection_id == connection.id).one()
     assert run.status == "succeeded"
     db_session.refresh(connection)
-    # 宽容读不带租约执行，收口时不得清掉租约持有者
+    # read 不参与租约，收口时不得清掉有副作用调用的租约。
     assert connection.lease_token == "other-worker"
     assert connection.lease_until is not None
 
 
-def test_read_during_timeout_grace_is_not_rejected(db_session):
-    """TB-198 回归：读超时保留宽限租约（防不可取消 future 重叠）期间，用户重试的读仍成功。"""
+def test_read_timeout_does_not_create_a_grace_lease_or_reject_retry(db_session):
+    """TB-198 回归：只读超时由 host 队列约束，不得创建 connection 宽限租约。"""
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.grace-read", "metadata.lookup")
     registry.register(plugin)
@@ -529,14 +649,15 @@ def test_read_during_timeout_grace_is_not_rejected(db_session):
         runtime.read(connection, "search_books", "三体")
     assert exc.value.code == "plugin.timeout"
     db_session.refresh(connection)
-    assert connection.lease_token
-    assert connection.lease_until is not None
+    assert connection.lease_token == ""
+    assert connection.lease_until is None
 
-    # 宽限窗口内的下一次读（如重新点击搜索结果）必须成功且不干扰宽限租约
+    # 下一次读（如重新点击搜索结果）必须成功，不会被 connection 互斥拒绝。
     result = runtime.read(connection, "search_books", "三体")
     assert result[0]["title"] == "三体"
     db_session.refresh(connection)
-    assert connection.lease_token
+    assert connection.lease_token == ""
+    assert connection.lease_until is None
     runs = (
         db_session.query(PluginRun)
         .filter(PluginRun.connection_id == connection.id)
@@ -547,8 +668,8 @@ def test_read_during_timeout_grace_is_not_rejected(db_session):
     assert runs[0].error_code == "plugin.timeout"
 
 
-def test_second_read_batch_proceeds_while_first_batch_holds_the_lease(db_session):
-    """搜索批量并发宽容：前一批仍占用连接时，新搜索批量不再整批 concurrent_run。"""
+def test_concurrent_read_batches_never_use_the_connection_lease(db_session):
+    """搜索批量由 plugin+host 队列约束，connection lease 不参与只读调度。"""
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.batch-overlap", "metadata.lookup")
     registry.register(plugin)
@@ -556,9 +677,8 @@ def test_second_read_batch_proceeds_while_first_batch_holds_the_lease(db_session
     runtime = PluginRuntime(db_session, SETTINGS, registry=registry)
 
     first = runtime.begin_read_batch(connection, timeout=1, requested_by=1)
-    assert first["lease_token"]
+    assert first["lease_token"] == ""
     second = runtime.begin_read_batch(connection, timeout=1, requested_by=1)
-    # 第二条宽容批量：不带租约，但审计 run 照常记录
     assert second["lease_token"] == ""
     assert second["run_id"] != first["run_id"]
 
@@ -653,7 +773,7 @@ def _blocking_metadata_handler(db_session, plugin_id):
     return handler, connection, plugin_call, started, release
 
 
-def test_metadata_sync_outer_timeout_keeps_lease_for_uncancellable_provider(db_session):
+def test_metadata_sync_outer_timeout_does_not_lease_read_connection(db_session):
     plugin_id = "talebook.test.metadata-sync-timeout"
     handler, connection, plugin_call, started, release = _blocking_metadata_handler(db_session, plugin_id)
     handler._build_search_tasks = lambda _metadata: {plugin_id: plugin_call}
@@ -664,13 +784,13 @@ def test_metadata_sync_outer_timeout_keeps_lease_for_uncancellable_provider(db_s
         run = db_session.query(PluginRun).filter(PluginRun.connection_id == connection.id).one()
         db_session.refresh(connection)
         assert run.error_code == "plugin.timeout"
-        assert connection.lease_token
-        assert connection.lease_until is not None
+        assert connection.lease_token == ""
+        assert connection.lease_until is None
     finally:
         release.set()
 
 
-def test_metadata_stream_close_keeps_lease_for_uncancellable_provider(db_session):
+def test_metadata_stream_close_does_not_lease_read_connection(db_session):
     plugin_id = "talebook.test.metadata-stream-timeout"
     handler, connection, plugin_call, started, release = _blocking_metadata_handler(db_session, plugin_id)
 
@@ -696,8 +816,8 @@ def test_metadata_stream_close_keeps_lease_for_uncancellable_provider(db_session
         run = db_session.query(PluginRun).filter(PluginRun.connection_id == connection.id).one()
         db_session.refresh(connection)
         assert run.error_code == "plugin.timeout"
-        assert connection.lease_token
-        assert connection.lease_until is not None
+        assert connection.lease_token == ""
+        assert connection.lease_until is None
     finally:
         release.set()
 
