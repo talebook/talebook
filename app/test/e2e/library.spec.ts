@@ -155,4 +155,38 @@ test.describe('Library Pages', () => {
         await expect(page.locator('.filter-label', { hasText: '连载状态' })).toHaveCount(0);
         await expect(page.getByTestId('library-filter-publisher')).toBeVisible();
     });
+
+    test('Library keeps server search results when an older page response arrives late', async ({ page }) => {
+        let releasePage: () => void = () => {};
+        const delayedPage = new Promise<void>(resolve => { releasePage = resolve; });
+        await page.route('**/api/publisher?**', async route => {
+            const url = new URL(route.request().url());
+            if (url.searchParams.get('page') === '2') {
+                const response = await route.fetch();
+                await delayedPage;
+                await route.fulfill({ response });
+            } else {
+                await route.continue();
+            }
+        });
+        try {
+            await page.goto('/library');
+            await page.getByTestId('library-filter-publisher-more').click();
+            const picker = page.getByTestId('library-filter-publisher-picker');
+            await expect(picker.locator('.library-filter-picker__option')).toHaveCount(100);
+            const oldRequest = page.waitForRequest(request => request.url().includes('/api/publisher?page=2&'));
+            await picker.locator('.v-pagination__item').filter({ hasText: /^2$/ }).click();
+            await oldRequest;
+            await picker.getByTestId('library-filter-publisher-search').locator('input').fill('测试出版社11');
+            await expect(picker.getByText('找到 11 / 120 项 · 第 1 / 1 页', { exact: true })).toBeVisible();
+            const oldResponse = page.waitForResponse(response => response.url().includes('/api/publisher?page=2&'));
+            releasePage();
+            await (await oldResponse).finished();
+            await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+            await expect(picker.locator('.library-filter-picker__option')).toHaveCount(11);
+            await expect(picker.getByText('找到 11 / 120 项 · 第 1 / 1 页', { exact: true })).toBeVisible();
+        } finally {
+            releasePage();
+        }
+    });
 });

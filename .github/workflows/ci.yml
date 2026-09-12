@@ -93,9 +93,41 @@ jobs:
           path: app/.nuxt
           retention-days: 1
 
+  test-library-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: app
+    env:
+      API_URL: http://127.0.0.1:8080
+      MOCK_API_URL: http://127.0.0.1:8080
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci
+      - name: Test metadata contract and pagination components
+        run: npx vitest run --maxWorkers=1 test/utils/metadata-pagination.spec.ts test/components/MetaList.spec.ts test/components/useMetadataPage.spec.ts test/components/LocalLibraryContent.spec.ts test/components/LibraryChipFilter.spec.ts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Run library browser regressions (including picker and keyboard cases)
+        run: npx playwright test -c playwright.library.config.ts
+      - name: Upload browser results and failure traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: library-browser-results
+          path: app/test-results
+          retention-days: 7
+
   integration-test:
     runs-on: ubuntu-latest
-    needs: [check-design, test-server, test-ui]
+    needs: [check-design, test-server, test-ui, test-library-browser]
 
     steps:
       - name: Checkout code
