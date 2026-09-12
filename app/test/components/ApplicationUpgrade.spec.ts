@@ -63,6 +63,63 @@ describe('application upgrade', () => {
         expect(wrapper.text()).toContain('upgrade.error.runtime');
         expect(wrapper.findAll('button').some(b => b.text() === 'upgrade.install')).toBe(false);
     });
+    it('lists versions and protects the running release and incompatible rollback', async () => {
+        backend.mockResolvedValue({ err: 'ok', status: { ...available, keep: 3, releases: [
+            { id: 'image', version: 'v1', builtin: true, current: true },
+            { id: 'b'.repeat(40), version: 'v0', protected: true, can_delete: false, can_activate: false, incompatible: 'database' },
+        ], backups: [] } });
+        const wrapper = render();
+        await flushPromises();
+        expect(wrapper.text()).toContain('upgrade.error.database');
+        expect(wrapper.find('[aria-label="upgrade.useVersion"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.find('[aria-label="upgrade.deleteVersion"]').attributes('disabled')).toBeDefined();
+        expect(wrapper.text()).toContain('upgrade.noBackups');
+    });
+    it.each(['activate', 'delete', 'delete_backup'])('confirms %s and forwards the selected identifier', async action => {
+        const id = 'b'.repeat(40);
+        backend.mockResolvedValue({ err: 'ok', status: { ...available, keep: 3, releases: [
+            { id, version: 'v0', can_delete: true, can_activate: true },
+        ], backups: [{ id, source: { version: 'v0' }, target: { version: 'v1' }, created_at: 1 }] } });
+        const wrapper = render();
+        await flushPromises();
+        const label = action === 'activate' ? 'useVersion' : action === 'delete' ? 'deleteVersion' : 'deleteSnapshot';
+        await wrapper.find(`[aria-label="upgrade.${label}"]`).trigger('click');
+        await flushPromises();
+        expect(backend).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent).toContain(`upgrade.manageBody.${action}`);
+        const confirm = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === `upgrade.manageConfirm.${action}`)!;
+        confirm.click();
+        await flushPromises();
+        expect(JSON.parse(backend.mock.calls[1][1].body)).toEqual({ action, release: id });
+    });
+    it('keeps invalid retention in the dialog and sends a valid count', async () => {
+        backend.mockResolvedValue({ err: 'ok', status: { ...available, keep: 3, releases: [], backups: [] } });
+        const wrapper = render();
+        await flushPromises();
+        await wrapper.findAll('button').find(b => b.text() === 'upgrade.keep')!.trigger('click');
+        await flushPromises();
+        const cancel = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'upgrade.cancel')!;
+        cancel.click();
+        await flushPromises();
+        await wrapper.findAll('button').find(b => b.text() === 'upgrade.keep')!.trigger('click');
+        await flushPromises();
+        const input = document.querySelector('input[type="number"]') as HTMLInputElement;
+        const confirm = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'upgrade.manageConfirm.retention')!;
+        input.value = '1';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+        confirm.click();
+        await flushPromises();
+        expect(backend).toHaveBeenCalledTimes(1);
+        expect(document.body.textContent).toContain('upgrade.error.retention');
+        input.value = '4';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+        confirm.click();
+        await flushPromises();
+        expect(JSON.parse(backend.mock.calls[1][1].body)).toEqual({ action: 'retention', keep: 4 });
+        expect(wrapper.text()).toContain('upgrade.managed.retention');
+    });
     it('keeps reconnecting after a lost response and recovers persistent result', async () => {
         vi.useFakeTimers();
         backend.mockRejectedValueOnce(new Error('503')).mockResolvedValueOnce({ err: 'ok', status: { ...available, phase: 'succeeded' } });

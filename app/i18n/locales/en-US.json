@@ -2094,7 +2094,59 @@
       "backup": "Database backup validation failed; installation stopped.",
       "source_config": "Invalid update source. Ask the deployment administrator to check HTTPS configuration.",
       "internal": "Operation failed. Inspect upgrade logs before retrying.",
-      "origin": "Request origin rejected. Retry from this site’s admin page."
-    }
+      "origin": "Request origin rejected. Retry from this site’s admin page.",
+      "retention": "Retention must be an integer from 2 to 20.",
+      "protected": "This item is required by the current release or recovery and cannot be deleted.",
+      "release_missing": "This local release or snapshot no longer exists. Refresh the list.",
+      "release_metadata": "Missing release metadata prevents compatibility verification and switching."
+    },
+    "library": "Local application versions",
+    "rebuildRule": "Reuse the entire /data volume when recreating a container. The loader checks runtime and database fingerprints and selects a persisted release newer than the image. A different base image triggers a new selection.",
+    "pinned": "Manually selected: recreating with the same base image preserves this choice.",
+    "automatic": "Selected automatically by compatibility and release sequence.",
+    "cleanupFailed": "The application is healthy, but cleanup did not finish:",
+    "keep": "Keep {count} releases / Cleanup settings",
+    "keepLabel": "Number to retain",
+    "keepHelp": "2–20. Keep N application releases and N new database snapshots separately. Protected items take priority and may exceed N.",
+    "unknownVersion": "Legacy release (missing metadata)",
+    "inUse": "In use",
+    "builtin": "Built into image",
+    "protected": "Protected",
+    "use": "Use this version",
+    "useVersion": "Use this version: {version}",
+    "delete": "Delete",
+    "deleteVersion": "Delete version {version}",
+    "deleteSnapshot": "Delete database snapshot {id}",
+    "backups": "Database snapshots before switching",
+    "databaseRule": "Every switch stops the application and backs up the current databases. A snapshot belongs to the source version, not the target. Application rollback does not restore databases. Incompatible schemas require a separately reviewed, offline restore. Deleting an application release keeps its database snapshots.",
+    "noBackups": "No database snapshots yet.",
+    "legacyBackup": "Unlinked legacy snapshot",
+    "legacyBackupHelp": "This snapshot has no version mapping and is not automatically pruned. Check its inventory.json before deleting it.",
+    "databaseCount": "{count} databases",
+    "databaseFingerprint": "Database fingerprint",
+    "manageTitle": {
+      "activate": "Switch application version",
+      "delete": "Delete local application release",
+      "delete_backup": "Delete database snapshot",
+      "retention": "Set retention limit"
+    },
+    "manageBody": {
+      "activate": "Service will briefly stop. The system backs up current databases and switches compatible application code only; it does not overwrite data with an old snapshot. This choice survives recreation with the same base image.",
+      "delete": "This version will no longer be available for switching. Your library and database snapshots will be kept.",
+      "delete_backup": "Permanently remove this database snapshot. It will no longer be available for recovery. Current databases and application releases remain.",
+      "retention": "Saving immediately removes excess application releases and new database snapshots. Current, previous and required recovery items remain protected; unlinked legacy snapshots need separate cleanup."
+    },
+    "manageConfirm": {
+      "activate": "Back up and switch",
+      "delete": "Delete release",
+      "delete_backup": "Delete snapshot",
+      "retention": "Save and clean up"
+    },
+    "managed": {
+      "delete": "Local version deleted.",
+      "delete_backup": "Database snapshot deleted.",
+      "retention": "Retention saved and cleanup completed."
+    },
+    "installedSize": "Application size: about {size} MB"
   }
 }

@@ -2100,7 +2100,59 @@
       "backup": "数据库备份校验失败，已停止安装。",
       "source_config": "升级源配置无效，请由部署管理员检查 HTTPS 配置。",
       "internal": "操作失败，请查看升级日志后重试。",
-      "origin": "请求来源校验失败，请在本站后台重新操作。"
-    }
+      "origin": "请求来源校验失败，请在本站后台重新操作。",
+      "retention": "保留数量必须是 2–20 的整数。",
+      "protected": "此项被当前版本或恢复流程引用，不能删除。",
+      "release_missing": "此本地版本或快照已不存在，请刷新列表。",
+      "release_metadata": "版本元数据缺失，无法核对兼容性，禁止切换。"
+    },
+    "library": "本地应用版本",
+    "rebuildRule": "重建容器时复用完整 /data。启动器校验运行时和数据库指纹，再加载比内置镜像新的持久化版本；更换基础镜像后重新选择。",
+    "pinned": "已手动指定版本：同一基础镜像重建后保持此选择。",
+    "automatic": "当前按兼容性和版本序号自动选择。",
+    "cleanupFailed": "应用已正常运行，但清理未完成：",
+    "keep": "保留 {count} 个版本 / 设置清理",
+    "keepLabel": "保留数量",
+    "keepHelp": "2–20；应用版本与新数据库快照分别保留 N 个。受保护项优先，可能暂时超过 N。",
+    "unknownVersion": "历史版本（元数据缺失）",
+    "inUse": "正在使用",
+    "builtin": "镜像内置",
+    "protected": "受保护",
+    "use": "使用此版本",
+    "useVersion": "使用此版本：{version}",
+    "delete": "删除",
+    "deleteVersion": "删除版本 {version}",
+    "deleteSnapshot": "删除数据库快照 {id}",
+    "backups": "切换前的数据库快照",
+    "databaseRule": "每次切换前停服并备份当前数据库。快照属于来源版本，不是目标版本的运行数据。应用回滚不恢复数据库；结构不兼容时拒绝切换，需停服后人工评估恢复。删除应用版本不会同时删除其数据库快照。",
+    "noBackups": "尚无数据库快照。",
+    "legacyBackup": "未关联的旧快照",
+    "legacyBackupHelp": "旧快照缺少版本关联，不自动清理；请核对目录中的 inventory.json 后再决定是否删除。",
+    "databaseCount": "{count} 个数据库",
+    "databaseFingerprint": "数据库指纹",
+    "manageTitle": {
+      "activate": "切换应用版本",
+      "delete": "删除本地应用版本",
+      "delete_backup": "删除数据库快照",
+      "retention": "设置保留数量"
+    },
+    "manageBody": {
+      "activate": "切换会短暂中断服务。系统先备份当前数据库，只切换兼容的应用代码，不用旧快照覆盖现有数据。此选择会在同一基础镜像重建后保留。",
+      "delete": "删除后将无法直接切换到此版本。此操作不会删除书库或数据库快照。",
+      "delete_backup": "永久删除此数据库快照，之后无法用它恢复数据。当前数据库和应用版本不受影响。",
+      "retention": "保存后立即清理超出数量的应用版本和新数据库快照。当前、上一版本及必要恢复快照不会删除；旧的未关联快照需单独处理。"
+    },
+    "manageConfirm": {
+      "activate": "备份并切换",
+      "delete": "确认删除版本",
+      "delete_backup": "确认删除快照",
+      "retention": "保存并清理"
+    },
+    "managed": {
+      "delete": "已删除本地版本。",
+      "delete_backup": "已删除数据库快照。",
+      "retention": "保留数量已保存，清理已完成。"
+    },
+    "installedSize": "应用大小约 {size} MB"
   }
 }

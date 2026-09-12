@@ -52,7 +52,31 @@ class TestUpgradeAdmin(TestWithAdminUser):
         current_user.return_value = mock.Mock()
         response = self.json("/api/admin/upgrade")
         self.assertEqual(response["err"], "permission.not_admin")
+        for action in ("activate", "delete", "delete_backup", "retention"):
+            response = self.json(
+                "/api/admin/upgrade",
+                method="POST",
+                body=json.dumps({"action": action}),
+                headers={"Content-Type": "application/json", "X-Talebook-Upgrade": "1"},
+            )
+            self.assertEqual(response["err"], "permission.not_admin")
         executor.assert_not_called()
+
+    @mock.patch("webserver.handlers.upgrade.request_executor", return_value={"err": "ok", "status": {"phase": "idle"}})
+    def test_admin_version_management(self, executor):
+        for action in ("activate", "delete", "delete_backup", "retention"):
+            executor.reset_mock()
+            response = self.json(
+                "/api/admin/upgrade",
+                method="POST",
+                body=json.dumps({"action": action, "release": "a" * 40, "keep": 4}),
+                headers={"Content-Type": "application/json", "X-Talebook-Upgrade": "1"},
+            )
+            self.assertEqual(response["err"], "ok")
+            if action == "retention":
+                executor.assert_called_once_with(action, None, 4)
+            else:
+                executor.assert_called_once_with(action, "a" * 40)
 
     def test_external_health_probe_hidden(self):
         self.assertEqual(self.fetch("/api/upgrade/health", headers={"X-Forwarded-For": "1.2.3.4"}).code, 404)

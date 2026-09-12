@@ -363,7 +363,13 @@ def test_real_files_install_and_failed_start_restore_application_only(engine, si
     monkeypatch.setattr(ex, "supervisor", lambda action: calls.append(action))
     monkeypatch.setattr(ex.subprocess, "run", lambda *a, **kw: Mock(returncode=0))
     backups = []
-    monkeypatch.setattr(ex, "backup_databases", lambda dest: backups.append(dest) or 2)
+
+    def backup(dest):
+        dest.mkdir()
+        backups.append(dest)
+        return 2
+
+    monkeypatch.setattr(ex, "backup_databases", backup)
 
     def check(expected=None, idle=False):
         if bad_health and expected == "v2":
@@ -395,3 +401,191 @@ def test_frontend_version_marker_is_replaced_and_escaped(tmp_path):
     p.stamp_frontend(tmp_path, "v3")
     assert index.read_text().count("data-talebook-version=") == 1
     assert 'data-talebook-version="v3"' in index.read_text()
+
+
+def local_release(manifest, number):
+    value = dict(manifest, commit=f"{number:040x}", sequence=number, version=f"v{number}")
+    path = ex.ROOT / "releases" / value["commit"]
+    path.mkdir()
+    (path / "server.py").write_text("pass")
+    p.atomic_json(path / "release.json", {"manifest": value, "installed_at": number})
+    return value, path
+
+
+def snapshot_stub(destination):
+    destination.mkdir()
+    with sqlite3.connect(destination / "accounts.db") as db:
+        db.execute("CREATE TABLE accounts (name TEXT)")
+        db.execute("INSERT INTO accounts VALUES ('current-data')")
+    p.atomic_json(destination / "inventory.json", [{"path": "accounts.db", "sha256": p.digest(destination / "accounts.db")}])
+    return 1
+
+
+def test_manual_rollback_below_image_survives_rebuild_and_new_image_wins(engine, signed, monkeypatch):
+    manifest, _, _ = signed
+    old, old_path = local_release(manifest, 2)
+    current, current_path = local_release(manifest, 9)
+    engine.image["sequence"] = 5
+    p.atomic_json(ex.IMAGE_FILE, engine.image)
+    p.atomic_json(ex.ROOT / "active.json", current)
+    ex.switch(current_path)
+    monkeypatch.setattr(engine, "wait_health", lambda **kw: None)
+    monkeypatch.setattr(ex, "supervisor", lambda action: None)
+    monkeypatch.setattr(ex, "backup_databases", snapshot_stub)
+    p.atomic_json(ex.ROOT / "watermark.json", {"sequence": 9})
+    engine.activate(old["commit"])
+    assert engine.state["phase"] == "succeeded"
+    assert ex.read_json(ex.ROOT / "watermark.json")["sequence"] == 9
+    saved = engine.backups()[0]
+    assert saved["source"]["commit"] == current["commit"]
+    assert saved["target"]["commit"] == old["commit"]
+    assert saved["database"] == current["database"]
+    # Destroy the ephemeral runtime pointer; prepare must reconstruct it from /data alone.
+    (ex.RUN / "current").unlink()
+    ex.prepare()
+    assert (ex.RUN / "current").resolve() == old_path
+    p.atomic_json(ex.IMAGE_FILE, dict(engine.image, commit="f" * 40))
+    ex.prepare()
+    assert (ex.RUN / "current").resolve() == ex.BUILTIN
+
+
+def test_manual_switch_to_builtin_without_migration_field(engine, signed, monkeypatch):
+    manifest, _, _ = signed
+    current, current_path = local_release(manifest, 9)
+    engine.image.pop("migration")
+    p.atomic_json(ex.ROOT / "active.json", current)
+    ex.switch(current_path)
+    monkeypatch.setattr(engine, "wait_health", lambda **kw: None)
+    monkeypatch.setattr(ex, "supervisor", lambda action: None)
+    monkeypatch.setattr(ex, "backup_databases", snapshot_stub)
+    engine.activate("image")
+    assert engine.state["phase"] == "succeeded"
+    assert (ex.RUN / "current").resolve() == ex.BUILTIN
+    assert ex.read_json(ex.ROOT / "active.json") is None
+
+
+@pytest.mark.parametrize("field", ["runtime", "database"])
+def test_incompatible_local_rollback_refused_before_backup(engine, signed, monkeypatch, field):
+    manifest, _, _ = signed
+    old, path = local_release(manifest, 2)
+    p.atomic_json(path / "release.json", {"manifest": dict(old, **{field: "f" * 64})})
+    backup = Mock()
+    monkeypatch.setattr(ex, "backup_databases", backup)
+    assert engine.command({"action": "activate", "release": old["commit"]})["err"] in ("runtime", "database")
+    backup.assert_not_called()
+    assert not engine.lock.locked()
+
+
+def test_retention_protects_current_and_previous_and_survives_executor_restart(engine, signed):
+    manifest, _, _ = signed
+    values = [local_release(manifest, n)[0] for n in range(2, 8)]
+    p.atomic_json(ex.ROOT / "active.json", values[0])
+    ex.switch(ex.ROOT / "releases" / values[0]["commit"])
+    engine.save(previous=values[1])
+    assert engine.command({"action": "retention", "keep": 2})["err"] == "ok"
+    assert {r["id"] for r in engine.releases()[1:]} == {v["commit"] for v in values[:2]}
+    assert ex.Executor().keep() == 2
+    for commit in [v["commit"] for v in values[:2]] + ["image"]:
+        assert engine.command({"action": "delete", "release": commit})["err"] == "protected"
+
+
+@pytest.mark.parametrize("value", [0, 1, 21, 3.5, True, "3", None])
+def test_invalid_retention_never_changes_preferences(engine, value):
+    assert engine.command({"action": "retention", "keep": value})["err"] == "retention"
+    assert engine.keep() == 3
+    assert not (ex.ROOT / "preferences.json").exists()
+
+
+@pytest.mark.parametrize("value", ["../outside", "/tmp/unsafe", {}, None])
+def test_delete_rejects_paths_and_non_strings(engine, value):
+    assert engine.command({"action": "delete", "release": value})["err"] == "release_missing"
+    assert ex.BUILTIN.is_dir()
+
+
+def test_prunes_managed_snapshots_but_retains_legacy_and_required_backup(engine, signed):
+    manifest, _, _ = signed
+    for number in range(6):
+        path = ex.ROOT / "backups" / f"{manifest['commit']}-{number}"
+        path.mkdir()
+        if number:
+            p.atomic_json(path / "snapshot.json", {"source": manifest, "target": manifest, "created_at": number})
+    engine.save(backup=f"backups/{manifest['commit']}-1")
+    engine.manage({"action": "retention", "keep": 2})
+    ids = {row["id"] for row in engine.backups()}
+    assert ids == {f"{manifest['commit']}-{number}" for number in [0, 1, 5]}
+    assert engine.command({"action": "delete_backup", "release": f"{manifest['commit']}-1"})["err"] == "protected"
+    assert engine.command({"action": "delete_backup", "release": f"{manifest['commit']}-0"})["err"] == "ok"
+
+
+def test_interrupted_switch_restores_previous_pin(engine, signed):
+    manifest, _, _ = signed
+    previous, path = local_release(manifest, 2)
+    current, _ = local_release(manifest, 9)
+    engine.image["sequence"] = 5
+    p.atomic_json(ex.IMAGE_FILE, engine.image)
+    pin = {"commit": previous["commit"], "image": {k: engine.image[k] for k in ("commit", "runtime", "database")}}
+    p.atomic_json(ex.ROOT / "active.json", current)
+    p.atomic_json(ex.ROOT / "pin.json", None)
+    p.atomic_json(ex.ROOT / "state.json", {"phase": "starting", "previous": previous, "previous_pin": pin})
+    ex.prepare()
+    assert (ex.RUN / "current").resolve() == path
+    assert ex.read_json(ex.ROOT / "pin.json") == pin
+
+
+def test_unknown_legacy_release_is_visible_not_activatable(engine, signed):
+    manifest, _, _ = signed
+    unknown, path = local_release(manifest, 2)
+    (path / "release.json").write_text("corrupt JSON")
+    row = next(row for row in engine.releases() if row["id"] == unknown["commit"])
+    assert row["incompatible"] == "release_metadata"
+    assert row["can_delete"] and not row["can_activate"]
+    assert engine.command({"action": "delete", "release": unknown["commit"]})["err"] == "ok"
+    assert not path.exists()
+
+
+def test_management_shares_upgrade_lock(engine):
+    engine.lock.acquire()
+    for action in ("activate", "delete", "delete_backup", "retention"):
+        assert engine.command({"action": action, "release": "a" * 40, "keep": 2})["err"] == "busy"
+    engine.lock.release()
+
+
+@pytest.mark.parametrize("cleanup_failure", [False, True])
+def test_manual_switch_failure_preserves_selection_and_cleanup_does_not_rollback(engine, signed, monkeypatch, cleanup_failure):
+    manifest, _, _ = signed
+    previous, previous_path = local_release(manifest, 9)
+    target, target_path = local_release(manifest, 2)
+    p.atomic_json(ex.ROOT / "active.json", previous)
+    pin = {"commit": previous["commit"], "image": {k: engine.image[k] for k in ("commit", "runtime", "database")}}
+    p.atomic_json(ex.ROOT / "pin.json", pin)
+    ex.switch(previous_path)
+    monkeypatch.setattr(ex, "supervisor", lambda action: None)
+    monkeypatch.setattr(ex.subprocess, "run", lambda *a, **kw: Mock(returncode=0))
+    monkeypatch.setattr(ex, "backup_databases", snapshot_stub)
+
+    def health(expected=None, **kw):
+        if expected == target["version"] and not cleanup_failure:
+            raise p.UpgradeError("health")
+
+    monkeypatch.setattr(engine, "wait_health", health)
+    monkeypatch.setattr(engine, "prune", Mock(side_effect=OSError("cleanup failed")))
+    engine.activate(target["commit"])
+    if cleanup_failure:
+        assert engine.state["phase"] == "succeeded"
+        assert engine.state["cleanup_error"] == "internal"
+        assert (ex.RUN / "current").resolve() == target_path
+    else:
+        assert engine.state["phase"] == "rolled_back"
+        assert ex.read_json(ex.ROOT / "pin.json") == pin
+        assert ex.read_json(ex.ROOT / "active.json") == previous
+        assert (ex.RUN / "current").resolve() == previous_path
+    assert not (ex.RUN / "maintenance").exists()
+
+
+def test_retention_disk_error_is_reported_without_changing_application(engine, monkeypatch):
+    monkeypatch.setattr(engine, "prune", Mock(side_effect=OSError(28, "full")))
+    result = engine.command({"action": "retention", "keep": 2})
+    assert result["err"] == "disk"
+    assert result["status"]["cleanup_error"] == "disk"
+    assert (ex.RUN / "current").resolve() == ex.BUILTIN
+    assert not engine.lock.locked()

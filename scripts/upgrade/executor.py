@@ -62,6 +62,37 @@ def switch(target):
     fsync_dir(RUN)
 
 
+def release_path(commit):
+    if not isinstance(commit, str) or not re.fullmatch("[0-9a-f]{40}", commit):
+        raise UpgradeError("release_missing")
+    path = ROOT / "releases" / commit
+    if path.is_symlink() or not path.is_dir():
+        raise UpgradeError("release_missing")
+    return path
+
+
+def pin_matches(pin, image, commit):
+    return bool(
+        pin
+        and pin.get("commit") == commit
+        and pin.get("image") == {key: image.get(key) for key in ("commit", "runtime", "database")}
+    )
+
+
+def read_record(path):
+    try:
+        if path.is_symlink():
+            return {}
+        value = read_json(path, {})
+        return value if isinstance(value, dict) else {}
+    except (ValueError, OSError):
+        return {}
+
+
+def summary(manifest):
+    return {key: manifest[key] for key in ("version", "sequence", "commit", "database") if key in manifest}
+
+
 def prepare():
     # A writable parent could rename/replace the entire root-owned release directory.
     # Disable upgrades gracefully on insecure bind mounts; keep the image application usable.
@@ -93,13 +124,19 @@ def prepare():
         if state.get("phase") in {"stopping", "backup", "switching", "starting", "recovering"}:
             active = state.get("previous")
             atomic_json(ROOT / "active.json", active)
+            atomic_json(ROOT / "pin.json", state.get("previous_pin"))
         state.update(phase="rolled_back", error="interrupted")
         atomic_json(ROOT / "state.json", state)
     if active:
         try:
             compatible(active, image)
-            candidate = ROOT / "releases" / active["commit"]
-            if image["sequence"] > 0 and active["sequence"] > image["sequence"] and (candidate / "server.py").is_file():
+            candidate = release_path(active["commit"])
+            pinned = pin_matches(read_json(ROOT / "pin.json"), image, active["commit"])
+            if (
+                image["sequence"] > 0
+                and (pinned or active["sequence"] > image["sequence"])
+                and (candidate / "server.py").is_file()
+            ):
                 target = candidate
         except UpgradeError:
             atomic_json(ROOT / "selection.json", {"reason": "runtime", "selected": "image"})
@@ -208,6 +245,15 @@ class Executor:
         self.lock = threading.Lock()
         self.state_lock = threading.Lock()
         self.state = read_json(ROOT / "state.json", {"phase": "idle"})
+        # Preserve metadata available from the older executor before a new job replaces state.
+        for manifest in (read_json(ROOT / "active.json"), self.state.get("previous"), self.state.get("candidate")):
+            if manifest:
+                try:
+                    path = release_path(manifest["commit"]) / "release.json"
+                    if not path.exists():
+                        atomic_json(path, {"manifest": manifest, "installed_at": int(path.parent.stat().st_mtime)})
+                except (UpgradeError, KeyError):
+                    pass
         self.disabled = None
         if self.image.get("mode") != "spa" or os.environ.get("TALEBOOK_UPGRADE_MODE") != "spa":
             self.disabled = "mode"
@@ -234,7 +280,146 @@ class Executor:
                 image=self.image,
                 current=self.current(),
                 domestic_configured=any(s != GITHUB for s in self.sources),
+                releases=self.releases(),
+                backups=self.backups(),
+                keep=self.keep(),
+                pinned=pin_matches(read_json(ROOT / "pin.json"), self.image, self.current()["commit"]),
             )
+
+    def keep(self):
+        value = read_json(ROOT / "preferences.json", {}).get("keep", 3)
+        return value if type(value) is int and 2 <= value <= 20 else 3
+
+    def protected_releases(self):
+        return {m.get("commit") for m in (self.current(), read_json(ROOT / "active.json"), self.state.get("previous")) if m}
+
+    def releases(self):
+        current = self.current()["commit"]
+        rows = [
+            dict(
+                self.image,
+                id="image",
+                current=current == self.image["commit"] and (RUN / "current").resolve() == BUILTIN,
+                protected=True,
+                can_delete=False,
+                can_activate=(RUN / "current").resolve() != BUILTIN,
+                builtin=True,
+            )
+        ]
+        for path in sorted((ROOT / "releases").iterdir()):
+            if not re.fullmatch("[0-9a-f]{40}", path.name) or path.is_symlink() or not path.is_dir():
+                continue
+            metadata = read_record(path / "release.json")
+            manifest = metadata.get("manifest")
+            if not isinstance(manifest, dict):
+                manifest = None
+            # Older data volumes only retained these manifests; never invent missing schema metadata.
+            if not manifest:
+                manifest = next(
+                    (
+                        m
+                        for m in (read_json(ROOT / "active.json"), self.state.get("previous"))
+                        if m and m.get("commit") == path.name
+                    ),
+                    None,
+                )
+            reason = None
+            try:
+                if not manifest or manifest.get("commit") != path.name or not (path / "server.py").is_file():
+                    raise UpgradeError("release_metadata")
+                compatible(manifest, self.image)
+                compatible(manifest, self.current())
+            except (UpgradeError, KeyError) as exc:
+                reason = str(exc) if isinstance(exc, UpgradeError) else "release_metadata"
+            protected = path.name in self.protected_releases()
+            rows.append(
+                dict(
+                    summary(manifest or {}),
+                    id=path.name,
+                    current=path.name == current and not rows[0]["current"],
+                    protected=protected,
+                    can_delete=not protected,
+                    can_activate=not reason and path.name != current,
+                    incompatible=reason,
+                    installed_at=metadata.get("installed_at"),
+                    size=(manifest or {}).get("expanded_size"),
+                )
+            )
+        return rows[:1] + sorted(rows[1:], key=lambda row: row.get("sequence", 0), reverse=True)
+
+    def backups(self):
+        rows = []
+        for path in sorted((ROOT / "backups").iterdir(), reverse=True):
+            if path.is_symlink() or not path.is_dir() or not re.fullmatch("[0-9a-f]{40}-[0-9]+", path.name):
+                continue
+            metadata = read_record(path / "snapshot.json")
+            if metadata and (not isinstance(metadata.get("source"), dict) or not isinstance(metadata.get("target"), dict)):
+                metadata = {}
+            if metadata:
+                metadata = dict(metadata, source=summary(metadata["source"]), target=summary(metadata["target"]))
+            rows.append(
+                dict(
+                    metadata,
+                    id=path.name,
+                    legacy=not metadata,
+                    created_at=metadata.get("created_at", int(path.stat().st_mtime)),
+                    protected=False,
+                )
+            )
+        rows.sort(key=lambda row: row["created_at"], reverse=True)
+        protected = {self.state.get("backup", "").removeprefix("backups/")}
+        for commit in self.protected_releases():
+            snapshot = next((row for row in rows if row.get("source", {}).get("commit") == commit), None)
+            if snapshot:
+                protected.add(snapshot["id"])
+        for row in rows:
+            row["protected"] = row["id"] in protected
+        return rows
+
+    def prune(self):
+        versions = self.releases()[1:]
+        retained = {row["id"] for row in versions if row["protected"]}
+        for row in versions:
+            if len(retained) < self.keep():
+                retained.add(row["id"])
+        for row in versions:
+            if row["id"] not in retained:
+                shutil.rmtree(release_path(row["id"]))
+        snapshots = [row for row in self.backups() if not row["legacy"]]
+        retained = {row["id"] for row in snapshots if row["protected"]}
+        for row in snapshots:
+            if len(retained) < self.keep():
+                retained.add(row["id"])
+        for row in snapshots:
+            if row["id"] not in retained:
+                shutil.rmtree(ROOT / "backups" / row["id"])
+        fsync_dir(ROOT / "releases")
+        fsync_dir(ROOT / "backups")
+
+    def manage(self, request):
+        action = request["action"]
+        if action == "retention":
+            value = request.get("keep")
+            if type(value) is not int or not 2 <= value <= 20:
+                raise UpgradeError("retention")
+            atomic_json(ROOT / "preferences.json", {"keep": value})
+            self.prune()
+        elif action == "delete":
+            commit = request.get("release")
+            if not isinstance(commit, str):
+                raise UpgradeError("release_missing")
+            if commit == "image" or commit in self.protected_releases():
+                raise UpgradeError("protected")
+            shutil.rmtree(release_path(commit))
+            fsync_dir(ROOT / "releases")
+        else:
+            snapshot = next((row for row in self.backups() if row["id"] == request.get("release")), None)
+            if not snapshot:
+                raise UpgradeError("release_missing")
+            if snapshot["protected"]:
+                raise UpgradeError("protected")
+            shutil.rmtree(ROOT / "backups" / snapshot["id"])
+            fsync_dir(ROOT / "backups")
 
     def current(self):
         if (RUN / "current").resolve() == BUILTIN:
@@ -245,7 +430,7 @@ class Executor:
         action = request.get("action")
         if action == "status":
             return {"err": "ok", "status": self.status()}
-        if action not in ("check", "install"):
+        if action not in ("check", "install", "activate", "delete", "delete_backup", "retention"):
             return {"err": "action"}
         if self.disabled:
             return {"err": self.disabled, "status": self.status()}
@@ -254,7 +439,20 @@ class Executor:
             same = action == "install" and request.get("release") == self.state.get("job")
             return {"err": "ok" if same else "busy", "status": self.status()}
         try:
-            if action == "install":
+            if action in ("delete", "delete_backup", "retention"):
+                self.manage(request)
+                self.save(error=None, cleanup_error=None)
+                return {"err": "ok", "status": self.status()}
+            if action == "activate":
+                row = next((row for row in self.releases() if row["id"] == request.get("release")), None)
+                if not row:
+                    raise UpgradeError("release_missing")
+                if row["current"]:
+                    return {"err": "ok", "status": self.status()}
+                if not row["can_activate"]:
+                    raise UpgradeError(row["incompatible"] or "runtime")
+                self.save(phase="draining", job=row["id"], error=None)
+            elif action == "install":
                 candidate = self.state.get("candidate")
                 if request.get("release") == self.current().get("commit"):
                     return {"err": "ok", "status": self.status()}
@@ -265,8 +463,13 @@ class Executor:
                 self.save(phase="checking", error=None)
             thread = threading.Thread(target=self.run, args=(action,), daemon=False)
             thread.start()
-        except Exception:
-            raise
+        except UpgradeError as exc:
+            return {"err": str(exc), "status": self.status()}
+        except OSError as exc:
+            logging.exception("Version management failed")
+            code = failure_code(exc)
+            self.save(error=code, **({"cleanup_error": code} if action == "retention" else {}))
+            return {"err": code, "status": self.status()}
         else:
             return {"err": "ok", "status": self.status()}
         finally:
@@ -278,6 +481,8 @@ class Executor:
         try:
             if action == "check":
                 self.check()
+            elif action == "activate":
+                self.activate(self.state["job"])
             else:
                 self.install()
         except Exception as exc:
@@ -382,10 +587,8 @@ class Executor:
         if manifest["sequence"] <= self.current()["sequence"]:
             raise UpgradeError("stale")
         self.wait_health(idle=True)
-        previous = read_json(ROOT / "active.json") if (RUN / "current").resolve() != BUILTIN else None
         old_target = (RUN / "current").resolve()
         target = ROOT / "releases" / manifest["commit"]
-        self.save(previous=previous)
         with tempfile.TemporaryDirectory(prefix="stage-", dir=ROOT) as temporary:
             stage = Path(temporary)
             archive = self.package(manifest, stage)
@@ -400,6 +603,7 @@ class Executor:
             logo.symlink_to("/data/books/logo", target_is_directory=True)
             # Environment file is persistent settings, not executable release code.
             (unpacked / "app/.env").symlink_to("/var/www/talebook/app/.env")
+            atomic_json(unpacked / "release.json", {"manifest": manifest, "installed_at": int(time.time())})
             if target.exists():
                 # Failed, unselected release from an earlier attempt can be rebuilt safely.
                 if target == old_target:
@@ -407,6 +611,26 @@ class Executor:
                 shutil.rmtree(target)
             os.replace(unpacked, target)
             fsync_dir(target.parent)
+        self.switch_release(manifest, target, manual=False)
+
+    def activate(self, identifier):
+        if identifier == "image":
+            manifest, target = dict(self.image, migration="none"), BUILTIN
+        else:
+            target = release_path(identifier)
+            manifest = read_record(target / "release.json").get("manifest")
+            if not isinstance(manifest, dict) or manifest.get("commit") != identifier:
+                raise UpgradeError("release_metadata")
+        compatible(manifest, self.image)
+        compatible(manifest, self.current())
+        self.switch_release(manifest, target, manual=True)
+
+    def switch_release(self, manifest, target, manual):
+        self.wait_health(idle=True)
+        old_target = (RUN / "current").resolve()
+        previous = read_json(ROOT / "active.json") if old_target != BUILTIN else None
+        previous_pin = read_json(ROOT / "pin.json")
+        self.save(previous=previous, previous_pin=previous_pin)
         self.save(phase="draining")
         (RUN / "maintenance").touch()
         stopped = False
@@ -419,9 +643,28 @@ class Executor:
             self.save(phase="backup")
             backup = ROOT / "backups" / f"{manifest['commit']}-{time.time_ns()}"
             count = backup_databases(backup)
+            atomic_json(
+                backup / "snapshot.json",
+                {
+                    "source": previous or self.image,
+                    "target": manifest,
+                    "database": (previous or self.image)["database"],
+                    "created_at": int(time.time()),
+                    "databases": count,
+                },
+            )
             self.save(phase="switching", backup=str(backup.relative_to(ROOT)), databases=count)
             switch(target)
-            atomic_json(ROOT / "active.json", manifest)
+            atomic_json(ROOT / "active.json", None if target == BUILTIN else manifest)
+            atomic_json(
+                ROOT / "pin.json",
+                {
+                    "commit": manifest["commit"],
+                    "image": {key: self.image.get(key) for key in ("commit", "runtime", "database")},
+                }
+                if manual
+                else None,
+            )
             self.save(phase="starting")
             supervisor("start")
             self.wait_health(expected=manifest["version"])
@@ -437,6 +680,7 @@ class Executor:
                     subprocess.run(["supervisorctl", "stop", "talebook:tornado"], capture_output=True, timeout=100)
                     switch(old_target)
                     atomic_json(ROOT / "active.json", previous)
+                    atomic_json(ROOT / "pin.json", previous_pin)
                     supervisor("start")
                     self.wait_health(expected=(previous or self.image)["version"])
                     self.save(phase="rolled_back", error=error)
@@ -446,6 +690,13 @@ class Executor:
             else:
                 self.save(phase="failed", error=error)
             (RUN / "maintenance").unlink(missing_ok=True)
+        if self.state["phase"] == "succeeded":
+            try:
+                self.prune()
+                self.save(cleanup_error=None)
+            except Exception as exc:
+                logging.exception("Release retention cleanup failed")
+                self.save(cleanup_error=failure_code(exc))
 
 
 class DisabledExecutor:

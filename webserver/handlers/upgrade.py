@@ -36,8 +36,17 @@ class AdminUpgrade(BaseHandler):
             args = json.loads(self.request.body)
         except (ValueError, TypeError):
             return {"err": "params"}
-        if not isinstance(args, dict) or args.get("action") not in ("check", "install"):
+        if not isinstance(args, dict) or args.get("action") not in (
+            "check",
+            "install",
+            "activate",
+            "delete",
+            "delete_backup",
+            "retention",
+        ):
             return {"err": "params"}
+        if args["action"] == "retention":
+            return await asyncio.to_thread(request_executor, "retention", None, args.get("keep"))
         return await asyncio.to_thread(request_executor, args["action"], args.get("release"))
 
 
