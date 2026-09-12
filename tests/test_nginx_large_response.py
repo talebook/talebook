@@ -19,6 +19,7 @@ import threading
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,7 +65,10 @@ class TestNginxLargeResponse(unittest.TestCase):
 
     @contextlib.contextmanager
     def proxy(self, variant, uid, *, original=False, writable=False):
-        with tempfile.TemporaryDirectory(prefix="talebook-nginx-") as directory:
+        # Calibre sets tempfile.tempdir to a private (0700) directory. Both the
+        # non-root master and root master's unprivileged worker need to traverse
+        # this path. Never chmod that shared parent; create our own under /tmp.
+        with tempfile.TemporaryDirectory(prefix="talebook-nginx-", dir="/tmp") as directory:
             root = Path(directory)
             os.chown(root, uid, uid)
             root.chmod(0o755)
@@ -162,6 +166,7 @@ class TestNginxLargeResponse(unittest.TestCase):
             self.assertEqual(length, len(body))
             self.assertEqual(body, LARGE)
             self.assertIn("buffered to a temporary file", log.read_text())
+            self.assertNotIn("Permission denied", log.read_text())
 
     def test_large_json_survives_without_writable_proxy_temp_in_all_variants(self):
         for variant in ("talebook.conf", "server-side-render.conf", "dev.conf"):
@@ -177,6 +182,30 @@ class TestNginxLargeResponse(unittest.TestCase):
                             self.assertEqual(len(parsed["items"]), 40000)
                             self.assertEqual(parsed["items"][-1]["id"], 39999)
                             self.assertNotIn("/proxy/", log.read_text())
+                            self.assertNotIn("Permission denied", log.read_text())
+
+
+class TestNginxLargeResponseWithRestrictedTmpdir(TestNginxLargeResponse):
+    """Run the same controls and matrix with Calibre's private temp parent."""
+
+    def setUp(self):
+        super().setUp()
+        stack = contextlib.ExitStack()
+        self.addCleanup(stack.close)
+        directory = stack.enter_context(tempfile.TemporaryDirectory(prefix="talebook-private-tmp-", dir="/tmp"))
+        self.private_tmp = Path(directory)
+        self.private_tmp.chmod(0o700)
+        self.private_stat = self.private_tmp.stat()
+        stack.enter_context(mock.patch.dict(os.environ, {"TMPDIR": directory}))
+        # Calibre also caches this path in tempfile, regardless of the environment.
+        stack.enter_context(mock.patch.object(tempfile, "tempdir", directory))
+
+    def tearDown(self):
+        current = self.private_tmp.stat()
+        self.assertEqual(current.st_mode, self.private_stat.st_mode)
+        self.assertEqual(current.st_uid, self.private_stat.st_uid)
+        self.assertEqual(current.st_gid, self.private_stat.st_gid)
+        super().tearDown()
 
 
 if __name__ == "__main__":
