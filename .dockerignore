@@ -4,6 +4,9 @@
 !requirements.txt
 !requirements-test.txt
 !server.py
+!scripts/
+!scripts/upgrade/
+!scripts/upgrade/**
 !app/
 !app/**
 !conf/

@@ -91,8 +91,22 @@ export default defineNuxtPlugin((nuxtApp) => {
       Object.assign(args, options);
     }
 
+    const applicationVersion = process.client ? document.documentElement.dataset.talebookVersion : null;
+    if (applicationVersion) {
+      args.headers = new Headers(args.headers);
+      args.headers.set('X-Talebook-App-Version', applicationVersion);
+    }
+    const quietMaintenance = args.quietMaintenance === true;
+    delete args.quietMaintenance;
     try {
       const rsp = await fetch(full_url, args);
+      if (quietMaintenance && (rsp.status === 502 || rsp.status === 503)) {
+        throw new Error('Application maintenance');
+      }
+      if (rsp.status === 409 && applicationVersion && rsp.headers.get('X-Talebook-Version') !== applicationVersion) {
+        window.location.reload();
+        throw new Error('Application changed; reloading');
+      }
       var msg = '';
       if (rsp.status === 413) {
         msg = '服务器响应了413异常状态码。<br/>可能是上传的文件过大，超过了服务器设置的上传大小。';
