@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 import logging
-import math
-import sys
 from functools import cmp_to_key
 
 import tornado.escape
@@ -62,9 +60,16 @@ class PubBooksUpdate(ListHandler):
 class MetaList(ListHandler):
     @js
     def get(self, meta):
-        SHOW_NUMBER = 300
-        if self.get_argument("show", "") == "all":
-            SHOW_NUMBER = sys.maxsize
+        page_arg = self.get_argument("page", None)
+        size_arg = self.get_argument("page_size", None)
+        try:
+            page = int(page_arg) if page_arg is not None else 1
+            page_size = int(size_arg) if size_arg is not None else 100
+            if page < 1 or not 1 <= page_size <= 1000:
+                raise ValueError
+        except (TypeError, ValueError):
+            return {"err": "params.pagination.invalid", "msg": _("分页参数无效")}
+        query = self.get_argument("q", "").strip().casefold()
         titles = {
             "tag": _("全部标签"),
             "author": _("全部作者"),
@@ -103,15 +108,40 @@ class MetaList(ListHandler):
                         item["count"] = len(get_author_book_ids(self, item["members"]))
                     item.pop("members")
                 items = list(grouped.values())
-        count = len(items)
-        if items:
-            if meta == "rating":
-                items.sort(key=lambda x: x["name"], reverse=True)
-            else:
-                hotline = int(math.log10(count)) if count > SHOW_NUMBER else 0
-                items = [v for v in items if v["count"] >= hotline]
-                items.sort(key=lambda x: x["count"], reverse=True)
-        return {"meta": meta, "title": title, "items": items, "total": count}
+        unfiltered_total = len(items)
+        if query:
+            items = [item for item in items if query in str(item["name"]).casefold()]
+        # Include a deterministic tie-breaker so equal counts cannot move between
+        # pages when Calibre returns its categories in a different order.
+        items.sort(
+            key=lambda item: (
+                -float(item["name"]) if meta == "rating" else -item["count"],
+                str(item["name"]).casefold(),
+                str(item["name"]),
+                str(item["id"]),
+            )
+        )
+        total = len(items)
+        paginated = total >= 1000 or page_arg is not None or size_arg is not None
+        if paginated:
+            pages = max(1, (total + page_size - 1) // page_size)
+            start = (page - 1) * page_size
+            items = items[start : start + page_size]
+        else:
+            pages = 1
+        # show=all refers to the complete category set, never an unbounded page.
+        return {
+            "err": "ok",
+            "meta": meta,
+            "title": title,
+            "items": items,
+            "total": total,
+            "unfiltered_total": unfiltered_total,
+            "page": page,
+            "page_size": page_size if paginated else max(total, 1),
+            "pages": pages,
+            "paginated": paginated,
+        }
 
 
 class MetaBooks(ListHandler):

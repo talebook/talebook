@@ -161,3 +161,30 @@ describe('LibraryChipFilter.vue', () => {
         wrapper.unmount();
     });
 });
+
+it('pages and searches remote options without downloading the full list, retaining the selection', async () => {
+    const loadPage = vi.fn(async (page: number, query: string) => ({
+        err: 'ok', total: query ? 1 : 1001, pages: query ? 1 : 11,
+        items: [{ id: page, name: query ? 'Remote match' : `Remote page ${page}`, count: 1 }]
+    }));
+    const wrapper = mountFilter({ items: items.slice(0, 10), total: 1001, loadPage });
+    expect(loadPage).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="library-filter-tag-more"]').trigger('click');
+    await flushPromises();
+    expect(loadPage).toHaveBeenLastCalledWith(1, '', 100);
+    wrapper.getComponent({ name: 'VPagination' }).vm.$emit('update:modelValue', 11);
+    await flushPromises();
+    expect(loadPage).toHaveBeenLastCalledWith(11, '', 100);
+    expect(document.body.textContent).toContain('Remote page 11');
+    await setSearch(' Remote ');
+    expect(loadPage).toHaveBeenLastCalledWith(1, 'Remote', 100);
+    expect(document.body.textContent).toContain('Remote match');
+    const option = document.querySelector<HTMLElement>('.library-filter-picker__option');
+    option!.click();
+    await flushPromises();
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['Remote match']);
+    await wrapper.setProps({ modelValue: 'Remote match' });
+    expect(wrapper.text()).toContain('Remote match');
+    expect(loadPage).toHaveBeenCalledTimes(3);
+    wrapper.unmount();
+});
