@@ -33,7 +33,7 @@
 
 No actionable interface findings in this change.
 
-原七项整改核对（原状态均为 Introduced，已关闭）：
+原七项整改核对（本书评论开关范围为 Regression，其余为 Introduced，均已修复）：
 
 | 原严重度 | 位置 | 修复和验证 |
 | --- | --- | --- |
