@@ -1,57 +1,47 @@
-# TB-199 七项 UX 修复交付
+# TB-199 焦点恢复交付
 
-七项问题已修复，完整分支界面自审 Approve；仍等待 UX 独立复核，唯一方案保持 WIP，父议题保持进行中。另修复同 CFI 多条笔记导致关闭后残留标记的问题。
+焦点回归已修复，等待 UX 独立复核。方案保持 `design/app/20260904-candle-reader-annotations.wip.html`，父议题保持进行中。原七项和同 CFI 修复继续保留。
 
-版本：Candle Reader `8cf246ce993a89e3b3f0ce23d23243907ed8ea2a`；Talebook 使用同一构建并更新缓存标识 `v1.2.0-tb199.3`。最终两仓库提交和 PR 链接见本交付的版本 JSON 与议题评论。ES/UMD/CSS 三份实际 HTTP 响应均与构建文件相同，完整 SHA256 见 bundle-hashes.json。
+关闭 Escape、键盘关闭按钮或点击遮罩后，仅在最后一个面板离场时恢复原入口；章评/书评/设置切换保留入口且不抢焦。直接设置关闭回到设置；由笔记切入设置，最终关闭回到笔记。失效触发元素使用有效底部入口。新增 `tests/e2e/panel-focus.spec.js` 及真实宿主 `scripts/tb199_focus.cjs`。
 
-## 验证结果与复现
+## 版本与结果
 
-- `npm run lint`、`npm run build`：通过。
-- `E2E_PORT=5019 npm run test:e2e -- --workers=1`：最终 **63 passed**。新增六项 UX/语义回归、更新开关组合和错误状态断言；两项缺目录用例增加同 CFI 双记录测试。
-- Docker 镜像 `talebook:tb214-revision-tests`，复制只读源码到隔离 /work 后 `python3 -m pytest tests/test_annotations.py -q`：**22 passed**。
-- 使用 `scripts/tb199_acceptance_server.py` 的独立测试库，运行 `NODE_PATH=<candle-reader/node_modules> TB199_EVIDENCE=<证据目录> [TB199_THEME=grey] node talebook/scripts/tb199_acceptance.cjs`。默认 white；另运行 grey。真实登录会话、真实 `/read/` 模板、真实 annotations GET/POST，无 API mock。按脚本要求使用私有测试凭据文件，不随附件交付。
-- **white/grey 各 88 个检查点通过，共 176 项**；各自 4 POST、48 GET，合计 **8 POST、96 GET**；无 pageerror。每个 POST 返回记录均能在重新加载后的 GET 记录中按 id/CFI 对应；游客没有 annotations HTTP 请求，数据来自本地存储。
-- 402×874、DPR3，实际 PNG 1206×2622。真实 API 矩阵浏览器 Chromium **148.0.7778.96**；Chrome DevTools MCP 渲染审查为 **150**。两者明确区分，不称真机测试。
-- `make check-design` 退出 **2**，唯一错误：`design/app/20260904-candle-reader-annotations.wip.html` 仍为 WIP，不能合并。按 Mika 要求保留，待 UX 复核；不是已通过合并门禁。
+- Candle 修复：`1d22c7a58fae6cf196a9238d50520a63c58750d6`；Talebook 最终提交见 `versions.json`，起点 `3a0e1bcf2422056f0bb7fab1d88b8806fc85b31f`。
+- PR：<https://github.com/talebook/candle-reader/pull/18>、<https://github.com/talebook/talebook/pull/1036>。两仓更新同一现有 PR，不合并，不等待外部 CI。
+- `npm run lint`、`npm run build` 通过；`E2E_PORT=5019 npm run test:e2e -- --workers=1` **67 passed**；Docker/Calibre `python3 -m pytest tests/test_annotations.py -q` **22 passed**。
+- 新焦点回归先在旧实现复现失败，修复后四主题/身份组合通过；还覆盖下一次 Tab、遮罩关闭及入口移除 fallback。
+- 真实宿主 `/read/8`，**402×874、DPR3、white/grey×guest/login，64项 passed、0 pageerrors**，Chromium148.0.7778.96。每项操作、结果、焦点元素/连接状态/面板状态、主题/数据源和截图文件名均在 `focus-results.json`。真实路径没有 mock API、没有注入焦点或保存记录。
+- 三方 bundle 校验：当前 dist、Talebook静态文件、实际 HTTP 字节一致，模板 cache=`v1.2.0-tb199.4`。ES `fcf5eea8544bbd469e3ba5a9a4dad7f7f584f31bef0c6e28edbcb202af9fdc61`；UMD `f140836373ea7b4af0bf688a59763a31fe5c14df8b3e6215d2501a02525e1860`；CSS `5186644e77d6042cb83ea43fd29c212a271c71e23b93ea1d957b025dbb6b4b01`。
 
-API 证据分为 real-light/real-dark，两份 acceptance.json 中每项包含操作名称、book/mode、结果状态和对应截图名。以下前缀均覆盖 `missing-login`、`missing-guest`、`normal-login`、`normal-guest`，每个主题各四种路径。
+## 证据阅读
 
-| 操作 | 结果 | 截图后缀 |
-| --- | --- | --- |
-| 在真实 EPUB 中设置 DOM Range，触发 selectionchange | 真实 CFI/引用保留，一个工具栏位于视口内 | 01-toolbar |
-| 点击笔记、输入、保存；另保存划线 | 登录实际 API 写入；游客本地保存 | 02-saved、02b-highlight |
-| 重新打开 /read/ 当前书 | 内容读回；登录无本地副本，游客从 localStorage 恢复 | 03-refresh |
-| 打开 book13 | 本书笔记列表为空，其他书数据不混入 | 04-other-book |
-| 返回原书并定位已存 CFI | 原记录及标记仍可用 | 05-mark |
-| 关闭总开关并重新选文字 | 子偏好保留，选区工具栏隐藏，SVG 标记为零 | 06-disabled-settings、07-disabled-selection |
-| 重开总开关、打开笔记 | 标记和数据恢复；同 CFI 的多记录仅渲染一个标记 | 08-reenabled-mark、09-reenabled-data |
-| 8 种总/子开关组合并刷新 | 偏好持久化，选区动作遵循组合，四入口顺序不变 | settings-true/false-true/false-true/false |
-| 统一入口进入章评、返回、进入本书评论 | 访问路径保留；社区内容为空由宿主限制导致 | unified-notes、chapter-comments、book-comments |
-| 关闭面板 | 底部固定目录、夜晚/白天、笔记、设置 | bottom-menu |
+`focus-results.json` 的每条记录直接对应同名 PNG。white/grey 分别为浅/深色，guest 为本地存储，login 为真实宿主回调。16种操作均在四组合执行，截图包按体积拆分，解压到同一目录即可按JSON索引查阅。关闭后的截图显示底部入口焦点框；切换截图结合 `inActivePanel=true` 与 `navbarFocusDuringSwitch=[]` 确认没有抢焦。
 
-独立 MCP 证据覆盖设置浅/深色、禁用、键盘焦点、命名组、统一入口、空/加载/错误/有数据、听书 44px、320px。`notes-populated-*` 明确使用界面样本；错误/加载和音频可用性为状态注入，不是 API 证据。原七项的操作与结果见完整 interface-review 报告。
+`mcp-*` 文件为 Chrome DevTools MCP 的补充审查：关闭回焦、切换、完整AX树、浅/深色与320px状态。loading/error/长笔记/总关等样本明确为界面状态注入，仅检验布局和反馈，不属于真实读写证明。错误的主题方法调用已纠正并重拍；原调用错误保留于日志。MCP会话完成取证后退出清理，不把清理时终止客户端的退出码当作测试失败或通过。
 
-## DeepSec 最终结果
+完整 `interface-review full branch` 自审 **Approve（所述覆盖范围）**，报告 `TB199-focus-interface-review.md` 和同一WIP包含两仓全部分支范围、六域结果、被排除候选、既有问题、准确限制。独立 UX 复核尚未完成。`make -C talebook check-design` **退出2**，唯一失败为保留WIP不可合并门禁。
 
-采用 `deepsec-shield` 技能，仅本地 Shield L1/L2。DeepSec **0.2.0**，来源 **fff031fc01fb36b95348214c8ee359f6ede8aa8b**；版本由 Python 包元数据确认，CLI 不支持 `--version`。
+## 最终 DeepSec
 
-命令：`/opt/deepsec/fff031fc01fb36b95348214c8ee359f6ede8aa8b/venv/bin/deepsec shield scan . --layer l1,l2 --include-tests --format json --output -`。分别在两仓库和 review-tools 执行，stdout 保存 `.deepsec/deepsec-report.json`，另保存退出码和 stderr。Vue 脚本不修改内容提取后，使用同一命令把 `.` 换成 `.deepsec/<组件>.script.js` 扫描。覆盖分支已提交修改、本轮测试/脚本及相关模块；范围内无外向符号链接。
+DeepSec Shield **0.2.0**，来源 `fff031fc01fb36b95348214c8ee359f6ede8aa8b`；CLI `/opt/deepsec/fff031fc01fb36b95348214c8ee359f6ede8aa8b/venv/bin/deepsec`。仅本地 L1/L2；各受影响仓默认全仓（含测试/脚本与bundle）执行：
 
-| 范围 | 文件数 | 退出码 | Findings |
-| --- | --- | --- | --- |
-| Candle 全仓，含测试 | 32 | 2 | 1 HIGH：既有 epub.js CSS innerHTML |
-| Talebook 全仓，含测试/发行 JS | 521 | 2 | 120：32 CRITICAL、67 HIGH、21 MEDIUM，既有告警 |
-| review-tools MCP 辅助脚本 | 1 | 0 | 0 |
-| EpubReader / Settings / BookAnnotations / CandleReader script | 每项 1 | 每项 0 | 每项 0 |
+```bash
+deepsec shield scan . --layer l1,l2 --include-tests --format json --output -
+```
 
-两份退出 2 均有完整 L1/L2 非零文件报告，属于安全发现，不是扫描参数失败。按相对文件、规则、严重度比较上一轮报告，没有新增告警；最终源码/测试修复后重新扫描。脱敏附件保留相对位置/规则/严重度，移除源码片段及绝对路径。
+stdout 保存各仓 `.deepsec/deepsec-report.json`，保留 stderr 与退出码；附件为脱敏文件/规则/严重度，不附原始源码片段。
 
-本轮 UI 的 HIGH 是引用对比度，已通过 token 修复；不与 DeepSec 的既有 HIGH 混淆。此前关联章评计数的 innerHTML 已改为 textContent，恶意标记计数回归仍通过。发行 ES 的三处 DOM/CSS 警告及 UMD 三份对应点为 Vue 内部 patch/编译静态模板、Vuetify 主题 CSS；与上一轮相同，未通过修改生成物消警。epub.js `public/js/epub-v0.3.88.js:7772` 为既有样式注入，仍保留告警。Talebook 其余 SQL/命令/配置等既有规则发现未在这轮无关改动中修复，不能认定全仓安全通过。
+| 范围 | 扫描文件数 | 退出码 | 发现与处理 |
+| --- | ---: | ---: | --- |
+| Candle Reader | 33 | 2 | 既有HIGH1：epub.js CSS innerHTML；相对前轮按文件/规则/严重度对照无新增 |
+| Talebook | 522 | 2 | 既有120：CRITICAL32/HIGH67/MEDIUM21；相同方法对照无新增，含bundle中的框架DOM/CSS规则告警 |
+| 4个受影响Vue的script原样提取 | 各1 | 各0 | 各0发现；EpubReader/Settings/BookAnnotations/CandleReader |
+| focus-tools MCP脚本 | 1 | 0 | 0发现 |
 
-限制：目录扫描不支持 Vue 模板、HTML、CSS、XML；提取 script 只补充脚本覆盖，不能覆盖模板安全。界面/DOM 人工检查与 MCP 是补充，不等于安全扫描完整覆盖。未启动 Spear，也未把源码上传远程 LLM。
+本轮焦点实现和回归脚本没有新增发现；没有靠忽略规则或把报告当成功来消除既有问题。既有高危/严重告警未整体修复，不能宣称全仓安全通过。Vue模板、HTML、CSS、XML未被工具解析；提取script不等于覆盖模板。扫描覆盖最终代码，之后仅回写文档及添加截图。stderr为空的主扫描及有效JSON确认退出2来自发现而非参数错误。未开启 Spear 或上传源码到远程LLM。
 
-## 仍然保留的验收边界
+## 保留限制
 
-真实社区宿主 `legacyCommunityResponse()` 返回空列表，review 真实路由缺失/404，故只验证访问入口和 mock 下的独立请求控制，不能声称真实社区读写持久化通过。此限制沿用 QA 已确认的结论。实际 annotations 登录读写与游客本地读写独立通过。
+真实社区链路按 QA 结论：`legacyCommunityResponse` 返回空列表，review路由缺失/404；入口和mock成功不等于社区持久化通过。此前真实 annotations API 与同CFI证据保留，本轮未重新跑真实写入矩阵，前端全量回归与后端22项再次通过。
 
-未验证真机 Safari、系统选区手柄、软键盘/VoiceOver、200% 浏览器缩放、所有皮肤和完整动画慢放。旧字体栅格 320px 裁切、旧皮肤按钮无名称、旧社区输入缺标签单独列为 pre-existing；不计入本次整改自审结论。
+真机Safari、VoiceOver、系统选区/软键盘、200%真实缩放、全皮肤、完整动画和实际音频未验证。深层登录/用户中心/主题对话框有不抢焦守卫，但未在本轮完整验收其多层键盘路径。320px旧设置栅格、皮肤名称、社区输入标签作为既有问题另列。测试环境已收尾，不交付临时运行地址；不包含凭据、Cookie或私有服务器日志。
