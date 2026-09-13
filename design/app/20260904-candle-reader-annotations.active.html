@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="将阅读笔记 UI 收归 candle-reader，并由 Talebook 注入持久化回调。" />
   <link rel="icon" href="data:," />
-  <title>Candle Reader 笔记能力收口与 Talebook 回调接入 · WIP</title>
+  <title>Candle Reader 笔记能力收口与 Talebook 回调接入 · ACTIVE</title>
   <style>
     :root { color-scheme: light; --bg:#f4f7f8; --panel:#fff; --ink:#20333f; --muted:#5b6972; --line:#d9e2e6; --accent:#315f7d; --good:#176443; --warn:#8a5500; }
     * { box-sizing:border-box; }
@@ -33,9 +33,9 @@
 <header>
   <h1>Candle Reader 笔记能力收口与 Talebook 回调接入</h1>
   <p class="sub">由 candle-reader 独占划线与笔记交互，宿主仅通过稳定回调提供数据持久化；未接宿主时保持浏览器本地闭环。</p>
-  <div class="chips" aria-label="方案元信息"><span class="chip active">状态：WIP</span><span class="chip">创建日期：2026-09-04</span><span class="chip">所属模块：app / candle-reader</span><span class="chip">影响范围：阅读器 UI、注释回调、静态发行包</span><span class="chip">需求来源：TB-199</span></div>
+  <div class="chips" aria-label="方案元信息"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-09-04</span><span class="chip">所属模块：app / candle-reader</span><span class="chip">影响范围：阅读器 UI、注释回调、静态发行包</span><span class="chip">需求来源：TB-199</span></div>
 </header>
-<main id="main"><section class="card"><h2>本轮整合需求（2026-09-13）</h2><p>主开关 notes_enabled 统管划线笔记、评论请求和选区工具栏；子选项 show_comments、show_selection_toolbar 独立保存。关闭不删除数据，禁用子选项控件，保留固定笔记入口并提示去设置开启。统一入口保留划线笔记、当前章评、本书评论（含登录）的访问。底部固定目录、日夜、笔记、设置，听书移至顶部，AI 由更多选项进入。</p><p>旧存档主开关取 show_comments OR show_annotations（缺失按 true），工具栏偏好取旧 show_annotations；show_comments 保留。旧两项均关闭时保持关闭。新 schema_version=2 优先使用新字段。主开关开启后支持统一笔记能力，不再维护旧的独立划线功能开关。</p><p class="pending">当前状态（2026-09-14 焦点修复交付）：开发自审 Approve，等待 UX 独立复核。已修复上一轮 MEDIUM 焦点恢复回归；原七项和同 CFI 修复保留。方案继续 WIP、父议题继续进行中。下文 UX 的 Needs changes 为修复前复现记录，工具缺失说明为更早历史，不代表本次执行状态。</p></section>
+<main id="main"><section class="card"><h2>本轮整合需求（2026-09-13）</h2><p>主开关 notes_enabled 统管划线笔记、评论请求和选区工具栏；子选项 show_comments、show_selection_toolbar 独立保存。关闭不删除数据，禁用子选项控件，保留固定笔记入口并提示去设置开启。统一入口保留划线笔记、当前章评、本书评论（含登录）的访问。底部固定目录、日夜、笔记、设置，听书移至顶部，AI 由更多选项进入。</p><p>旧存档主开关取 show_comments OR show_annotations（缺失按 true），工具栏偏好取旧 show_annotations；show_comments 保留。旧两项均关闭时保持关闭。新 schema_version=2 优先使用新字段。主开关开启后支持统一笔记能力，不再维护旧的独立划线功能开关。</p><p class="verified">当前状态（2026-09-14 独立UX复核）：Approve，方案ACTIVE。原七项、焦点与同CFI修复均已复核。112项真实宿主焦点断言及8组同CFI矩阵通过，父议题继续进行中，等待Mika汇总验收。下方按轮次保留历史WIP/Block/Needs changes记录，以末节独立UX结论为准；真实社区与真机限制保留，不构成自动合并授权。</p></section>
 <section class="card"><h2>1. 原始诉求</h2><div class="callout">“candle-reader 自身闭环实现所有的 UI，提供划线笔记的 UI、功能、框架，并且设置选项里允许关闭；对外提供 callback，让 Talebook 注入读取、写入笔记，未注入时默认写浏览器 localStorage。”</div><p>现状是 Talebook 的 <code>creader.html</code> 在阅读器外再次实现选择工具栏、笔记编辑器、浮动入口、列表侧栏和 EPUB 高亮，随后替换 candle-reader 的 selected 监听，形成两套 UI 和事件所有权冲突。</p></section>
 <section class="card"><h2>2. 目标与边界</h2><div class="grid"><article class="box"><h3>目标</h3><ul><li>选择文本、划线、写笔记、查看与定位均由 candle-reader UI 完成。</li><li>提供异步 <code>load</code> / <code>save</code> 回调契约，Talebook 只负责接 API。</li><li>无回调时按书隔离写入 localStorage。</li><li>设置主开关可关闭评论加载、选区动作和标记，保留统一入口与数据。</li></ul></article><article class="box"><h3>非目标</h3><ul><li>不改变 Talebook 注释后端的数据模型和 HTTP API。</li><li>本次不新增删除、编辑、冲突合并与离线服务端同步。</li><li>不改章评后端、有声书播放逻辑及旧阅读器；整合社区与笔记入口。</li></ul></article></div></section>
 <section class="card"><h2>3. 方案</h2><div class="callout good"><strong>结论：</strong>candle-reader 暴露 <code>annotation_callbacks</code>，内部统一标准化回调结果、渲染标记与反馈。Talebook 登录态注入 API 适配器；游客不注入并自然使用本地存储。</div><h3>回调契约</h3><pre><code>annotation_callbacks: {
@@ -76,7 +76,15 @@
 <p>Talebook实际HTTP、仓库bundle和dist三方一致，缓存v1.2.0-tb199.4。ES SHA256 fcf5eea8544bbd469e3ba5a9a4dad7f7f584f31bef0c6e28edbcb202af9fdc61；UMD f140836373ea7b4af0bf688a59763a31fe5c14df8b3e6215d2501a02525e1860；CSS 5186644e77d6042cb83ea43fd29c212a271c71e23b93ea1d957b025dbb6b4b01。</p>
 <p>最终DeepSec Shield0.2.0，来源fff031fc01fb36b95348214c8ee359f6ede8aa8b，各仓 shield scan . --layer l1,l2 --include-tests --format json --output -。Candle33文件、退出2、既有HIGH1；Talebook522文件、退出2、既有120项（CRITICAL32/HIGH67/MEDIUM21）。按文件/规则/严重度对照上轮无新增。4个Vue script原样提取各1文件、退出0/0发现；MCP取证脚本1文件、退出0/0发现。真实焦点脚本本次没有新增发现；保留原始stdout/stderr/退出码并交付脱敏报告。既有框架DOM/CSS等告警未清除，Vue模板/HTML/CSS/XML未覆盖，不称全仓安全通过；仅本地L1/L2。</p>
 <p>make check-design仍因唯一WIP门禁退出2，按明确要求不转ACTIVE。社区宿主空列表/路由404限制保留；既有320px旧设置栅格、皮肤名称、社区输入标签另列，不计入本次变更结论。未验证真机Safari/VoiceOver、200%缩放、全皮肤、完整动画/真实音频及深层嵌套模态完整链路。独立UX复核前保持WIP和父议题进行中。</p>
-</section><footer>Talebook internal design · app · WIP · 2026-09-04</footer>
+</section><section class="card"><h2>2026-09-14 焦点修复独立UX复核与ACTIVE回写</h2>
+<p><strong>Approve：无待处理界面发现。原七项、原焦点MEDIUM、同CFI清理均关闭。</strong>保留当前Vuetify/MDI、主从设置、四按钮与统一入口。遵照本轮Mika明确授权，将同一方案由WIP改为ACTIVE；父议题保持进行中，社区及真机验收不由此变为完成。历史各轮结论仅代表对应旧版本。</p>
+<p>interface-review full branch：Candle origin/main merge-base 3eadb5ab9555e87df93b4cf084c656a0cf3408c5 至 1d22c7a58fae6cf196a9238d50520a63c58750d6，5提交、初始0未提交、30文件排除13夹具后17；Talebook origin/master merge-base db8688429c55ed5a5d1a40a227725b83d54ca3a9 至 05e387ee2fd7a74848a87818a8868613bb933a17，6提交、初始0未提交、29文件排除3生成物及17截图后9。读取diff两侧并展开main.js、BookReview、BookComments、AudiobookPlayer四个消费者，六域均已审查。完整报告为document/TB199-interface-review-final.md。</p>
+<p>Chrome150.0.7871.100，402×874、DPR3，white/grey×guest/login。真实Docker/Talebook /read/13 共112项焦点断言通过（NO_SCREENSHOTS=1 node review-tools/focus.cjs，退出0、pageerror0）：笔记Escape/关闭按钮/遮罩/底部同按钮关闭；章评书评三种关闭、往返笔记与设置切换；设置和目录Escape/遮罩/底部关闭、目录选择；底部跨面板切换、失效入口回退。面板组内切换后回原笔记入口，直接开设置则回设置，未再落到BODY。首次固定遮罩坐标及最后入口预期已修正，截图轮退出143不视为命令通过，最终无截图完整重跑退出0。</p>
+<p>MCP实际渲染 /read/8 浅深笔记/设置、AX、Escape/Tab及更多选项；矩阵由Playwright操作同一真实宿主，未声称所有步骤经MCP。执行函数及实际资源v1.2.0-tb199.4已核实，ES/UMD/CSS HTTP字节与HEAD完全一致，ES SHA256 fcf5eea8544bbd469e3ba5a9a4dad7f7f584f31bef0c6e28edbcb202af9fdc61。MCP设置按钮48px、四导航100.5×56px、子项缩进16px。原引用对比度17.30/13.97与顶部听书44px沿用上轮已核实结果，相关实现未变。</p>
+<p>node ../review-round2/review-tools/real-cfi.cjs 本轮退出0：真实 /read/8 与 /read/1，浅深×登录游客共8组，16次UI保存；每组两条同CFI数据保留，刷新一个SVG、关闭零、关闭刷新零、重开一个；登录8POST/38GET、游客零annotations HTTP、pageerror0。既有权限/跨书完整矩阵结果保留，本轮不冒充重复全量验收。</p>
+<p>本轮产品仓只修改设计/审查/交付文档与代表截图，不改产品代码；上游67 E2E及22后端记录来自开发同一实现SHA，UX未再运行。新增本地复核脚本DeepSec0.2.0，shield scan review-tools --layer l1,l2 --include-tests --format json --output -：1文件、退出0、L1/L2、stderr空，1 MEDIUM规则误报（测试客户端读取res.json()).err作登录断言，没有向用户返回内部异常）。报告保留；不称0发现或产品全仓安全通过。产品文档改动豁免产品重扫，既有Candle HIGH1、Talebook120发现继续披露。</p>
+<p>社区仍受legacyCommunityResponse空列表及review路由404限制，未验真实加载/关闭停止/重开恢复与持久化。真机Safari/VoiceOver、系统选区/软键盘、200%真实缩放、全皮肤、完整慢放动画、真实音频、深层嵌套模态完整链路未验；旧320px设置栅格、皮肤无名称、评论输入label问题另列，不计本次变更verdict。ACTIVE仅代表已声明界面范围完成，父议题仍在进行中。</p>
+<p>make check-design：ACTIVE回写后退出0，138 design document(s) passed；未执行合并。</p></section><footer>Talebook internal design · app · ACTIVE · 2026-09-04</footer>
 </div>
 </body>
 </html>

@@ -1,3 +1,5 @@
+本轮状态（2026-09-14）：独立UX full branch复核 **Approve**，同一方案转为 `design/app/20260904-candle-reader-annotations.active.html` 。112项焦点断言退出0，8组真实同CFI回归通过（登录8POST/38GET）；原七项与焦点问题均关闭。实际加载v1.2.0-tb199.4，产品代码版本仍为Talebook05e387ee / Candle1d22c7a。详细范围、复测与保留限制见 `document/TB199-interface-review-final.md` 。`make check-design` 退出0，138份方案通过。父议题保持进行中，社区/真机未验限制不变；以下为开发原始交付记录，历史WIP/待UX表述由本段取代。
+
 # TB-199 焦点恢复交付
 
 焦点回归已修复，等待 UX 独立复核。方案保持 `design/app/20260904-candle-reader-annotations.wip.html`，父议题保持进行中。原七项和同 CFI 修复继续保留。
