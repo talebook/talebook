@@ -3,7 +3,7 @@ const { chromium, expect } = require('@playwright/test');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const out = path.resolve(process.env.TB199_EVIDENCE || path.join(__dirname, '../../evidence-fix'));
+const out = path.resolve(process.env.TB199_EVIDENCE || path.join(__dirname, '../../evidence-integrated'));
 const base = 'http://127.0.0.1:39299';
 const report = { viewport: { width: 402, height: 874, deviceScaleFactor: 3 },
   method: 'Chromium mobile emulation; DOM Range selection in real EPUB; UI saves; no API mocks',
@@ -19,13 +19,15 @@ async function panel(page, name) {
   await page.evaluate(name => document.querySelector('#app').__vue_app__._instance.subTree.component.proxy.set_menu(name), name);
 }
 async function snapshot(page, name) {
+  // Wait for Vuetify sheet/ripple transitions so evidence shows the settled UI.
+  await page.waitForTimeout(350);
   await page.screenshot({ path: path.join(out, `${name}.png`), fullPage: true });
   return `${name}.png`;
 }
 async function state(page) {
   return page.evaluate(() => {
     const r = document.querySelector('#app').__vue_app__._instance.subTree.component.proxy;
-    return { book: r.initial_book_id, source: r.annotation_repository.source, enabled: r.settings.show_annotations,
+    return { book: r.initial_book_id, source: r.annotation_repository.source, enabled: r.settings.notes_enabled, settings: JSON.parse(JSON.stringify(r.settings)),
       annotations: JSON.parse(JSON.stringify(r.annotations)), rendered: r.rendered_annotations.length,
       svgMarks: document.querySelectorAll('.candle-reader-annotation').length,
       local: Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('candle-reader:annotations:')).map(k => [k, JSON.parse(localStorage[k])])),
@@ -33,7 +35,7 @@ async function state(page) {
       geometry: { width: innerWidth, height: innerHeight, dpr: devicePixelRatio, scrollWidth: document.documentElement.scrollWidth } };
   });
 }
-async function select(page, navigate = true, offset = 0) {
+async function select(page, navigate = true, offset = 0, visible = true) {
   await panel(page, 'hide');
   if (navigate) {
     await page.evaluate(async () => {
@@ -63,7 +65,7 @@ async function select(page, navigate = true, offset = 0) {
     }
     throw new Error('No selectable paragraph in rendered EPUB');
   }, offset);
-  await expect(page.locator('#comments-toolbar')).toBeVisible();
+  await expect(page.locator('#comments-toolbar')).toBeVisible({ visible });
   return selected;
 }
 async function notes(page) {
@@ -140,15 +142,14 @@ async function run() {
       await page.waitForFunction(() => document.querySelectorAll('.candle-reader-annotation').length > 0);
       report.cases.push({ book, mode, name: 'mark-before-disable', state: await state(page), screenshot: await snapshot(page, `${prefix}-05-mark`) });
       await panel(page, 'settings');
-      const row = page.locator('.v-list-item').filter({ hasText: '划线笔记' });
+      const row = page.locator('[data-setting=notes_enabled]');
       await row.getByRole('button', { name: '关闭', exact: true }).click();
       const disabled = await state(page);
       assert.equal(disabled.enabled, false); assert.equal(disabled.rendered, 0); assert.equal(disabled.svgMarks, 0);
-      assert.equal(await page.locator('.v-bottom-navigation').getByRole('button', { name: /^笔记/ }).count(), 0);
+      assert.equal(await page.locator('.v-bottom-navigation').getByRole('button', { name: /^笔记/ }).count(), 1);
       report.cases.push({ book, mode, name: 'disable-settings', state: disabled, screenshot: await snapshot(page, `${prefix}-06-disabled-settings`) });
-      await select(page, false);
-      assert.equal(await toolbar.getByRole('button', { name: '划线', exact: true }).count(), 0);
-      assert.equal(await toolbar.getByRole('button', { name: '笔记', exact: true }).count(), 0);
+      await select(page, false, 0, false);
+      await expect(toolbar).toBeHidden();
       report.cases.push({ book, mode, name: 'disable-selection-and-marks', state: await state(page), screenshot: await snapshot(page, `${prefix}-07-disabled-selection`) });
       await page.evaluate(() => document.querySelector('#app').__vue_app__._instance.subTree.component.proxy.hide_toolbar());
       await panel(page, 'settings');
@@ -159,6 +160,50 @@ async function run() {
       await notes(page);
       await expect(page.getByText(content, { exact: true })).toBeVisible();
       report.cases.push({ book, mode, name: 'reenable-data', state: await state(page), screenshot: await snapshot(page, `${prefix}-09-reenabled-data`) });
+      // Exercise all master/child combinations on the real book and persist across reloads.
+      const reviewRequests = [];
+      page.on('request', req => { if (/\/api\/review\/(summary|list|book\/list|me)/.test(req.url())) reviewRequests.push(req.url()); });
+      for (const enabled of [true, false]) {
+        for (const comments of [true, false]) {
+          for (const selectionToolbar of [true, false]) {
+            await panel(page, 'settings');
+            await row.getByRole('button', { name: '开启', exact: true }).click();
+            await page.locator('[data-setting=show_comments]').getByRole('button', { name: comments ? '开启' : '关闭', exact: true }).click();
+            await page.locator('[data-setting=show_selection_toolbar]').getByRole('button', { name: selectionToolbar ? '开启' : '关闭', exact: true }).click();
+            if (!enabled) await row.getByRole('button', { name: '关闭', exact: true }).click();
+            const settingsScreenshot = await snapshot(page, `${prefix}-settings-${enabled}-${comments}-${selectionToolbar}`);
+            await page.waitForTimeout(150);
+            const requestStart = reviewRequests.length;
+            await ready(page, book);
+            const current = await state(page);
+            assert.equal(current.settings.notes_enabled, enabled);
+            assert.equal(current.settings.show_comments, comments);
+            assert.equal(current.settings.show_selection_toolbar, selectionToolbar);
+            await expect(page.locator('.v-bottom-navigation button')).toHaveText(['目录', '夜晚', /笔记$/, '设置']);
+            await select(page, true, 0, enabled && selectionToolbar);
+            if (!enabled || !comments) assert.equal(reviewRequests.length, requestStart);
+            report.cases.push({ book, mode, name: 'switch-combination-refresh', enabled, comments, selectionToolbar,
+              reviewRequests: reviewRequests.slice(requestStart), state: await state(page), screenshot: settingsScreenshot });
+          }
+        }
+      }
+      await panel(page, 'settings');
+      await row.getByRole('button', { name: '开启', exact: true }).click();
+      for (const key of ['show_comments', 'show_selection_toolbar']) {
+        await page.locator(`[data-setting=${key}]`).getByRole('button', { name: '开启', exact: true }).click();
+      }
+      await notes(page);
+      report.cases.push({ book, mode, name: 'unified-notes', screenshot: await snapshot(page, `${prefix}-unified-notes`) });
+      await page.getByRole('button', { name: '当前章评', exact: true }).click();
+      await expect(page.getByText('评论列表')).toBeVisible();
+      report.cases.push({ book, mode, name: 'chapter-comments-entry', screenshot: await snapshot(page, `${prefix}-chapter-comments`) });
+      await page.getByRole('button', { name: '返回笔记', exact: true }).click();
+      await page.getByRole('button', { name: '本书评论', exact: true }).click();
+      await expect(page.getByRole('heading', { name: '本书评论', exact: true })).toBeVisible();
+      report.cases.push({ book, mode, name: 'book-comments-entry', screenshot: await snapshot(page, `${prefix}-book-comments`) });
+      await panel(page, 'hide');
+      await expect(page.locator('.book-review-card')).toBeHidden();
+      report.cases.push({ book, mode, name: 'four-button-menu', screenshot: await snapshot(page, `${prefix}-bottom-menu`) });
       await Promise.all(responses);
       if (mode === 'guest') assert.equal(report.network.filter(n => n.mode === 'guest').length, 0);
       // Match every successful write to the rows read from a fresh page load.
