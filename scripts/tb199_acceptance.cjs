@@ -5,7 +5,11 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const out = path.resolve(process.env.TB199_EVIDENCE || path.join(__dirname, '../../evidence-integrated'));
 const base = 'http://127.0.0.1:39299';
+const theme = process.env.TB199_THEME || 'white';
+assert.ok(['white', 'grey'].includes(theme), 'TB199_THEME must be white or grey');
+const runId = Date.now().toString(36);
 const report = { viewport: { width: 402, height: 874, deviceScaleFactor: 3 },
+  theme,
   method: 'Chromium mobile emulation; DOM Range selection in real EPUB; UI saves; no API mocks',
   cases: [], network: [], errors: [] };
 async function ready(page, book) {
@@ -81,6 +85,9 @@ async function run() {
     for (const mode of ['login', 'guest']) {
       const prefix = `${book === 1 ? 'missing' : 'normal'}-${mode}`;
       const ctx = await browser.newContext({ viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
+      await ctx.addInitScript(theme => {
+        if (!localStorage.getItem('readerSettings')) localStorage.setItem('readerSettings', JSON.stringify({ theme }));
+      }, theme);
       const page = await ctx.newPage();
       page.on('pageerror', err => report.errors.push({ book, mode, error: err.message }));
       const responses = [];
@@ -105,7 +112,7 @@ async function run() {
       assert.ok(box.x >= 0 && box.x + box.width <= 402);
       report.cases.push({ book, mode, name: 'single-toolbar', selection, box, screenshot: await snapshot(page, `${prefix}-01-toolbar`) });
       await toolbar.getByRole('button', { name: '笔记', exact: true }).click();
-      const content = `TB199 ${book} ${mode} 刷新恢复验收`;
+      const content = `TB199 ${book} ${mode} ${theme} ${runId} 刷新恢复验收`;
       await page.getByLabel('笔记内容').fill(content);
       await page.getByRole('button', { name: '保存笔记' }).click();
       await expect(page.getByText('笔记已保存')).toBeVisible();
@@ -179,7 +186,8 @@ async function run() {
             assert.equal(current.settings.notes_enabled, enabled);
             assert.equal(current.settings.show_comments, comments);
             assert.equal(current.settings.show_selection_toolbar, selectionToolbar);
-            await expect(page.locator('.v-bottom-navigation button')).toHaveText(['目录', '夜晚', /笔记$/, '设置']);
+            assert.equal(current.settings.theme, theme);
+            await expect(page.locator('.v-bottom-navigation button')).toHaveText(['目录', theme === 'white' ? '夜晚' : '白天', /笔记$/, '设置']);
             await select(page, true, 0, enabled && selectionToolbar);
             if (!enabled || !comments) assert.equal(reviewRequests.length, requestStart);
             report.cases.push({ book, mode, name: 'switch-combination-refresh', enabled, comments, selectionToolbar,
