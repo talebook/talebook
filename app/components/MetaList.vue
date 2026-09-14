@@ -1,158 +1,127 @@
-
 <template>
-    <div>
-        <v-row>
-            <template v-if="meta == 'rating'">
-                <v-col
-                    v-for="item in meta_items"
-                    :key="item.name"
-                    cols="4"
-                    sm="2"
-                >
-                    <v-chip
-                        :to="item.href"
-                        variant="outlined"
-                        color="primary"
-                    >
-                        {{ item.name }}星
-                        <span v-if="item.count">&nbsp;({{ item.count }})</span>
-                    </v-chip>
-                </v-col>
-            </template>
-            <v-col v-else>
-                <v-chip
-                    v-for="item in meta_items"
-                    :key="item.name"
-                    size="small"
-                    class="ma-1"
-                    :to="item.href"
-                    variant="outlined"
-                    color="primary"
-                >
-                    {{ item.name }}
-                    <span v-if="item.count">&nbsp;({{ item.count }})</span>
-                </v-chip>
-                <v-btn
-                    v-if="total > items.length"
-                    color="primary"
-                    rounded
-                    size="small"
-                    @click="expand()"
-                >
-                    {{ $t('messages.showAll') }}
-                </v-btn>
-            </v-col>
-        </v-row>
-        
-        <!-- 空状态提示 -->
-        <v-row
-            v-if="loaded && meta_items.length === 0"
-            class="empty-state"
+    <section
+        :aria-label="label"
+        :aria-busy="loading"
+        data-testid="metadata-list"
+    >
+        <v-text-field
+            v-model="query"
+            :label="t('library.searchFilter', { label })"
+            prepend-inner-icon="mdi-magnify"
+            variant="outlined"
+            density="compact"
+            clearable
+            hide-details
+            class="mb-3"
+            data-testid="metadata-search"
+        />
+        <p
+            class="text-body-2 mb-3"
+            role="status"
+            aria-live="polite"
         >
-            <v-col cols="12">
-                <v-card class="ma-1 pa-6 text-center">
-                    <v-icon
-                        large
-                        color="grey lighten-2"
-                    >
-                        mdi-book-open-variant
-                    </v-icon>
-                    <h3 class="text-h6 grey--text">
-                        {{ $t('messages.noBooks') }}
-                    </h3>
-                    <p class="text-caption grey--text">
-                        {{ $t('messages.addBooksFirst') }}
-                    </p>
-                </v-card>
-            </v-col>
-        </v-row>
-    </div>
+            {{ loading ? t('book.loading') : failed ? '' : summary }}
+        </p>
+        <v-progress-linear
+            v-if="loading"
+            indeterminate
+            color="primary"
+            :aria-label="t('book.loading')"
+        />
+        <v-alert
+            v-else-if="failed"
+            type="error"
+            variant="tonal"
+            role="alert"
+        >
+            {{ t('errors.networkError') }}
+            <v-btn
+                variant="text"
+                @click="reload"
+            >
+                {{ t('common.retry') }}
+            </v-btn>
+        </v-alert>
+        <div
+            v-else-if="items.length"
+            class="metadata-chips"
+            data-testid="metadata-items"
+        >
+            <v-chip
+                v-for="item in items"
+                :key="item.id"
+                :to="'/' + meta + '/' + encodeURIComponent(item.name)"
+                :title="String(item.name)"
+                variant="outlined"
+                color="primary"
+                size="small"
+            >
+                {{ item.name }}<template v-if="meta === 'rating'">
+                    {{ t('admin.books.label.star') }}
+                </template>
+                <span v-if="item.count">&nbsp;({{ item.count }})</span>
+            </v-chip>
+        </div>
+        <div
+            v-else
+            class="pa-6 text-center"
+            role="status"
+        >
+            {{ t('library.noMatchingFilter', { label }) }}
+        </div>
+        <v-pagination
+            v-if="pages > 1"
+            v-model="page"
+            :length="pages"
+            :total-visible="xs ? 3 : 5"
+            :disabled="loading"
+            class="mt-4"
+            density="compact"
+            data-testid="metadata-pagination"
+        />
+    </section>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { computed, watch } from 'vue';
+import { useDisplay } from 'vuetify';
 import { useRoute } from 'vue-router';
-import { useAsyncData, useNuxtApp } from 'nuxt/app';
-import { useMainStore } from '@/stores/main';
-
-const route = useRoute();
-const store = useMainStore();
-const { $backend } = useNuxtApp();
-
-const props = defineProps({
-    metaType: {
-        type: String,
-        default: ''
-    }
-});
-
-store.setNavbar(true);
-
-const meta = computed(() => props.metaType || route.path.split('/')[1]);
-const show_all = ref(false);
-const items = ref([]);
-const total = ref(0);
-const page_size = ref(20);
-const loaded = ref(false);
-
-const loadData = async () => {
-    const path = '/' + meta.value + (show_all.value ? '?show=all' : '');
-    loaded.value = false;
-    try {
-        const rsp = await $backend(path);
-        items.value = rsp.items || [];
-        total.value = rsp.total || 0;
-        loaded.value = true;
-    } catch (e) {
-        console.error(e);
-    }
-};
-
-// 修复：移除 await，正确使用 useAsyncData
-// 使用 useAsyncData 替代直接调用
-const { data, refresh } = useAsyncData(`meta-${meta.value}`, async () => {
-    const path = '/' + meta.value + (show_all.value ? '?show=all' : '');
-    loaded.value = false;
-    try {
-        const rsp = await $backend(path);
-        items.value = rsp.items || [];
-        total.value = rsp.total || 0;
-        loaded.value = true;
-        return rsp;
-    } catch (e) {
-        console.error(e);
-        return null;
-    }
-}, {
-    watch: [meta, show_all] // 监听 meta 和 show_all 的变化
-});
-
-// 或者使用 watch 监听变化来刷新数据
-watch([meta, show_all], () => {
-    refresh();
-});
-
-const expand = () => {
-    show_all.value = !show_all.value;
-    // 不需要手动调用 loadData，因为 watch 会自动触发 refresh
-};
-
-const meta_items = computed(() => {
-    var prefix = '/' + meta.value + '/';
-    return items.value.map(d => {
-        d.href = prefix + encodeURIComponent(d.name);
-        return d;
-    });
-});
-
-const page_cnt = computed(() => {
-    return Math.max(1, Math.ceil(total.value/page_size.value));
-});
-
+import { useNuxtApp, useHead } from 'nuxt/app';
 import { useI18n } from 'vue-i18n';
-const { t } = useI18n();
+import { useMainStore } from '@/stores/main';
+import { metadataPageUrl, useMetadataPage } from '@/composables/useMetadataPage';
 
-useHead({
-    title: () => t(`messages.titles.${meta.value}`) || ''
-});
+const props = defineProps({ metaType: { type: String, default: '' } });
+const route = useRoute();
+const { xs } = useDisplay();
+const { t } = useI18n();
+const { $backend } = useNuxtApp();
+useMainStore().setNavbar(true);
+const meta = computed(() => props.metaType || route.path.split('/')[1]);
+const label = computed(() => t(`messages.titles.${meta.value}`));
+const { page, query, items, total, unfilteredTotal, pages, loading, failed, reload } = useMetadataPage(
+    (p, q, size) => $backend(metadataPageUrl(meta.value, p, q, size)),
+    { key: meta }
+);
+watch(meta, () => { query.value = ''; }, { flush: 'sync' });
+const summary = computed(() => t(
+    query.value?.trim() ? 'library.filterPickerSearchSummary' : 'library.filterPickerSummary',
+    { count: total.value, total: unfilteredTotal.value, page: page.value, pages: pages.value }
+));
+useHead({ title: () => label.value });
 </script>
+
+<style scoped>
+.metadata-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-width: 0;
+}
+.metadata-chips :deep(.v-chip) { max-width: 100%; }
+.metadata-chips :deep(.v-chip__content) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+</style>
