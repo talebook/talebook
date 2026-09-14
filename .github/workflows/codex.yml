@@ -1,8 +1,6 @@
 name: Codex
 
 on:
-  issues:
-    types: [opened]
   issue_comment:
     types: [created]
   pull_request:
@@ -26,11 +24,6 @@ jobs:
     if: |
       !endsWith(github.actor, '[bot]') &&
       (
-        (
-          github.event_name == 'issues' &&
-          github.event.action == 'opened' &&
-          contains(github.event.issue.labels.*.name, 'bug')
-        ) ||
         (
           contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association || github.event.review.author_association) &&
           (
@@ -115,7 +108,6 @@ jobs:
             let issueTitle = "";
             let pr = null;
             let requestKind = eventName;
-            let automaticBugIssue = false;
             let authorizationKind = "none";
             let triggerIssueCommentId = "";
             let triggerReviewCommentId = "";
@@ -131,21 +123,7 @@ jobs:
             const historicalIssueBranches = [];
             const defaultBranch = payload.repository.default_branch;
 
-            if (eventName === "issues") {
-              const issueActor = payload.issue?.user?.login || context.actor;
-              const issueLabels = Array.isArray(payload.issue?.labels) ? payload.issue.labels : [];
-              automaticBugIssue = (
-                payload.action === "opened" &&
-                !payload.issue?.pull_request &&
-                !String(issueActor).endsWith("[bot]") &&
-                issueLabels.some((label) => typeof label?.name === "string" && label.name.toLowerCase() === "bug")
-              );
-              body = payload.issue?.body || "";
-              actor = issueActor;
-              issueNumber = payload.issue?.number ? String(payload.issue.number) : "";
-              issueTitle = payload.issue?.title || "";
-              requestKind = automaticBugIssue ? "automatic_bug_issue" : "issue_event";
-            } else if (eventName === "issue_comment") {
+            if (eventName === "issue_comment") {
               body = payload.comment.body || "";
               actor = payload.comment.user.login;
               issueNumber = String(payload.issue.number);
@@ -207,10 +185,8 @@ jobs:
                 core.warning(`Could not resolve repository permission for ${actor}: ${error.message}`);
               }
             }
-            authorized = automaticBugIssue || manualAuthorized;
-            if (automaticBugIssue) {
-              authorizationKind = "automatic_bug_issue";
-            } else if (manualAuthorized) {
+            authorized = manualAuthorized;
+            if (manualAuthorized) {
               authorizationKind = "repository_writer";
             }
 
@@ -263,7 +239,7 @@ jobs:
                 targetRef = pr.head.ref;
                 targetSha = pr.head.sha;
               }
-            } else if (authorized && (requestKind === "issue_comment" || automaticBugIssue)) {
+            } else if (authorized && requestKind === "issue_comment") {
               const refPrefix = `heads/codex/issue-${issueNumber}-`;
               const refs = await github.paginate(github.rest.git.listMatchingRefs, {
                 owner,
@@ -326,8 +302,6 @@ jobs:
               actor,
               actorPermission: permission,
               authorizationKind,
-              automaticBugIssue,
-              designReviewPreapproved: automaticBugIssue,
               issueNumber,
               issueTitle,
               body,
@@ -442,7 +416,6 @@ jobs:
             }
 
             core.setOutput("authorized", authorized ? "true" : "false");
-            core.setOutput("automatic_bug_issue", automaticBugIssue ? "true" : "false");
             core.setOutput("is_pr", pr ? "true" : "false");
             core.setOutput("issue_number", issueNumber);
             core.setOutput("pr_number", pr ? String(pr.number) : "");
