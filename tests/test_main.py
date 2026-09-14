@@ -950,12 +950,12 @@ class TestRefer(TestWithUserLogin):
     def test_refer(self):
         from calibre.ebooks.metadata.book.base import Metadata
 
-        from webserver.plugins.meta.baike.api import BaiduBaikeProvider
+        from webserver.plugins.meta.baike.api import BaiduBaikeApi, BaiduBaikeProvider
         from webserver.services.plugin_runtime import PluginRuntime
 
         plugin_key = BaiduBaikeProvider.manifest["id"]
         metadata = Metadata("冰火魔厨", ["唐家三少"])
-        metadata.provider_value = "https://baike.baidu.com/item/冰火魔厨/123"
+        metadata.provider_value = "123"
         metadata.source = "百度百科"
         metadata.comments = "冰与火的魔法故事"
         metadata.tags = ["小说"]
@@ -972,7 +972,7 @@ class TestRefer(TestWithUserLogin):
         # Isolate external lookups so unrelated enabled sources cannot affect this test.
         with enabled_builtin_plugin(plugin_key):
             with mock.patch.object(PluginRuntime, "connections_for", baike_connections):
-                with mock.patch.object(BaiduBaikeProvider, "get_book", return_value=metadata):
+                with mock.patch.object(BaiduBaikeApi, "get_book", return_value=metadata):
                     data = self.json("/api/book/1/refer")
                     self.assertEqual(data["err"], "ok")
                     self.assertEqual(len(data["books"]), 1)

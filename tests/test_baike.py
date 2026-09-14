@@ -237,6 +237,71 @@ class TestBaiduBaikeApi(unittest.TestCase):
         client_class.assert_not_called()
 
 
+class TestBaikeProviderReferences(unittest.TestCase):
+    def setUp(self):
+        from webserver.plugins.meta.baike.api import BaiduBaikeProvider
+
+        self.provider = BaiduBaikeProvider()
+        self.response = mock.Mock(status_code=200)
+        self.response.json.return_value = BAIKE_API_DATA
+        self.http = self.enterContext(mock.patch("webserver.plugins.meta.baike.api.requests.get"))
+
+        # Match the actual API: numeric bk_key values return no lemma.
+        def lookup(url, **kwargs):
+            response = mock.Mock(status_code=200)
+            response.json.return_value = BAIKE_API_DATA if kwargs["params"]["bk_key"].startswith("东周列国志") else {}
+            return response
+
+        self.http.side_effect = lookup
+        self.cover = self.enterContext(mock.patch("webserver.plugins.meta.baike.api.SafeHttpClient.get"))
+        self.cover.return_value.content = b"cover-image"
+
+    def test_search_reference_round_trips_through_real_detail(self):
+        records = self.provider.search_books({"title": "东周列国志", "authors": ["冯梦龙"]}, {})
+        self.assertEqual(len(records), 1)
+        self.cover.assert_not_called()
+        value = records[0]["provider_value"]
+        self.assertTrue(value.startswith("baike:v1:"))
+        self.assertEqual(json.loads(value[len("baike:v1:") :])["id"], "2653")
+        detail = self.provider.get_metadata(value, {})
+        self.assertEqual(detail["title"], records[0]["title"])
+        self.assertEqual(detail["provider_value"], value)
+        self.assertEqual(detail["_calibre_mi"].cover_data, ("jpg", b"cover-image"))
+        self.assertFalse(self.provider.copy_image)
+        self.assertEqual(self.http.call_args.kwargs["params"]["bk_key"], "东周列国志")
+
+    def test_legacy_and_malformed_references_require_a_new_search_without_http(self):
+        for value in (
+            "2653",
+            "https://baike.baidu.com/item/2653",
+            "baike:v2:{}",
+            "baike:v1:[]",
+            "baike:v1:{",
+            'baike:v1:{"title":"东周列国志","author":"","id":2653}',
+            'baike:v1:{"title":"东周列国志","author":"","id":"../2653"}',
+            'baike:v1:{"title":"","author":"","id":"2653"}',
+            "x" * 4097,
+        ):
+            with self.subTest(value=value[:80]):
+                self.assertIsNone(self.provider.get_metadata(value, {}))
+        self.http.assert_not_called()
+        self.cover.assert_not_called()
+
+    def test_changed_lemma_is_not_applied(self):
+        records = self.provider.search_books({"title": "东周列国志"}, {})
+        self.http.side_effect = None
+        response = mock.Mock(status_code=200)
+        response.json.return_value = {**BAIKE_API_DATA, "id": 999, "newLemmaId": 999}
+        self.http.return_value = response
+        self.assertIsNone(self.provider.get_metadata(records[0]["provider_value"], {}))
+        self.cover.assert_not_called()
+
+    def test_placeholder_author_does_not_filter_valid_candidate(self):
+        for author in ("佚名", "Unknown", "unknown author", "未知"):
+            with self.subTest(author=author):
+                self.assertEqual(len(self.provider.search_books({"title": "东周列国志", "authors": [author]}, {})), 1)
+
+
 class TestBaikePage(unittest.TestCase):
     """百度百科 Page 类测试"""
 

@@ -8,7 +8,7 @@ const candidate = {
     source: '百度百科',
     website: 'https://baike.baidu.com/item/冰火魔厨/123',
     provider_key: 'talebook.meta.baike',
-    provider_value: 'https://baike.baidu.com/item/冰火魔厨/123',
+    provider_value: 'baike:v1:' + JSON.stringify({ title: '冰火魔厨', author: '唐家三少', id: '123' }),
     comments: '冰与火的魔法故事',
     cover_url: 'https://example.com/cover.jpg',
     pubyear: '2004',
