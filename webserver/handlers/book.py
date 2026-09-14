@@ -12,6 +12,7 @@ import re
 import shutil
 import time
 import urllib
+from collections.abc import Mapping
 
 import tornado.escape
 from tornado import web
@@ -728,7 +729,7 @@ class BookRefer(BaseHandler):
                 "provider_value": b.provider_value if hasattr(b, "provider_value") else "",
                 "pubdate": b.pubdate if hasattr(b, "pubdate") else None,
             }
-        elif not isinstance(b, dict):
+        elif not isinstance(b, Mapping):
             return None
 
         if "title" not in b or not b["title"]:
