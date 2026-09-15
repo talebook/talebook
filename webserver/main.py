@@ -124,15 +124,20 @@ def safe_filename(filename):
     return re.sub(r"[\/\\\:\*\?\"\<\>\|]", "_", filename)  # 替换为下划线
 
 
+def truncate_utf8(value, byte_limit):
+    """Fit a filesystem component without splitting a UTF-8 code point."""
+    return value.encode("utf-8")[:byte_limit].decode("utf-8", errors="ignore")
+
+
 # the codes is from calibre source code. just change 'ascii_filename' to 'safe_filename'
 def utf8_construct_path_name(book_id, title, author):
     from calibre.db.backend import DB, WINDOWS_RESERVED_NAMES
 
     book_id = " (%d)" % book_id
     lm = DB.PATH_LIMIT - (len(book_id) // 2) - 2
-    lm = lm // 4  # UTF8 is 1~4 char
-    author = safe_filename(author)[:lm]
-    title = safe_filename(title.lstrip())[:lm].rstrip()
+    # Keep Calibre's character budget; separately enforce the filesystem byte limit.
+    author = truncate_utf8(safe_filename(author)[:lm], 255)
+    title = truncate_utf8(safe_filename(title.lstrip())[:lm], 255 - len(book_id)).rstrip()
     if not title:
         title = "Unknown"[:lm]
     try:
@@ -152,11 +157,12 @@ def utf8_construct_file_name(book_id, title, author, extlen):
 
     extlen = max(extlen, 14)  # 14 accounts for ORIGINAL_EPUB
     lm = (DB.PATH_LIMIT - extlen - 2) // 2
-    lm = lm // 4  # UTF8 is 1~4 char
     if lm < 5:
         raise ValueError("Extension length too long: %d" % extlen)
-    author = safe_filename(author)[:lm]
-    title = safe_filename(title.lstrip())[:lm].rstrip()
+    # Reserve bytes for the extension, its dot, and the " - " separator.
+    byte_limit = (255 - extlen - 4) // 2
+    author = truncate_utf8(safe_filename(author)[:lm], byte_limit)
+    title = truncate_utf8(safe_filename(title.lstrip())[:lm], byte_limit).rstrip()
     if not title:
         title = "Unknown"[:lm]
     name = title + " - " + author
