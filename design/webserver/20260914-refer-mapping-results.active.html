@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>互联网元数据候选兼容修复 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page"><header class="hero"><h1>互联网元数据候选兼容修复</h1><p>创建日期：2026-09-14 · 模块：webserver · 状态：ACTIVE</p><p>来源：TB-219 / talebook#1043</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>百度百科查询成功但没有候选记录。恢复候选字段展示及三种选用操作，兼容现有来源。</p></section>
+<section class="card"><h2>QA 阻塞修订（2026-09-14）</h2><p>真实结构化搜索返回数字词条 ID，但 provider 详情把 ID 当作 bk_key 书名，结果为空；此前回归替换了详情或 get_book，未覆盖该路径。详情沿用了 copy_image=False，封面选用也未得到真实验证。</p><p>新 provider_value 格式：baike:v1: 后接 JSON 对象（title、author、id）。仅在 BaiduBaikeProvider 搜索/详情输出此不透明值，基础 API 继续输出数字 ID 供旧入口使用。详情校验引用类型与长度，用书名/作者查询固定百科接口并验证词条 ID，不将引用作为 URL 下载；详情单独创建 copy_image=True 的 API，避免修改共享 provider 的状态。佚名/Unknown/未知等占位作者不参与作者匹配。</p><p>兼容：talebook.meta.baike 的旧数字 ID、旧 URL、非法或不支持版本值不再误作搜索词；返回 metadata.not_found 并提示重新搜索，客户端重开弹窗即可获得新引用，无持久库表迁移。旧 provider_key=BaiduBaike 加数字 ID 的既有路径仍按当前书名与期望 ID 查询。通用插件连接缺失与详情为空分别返回 plugin.connection_missing 和 metadata.not_found。</p><p>验证计划：HTTP fixture 按 bk_key 区分书名成功/数字失败；真实 runtime/provider/详情/POST 写库在临时隔离 Calibre 库覆盖三模式、旧引用、ID 漂移与缺失封面；检查持久字段与封面。修订磁盘说明：设置 Python CONF 而非环境变量。完成后全仓重跑 DeepSec，更新本方案与原 PR。</p></section><section class="card"><h2>边界与方案</h2><p>展示入口兼容 Mapping，保持字段白名单和旧 Calibre/dict 支持。百度百科引用与详情修复见上节；前端继续将 provider_value 原样 POST，不解释引用内容。私有 _calibre_mi 不输出，无效标题继续过滤，写库权限与三种操作仍沿用既有机制。</p><p>同一 PR 的首次方案曾仅覆盖展示边界；QA 证明详情与封面未覆盖，本次在唯一方案内修订。grill 技能在本会话与仓库中未找到，设计边界按契约及本轮明确授权确定。</p></section>
+<section class="card"><h2>最终测试结果与限制</h2><div id="results"><ul>
+<li>基线复现：从提交 92f519ba 加载原百度百科模块，HTTP fixture 按 bk_key 区分书名/数字，search_books 得到 1 条且 provider_value=2653，get_metadata("2653") 返回 None。新增隔离写库三模式测试修复前 3 failed，修复后全部通过。</li>
+<li>Docker 镜像 talebook:tb214-revision-tests，挂载当前仓库到 /work：pytest tests/test_baike.py tests/test_refer_candidates.py tests/test_main.py::TestRefer tests/test_main.py::TestReferCoverUpdate tests/test_main.py::TestReferFailureSummary tests/test_book_write_permissions.py -q → 50 passed。真实 provider/runtime/详情/POST/set_metadata 未替换，仅外部 HTTP transport 及来源选择隔离；每个写库用例创建临时 Calibre 库，三模式执行后关闭重开，读取持久字段/封面/正文断言。旧值、ID 漂移、缺失封面和缺失连接分支也覆盖。</li>
+<li>make lint-py-fix、make lint-py；ruff check tests/test_baike.py tests/test_main.py tests/test_refer_candidates.py；ruff format --check 同三文件 → 通过。首轮 npm run lint 为 0 errors / 459 既有 warnings，项目默认排除 test/** 和 TypeScript；本轮 TypeScript 修改由 Playwright 实际编译执行。</li>
+<li>本轮 make pytest → 1338 passed / 37 skipped / 5 failed。四项 tests/test_audiobook.py 因宿主可用约 4GB，低于 Python CONF 的 AUDIOBOOK_MIN_FREE_GB=5；另一项 tests/test_network_library.py::TestNetworkLibrary::test_search_weight_increment 在 5 秒内未结束，该失败在 92f519ba 独立工作树单独复测也重现。本次元数据相关测试均通过；标准全量并非全绿。</li>
+<li>磁盘澄清：环境变量 AUDIOBOOK_MIN_FREE_GB=0 不覆盖 CONF。验证命令是在同一 Docker 镜像内执行 python3 -c 'from webserver import loader; import pytest; loader.get_settings()["AUDIOBOOK_MIN_FREE_GB"] = 0; raise SystemExit(pytest.main(["tests/test_audiobook.py", "-q"]))' → 18 passed（5.56s）。这仅改变测试进程内配置，不改生产文件/环境，不代表默认磁盘策略测试全绿。首轮仅复跑 4 个失败节点的记录由此完整文件复测补强。</li>
+<li>MOCK_API_URL=http://127.0.0.1:18089 npx playwright test --config playwright.refer.local.config.ts test/e2e/refer-candidates.spec.ts --retries=1 → 2 passed / 1 flaky / 0 failed；第三例因全局 loading 超时，重试通过。此前首轮 2 超时 / 1 通过。三种模式均验证新引用透传、候选字段和设置提交；无生产前端布局/逻辑修改。临时配置由 Playwright webServer 管理 PORT=18089 node test/mock-server.js 与 API_URL=http://127.0.0.1:18089 npx nuxt dev --port 13089 --host 127.0.0.1，baseURL 13089、用例 90s、断言 15s、/api/welcome 就绪，测试后停止。</li>
+<li>浏览器范围：Chromium 桌面浅色 /book/1，mock API 隔离自测。Chrome DevTools MCP 不可用；未进行群晖、真实开发者书库、完整真实网络浏览器验收；隔离库真实写入已覆盖。沿用首轮同界面截图 app/test/e2e/screenshots/20260914-refer-candidate.png 。</li>
+<li>DeepSec Shield 0.2.0 / fff031fc01fb36b95348214c8ee359f6ede8aa8b：最终全仓命令 /opt/deepsec/fff031fc01fb36b95348214c8ee359f6ede8aa8b/venv/bin/deepsec shield scan . --layer l1,l2 --include-tests --format json --output - 。539 文件、L1/L2、退出 2，stderr 为空；122 条发现（32 critical / 69 high / 21 medium）。逐文件/证据对比 8b21fbb9480f14b498327d3cef36088c4ba47821，命中全是既有代码（包括未改的 CORS 测试断言），本次改动行无告警。</li>
+<li>扫描 stdout 保留 .deepsec/deepsec-report.json，共享脱敏报告含改动代码 SHA256。存量阅读器 HTML、来源网络/TLS 等风险未在本任务处理；SQL 文案、私钥类型标签、测试凭据含误报，未整体忽略。Vue/Shell/HTML 不受此工具覆盖；本次生产 Python 和测试 Python/TypeScript 已覆盖，无源码符号链接。仅本地 L1/L2，无 Spear 或远程上传，不声称全仓安全通过。</li>
+<li>make check-design 与 git diff --check：最终执行并通过后转 ACTIVE。</li>
+</ul></div></section><section class="card"><h2>界面变更审查（interface-review full）</h2>
+<p>基线 origin/master merge-base：8b21fbb9480f14b498327d3cef36088c4ba47821；审查 92f519ba 已提交内容与本轮全部未提交内容（两个生产 Python、三个后端测试文件、前端 E2E 与本方案）。排除生成测试输出、临时测试配置、日志与扫描报告。遵循根 AGENTS.md 与 app/CLAUDE.md，技术栈为 Nuxt / Vue / Vuetify。</p>
+<p>消费者展开：GET refer 的流式及 JSON 分支 → app/pages/book/[bid]/index.vue → BookCards_Small.vue 与设置菜单；其他消费者未发现。比较两侧 diff，包括 Mapping 兼容和本轮详情/引用变更；未移除界面语义、颜色或状态，新增详情为空时的重新搜索提示。</p>
+<div class="table-wrap"><table><thead><tr><th>领域</th><th>证据与结果</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>无界面语义变更；复用现有具名设置/取消按钮和进度播报。Not reviewed: no evidence in the change scope（完整键盘及屏幕阅读器验收不在本次覆盖声明内）。</td></tr>
+<tr><td>Layout</td><td>无布局变更；复用现有候选列表。Not reviewed: no evidence in the change scope（不声称覆盖窄屏或缩放）。</td></tr>
+<tr><td>Writing</td><td>候选字段恢复，非空记录不再错误进入未找到结果提示；三种操作文案与参数一致，详情为空明确提示重新搜索，而实际缺失连接仍引导配置。Clear。</td></tr>
+<tr><td>Typography</td><td>Not reviewed: no evidence in the change scope。</td></tr>
+<tr><td>Colors</td><td>Not reviewed: no evidence in the change scope；未测量明暗主题对比度。</td></tr>
+<tr><td>UI</td><td>Not reviewed: no evidence in the change scope；无新视觉样式或动画。</td></tr>
+</tbody></table></div>
+<h3>发现与排除项</h3><p>No actionable interface findings in this change. 已修正误导的空详情提示；评估过为引用格式添加前端解析与重排设置菜单，两者均无必要，原样透传支持新值且现有菜单覆盖三模式。无新增 HIGH / MEDIUM 发现。</p>
+<h3>验证与结论</h3><p>范围内的类型判断与前端字段消费者已逐项检查。浏览器验证结果见测试章节；Chrome DevTools MCP 不可用，Playwright Chromium 作为隔离替代，不声称真实来源验收。结论：Approve（仅针对上述已检查的变更范围）。</p></section></main></body></html>

@@ -12,6 +12,7 @@ import re
 import shutil
 import time
 import urllib
+from collections.abc import Mapping
 
 import tornado.escape
 from tornado import web
@@ -501,6 +502,8 @@ class BookRefer(BaseHandler):
         )
         if isinstance(outcome, Exception):
             raise outcome
+        if outcome is None:
+            raise PluginRuntimeError("metadata.not_found", "Selected metadata is no longer available")
         return to_calibre_metadata(outcome) or outcome
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
@@ -558,6 +561,8 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = self._plugin_metadata_detail(provider_key, provider_value)
             except Exception as e:
+                if isinstance(e, PluginRuntimeError) and e.code == "metadata.not_found":
+                    raise RuntimeError({"err": "metadata.not_found", "msg": _("未获取到所选记录，请重新搜索")})
                 logging.error("插件 %s 元数据查询失败：%s", provider_key, e)
                 raise RuntimeError({"err": "httprequest.plugin.failed", "msg": _("插件查询失败")})
             if refer_mi is None:
@@ -728,7 +733,7 @@ class BookRefer(BaseHandler):
                 "provider_value": b.provider_value if hasattr(b, "provider_value") else "",
                 "pubdate": b.pubdate if hasattr(b, "pubdate") else None,
             }
-        elif not isinstance(b, dict):
+        elif not isinstance(b, Mapping):
             return None
 
         if "title" not in b or not b["title"]:
