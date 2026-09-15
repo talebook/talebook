@@ -1,0 +1,506 @@
+/* ── 响应式与特殊元素补齐（手机/PC 双环境 + 暗色适配）──
+   由所有预设通过 RESPONSIVE 占位注入，独立于 TOC 样式。
+   兼容原则：仅用常规属性与 @media，不依赖 flex/grid 复杂布局，
+   多看/Kindle 不支持的 @media 会被安全忽略。 */
+
+/* 行长控制：PC 端限 42em 提升可读性，手机端自动 100% */
+body {
+  max-width: 42em;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Calibre 汤兼容：高特异性覆盖 p.calibre1 等。
+   :not(.mb-ch):not(.mb-vol) 把章节/卷标题从类汤规则排除——标题的缩进、边距、
+   对齐由预设 .mb-ch 接管（此前 0-1-1 !important 会把标题 margin 压成 0、居中
+   压成 justify）。:not() 参数计入特异性（本规则实际 0-3-1），
+   styles/__init__.py 的 _CALIBRE_*_SELECTORS 覆写块必须保持同选择器列表
+   （同特异性靠源序在后取胜），TestCssCascade 有奇偶校验。 */
+p.calibre1:not(.mb-ch):not(.mb-vol), p.calibre:not(.mb-ch):not(.mb-vol),
+p.calibre2:not(.mb-ch):not(.mb-vol), div.calibre1:not(.mb-ch):not(.mb-vol),
+.calibre1:not(.mb-ch):not(.mb-vol), .calibre:not(.mb-ch):not(.mb-vol) {
+  text-indent: 2em !important;
+  duokan-text-indent: 2em !important;
+  margin: 0 !important;
+  line-height: inherit !important;
+  text-align: justify !important;
+  text-justify: inter-ideograph !important;
+}
+p.calibre1[data-mb-first]:not(.mb-ch):not(.mb-vol),
+p.calibre[data-mb-first]:not(.mb-ch):not(.mb-vol) {
+  text-indent: 0 !important;
+  duokan-text-indent: 0 !important;
+}
+
+/* 链接去蓝（正文），目录页保留下划线装饰 */
+body:not(.mb-toc-page) a, body:not(.mb-toc-page) a:link, body:not(.mb-toc-page) a:visited {
+  color: inherit !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+}
+a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+/* 标题增强：大写（中文无影响，英文自动大写）— 保留预设的周边装饰，仅追加字距 */
+.mb-ch {
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  word-spacing: 0.12em;
+}
+.mb-ch span {
+  text-transform: none;
+  letter-spacing: 0.06em;
+}
+
+/* 卷级标题（mb-vol）：独占一页、居中大字距；无长线，与章级区分 */
+.mb-vol {
+  page-break-before: always;
+  break-before: page;
+  text-align: center !important;
+  text-indent: 0 !important;
+  duokan-text-indent: 0;
+  {{FONT_HEAD}}
+  font-weight: bold;
+  font-size: 1.9em !important;
+  line-height: 1.5;
+  color: {{ACCENT}} !important;
+  letter-spacing: 0.3em;
+  margin: 34% 0 2.2em 0 !important;
+}
+
+/* 双行排版（split_title）：章节号小字上移 + 标题大字。
+   用 .mb-ch 前缀提升特异性，抵消各预设自带的 .mb-ch span 规则
+   （如 classic 的 0.75em/muted 会把标题也缩小变灰） */
+.mb-ch-num,
+.mb-ch-title {
+  display: block;
+}
+.mb-ch .mb-ch-num {
+  font-size: 0.55em;
+  font-weight: normal !important;
+  color: {{MUTED}} !important;
+  letter-spacing: 0.4em;
+  margin-bottom: 0.35em;
+}
+.mb-ch .mb-ch-title {
+  font-size: inherit;
+  color: inherit;
+}
+/* 长线分隔（真实元素 div.mb-ch-sep，由代码注入）— 基础样式，宽度由各预设覆盖 */
+.mb-ch-sep {
+  height: 1px !important;
+  background: {{BORDER}} !important;
+  margin: 0 auto 2.4em auto !important;
+  border: none !important;
+  border-radius: 1px;
+  page-break-after: avoid;
+  break-after: avoid;
+}
+/* 默认宽度（无预设覆盖时）— 无 !important 以便预设覆盖 */
+.mb-ch-sep {
+  width: 68%;
+}
+
+/* 词内换行：防止长 URL/代码溢出窄屏 */
+p, li, blockquote p, td, figcaption {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 图片：限制超高长图占满多屏 */
+img {
+  max-height: 90vh;
+  object-fit: contain;
+}
+
+/* figure / 图注（特殊元素：图片与插图） */
+figure, div.duokan-image-single, div.img0, div.imgw, div.imgc, div.imgf {
+  margin: 1.5em auto !important;
+  text-align: center !important;
+  text-indent: 0 !important;
+  duokan-text-indent: 0;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+figcaption, p.duokan-image-maintitle, div.duokan-image-maintitle {
+  font-size: 0.82em !important;
+  line-height: 1.5;
+  color: {{MUTED}} !important;
+  text-align: center !important;
+  text-indent: 0 !important;
+  margin: 0.6em auto 0 auto !important;
+  {{FONT_KAI}}
+}
+
+/* 对话行（mb-dialog）：以「『“起始的段落，预设色板驱动，开关控制打标 */
+p.mb-dialog {
+  {{FONT_KAI}}
+  color: {{MUTED}} !important;
+  background: {{QUOTE_BG}} !important;
+  border-left: 3px solid {{ACCENT}} !important;
+  border-radius: 4px;
+  padding: 0.55em 0.9em !important;
+  margin: 0.7em 0 !important;
+  text-indent: 0 !important;
+  duokan-text-indent: 0;
+}
+
+/* ── 弹注/标注（mb-notemark / mb-notes）──
+   标注符与注释容器打标（mark_notes_in_html），预设色板驱动；
+   B 型裸列表已由归一化包入 aside.epub:type=footnote */
+a.mb-notemark {
+  text-decoration: none !important;
+  font-weight: 700;
+}
+/* 原图标模式：书内 note.png 缩放上标对齐（位图无法染色，仅调形态） */
+a.mb-notemark img {
+  width: auto !important;
+  height: 0.72em !important;
+  vertical-align: super;
+  opacity: 0.85;
+}
+/* 文本标记（sym ※ / num [n]）：主题色上标 */
+a.mb-notemark .mb-marktxt {
+  color: {{ACCENT}} !important;
+  font-size: 0.74em;
+  line-height: 1;
+  vertical-align: super;
+}
+/* SVG 图形模板：fill=currentColor 继承主题色 */
+a.mb-notemark[data-mb-mark^="svg"] {
+  color: {{ACCENT}} !important;
+}
+.mb-marksvg {
+  width: 0.72em;
+  height: 0.72em;
+  fill: currentColor;
+  vertical-align: super;
+}
+
+/* 「注」字圆章（note_mark=zhu）：中文 EPUB 标注符惯例的向量化——
+   圆形描边 + 居中单字，currentColor 跟随预设主题色；
+   位图版两例（到灯塔去 描边橙圈 / 地疤 实心褐圆）的统一形态 */
+a.mb-notemark .mb-markzhu {
+  display: inline-block;
+  box-sizing: border-box;
+  width: 1.5em;
+  height: 1.5em;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  color: {{ACCENT}} !important;
+  font-size: 0.62em;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: center;
+  text-decoration: none;
+  vertical-align: 0.32em;
+}
+
+/* 注释容器卡片（章末可见形态；弹出形态由阅读器接管内容元素样式） */
+.mb-notes {
+  margin: 2em 4% 0.8em !important;
+  padding: 0.9em 1.1em !important;
+  background: {{QUOTE_BG}};
+  border-left: 3px solid {{ACCENT}};
+  border-radius: 3px;
+}
+.mb-notes > div {
+  margin: 0 !important;
+}
+.mb-notes hr, .mb-notes hr.xian {
+  border: none !important;
+  border-top: 1px solid {{BORDER}} !important;
+  width: 100% !important;
+  margin: 0 0 0.7em 0 !important;
+}
+.mb-notes ol.duokan-footnote-content {
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none;
+}
+.mb-notes li.duokan-footnote-item, .mb-notes li {
+  {{FONT_KAI}}
+  font-size: 0.88em;
+  line-height: 1.65;
+  color: #454340;
+  text-indent: 0 !important;
+  duokan-text-indent: 0;
+  margin: 0 0 0.5em 0 !important;
+  padding: 0 !important;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+.mb-notes li:last-child {
+  margin-bottom: 0 !important;
+}
+.mb-notes li a {
+  color: {{MUTED}} !important;
+}
+
+/* 代码块（特殊元素：代码）— CODE_BG + BORDER */
+pre {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  {{FONT_CODE}}
+  font-size: 0.88em !important;
+  line-height: 1.55 !important;
+  background: {{CODE_BG}} !important;
+  border: 1px solid {{BORDER}} !important;
+  padding: 0.85em 1em !important;
+  margin: 1.2em auto !important;
+  border-radius: 4px;
+  text-align: left !important;
+  text-indent: 0 !important;
+  duokan-text-indent: 0;
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+code, kbd, samp {
+  {{FONT_CODE}}
+  font-size: 0.88em;
+  background: {{ACCENT_LIGHT}};
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  word-break: break-all;
+}
+pre code, pre kbd, pre samp {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: 1em;
+  word-break: normal;
+}
+
+/* 表格：横向滚动（特殊元素：表格超宽） */
+table {
+  display: table;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (max-width: 600px) {
+  table {
+    display: block;
+  }
+}
+
+/* 引文内表格/列表微调 */
+blockquote table, blockquote pre {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 防止引文/图片/表格跨页截断 */
+blockquote, pre, table, figure, img {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* ── 手机窄屏适配（≤600px）──
+   选择器一律 body 前缀提特异性（0-0-2 / 0-1-1，A4）：本文件前置注入，
+   裸 p / .mb-ch 同特异性会按源序输给后方预设规则而全部失效；
+   用户段排覆写（body p，末尾）与 vertclassical 竖排块（body 前缀，后方）
+   以同特异性+源序再压过此处，保持各自优先级。 */
+@media (max-width: 600px) {
+  @page {
+    margin: 3% 4% !important;
+  }
+  body {
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  body p {
+    margin: 0.6em 0 !important;
+    line-height: 1.65 !important;
+  }
+  /* 修复 modern 外扩 -1em 在窄屏溢出 */
+  body blockquote {
+    margin: 1em 0.6em !important;
+    padding: 0.5em 0.8em !important;
+  }
+  body .mb-ch {
+    margin: 2.2em 0 0.6em 0 !important;
+    font-size: 1.25em !important;
+  }
+  body .mb-ch-sep {
+    width: 84% !important;
+    margin: 0 auto 1.8em auto !important;
+  }
+  h1, h2, h3 {
+    font-size: 1.15em !important;
+  }
+  pre {
+    font-size: 0.82em !important;
+    padding: 0.7em 0.8em !important;
+  }
+  /* 目录通用移动优化 */
+  body.mb-toc-page .mb-toc {
+    margin: 1.5em 0.8em !important;
+  }
+  body.mb-toc-page li {
+    line-height: 1.7 !important;
+  }
+  body.mb-toc-page .mb-toc-sub {
+    font-size: 0.32em !important;
+    letter-spacing: 0.3em !important;
+  }
+}
+
+/* ── 平板/PC 宽屏（≥900px）── */
+@media (min-width: 900px) {
+  body {
+    font-size: 1.05em;
+  }
+  p {
+    line-height: 1.75 !important;
+  }
+  @page {
+    margin: 4% 8% !important;
+  }
+}
+
+/* ── 深色模式（prefers-color-scheme: dark）──
+   现代阅读器（Apple Books 4+, KOReader, 微信读书夜间）支持，旧设备忽略 */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #121212 !important;
+    color: #e0e0e0 !important;
+  }
+  a {
+    color: #a8c0ff !important;
+  }
+  blockquote {
+    background: #1e1e1e !important;
+    border-color: #555 !important;
+    color: #d0d0d0 !important;
+  }
+  blockquote p {
+    color: #d0d0d0 !important;
+  }
+  /* 对话行夜间适配：底色转深灰，竖线用预设夜间色 */
+  p.mb-dialog {
+    background: #1e1e1e !important;
+    border-left-color: {{ACCENT_DARK}} !important;
+    color: #c8c8c8 !important;
+  }
+  /* 弹注夜间适配：容器深底、条目浅字，标记/竖线用预设夜间色 */
+  a.mb-notemark .mb-marktxt {
+    color: {{ACCENT_DARK}} !important;
+  }
+  a.mb-notemark[data-mb-mark^="svg"] {
+    color: {{ACCENT_DARK}} !important;
+  }
+  a.mb-notemark img {
+    opacity: 0.7;
+  }
+  .mb-notes {
+    background: #201d18 !important;
+    border-left-color: {{ACCENT_DARK}} !important;
+  }
+  .mb-notes li.duokan-footnote-item, .mb-notes li {
+    color: #b9b4aa !important;
+  }
+  .mb-notes hr, .mb-notes hr.xian {
+    border-top-color: #3a362e !important;
+  }
+  pre {
+    background: #1e1e1e !important;
+    border-color: #333 !important;
+    color: #e0e0e0 !important;
+  }
+  code, kbd, samp {
+    background: #2a2a2a !important;
+    color: #e0c88a !important;
+  }
+  hr {
+    border-color: #444 !important;
+  }
+  table, td, th {
+    border-color: #444 !important;
+  }
+  figcaption {
+    color: #aaa !important;
+  }
+  /* 章节卡夜间深底（A1）：classic/classical/children/navy/refined/vertclassical
+     的 .mb-ch 自带 background:{{ACCENT_LIGHT}} !important，而本文件前置注入、
+     同特异性按源序必输——html body 前缀（0-1-2）压过预设裸 .mb-ch（0-1-0）
+     与 vertclassical 竖排块的 body .mb-ch（0-1-1），否则夜间浅底浅字
+     （ACCENT_DARK on ACCENT_LIGHT ≈ 1.5:1）不可读 */
+  html body .mb-ch {
+    color: {{ACCENT_DARK}} !important;
+    background: #1e1e1e !important;
+  }
+  .mb-vol {
+    color: {{ACCENT_DARK}} !important;
+  }
+  .mb-ch .mb-ch-num {
+    color: #8a8a8a !important;
+  }
+  /* 长线同理：预设 .mb-ch-sep 的 background 带 !important，需提特异性才能转灰 */
+  body .mb-ch-sep {
+    background: #444 !important;
+  }
+  /* 目录深色适配 */
+  body.mb-toc-page {
+    background-color: #121212 !important;
+  }
+  body.mb-toc-page .mb-toc-num {
+    color: {{ACCENT_DARK}} !important;
+  }
+  body.mb-toc-page li,
+  body.mb-toc-page td {
+    color: #ccc !important;
+    border-color: #333 !important;
+  }
+  body.mb-toc-page ol,
+  body.mb-toc-page ul {
+    background-color: #1e1e1e !important;
+    border-color: #333 !important;
+  }
+  body.mb-toc-page table.mulu td.mb-toc-mark {
+    color: #8a7a5a !important;
+  }
+  body.mb-toc-page .mb-toc-sub,
+  body.mb-toc-page .mb-toc-truncated {
+    color: #999 !important;
+  }
+  /* 目录卡片夜间深底（A3）：elegant/cool/seal 的 body.mb-toc-page .mb-toc
+     自带 background:{{ACCENT_LIGHT}} !important 且 TOC_STYLE 注入在本文件
+     之后，同特异性按源序必输——html 前缀（0-2-2）压过（0-2-1），
+     否则白卡嵌深块（三明治）；border-color 同步转暗 */
+  html body.mb-toc-page .mb-toc {
+    background: #121212 !important;
+    border-color: #333 !important;
+  }
+  /* 目录页标题（toc_* 的 h1/h2 与平铺页兜底 .mb-toc-title 用 ACCENT 深色字）
+     夜间转亮，深棕字沉入 #121212 不可读；顶部装饰线同步转暗 */
+  body.mb-toc-page h1,
+  body.mb-toc-page h2,
+  body.mb-toc-page .mb-toc-title {
+    color: {{ACCENT_DARK}} !important;
+    border-color: #444 !important;
+  }
+  /* 二级条目链接（seal 的 MUTED 字）夜间转灰亮 */
+  html body.mb-toc-page td.mb-toc-l2 a,
+  html body.mb-toc-page .mb-toc-l2 a {
+    color: #999 !important;
+  }
+}
+
+/* ── 打印优化 ── */
+@media print {
+  body {
+    max-width: none !important;
+  }
+  .mb-ch {
+    page-break-before: always;
+    break-before: page;
+  }
+}
