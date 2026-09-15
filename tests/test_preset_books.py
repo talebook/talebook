@@ -88,21 +88,22 @@ def test_preset_collection_contains_exactly_ten_books_in_expected_formats(source
     actual_files = {path.name for path in BOOK_DIR.iterdir() if path.name != SOURCE_MANIFEST.name}
     format_counts = Counter(path.suffix.lower() for path in BOOK_DIR.iterdir() if path.name != SOURCE_MANIFEST.name)
 
-    assert source_manifest["schema_version"] == 2
+    assert source_manifest["schema_version"] == 3
     assert len(books) == 10
     assert len(expected_files) == 10
     assert actual_files == expected_files
-    assert format_counts == {".epub": 6, ".mobi": 1, ".azw3": 1, ".txt": 1, ".pdf": 1}
+    assert format_counts == {".epub": 8, ".mobi": 1, ".azw3": 1}
     assert sum(book["language"] == "zh-CN" for book in books) == 5
     assert sum(book["language"] == "en-GB" for book in books) == 5
     assert all(Path(book["filename"]).suffix.lower() == f".{book['format'].lower()}" for book in books)
 
 
 def test_source_manifest_is_auditable(source_manifest):
-    assert source_manifest["generated_on"] == "2026-07-23"
+    assert source_manifest["generated_on"] == "2026-09-04"
     assert source_manifest["chinese_conversion"]["configuration"] == "t2s"
     assert source_manifest["format_conversion"]["version"] == "8.5.0"
-    assert "TXT and PDF" in source_manifest["format_conversion"]["metadata_limit"]
+    assert source_manifest["format_conversion"]["artifact_formats"] == ["EPUB", "MOBI", "AZW3"]
+    assert "preserve author, language, cover" in source_manifest["format_conversion"]["metadata_policy"]
 
     for book in source_manifest["books"]:
         assert book["source"] in {"Project Gutenberg", "Standard Ebooks"}
@@ -113,7 +114,7 @@ def test_source_manifest_is_auditable(source_manifest):
         assert re.fullmatch(r"[0-9a-f]{64}", book["sha256"])
         assert "public domain" in book["rights"].lower()
         assert isinstance(book["transformations"], list)
-        assert book["format"] in {"EPUB", "MOBI", "AZW3", "TXT", "PDF"}
+        assert book["format"] in {"EPUB", "MOBI", "AZW3"}
 
 
 def test_preset_artifact_hashes_match_source_manifest(source_manifest):
@@ -130,6 +131,8 @@ def test_preset_artifact_hashes_match_source_manifest(source_manifest):
         "san-guo-zhi-yan-yi.epub",
         "shui-hu-zhuan.epub",
         "dao-de-jing.epub",
+        "alices-adventures-in-wonderland.epub",
+        "frankenstein.epub",
         "the-adventures-of-sherlock-holmes.epub",
     ],
 )
@@ -202,8 +205,50 @@ def test_chinese_editions_are_simplified_and_keep_gutenberg_notice(filename, tra
 
 
 @pytest.mark.parametrize(
+    ("filename", "series_index"),
+    [
+        ("san-guo-zhi-yan-yi.epub", 1),
+        ("shui-hu-zhuan.epub", 2),
+        ("xi-you-ji.epub", 3),
+        ("hong-lou-meng.epub", 4),
+    ],
+)
+def test_four_classics_have_epub3_and_calibre_series_metadata(source_manifest, filename, series_index):
+    record = next(book for book in source_manifest["books"] if book["filename"] == filename)
+    with zipfile.ZipFile(BOOK_DIR / filename) as archive:
+        _, package = load_package(archive)
+
+    metadata = package.find("opf:metadata", OPF_NS)
+    assert metadata is not None
+    meta_elements = metadata.findall("opf:meta", OPF_NS)
+
+    collection = next(
+        element for element in meta_elements if element.attrib.get("property") == "belongs-to-collection"
+    )
+    collection_id = collection.attrib["id"]
+    refined = {
+        element.attrib.get("property"): element.text
+        for element in meta_elements
+        if element.attrib.get("refines") == f"#{collection_id}"
+    }
+    calibre = {
+        element.attrib.get("name"): element.attrib.get("content")
+        for element in meta_elements
+        if element.attrib.get("name", "").startswith("calibre:")
+    }
+
+    assert collection.text == "中国四大名著"
+    assert refined == {"collection-type": "series", "group-position": str(series_index)}
+    assert calibre == {"calibre:series": "中国四大名著", "calibre:series_index": str(series_index)}
+    assert record["series"] == "中国四大名著"
+    assert record["series_index"] == series_index
+
+
+@pytest.mark.parametrize(
     "filename",
     [
+        "alices-adventures-in-wonderland.epub",
+        "frankenstein.epub",
         "the-adventures-of-sherlock-holmes.epub",
     ],
 )
@@ -212,6 +257,29 @@ def test_standard_ebooks_editions_keep_cc0_notice(filename):
         text = combined_text_resources(archive)
 
     assert "creativecommons.org/publicdomain/zero/1.0" in text
+
+
+@pytest.mark.parametrize(
+    ("filename", "minimum_subject_count"),
+    [
+        ("alices-adventures-in-wonderland.epub", 1),
+        ("frankenstein.epub", 5),
+    ],
+)
+def test_replacement_epubs_preserve_rich_source_metadata(source_manifest, filename, minimum_subject_count):
+    record = next(book for book in source_manifest["books"] if book["filename"] == filename)
+    with zipfile.ZipFile(BOOK_DIR / filename) as archive:
+        _, package = load_package(archive)
+
+    assert package.findtext("opf:metadata/dc:publisher", namespaces=OPF_NS) == "Standard Ebooks"
+    assert len(package.findall("opf:metadata/dc:subject", OPF_NS)) >= minimum_subject_count
+    assert package.find("opf:metadata/dc:description", OPF_NS) is not None
+    assert record["source_sha256"] == record["sha256"]
+    assert record["transformations"] == []
+    assert record["calibre_import"]["author"] == record["author"]
+    assert record["calibre_import"]["language"] == "eng"
+    assert record["calibre_import"]["publisher"] == "Standard Ebooks"
+    assert record["calibre_import"]["minimum_tag_count"] == minimum_subject_count
 
 
 @pytest.mark.parametrize(
@@ -228,28 +296,3 @@ def test_kindle_formats_have_palm_database_signature_and_metadata(filename, titl
     assert title in data
     assert author in data
     assert len(data) > minimum_size
-
-
-def test_frankenstein_txt_is_complete_utf8_with_visible_metadata_and_rights():
-    data = (BOOK_DIR / "frankenstein.txt").read_bytes()
-    text = data.decode("utf-8")
-
-    assert data.startswith(b"Frankenstein\n")
-    assert "\r\n" not in text
-    assert "Mary Shelley" in text[:500]
-    assert re.search(r"Chapter\s+I\b", text)
-    assert re.search(r"Chapter\s+XXIV\b", text)
-    assert "CC0 1.0 Universal Public Domain Dedication" in text
-    assert len(text.splitlines()) == 2087
-    assert len(data) > 400_000
-
-
-def test_alice_pdf_has_valid_signature_complete_file_and_illustrations(source_manifest):
-    data = (BOOK_DIR / "alices-adventures-in-wonderland.pdf").read_bytes()
-    record = next(book for book in source_manifest["books"] if book["format"] == "PDF")
-
-    assert data.startswith(b"%PDF-1.7")
-    assert data.rstrip().endswith(b"%%EOF")
-    assert data.count(b"/Subtype /Image") >= 80
-    assert len(data) > 10_000_000
-    assert record["page_count"] == 102

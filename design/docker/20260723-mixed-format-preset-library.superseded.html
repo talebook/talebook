@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>混合格式公版预置书库修正方案</title>
+  <title>混合格式公版预置书库修正方案 · SUPERSEDED</title>
   <style>
     :root {
       color-scheme: light;
@@ -59,7 +59,7 @@
     }
     .meta div { min-height: 88px; padding: 12px 14px; background: #fff; }
     .meta strong { display: block; margin-bottom: 6px; color: var(--muted); font: 700 .68rem/1.3 ui-monospace, "SFMono-Regular", Consolas, monospace; letter-spacing: .08em; text-transform: uppercase; }
-    .status { display: inline-block; padding: 2px 9px; border: 1px solid var(--green); color: var(--green); font: 800 .8rem/1.5 ui-monospace, "SFMono-Regular", Consolas, monospace; }
+    .status { display: inline-block; padding: 2px 9px; border: 1px solid var(--amber); color: var(--amber); font: 800 .8rem/1.5 ui-monospace, "SFMono-Regular", Consolas, monospace; }
     nav { display: flex; gap: 8px; margin: 17px 0; overflow-x: auto; }
     nav a { flex: none; padding: 7px 11px; border: 1px solid var(--line); background: #fff; color: var(--navy); font: 700 .78rem/1.2 ui-monospace, "SFMono-Regular", Consolas, monospace; text-decoration: none; }
     nav a:hover, nav a:focus-visible { border-color: var(--blue); outline: 3px solid rgba(49, 94, 138, .16); }
@@ -119,13 +119,13 @@
     <header>
       <p class="kicker">Preset library · format coverage correction</p>
       <h1>十本书，也是一套格式测试台</h1>
-      <p class="lede">保留 10 本完整中英文公版书，同时恢复内置馆藏对 EPUB、MOBI、AZW3、TXT、PDF 的覆盖，让新安装演示数据继续承担真实格式回归职责。</p>
+      <p class="lede">本历史方案曾以 EPUB、MOBI、AZW3、TXT、PDF 覆盖格式回归；2026-09-04 起由富元数据格式方案替代，不再作为当前预置书库契约。</p>
       <div class="meta">
         <div><strong>创建日期</strong>2026-07-23</div>
         <div><strong>所属模块</strong>docker</div>
-        <div><strong>状态</strong><span class="status">ACTIVE</span></div>
+        <div><strong>状态</strong><span class="status">SUPERSEDED</span></div>
         <div><strong>需求来源</strong>PR #900 用户反馈</div>
-        <div><strong>替代方案</strong><code>20260723-public-domain-preset-library.superseded.html</code></div>
+        <div><strong>替代方案</strong><code>20260904-preset-library-rich-metadata.active.html</code></div>
       </div>
     </header>
 
@@ -140,6 +140,10 @@
 
     <section id="request">
       <div class="section-head"><div class="label">Problem correction</div><h2>原始诉求与修正目标</h2></div>
+      <div class="correction">
+        <strong>替代说明</strong>
+        <p>2026-09-04：TXT 与 PDF 导入后无法保留完整作者和语言元数据，本方案由 <code>20260904-preset-library-rich-metadata.active.html</code> 替代。新方案保持 10 本，但仅使用 EPUB、MOBI、AZW3，并为四大名著增加丛书元数据。</p>
+      </div>
       <div class="correction">
         <strong>用户原话</strong>
         <p>“格式不能统一用 epub，因为要测试对于所有格式的支持情况，你看原本的书库也是使用了不同的格式。”</p>
@@ -279,7 +283,7 @@
       <p>第一次全量运行出现既有异步用例 <code>TestScan.test_scan_background</code> 的线程时序波动：666 passed、1 failed、1 skipped；该用例单独复跑为 1 passed，随后第二次完整运行全部通过。未修改或规避该用例。</p>
     </section>
 
-    <footer>Talebook · Docker 混合格式预置馆藏修正方案 · 离线单文件</footer>
+    <footer>Talebook · Docker 混合格式预置馆藏修正方案 · SUPERSEDED · 离线单文件</footer>
   </main>
 </body>
 </html>
