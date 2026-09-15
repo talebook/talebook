@@ -144,7 +144,7 @@
     "uploadNewFormat": "Upload New Format",
     "uploadNewFormatDesc": "Select a file to upload as a new format for this book",
     "selectFile": "Select File",
-    "supportedFormatsUpload": "Supported formats: EPUB, MOBI, AZW, AZW3, PDF, TXT, CBZ, ZIP, CBR, RAR",
+    "supportedFormatsUpload": "Supported formats: EPUB, MOBI, AZW, AZW3, PDF, TXT, DJVU, UVZ, CBZ, ZIP, CBR, RAR",
     "upload": "Upload",
     "selectFileToUpload": "Please select a file to upload",
     "uploadSuccess": "Upload successful!",
@@ -793,7 +793,7 @@
         "description": "Brief description of this OPDS source"
       },
       "message": {
-        "importDirInfo": "Please put books in {0} directory. Supported formats: azw/azw3/epub/mobi/pdf/txt.",
+        "importDirInfo": "Please put books in {0} directory. Supported formats: azw/azw3/epub/mobi/pdf/txt/djvu/uvz/cbz/zip/cbr/rar.",
         "importAsyncInfo": "This is a background task. You can close browser and check status later.",
         "calibreInfo": "You can also use Calibre software (https://calibre-ebook.com/), but restart web service after use.",
         "selectFilesInfo": "Please select files to process. Existing books won't be imported again.",

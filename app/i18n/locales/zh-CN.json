@@ -148,7 +148,7 @@
     "uploadNewFormat": "上传新格式",
     "uploadNewFormatDesc": "选择文件上传为本书的新格式",
     "selectFile": "选择文件",
-    "supportedFormatsUpload": "支持的格式：EPUB、MOBI、AZW、AZW3、PDF、TXT、CBZ、ZIP、CBR、RAR",
+    "supportedFormatsUpload": "支持的格式：EPUB、MOBI、AZW、AZW3、PDF、TXT、DJVU、UVZ、CBZ、ZIP、CBR、RAR",
     "upload": "上传",
     "selectFileToUpload": "请选择要上传的文件",
     "uploadSuccess": "上传成功！",
@@ -813,7 +813,7 @@
         "description": "简短描述此 OPDS 源"
       },
       "message": {
-        "importDirInfo": "请将需要导入的书籍放入{0}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt 。",
+        "importDirInfo": "请将需要导入的书籍放入{0}目录中。 支持的格式为 azw/azw3/epub/mobi/pdf/txt/djvu/uvz/cbz/zip/cbr/rar 。",
         "importAsyncInfo": "请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。",
         "calibreInfo": "另外，还可以使用 PC 版 Calibre 软件 (https://calibre-ebook.com/) 管理书籍，但是请注意：使用完 PC 版后，需重启 Web 版方可生效。",
         "selectFilesInfo": "请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）",
