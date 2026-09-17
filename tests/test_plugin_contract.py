@@ -272,6 +272,7 @@ def test_concrete_plugins_live_outside_the_platform_runtime():
         "talebook.tool.text-replace": "webserver.plugins.tool.text_replace.provider",
         "talebook.tool.zh-converter": "webserver.plugins.tool.zh_converter.provider",
         "talebook.tool.txt-fixer": "webserver.plugins.tool.txt_fixer.provider",
+        "talebook.tool.epub-beautify": "webserver.plugins.tool.epub_beautify.provider",
         "talebook.push.duokan": "webserver.plugins.push.duokan",
         "talebook.push.boox": "webserver.plugins.push.boox",
         "talebook.push.hanwang": "webserver.plugins.push.hanwang",

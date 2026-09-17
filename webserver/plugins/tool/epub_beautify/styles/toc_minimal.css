@@ -1,0 +1,149 @@
+/* ── 目录页极简版（minimal）──
+   零卡片、零边框、零底色：白底纯文字目录。
+   标题居中小号大字距；编号淡色小字悬挂；条目间仅靠行距呼吸；
+   收尾符（◆）以 font-size:0 隐藏、元素本身化为 8% 细横线收束。
+   装饰全部为真实元素与常规属性，兼容手机阅读器。 */
+body.mb-toc-page {
+    margin: 0 !important;
+    {{FONT_BODY}}
+}
+/* 无卡片：透明容器，仅保留呼吸边距 */
+body.mb-toc-page .mb-toc {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0;
+    padding: 1.5em 2em 1.2em 2em !important;
+    margin: 2em 0.6em !important;
+}
+body.mb-toc-page div.mulu,
+body.mb-toc-page table.mulu {
+    margin: 2em 1.2em;
+}
+/* 标题：小号居中 + 宽字距，无装饰线
+   （.mb-toc-title = 书内平铺目录页的 p/div 标题兜底类） */
+body.mb-toc-page h1,
+body.mb-toc-page h2,
+body.mb-toc-page .mb-toc-title {
+    {{FONT_HEAD}}
+    text-align: center !important;
+    font-weight: 600;
+    font-size: 1.15em !important;
+    line-height: 1.5;
+    letter-spacing: 0.42em;
+    text-indent: 0.42em; /* 平衡末字距造成的视觉偏移 */
+    duokan-text-indent: 0.42em;
+    color: {{ACCENT}};
+    padding-top: 1.6em;
+    margin: 0.8em auto 3em auto !important;
+    orphans: 2;
+    widows: 2;
+}
+/* 英文副题：极淡极小 */
+body.mb-toc-page .mb-toc-sub {
+    display: block;
+    font-size: 0.4em;
+    font-weight: normal;
+    letter-spacing: 0.5em;
+    color: {{MUTED}};
+    margin-top: 1em;
+}
+/* 条目：无背景无边框，行距即分隔 */
+body.mb-toc-page ol,
+body.mb-toc-page ul {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent;
+    border: none;
+}
+body.mb-toc-page li {
+    margin: 0 !important;
+    line-height: 2 !important;
+    color: #333;
+    padding: 0;
+    border-bottom: none;
+    orphans: 2;
+    widows: 2;
+}
+body.mb-toc-page li a,
+body.mb-toc-page p a,
+body.mb-toc-page div a {
+    text-decoration: none !important;
+    color: inherit;
+}
+/* 编号：淡色小字悬挂对齐 */
+body.mb-toc-page .mb-toc-num {
+    display: inline-block;
+    min-width: 2.2em;
+    margin-right: 0.5em;
+    font-size: 0.75em;
+    font-weight: normal;
+    color: {{MUTED}};
+}
+/* 二级条目：缩进 + 淡色 */
+body.mb-toc-page li li {
+    margin-left: 2.2em !important;
+    font-size: 0.9em;
+    color: {{MUTED}};
+}
+/* 平铺式目录（p/div 条目）兜底；标题块走 .mb-toc-title 的标题样式不在此列 */
+body.mb-toc-page p,
+body.mb-toc-page div {
+    text-indent: 0 !important;
+}
+body.mb-toc-page p:not(.mb-toc-title) {
+    margin: 0.7em 0 !important;
+    line-height: 2 !important;
+}
+/* 表格式目录（兼容）：无边框 */
+body.mb-toc-page table.mulu {
+    width: 92%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+}
+body.mb-toc-page table.mulu td {
+    padding: 0.45em 0.2em;
+    border: none;
+    text-align: left;
+    vertical-align: middle;
+}
+body.mb-toc-page table.mulu a {
+    text-decoration: none !important;
+    color: inherit;
+}
+/* 收尾：隐藏 ◆ 字形，元素化为 8% 细横线收束 */
+body.mb-toc-page .mb-toc-end {
+    width: 8%;
+    height: 1px;
+    background: {{BORDER}};
+    font-size: 0;
+    overflow: hidden;
+    letter-spacing: 0;
+    margin: 2.8em auto 0 auto !important;
+}
+/* 截断提示 — MUTED */
+body.mb-toc-page .mb-toc-truncated {
+    text-align: center;
+    color: {{MUTED}};
+    margin-top: 1.5em !important;
+}
+
+/* ── 移动端 ── */
+@media (max-width: 600px) {
+  body.mb-toc-page .mb-toc {
+    padding: 1em 1.1em 1em 1.1em !important;
+    margin: 1.2em 0.4em !important;
+  }
+  body.mb-toc-page h1,
+  body.mb-toc-page h2,
+  body.mb-toc-page .mb-toc-title {
+    font-size: 1.05em !important;
+    letter-spacing: 0.3em;
+    text-indent: 0.3em;
+    padding-top: 1em;
+    margin-bottom: 2.2em !important;
+  }
+  body.mb-toc-page li {
+    line-height: 1.85 !important;
+  }
+}
