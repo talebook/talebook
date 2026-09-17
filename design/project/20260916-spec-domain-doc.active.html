@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>用 spec/ 建立唯一领域规格文档 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">文档职责矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">文档职责矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
+      <header class="hero">
+        <h1>用 spec/ 建立唯一领域规格文档</h1>
+        <p class="sub">把散落在 146 份方案、根级 CONTEXT.md 和代码里的产品定义，收敛成仓库根下唯一一份、无时态、总是最新的领域规格；并用流程条款与机器门禁保证它不退化成第四份过期文档。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-09-16</span>
+          <span class="chip">所属模块：project</span>
+          <span class="chip">影响范围：spec/、CONTEXT.md、design/wiki/、AGENTS.md、scripts/、Makefile、tests/</span>
+          <span class="chip">需求来源：用户要求「重新定义 wiki 内容，作为产品设计主逻辑文档」并要求先 grill</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“我想重新定义 wiki 里面的内容，作为 talebook 项目的产品设计主逻辑文档。需要你帮助我进行设计，包括目录层次（比如每个文件应该是个概念实体，比如「书库」、「书籍」、「作者」、「标题」），文件内部描述该实体的所有产品功能（比如包含定义、use-case、术语、功能、界面用词、行为逻辑等）。你先 grill-me 讨论清楚。”</div>
+            <p>触发背景：上一轮已从 design/ 的 146 份方案与代码中蒸馏出 design/wiki/ 共 16 篇知识库，但那份是<strong>贴着代码描述现状</strong>的实录文档，带 Status 时态标注，且明确声明「代码 &gt; ACTIVE 方案 &gt; 知识库」。它无法承担产品设计主逻辑的职责。</p>
+            <p>grill 过程中用户追加确认的关键定性：<strong>“他是领域规格文档，并且是唯一一份，总是最新，不存在未实现或者已废弃的情况。”</strong></p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul>
+                <li>仓库根下建立 spec/，按领域名词划分实体，每篇统一 7 节骨架。</li>
+                <li>删除根级 CONTEXT.md 与 design/wiki/，领域定义只有一个归属地。</li>
+                <li>正文使用产品语言，实现细节集中在每篇末节「实现对照」。</li>
+                <li>无时态：不写未实现、不写已废弃、不写变更历史。</li>
+                <li>新增 make check-spec 门禁与 AGENTS.md 流程条款，保证「总是最新」可执行。</li>
+                <li>不变量：design/ 的方案生命周期门禁与既有写作规范保持不变。</li>
+              </ul></article>
+              <article class="choice"><h3>非目标</h3><ul>
+                <li>不改动任何运行时代码、数据库、接口或页面行为。</li>
+                <li>不迁移 document/ 面向使用者的文档，不处理 docs/ 与 document/ 的历史重复。</li>
+                <li>不为 design/ 下既有 146 份方案补写或重排。</li>
+                <li>不把 spec/ 内容对外发布或翻译成英文。</li>
+                <li>不修正本次发现的三处文档与代码漂移，只记录（见第 4 节）。</li>
+              </ul></article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 文档职责矩阵</h2>
+            <p>本方案不改变用户可感知功能，因此这里替换为仓库内五类文字资产的职责切分。边界能否一句话说清，是本次命名与选址的验收口径。</p>
+            <div class="table-wrap" role="region" aria-label="文档职责矩阵" tabindex="0">
+              <table>
+                <thead><tr><th>资产</th><th>回答的问题</th><th>时态</th><th>权威性</th><th>本次处置</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">spec/</th><td>产品<strong>是什么</strong></td><td>无时态</td><td>唯一领域规格，代码向它对齐</td><td>新建 23 篇</td></tr>
+                  <tr><th scope="row">design/</th><td>某次改动<strong>怎么做</strong></td><td>有时态，WIP/ACTIVE/SUPERSEDED</td><td>该次变更的论证与验证记录</td><td>职责收窄，门禁不变</td></tr>
+                  <tr><th scope="row">document/</th><td>使用者<strong>怎么用</strong></td><td>跟随版本</td><td>对外说明</td><td>不动</td></tr>
+                  <tr><th scope="row">research/</th><td>外部系统<strong>怎么做的</strong></td><td>快照</td><td>调研素材</td><td>不动</td></tr>
+                  <tr><th scope="row">CONTEXT.md</th><td>插件与笔记术语</td><td>无时态</td><td>与 spec/ 直接冲突</td><td><strong>删除</strong>，内容并入 spec/</td></tr>
+                  <tr><th scope="row">design/wiki/</th><td>代码现状实录</td><td>带 Status 标注</td><td>低于代码与方案</td><td><strong>删除</strong>，内容重组进 spec/</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <p>目录与命名的每一处取舍都以代码或界面文案为证据，不凭语感。</p>
+            <div class="table-wrap" role="region" aria-label="证据表" tabindex="0">
+              <table>
+                <thead><tr><th>决策</th><th>证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>目录不叫 context/ 而叫 spec/</td><td>用户定性为「领域规格、唯一一份、代码向它对齐」；context 字面为背景材料</td><td>名实相符，且与 design/ 的边界能一句话说清</td></tr>
+                  <tr><td>OPDS 归入外部访问而非独立协议篇</td><td>webserver/plugins/source/opds.py 的 manifest 含 <code>"service_toggle": "opds"</code>，status() 返回 <code>service_enabled</code>；/api/admin/plugins/opds-service 写 OPDS_ENABLED；handlers/opds.py 据此决定对外服务开关</td><td>对外 OPDS 服务的开关长在插件卡片上，必须写明这处耦合</td></tr>
+                  <tr><td>WebDAV 服务端不归插件管</td><td>全仓仅 opds.py 一处出现 service_toggle；talebook.source.webdav 只声明 sources.browse / sources.acquire。WebDAV 服务端<strong>另有自己的开关</strong> ENABLE_WEBDAV_SERVICE，在 webserver/webdav/handler.py:55 于请求时检查，属管理员设置项而非插件状态；另有 WEBDAV_SYNC_FOLDER 控制每用户可写同步目录</td><td>两个协议的开关位置不同：OPDS 在插件卡片，WebDAV 在系统设置。WebDAV 服务端不能放进插件目录，否则误导读者以为停用插件会关闭挂载</td></tr>
+                  <tr><td>外部访问包含 Moke</td><td>app/pages/library/apps.vue 与 i18n 的 <code>appAccess.mokeDescription</code>：「Talebook 官方跨平台阅读客户端，可直接连接您的 Talebook 实例」</td><td>该篇覆盖三种客户端，后端零代码</td></tr>
+                  <tr><td>插件按「有无专属界面」拆篇</td><td>全仓仅 6 个 manage_route 指向独立页面；Kindle 指向共享的 /me/devices；其余 30 个无独立界面</td><td>判据可执行，新插件默认进合集篇</td></tr>
+                  <tr><td>正文用「丛书」「文件格式」</td><td>i18n <code>navigation.series</code> = 丛书，<code>navigation.formats</code> = 文件格式</td><td>界面用词写入术语节，不用「系列」「格式」</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>grill 过程中另外发现三处文档与代码漂移，本次<strong>只记录不修复</strong>，且按「不写未实现」规则不进入 spec/：</p>
+            <ul>
+              <li><strong>书单</strong>：design/webserver/20260716-booklist-collection.active.html 状态为 ACTIVE 且自注「待实现」，但代码无 BookList 模型、无 /api/lists、无前端页面。该方案违反 ACTIVE 门禁，应由独立后续工作改状态。</li>
+              <li><strong>talebook.meta.ai</strong>：webserver/plugins/meta/ai/api.py:221 定义了 manifest，但 register.py 未注册，不是可用插件。</li>
+              <li><strong>design/webserver/20260723-epub-first-reading.active.html</strong>：文件名为 active，正文状态写 WIP、测试结果写「待验证」。check_design_docs.py 只校验文件名不校验正文，故未被拦截。</li>
+            </ul>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <h3>5.1 目录结构</h3>
+            <p>分类轴为领域名词，只留大实体，插件作为子目录。顶层 12 篇，插件 11 篇，共 23 篇。</p>
+            <div class="table-wrap" role="region" aria-label="目录结构" tabindex="0">
+              <table>
+                <thead><tr><th>文件</th><th>覆盖范围</th></tr></thead>
+                <tbody>
+                  <tr><td>spec/索引.md</td><td>全部条目的入口与边界声明</td></tr>
+                  <tr><td>spec/书库.md</td><td>藏书总体、上传/扫描/导入、回收站、浏览筛选、搜索</td></tr>
+                  <tr><td>spec/书籍.md</td><td>标识、格式文件、媒体分类、可见范围与所有权、计数、删除</td></tr>
+                  <tr><td>spec/元数据.md</td><td>全部描述字段的产品准则、别名与作者合并、分类浏览、互联网同步</td></tr>
+                  <tr><td>spec/用户.md</td><td>账号、权限、注册登录激活、访客、演示模式、消息、设备</td></tr>
+                  <tr><td>spec/阅读器.md</td><td>EPUB / TXT / 漫画三种阅读器、格式优先级、音文同步</td></tr>
+                  <tr><td>spec/阅读状态.md</td><td>收藏、书架、已读状态、进度、统计、历史</td></tr>
+                  <tr><td>spec/划线笔记.md</td><td>权威模型、可见性、来源同步</td></tr>
+                  <tr><td>spec/有声书.md</td><td>版本、章节、制作任务、播放、播客分发、收听统计</td></tr>
+                  <tr><td>spec/网络书库.md</td><td>读者视角：搜索、目录、在线阅读、保存本地、连载状态</td></tr>
+                  <tr><td>spec/外部访问.md</td><td>Moke 官方客户端、OPDS 目录服务、WebDAV 挂载</td></tr>
+                  <tr><td>spec/系统设置.md</td><td>安装、设置项、主题、导航、i18n</td></tr>
+                  <tr><td>spec/插件/插件平台.md</td><td>插件、能力、连接、运行；Manifest 协议；权限与凭据</td></tr>
+                  <tr><td>spec/插件/{BRS,Legado,微信读书}.md</td><td>有专属管理页的接入型插件</td></tr>
+                  <tr><td>spec/插件/{正文查找替换,TXT编码修复,繁简转换}.md</td><td>有专属管理页的书籍工具</td></tr>
+                  <tr><td>spec/插件/{元数据源,评价源,外部书库源,发送到设备}.md</td><td>无专属界面的插件，按能力类别合并，表格一行一个</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>5.2 每篇骨架</h3>
+            <p>顺序是「先建立直觉，再交付词汇，最后进入细节」：读者先知道这是什么、谁在用、能做什么，此时再看术语表才有上下文，然后带着统一词汇读行为逻辑。</p>
+            <ol>
+              <li><strong>定义</strong>：一句话说清是什么，紧跟「不是什么」的边界。</li>
+              <li><strong>使用场景</strong>：谁、在什么情况下、要达成什么。</li>
+              <li><strong>功能</strong>：功能概述清单，一行一条。</li>
+              <li><strong>术语与界面用词</strong>：术语表（标准用词、英文、含义、<strong>示例</strong>四列）与操作按钮用词表（界面用词、位置、行为三列）；示例必须是具体的书、作者或读者动作，不用占位描述；不抄文案原文，不写 Avoid 反例。</li>
+              <li><strong>行为逻辑</strong>：详细产品设计，规则、状态流转、约束与边界情况；全篇最重。</li>
+              <li><strong>关联实体</strong>：与其他篇的关系与互链。</li>
+              <li><strong>实现对照</strong>：<strong>唯一做「概念到代码位置」映射的地方</strong>（正文可自由使用英文术语、协议名与产品自身定义的稳定标识），按落点类型拆成五张子表，每张子表有自己的列头，不适用时整张删除：<br /><code>7.1 数据存储</code>（概念、存储、表与字段）、<code>7.2 API 接口</code>（方法、路径、说明）、<code>7.3 关键定义</code>（符号、值、含义——常量、枚举与限额）、<code>7.4 代码落点</code>（行为、文件与函数）、<code>7.5 界面文案</code>（i18n 分组、覆盖范围）。</li>
+            </ol>
+            <h3>5.3 命名规则</h3>
+            <ul>
+              <li>目录与文件名一律中文；协议专名（OPDS、WebDAV、BRS、TXT）保留原写法。</li>
+              <li>文件名与文中主术语<strong>以领域术语为准</strong>；界面用词只出现在第 4 节。</li>
+              <li>一级标题与文件名严格一致；<strong>索引篇例外</strong>——它不遵守七节骨架，只需存在、收录每一篇，且指向 spec/ 内文件的链接文案等于目标文件名。</li>
+            </ul>
+            <h3>5.4 维护机制</h3>
+            <ul>
+              <li>AGENTS.md 增加条款：改变产品行为的改动必须在同一 PR 更新 spec/ 对应篇；方案 HTML 声明 spec 影响范围。</li>
+              <li>新增 scripts/check_spec.py 与 <code>make check-spec</code>，校验：7 节齐全、一级标题与文件名一致、内部互链有效、实现对照节引用的文件路径存在、引用的路由能在 webserver/handlers/ 命中、每个已注册内置插件在 spec/插件/ 下有归属。</li>
+              <li>机器查不出「行为逻辑变了没改文档」，该部分由流程条款与评审承担。</li>
+            </ul>
+            <h3>5.5 交付顺序</h3>
+            <ol>
+              <li>本方案 + spec/元数据.md 与 spec/阅读状态.md 两篇样片，供定调。</li>
+              <li>定调后补齐其余 21 篇。</li>
+              <li>最后交付门禁脚本与测试、AGENTS.md 条款；同批删除 CONTEXT.md 与 design/wiki/，并回退 check_design_docs.py 的 wiki 豁免与对应测例。</li>
+            </ol>
+            <div class="callout warn">删除动作<strong>刻意安排在最后一步</strong>：在 spec/ 补齐之前删除 design/wiki/ 会丢失尚未重组的 14 篇内容。</div>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <p><strong>影响范围</strong>：新增 spec/ 共 23 篇；删除 CONTEXT.md 与 design/wiki/；新增 scripts/check_spec.py 与测试；修改 Makefile 与 AGENTS.md；删除交付过程中一度为 design/wiki/ 添加的 check_design_docs.py 豁免，使该脚本与其测例回到主干原状（该豁免从未进入主干）。</p>
+            <p><strong>保持不变</strong>：运行时代码、数据库、接口、页面行为、design/ 方案门禁、document/ 与 research/。</p>
+            <ul>
+              <li><strong>主要风险</strong>：spec/ 随时间失准，退化为第四份过期文档。缓解：门禁覆盖可机检部分，流程条款覆盖其余，并把「是否更新 spec/」写进方案模板的影响范围。</li>
+              <li><strong>次要风险</strong>：「不写未实现」会让书单等已有设计从文档中消失，新同学可能重复设计。缓解：对应 design/ 方案仍在仓库中，且在第 4 节留痕。</li>
+              <li><strong>回滚</strong>：本次只增删 Markdown、HTML、校验脚本与规范文本，按文件回退即可，无数据迁移。</li>
+            </ul>
+            <p><strong>界面审查</strong>：本次无页面、交互、文案资源或前端消费者变化，判断依据为改动仅涉及 spec/、design/、scripts/、tests/、Makefile 与 AGENTS.md，不进入 app/ 与 webserver/ 代码路径，故豁免 interface-review。剩余风险仅为文档准确性。</p>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令</th><th>验收口径</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>规格门禁</td><td><code>make check-spec</code></td><td>23 篇的章节结构、标题、术语表列与示例、互链、实现对照路径、7.2 接口命中真实路由、插件覆盖度全部通过</td><td class="verified">23 spec document(s) passed</td></tr>
+                  <tr><td>门禁自身</td><td><code>pytest tests/test_check_spec.py</code></td><td>21 条用例覆盖结构、顺序、术语表、路由形态、断链、文案一致、索引收录与插件覆盖度</td><td class="verified">21 passed in 0.28s</td></tr>
+                  <tr><td>门禁负向验证</td><td>对真实 spec/ 注入 8 类缺陷后运行门禁</td><td>改错路由、改错标题、删子表、示例留空、引用不存在的文件、链接文案不符、索引漏收、删「不是什么」——每一类都必须被拦截</td><td class="verified">8 条注入全部拦截，0 漏过</td></tr>
+                  <tr><td>方案门禁</td><td><code>make check-design</code></td><td>WIP 阶段应按设计失败；转 ACTIVE 后通过</td><td class="verified">WIP 阶段正确报「WIP design document cannot be merged」；转 ACTIVE 后 147 份方案通过</td></tr>
+                  <tr><td>后端全量回归</td><td><code>make test</code>（Docker）连跑 4 次</td><td>本次不改运行时代码，应等于基线加上新增测试数</td><td class="verified">4 次均为 1392 passed / 37 skipped；基线 origin/master 为 1371，差值 21 恰为新增用例数</td></tr>
+                  <tr><td>测试稳定性</td><td>基线与本分支各连跑 4 次全量</td><td>不得引入不稳定</td><td class="verified">见下方专项说明，已定位并修复</td></tr>
+                  <tr><td>后端 lint</td><td><code>make lint-py</code>、对新增脚本与测试执行 ruff check 与 format</td><td>全部通过</td><td class="verified">All checks passed；177 files already formatted</td></tr>
+                  <tr><td>残留引用</td><td>全仓 grep <code>CONTEXT.md</code></td><td>删除后不得有活引用</td><td class="verified">仅剩 design/ 历史方案中的记述，属其记录职责，不修改</td></tr>
+                  <tr><td>界面审查</td><td>—</td><td>无页面、交互、文案资源或前端消费者变化</td><td>按影响范围豁免</td></tr>
+                  <tr><td>前端测试</td><td>—</td><td>未触及 app/ 代码路径</td><td>按影响范围跳过</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>7.1 交叉评审后的修正</h3>
+            <p>本方案与 23 篇产物完成后执行了一次双轴代码评审（Standards 与 Spec 各一个独立子代理），共报 17 项。逐项核实后的处置：</p>
+            <div class="table-wrap" role="region" aria-label="评审处置" tabindex="0">
+              <table>
+                <thead><tr><th>类别</th><th>项</th><th>处置</th></tr></thead>
+                <tbody>
+                  <tr><td>规则本身写坏</td><td>1</td><td>已改：正文与实现细节的分界由「token 类型清单」改为视角判据，连带消解 2 项假阳性（6 篇 + 3 处）</td></tr>
+                  <tr><td>门禁缺陷</td><td>3</td><td>已改：子表按需缺省、7.2 校验同行全部完整路由、路径校验取消目录白名单</td></tr>
+                  <tr><td>文档瑕疵</td><td>2</td><td>已改：spec/索引.md 反引号内空格 5 处；spec/插件/评价源.md 误用「含义」列指向文件</td></tr>
+                  <tr><td>命名与接入</td><td>2</td><td>已改：check_context 全面改名 check_spec；make check-spec 接入 CI</td></tr>
+                  <tr><td>方案与产物不一致</td><td>5</td><td>已改：文件名清单、界面用词节号、索引豁免、方案模板 spec 提示、影响范围的不实表述</td></tr>
+                  <tr><td>风格一致性</td><td>1</td><td>已改：全脚本由 % 格式化改 f-string，沿用 check_design_docs.py 既有风格</td></tr>
+                  <tr><td>经核实不成立</td><td>3</td><td>不改：常量出现在 4、5 节与术语表示例为常量均系旧规则误报；Legado.md 正文并无字段名（评审断言经扫描证否）</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p><strong>门禁放宽与补洞的净效果</strong>：对作者更宽松（子表可整张删除），对事实更严格（新增 16 个路由纳入校验，路径校验不再有目录盲区）。取消白名单当场查出 5 篇把 <code>webserver/plugins/runtime/</code> 简写为 <code>runtime/</code> 的真实错误，此前被静默放行。</p>
+            <p>门禁测试从 21 条增至 27 条，新增覆盖：子表可缺省、至少一张、顺序、未定义子表名、同行多路由全校验、非白名单目录路径、外部地址不误判为仓库路径。</p>
+
+            <h3>7.2 一处由本次改动引入的测试不稳定及其修复</h3>
+            <p>首轮全量回归出现 <code>tests/test_network_library.py</code> 的偶发失败。按基线对照确认<strong>是本次引入的</strong>，而非既有偶发：</p>
+            <ul>
+              <li>基线 <code>origin/master</code> 连跑 4 次全绿；本分支连跑 4 次中 2 次失败。</li>
+              <li><code>test_network_library.py</code> 单独连跑 5 次全绿；与新增的 <code>test_check_spec.py</code> 组合跑 3 次中 1 次失败。</li>
+              <li>失败点是 <code>_wait_finished()</code> 的硬编码 5 秒墙钟超时（tests/test_network_library.py:50），它轮询后台线程池中的搜索任务。</li>
+            </ul>
+            <p><strong>根因</strong>：新增的 21 条用例原本每条都起一个解释器子进程，其中一条还会遍历整个仓库读文件；这些子进程抢占 CPU 与 IO，使紧随其后的后台搜索线程未能在 5 秒内完成。</p>
+            <p><strong>修复</strong>：把校验逻辑改为<strong>进程内调用</strong>，仅保留一条子进程用例覆盖命令行与退出码契约。用例数与覆盖范围不变，耗时从 2.16s 降到 0.28s。修复后组合跑 6 次、全量跑 4 次全部通过。</p>
+            <p><strong>未处理的相邻问题</strong>：该硬编码墙钟超时对机器负载敏感，是既有测试的脆弱假设。本次按「只动必须动的」原则不修改它，记录在此作为后续独立工作的输入。</p>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-09-16：</strong>定位为领域规格文档，唯一一份，总是最新，不写未实现与已废弃内容。</li>
+              <li><strong>2026-09-16：</strong>删除 CONTEXT.md；design/ 单篇 HTML 收窄为每次开发的具体方案与过程实现。</li>
+              <li><strong>2026-09-16：</strong>落点从 design/wiki/ 改为仓库根，先定为 context/，后按名实相符改为 <strong>spec/</strong>；design/wiki/ 删除并回退校验豁免。</li>
+              <li><strong>2026-09-16：</strong>分类轴取领域名词而非产品功能域；只留大实体；阅读器单独成篇；插件作为子目录。</li>
+              <li><strong>2026-09-16：</strong>插件拆篇判据为「有无专属产品界面」，新插件默认进合集篇。</li>
+              <li><strong>2026-09-16：</strong>正文用产品语言，表名、字段与路由只出现在末节「实现对照」。</li>
+              <li><strong>2026-09-16：</strong>界面用词节只保留术语表与操作按钮用词表，不抄文案原文，不保留 Avoid 反例。</li>
+              <li><strong>2026-09-16：</strong>术语表增加「示例」列，用具体的书、作者或读者动作把抽象定义坐实；仅定义不给例子的术语容易被各自理解。</li>
+              <li><strong>2026-09-16：</strong>章节顺序定为定义、使用场景、功能、术语与界面用词、行为逻辑、关联实体、实现对照；术语表从第 2 节后移到第 4 节，先建立直觉再交付词汇。</li>
+              <li><strong>2026-09-16：</strong>实现对照由单张大表拆为五张子表（数据存储、API 接口、关键定义、代码落点、界面文案）；单表混装表名、路由、常量与函数时列头无法统一，也无法对不同落点类型做针对性的机器校验。</li>
+              <li><strong>2026-09-16：</strong>网络书库与 Legado 按「读者视角 / 管理员视角」切分。</li>
+              <li><strong>2026-09-16：</strong>OPDS 与 WebDAV 按「对外暴露 / 从外部获取」方向切分，合并为外部访问一篇，并补入此前遗漏的 Moke 客户端。</li>
+              <li><strong>2026-09-16：</strong>文件名以领域术语为准，界面用词只写在第 4 节。</li>
+              <li><strong>2026-09-16：</strong>元数据分面改名为元数据，并把书籍的字段规格整体移入该篇；书籍篇收窄为「书作为可管理的实体与文件」，撞名问题随边界重划消解。</li>
+              <li><strong>2026-09-16：</strong>维护机制取「流程强制 + make check-spec 门禁」，删除动作安排在最后一步以免丢失未重组内容。</li>
+              <li><strong>2026-09-16：</strong>门禁的接口校验由字面前缀比对改为<strong>真实路由正则匹配</strong>：收集 handlers 与 webdav 中注册的路由，把文档写法还原成具体路径后比对，并排除会匹配一切的兜底路由。前缀比对要么放过 <code>/api/no-such-namespace</code>，要么误伤兜底路由下的合法路径，两者不可兼得。该校验随即查出两处真实文档错误：OPDS 分类路由实际接两段参数，以及把前端页面路径 <code>/book/&lt;id&gt;/readtxt</code> 误列为服务端接口。</li>
+              <li><strong>2026-09-16：</strong>门禁测试改为进程内调用，只保留一条子进程用例覆盖命令行契约；原先每条用例一个子进程的写法会因 CPU 与 IO 抢占，压垮同批运行的后台线程测试的墙钟超时。</li>
+              <li><strong>2026-09-17：</strong>交叉评审后修正正文与实现细节的分界规则。原先写成「表名、字段名、路由与常量只允许出现在第 7 节」，它与自己规定的术语表「英文」列冲突，与「示例必须具体」冲突（定义「插件 ID」的术语，示例只能是一个插件 ID），且机器无法校验，实测 23 篇中 6 篇「违反」全部是假阳性。改为按视角判据：正文不做「概念到代码位置」的映射，但可自由使用领域词汇，包括英文术语、协议名与产品自身定义的稳定标识。</li>
+              <li><strong>2026-09-17：</strong>门禁的宽严按「是否增加写作负担」区分：约束作者写什么的放宽，校验作者已写内容是否属实的补齐。实现对照五张子表改为按需缺省（子集 + 保序），据此删除 spec/插件/评价源.md 中为满足旧约束而凑数的 7.5；7.2 改为校验同行内全部完整路由（新增 16 个），路径校验取消顶级目录白名单，后者当场查出 5 篇把 webserver/plugins/runtime/ 简写成 runtime/ 的真实错误。</li>
+              <li><strong>2026-09-17：</strong>脚本、make 目标与测试文件从 check_context 改名为 check_spec，与校验对象 spec/ 对齐；原名是目录从 context/ 改为 spec/ 时的残留。同时把 make check-spec 接入 CI 的 check-design 作业，并统一为 f-string 以沿用 scripts/check_design_docs.py 的既有风格。</li>
+              <li><strong>2026-09-17：</strong>实现对照的每张子表只承担自己那一列的职责：「关键定义」说明符号是什么，指向文件是「代码落点」的职责。据此修正 spec/插件/评价源.md 中用「含义」列写「见某某.py」的一行。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
+      <footer>Talebook internal design · project · ACTIVE · 2026-09-16</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

@@ -207,7 +207,7 @@
           <span class="chip">创建日期：YYYY-MM-DD</span>
           <span class="chip">所属模块：〔module〕</span>
           <!-- OPTIONAL：按需保留、删除或新增 tags。 -->
-          <span class="chip">影响范围：〔目录、接口或系统〕</span>
+          <span class="chip">影响范围：〔目录、接口或系统；涉及产品行为时注明 spec/ 篇目〕</span>
           <span class="chip">需求来源：〔Issue / PR / 用户原话〕</span>
         </div>
       </header>
@@ -318,7 +318,7 @@
           <section id="impact" class="card">
             <h2>6. 影响范围、风险与回滚</h2>
             <div class="grid">
-              <article class="choice recommended"><h3>影响范围</h3><p>〔列出代码、接口、数据、配置、部署、权限、兼容性与用户体验中实际受影响的部分。〕</p></article>
+              <article class="choice recommended"><h3>影响范围</h3><p>〔列出代码、接口、数据、配置、部署、权限、兼容性与用户体验中实际受影响的部分。改变产品行为时必须列出本次涉及的 <code>spec/</code> 篇目；不影响产品行为则说明判断依据。〕</p></article>
               <article class="choice"><h3>保持不变</h3><p>〔列出评审者容易担心但本次明确不改变的契约。〕</p></article>
             </div>
             <div class="callout danger"><strong>主要风险：</strong>〔风险 → 触发条件 → 监控或测试 → 缓解方式。不要只写“风险可控”。〕</div>
