@@ -21,6 +21,9 @@ jobs:
       - name: Validate internal design documents
         run: make check-design
 
+      - name: Validate domain specification documents
+        run: make check-spec
+
   test-server:
     runs-on: ubuntu-latest
     container:
