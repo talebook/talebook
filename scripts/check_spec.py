@@ -180,6 +180,30 @@ def check_plugin_coverage(spec_root, repo_root, errors):
                 errors.append(f"插件 {plugin_id} 已注册但在 spec/插件/ 下没有归属")
 
 
+def check_inbound_links(spec_root, repo_root, errors):
+    """仓库内其他 Markdown 指向 spec/ 的链接必须有效。
+
+    门禁只扫 spec/ 目录时，document/ 一类文档里指向 spec/ 的链接改错或失效都不会被
+    发现——CONTEXT.md 删除后 document/PluginGuide.md 留下死链，正是这样漏掉的。
+    """
+    for source in sorted(repo_root.rglob("*.md")):
+        if spec_root in source.parents or "node_modules" in source.parts or ".git" in source.parts:
+            continue
+        try:
+            text = source.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        for label, target in LINK_RE.findall(text):
+            if target.startswith(("http://", "https://", "#")):
+                continue
+            resolved = (source.parent / target).resolve()
+            if not resolved.is_relative_to(spec_root):
+                continue
+            if not resolved.exists():
+                rel = source.relative_to(repo_root)
+                errors.append(f"{rel}: 指向 spec/ 的链接已失效 [{label}]({target})")
+
+
 def check_index(spec_root, errors):
     index = spec_root / INDEX_NAME
     if not index.is_file():
@@ -214,6 +238,7 @@ def check_spec(repo_root):
         check_implementation(path, text, repo_root, routes, errors)
 
     check_index(spec_root, errors)
+    check_inbound_links(spec_root, repo_root, errors)
     check_plugin_coverage(spec_root, repo_root, errors)
     return errors, len(files)
 

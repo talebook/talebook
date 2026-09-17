@@ -344,6 +344,42 @@ def test_unknown_implementation_subsection_fails(tmp_path):
     assert "未定义的子表" in result.stdout
 
 
+def test_broken_inbound_link_from_outside_spec_fails(tmp_path):
+    """仓库内其他文档指向 spec/ 的死链要被抓到（CONTEXT.md 删除后 PluginGuide 的教训）。"""
+    write_spec(tmp_path, {"书籍.md": build_doc()})
+    outside = tmp_path / "document"
+    outside.mkdir()
+    (outside / "Guide.md").write_text("见 [已删除](../spec/不存在.md)。", encoding="utf-8")
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 1
+    assert "指向 spec/ 的链接已失效" in result.stdout
+
+
+def test_valid_inbound_link_from_outside_spec_passes(tmp_path):
+    write_spec(tmp_path, {"书籍.md": build_doc()})
+    outside = tmp_path / "document"
+    outside.mkdir()
+    (outside / "Guide.md").write_text("见 [书籍](../spec/书籍.md)。", encoding="utf-8")
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_links_outside_spec_are_not_checked(tmp_path):
+    """只管指向 spec/ 的链接，document/ 内部的相互引用不在本门禁职责内。"""
+    write_spec(tmp_path, {"书籍.md": build_doc()})
+    outside = tmp_path / "document"
+    outside.mkdir()
+    (outside / "Guide.md").write_text("见 [别的](./OtherGuide.md)。", encoding="utf-8")
+
+    result = run_check(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_registered_plugin_must_be_documented(tmp_path):
     write_spec(tmp_path, {"书籍.md": build_doc()}, with_plugins=True)
 

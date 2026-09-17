@@ -361,13 +361,13 @@
                 <thead><tr><th>验证层</th><th>实际命令</th><th>验收口径</th><th>结果</th></tr></thead>
                 <tbody>
                   <tr><td>规格门禁</td><td><code>make check-spec</code></td><td>23 篇的章节结构、标题、术语表列与示例、互链、实现对照路径、7.2 接口命中真实路由、插件覆盖度全部通过</td><td class="verified">23 spec document(s) passed</td></tr>
-                  <tr><td>门禁自身</td><td><code>pytest tests/test_check_spec.py</code></td><td>21 条用例覆盖结构、顺序、术语表、路由形态、断链、文案一致、索引收录与插件覆盖度</td><td class="verified">21 passed in 0.28s</td></tr>
+                  <tr><td>门禁自身</td><td><code>pytest tests/test_check_spec.py</code></td><td>27 条用例覆盖结构、顺序、术语表、路由形态、子表缺省与保序、断链、文案一致、索引收录与插件覆盖度</td><td class="verified">27 passed</td></tr>
                   <tr><td>门禁负向验证</td><td>对真实 spec/ 注入 8 类缺陷后运行门禁</td><td>改错路由、改错标题、删子表、示例留空、引用不存在的文件、链接文案不符、索引漏收、删「不是什么」——每一类都必须被拦截</td><td class="verified">8 条注入全部拦截，0 漏过</td></tr>
-                  <tr><td>方案门禁</td><td><code>make check-design</code></td><td>WIP 阶段应按设计失败；转 ACTIVE 后通过</td><td class="verified">WIP 阶段正确报「WIP design document cannot be merged」；转 ACTIVE 后 147 份方案通过</td></tr>
-                  <tr><td>后端全量回归</td><td><code>make test</code>（Docker）连跑 4 次</td><td>本次不改运行时代码，应等于基线加上新增测试数</td><td class="verified">4 次均为 1392 passed / 37 skipped；基线 origin/master 为 1371，差值 21 恰为新增用例数</td></tr>
+                  <tr><td>方案门禁</td><td><code>make check-design</code></td><td>WIP 阶段应按设计失败；转 ACTIVE 后通过</td><td class="verified">WIP 阶段正确报「WIP design document cannot be merged」；转 ACTIVE 后 146 份方案通过（另有一份未跟踪的架构图不在本次提交内）</td></tr>
+                  <tr><td>后端全量回归</td><td><code>make test</code>（Docker）连跑 3 次</td><td>本次不改运行时代码，应等于基线加上新增测试数</td><td class="verified">3 次均为 1398 passed / 37 skipped；基线 origin/master 为 1371，差值 27 恰为新增用例数</td></tr>
                   <tr><td>测试稳定性</td><td>基线与本分支各连跑 4 次全量</td><td>不得引入不稳定</td><td class="verified">见下方专项说明，已定位并修复</td></tr>
                   <tr><td>后端 lint</td><td><code>make lint-py</code>、对新增脚本与测试执行 ruff check 与 format</td><td>全部通过</td><td class="verified">All checks passed；177 files already formatted</td></tr>
-                  <tr><td>残留引用</td><td>全仓 grep <code>CONTEXT.md</code></td><td>删除后不得有活引用</td><td class="verified">仅剩 design/ 历史方案中的记述，属其记录职责，不修改</td></tr>
+                  <tr><td>残留引用</td><td>全仓 grep <code>CONTEXT.md</code></td><td>删除后不得有活引用</td><td class="verified">初次核查仅用 grep 看了首屏输出，漏掉 document/PluginGuide.md:7 的相对链接，由 PR 评审指出后修正为指向 spec/插件/插件平台.md；design/ 历史方案中的记述属其记录职责，不修改</td></tr>
                   <tr><td>界面审查</td><td>—</td><td>无页面、交互、文案资源或前端消费者变化</td><td>按影响范围豁免</td></tr>
                   <tr><td>前端测试</td><td>—</td><td>未触及 app/ 代码路径</td><td>按影响范围跳过</td></tr>
                 </tbody>
@@ -399,7 +399,7 @@
               <li><code>test_network_library.py</code> 单独连跑 5 次全绿；与新增的 <code>test_check_spec.py</code> 组合跑 3 次中 1 次失败。</li>
               <li>失败点是 <code>_wait_finished()</code> 的硬编码 5 秒墙钟超时（tests/test_network_library.py:50），它轮询后台线程池中的搜索任务。</li>
             </ul>
-            <p><strong>根因</strong>：新增的 21 条用例原本每条都起一个解释器子进程，其中一条还会遍历整个仓库读文件；这些子进程抢占 CPU 与 IO，使紧随其后的后台搜索线程未能在 5 秒内完成。</p>
+            <p><strong>根因</strong>：新增的门禁用例原本每条都起一个解释器子进程，其中一条还会遍历整个仓库读文件；这些子进程抢占 CPU 与 IO，使紧随其后的后台搜索线程未能在 5 秒内完成。</p>
             <p><strong>修复</strong>：把校验逻辑改为<strong>进程内调用</strong>，仅保留一条子进程用例覆盖命令行与退出码契约。用例数与覆盖范围不变，耗时从 2.16s 降到 0.28s。修复后组合跑 6 次、全量跑 4 次全部通过。</p>
             <p><strong>未处理的相邻问题</strong>：该硬编码墙钟超时对机器负载敏感，是既有测试的脆弱假设。本次按「只动必须动的」原则不修改它，记录在此作为后续独立工作的输入。</p>
           </section>
@@ -428,6 +428,7 @@
               <li><strong>2026-09-17：</strong>门禁的宽严按「是否增加写作负担」区分：约束作者写什么的放宽，校验作者已写内容是否属实的补齐。实现对照五张子表改为按需缺省（子集 + 保序），据此删除 spec/插件/评价源.md 中为满足旧约束而凑数的 7.5；7.2 改为校验同行内全部完整路由（新增 16 个），路径校验取消顶级目录白名单，后者当场查出 5 篇把 webserver/plugins/runtime/ 简写成 runtime/ 的真实错误。</li>
               <li><strong>2026-09-17：</strong>脚本、make 目标与测试文件从 check_context 改名为 check_spec，与校验对象 spec/ 对齐；原名是目录从 context/ 改为 spec/ 时的残留。同时把 make check-spec 接入 CI 的 check-design 作业，并统一为 f-string 以沿用 scripts/check_design_docs.py 的既有风格。</li>
               <li><strong>2026-09-17：</strong>实现对照的每张子表只承担自己那一列的职责：「关键定义」说明符号是什么，指向文件是「代码落点」的职责。据此修正 spec/插件/评价源.md 中用「含义」列写「见某某.py」的一行。</li>
+              <li><strong>2026-09-17：</strong>PR #1053 评审提出三项，全部属实并已修正：插件平台篇正文写了代码目录名（移入 7.4）；本方案测试结果表的用例数与回归总数未随最终结果回写（21/1392 改为 27/1398）；删除 CONTEXT.md 后 document/PluginGuide.md:7 留下死链（改指 spec/插件/插件平台.md）。第三项暴露门禁只扫 spec/ 目录的盲区，因此新增 check_inbound_links()，校验仓库内其他 Markdown 指向 spec/ 的链接是否有效，并补 3 条用例。</li>
             </ol>
           </section>
         </main>
