@@ -1,0 +1,164 @@
+name: Build signed application upgrade
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: Full reviewed commit SHA
+        required: true
+      version:
+        description: Application version (for example v26.09.10)
+        required: true
+      publish:
+        description: Publish immutable packages and advance app-stable (requires release environment approval)
+        type: boolean
+        default: false
+      release_tag:
+        description: Optional existing stable Release tag to attach packages to (must match commit and version)
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: application-upgrade-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.event_name == 'workflow_dispatch' || (!github.event.release.prerelease && !github.event.release.draft && startsWith(github.event.release.tag_name, 'v'))
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      version: ${{ steps.release.outputs.version }}
+      sequence: ${{ steps.release.outputs.sequence }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve and validate release inputs before accessing signing secrets
+        id: release
+        env:
+          INPUT_COMMIT: ${{ inputs.commit }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          if os.environ['GITHUB_EVENT_NAME'] == 'release':
+              release = event['release']
+              assert not release['draft'] and not release['prerelease']
+              tag = version = release['tag_name']
+              assert re.fullmatch(r'v[a-zA-Z0-9._-]{1,79}', tag)
+              commit = git('rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}')
+          else:
+              commit, version = os.environ['INPUT_COMMIT'], os.environ['INPUT_VERSION']
+              tag = os.environ.get('INPUT_RELEASE_TAG', '')
+          assert re.fullmatch(r'[0-9a-f]{40}', commit)
+          assert re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}', version)
+          if tag:
+              assert re.fullmatch(r'v[a-zA-Z0-9._-]{1,79}', tag) and version == tag
+              assert git('rev-parse', '--verify', f'refs/tags/{tag}^{{commit}}') == commit
+          subprocess.run(['git', 'merge-base', '--is-ancestor', commit, 'origin/master'], check=True)
+          sequence = int(git('show', '-s', '--format=%ct', commit))
+          assert sequence > 0
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'commit={commit}\nversion={version}\nsequence={sequence}\nrelease_tag={tag}\n')
+          PY
+  package:
+    needs: prepare
+    runs-on: ubuntu-latest
+    environment: application-upgrade
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+          - platform: linux/arm64
+            arch: arm64
+          - platform: linux/arm/v7
+            arch: armv7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - name: Require signing configuration
+        env:
+          UPGRADE_SIGNING_KEY: ${{ secrets.UPGRADE_SIGNING_KEY }}
+          UPGRADE_KEY_ID: ${{ vars.UPGRADE_KEY_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          if not os.environ['UPGRADE_SIGNING_KEY'] or not os.environ['UPGRADE_KEY_ID']:
+              raise SystemExit('Configure UPGRADE_SIGNING_KEY and UPGRADE_KEY_ID in the application-upgrade environment first')
+          PY
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build candidate and export application
+        env:
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+          SEQUENCE: ${{ needs.prepare.outputs.sequence }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          docker buildx build --load --platform "$PLATFORM" --target production --build-arg "GIT_VERSION=$RELEASE_VERSION" --build-arg "GIT_COMMIT=$RELEASE_COMMIT" --build-arg "UPGRADE_SEQUENCE=$SEQUENCE" -t upgrade-candidate .
+          container=$(docker create --platform "$PLATFORM" upgrade-candidate)
+          mkdir -p export/app output
+          docker cp "$container:/var/www/talebook/server.py" export/
+          docker cp "$container:/var/www/talebook/webserver" export/
+          docker cp "$container:/var/www/talebook/app/dist" export/app/
+          docker cp "$container:/opt/talebook-upgrade/image.json" image.json
+          docker rm -v "$container"
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          notes = event.get('release', {}).get('body') or subprocess.check_output(['git', 'log', '-1', '--format=%B'], text=True)
+          Path('notes.txt').write_text(notes[:10000])
+          PY
+      - name: Sign package
+        env:
+          UPGRADE_SIGNING_KEY: ${{ secrets.UPGRADE_SIGNING_KEY }}
+          UPGRADE_KEY_ID: ${{ vars.UPGRADE_KEY_ID }}
+        run: |
+          python3 -m pip install 'cryptography>=38'
+          python3 scripts/upgrade/package.py --root export --image image.json --output output --key-id "$UPGRADE_KEY_ID" --notes notes.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: application-upgrade-${{ matrix.arch }}
+          path: output/
+          if-no-files-found: error
+  publish:
+    if: github.event_name == 'release' || inputs.publish
+    needs: [prepare, package]
+    runs-on: ubuntu-latest
+    environment: application-upgrade-publish
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: application-upgrade-*
+          merge-multiple: true
+          path: output
+      - name: Publish immutable resources, then channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          UPGRADE_TRUSTED_KEYS: ${{ vars.UPGRADE_TRUSTED_KEYS }}
+          RELEASE_COMMIT: ${{ needs.prepare.outputs.commit }}
+          RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          python3 -m pip install 'cryptography>=38'
+          python3 scripts/upgrade/github_publish.py

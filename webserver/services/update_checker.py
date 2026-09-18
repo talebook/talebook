@@ -23,9 +23,7 @@ UPDATE_NOTIFY_VERSION_KEY = "update_version"
 UPDATE_NOTIFY_URL_KEY = "update_url"
 UPDATE_NOTIFY_BODY_KEY = "update_body"
 
-_UNVERIFIED_CONTEXT = ssl.create_default_context()
-_UNVERIFIED_CONTEXT.check_hostname = False
-_UNVERIFIED_CONTEXT.verify_mode = ssl.CERT_NONE
+_VERIFIED_CONTEXT = ssl.create_default_context()
 
 
 def _normalize_version(version):
@@ -109,7 +107,7 @@ class UpdateChecker:
                     "User-Agent": "TaleBook-UpdateChecker",
                 },
             )
-            with urllib.request.urlopen(req, timeout=10, context=_UNVERIFIED_CONTEXT) as response:
+            with urllib.request.urlopen(req, timeout=10, context=_VERIFIED_CONTEXT) as response:
                 raw_body = response.read().decode("utf-8")
 
             if not raw_body or not raw_body.strip():

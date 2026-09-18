@@ -100,6 +100,8 @@ def is_admin(func):
 
 
 class BaseHandler(web.RequestHandler):
+    upgrade_requests = 0
+
     _path_to_env = {}
     # 添加一个锁来保护数据库连接的访问
     _db_lock = threading.Lock()
@@ -217,6 +219,22 @@ class BaseHandler(web.RequestHandler):
             self.cdn_url = self.request.protocol + "://" + CONF["static_host"]
 
     def prepare(self):
+        from webserver.services.application_upgrade import MAINTENANCE
+        from webserver.version import VERSION
+
+        self.set_header("X-Talebook-Version", VERSION)
+
+        if MAINTENANCE.exists():
+            self.set_status(503)
+            self.finish({"err": "maintenance"})
+            raise web.Finish()
+        client_version = self.request.headers.get("X-Talebook-App-Version")
+        if client_version and client_version != VERSION:
+            self.set_status(409)
+            self.finish({"err": "upgrade.reload"})
+            raise web.Finish()
+        self._upgrade_counted = True
+        BaseHandler.upgrade_requests += 1
         self.set_hosts()
         self.set_i18n()
         self.process_auth_header()
@@ -239,6 +257,8 @@ class BaseHandler(web.RequestHandler):
         self.cookies_cache = {}
 
     def on_finish(self):
+        if getattr(self, "_upgrade_counted", False):
+            BaseHandler.upgrade_requests -= 1
         self.session.close()
 
     def static_url(self, path, **kwargs):
