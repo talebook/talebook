@@ -6,7 +6,7 @@
     >
         <v-img
             v-if="brandIcon && !imageFailed"
-            :src="brandIcon"
+            :src="withBasePath(brandIcon)"
             alt=""
             contain
             @error="imageFailed = true"
@@ -21,6 +21,7 @@
 </template>
 
 <script setup lang="ts">
+import { withBasePath } from '@/utils/base-path';
 import { ref, watch } from 'vue';
 
 const props = withDefaults(defineProps<{

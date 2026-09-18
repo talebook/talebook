@@ -26,7 +26,7 @@
                         rounded
                         color="primary"
                         variant="elevated"
-                        href="/"
+                        :href="withBasePath('/')"
                     >
                         {{ t('common.home') }}
                     </v-btn>
@@ -38,6 +38,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { useMainStore } from '@/stores/main';
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';

@@ -6,8 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>{{ book.title | e }}</title>
-  <link rel="icon" href="/logo/favicon.ico" />
-  <link rel="stylesheet" href="/static/komga-reader/style.css?v={{ READER_VERSION | e }}" />
+  <link rel="icon" href="{{BASE_PATH}}/logo/favicon.ico" />
+  <link rel="stylesheet" href="{{BASE_PATH}}/static/komga-reader/style.css?v={{ READER_VERSION | e }}" />
   <style>
     :root { color-scheme: dark; }
     * { box-sizing: border-box; }
@@ -108,7 +108,7 @@
       <p id="reader-error-message">{{ messages.default_error | e }}</p>
       <div class="reader-state__actions">
         <button id="reader-retry" type="button">{{ messages.retry | e }}</button>
-        <a href="/book/{{ book.id | int }}">{{ messages.back | e }}</a>
+        <a href="{{BASE_PATH}}/book/{{ book.id | int }}">{{ messages.back | e }}</a>
       </div>
     </section>
     <aside id="reader-notice" class="reader-notice" role="status" hidden>
@@ -119,7 +119,7 @@
 
   <script type="module">
     const readerVersion = '{{ READER_VERSION | e }}';
-    const readerModuleUrl = `/static/komga-reader/komga-reader.es.js?v=${readerVersion}`;
+    const readerModuleUrl = `{{BASE_PATH}}/static/komga-reader/komga-reader.es.js?v=${readerVersion}`;
     const page = document.getElementById('comic-reader-page');
     const host = document.getElementById('comic-reader-host');
     const loading = document.getElementById('reader-loading');
@@ -138,9 +138,9 @@
       imageError: page.dataset.msgImageError,
       readerError: page.dataset.msgReaderError,
     };
-    const bookUrl = `/book/${bookId}`;
-    const manifestUrl = `/api/book/${bookId}/comic/pages`;
-    const progressUrl = `/api/book/${bookId}/comic/progress`;
+    const bookUrl = `{{BASE_PATH}}/book/${bookId}`;
+    const manifestUrl = `{{BASE_PATH}}/api/book/${bookId}/comic/pages`;
+    const progressUrl = `{{BASE_PATH}}/api/book/${bookId}/comic/progress`;
 
     let reader;
     let saveTimer;
@@ -186,7 +186,7 @@
       const pages = [...source.pages].sort((left, right) => left.index - right.index);
       pages.forEach((item, index) => {
         const validId = typeof item.id === 'string' || typeof item.id === 'number';
-        const validUrl = typeof item.url === 'string' && item.url.startsWith(`/api/book/${bookId}/comic/pages/`);
+        const validUrl = typeof item.url === 'string' && item.url.startsWith(`{{BASE_PATH}}/api/book/${bookId}/comic/pages/`);
         if (item.index !== index || !validId || !validUrl || !Number.isInteger(item.width) || item.width <= 0 || !Number.isInteger(item.height) || item.height <= 0 || typeof item.mime_type !== 'string' || !item.mime_type.startsWith('image/')) {
           throw new Error(messages.invalidManifest);
         }

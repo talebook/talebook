@@ -45,7 +45,7 @@
                 <h2>{{ t('opdsPage.webdavSection') }}</h2>
                 <p>
                     {{ t('opdsPage.webdavDesc') }}
-                    <a href="/webdav-readme" target="_blank" rel="noopener noreferrer">{{ t('opdsPage.webdavLink') }}</a>
+                    <a :href="withBasePath('/webdav-readme')" target="_blank" rel="noopener noreferrer">{{ t('opdsPage.webdavLink') }}</a>
                 </p>
             </section>
         </template>
@@ -61,12 +61,13 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, onMounted } from 'vue';
 import { useRequestURL, useNuxtApp } from 'nuxt/app';
 import { useI18n } from 'vue-i18n';
 
 const url = useRequestURL();
-const opdsUrl = `${url.protocol}//${url.host}/opds/`;
+const opdsUrl = `${url.protocol}//${url.host}${withBasePath('/opds/')}`;
 const { $backend } = useNuxtApp();
 const { t } = useI18n();
 const opdsEnabled = ref(true);

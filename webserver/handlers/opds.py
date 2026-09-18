@@ -25,6 +25,7 @@ from lxml.builder import ElementMaker
 from tornado import web
 
 from webserver import loader
+from webserver.base_path import BASE_PATH, public_url
 from webserver.handlers.base import BaseHandler
 from webserver.i18n import _
 
@@ -82,7 +83,7 @@ def format_tag_string(tags, sep, ignore_max=False, no_tag_count=False, joinval="
 
 
 def url_for(name, **kwargs):
-    base_href = "/opds"
+    base_href = public_url("/opds")
     urls = {}
     urls["opds"] = base_href
     urls["opdst"] = base_href + "/"
@@ -484,7 +485,7 @@ class OpdsHandler(BaseHandler):
                 page_url,
                 up_url,
                 self.db,
-                CONF["opds_url_prefix"],
+                CONF["opds_url_prefix"] or BASE_PATH,
                 title=feed_title,
             )
         )
