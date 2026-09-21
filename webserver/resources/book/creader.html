@@ -150,6 +150,10 @@
       font-weight: 800;
       font-variant-numeric: tabular-nums;
     }
+    /* 上面两条 display 声明属于作者样式，会盖掉浏览器默认的 [hidden] { display: none }，
+       导致「阅读笔记悬浮窗」开关关掉后按钮仍然挂在页面上。这里把 hidden 状态显式补回。 */
+    #annotation-toggle[hidden],
+    #annotation-count[hidden] { display: none; }
     #comments-toolbar { display: none !important; }
     #talebook-selection-toolbar {
       position: fixed;
@@ -255,6 +259,33 @@
     #annotation-frame { display:block; width:100%; height:calc(100% - 52px); border:0; }
     @media (max-width: 560px) { .annotation-toggle__label { display:none; } #annotation-shell { width:100vw; } }
     @media (prefers-reduced-motion: reduce) { #annotation-shell { transition:none; } #converting .spinner { animation:none; } }
+    /* 阅读辅助开关：注入到阅读器「设置」面板末尾的分组，视觉上与该面板其它设置项一致 */
+    #talebook-reader-prefs { display: contents; }
+    .talebook-prefs-title {
+      padding: 10px 16px 0;
+      color: inherit;
+      font: 500 12px/1.4 Roboto, sans-serif;
+      letter-spacing: .04em;
+      opacity: .66;
+    }
+    .talebook-pref-group {
+      display: inline-flex;
+      overflow: hidden;
+      border: 1px solid currentColor;
+      border-radius: 4px;
+    }
+    .talebook-pref-group button {
+      min-height: 32px;
+      padding: 0 14px;
+      color: inherit;
+      background: transparent;
+      border: 0;
+      cursor: pointer;
+      font: 500 13px/1 Roboto, sans-serif;
+    }
+    .talebook-pref-group button + button { border-left: 1px solid currentColor; }
+    .talebook-pref-group button[aria-pressed="true"] { font-weight: 700; background: rgba(49, 95, 125, .16); }
+    .talebook-pref-group button:focus-visible { outline: 3px solid #ffca67; outline-offset: -3px; }
   </style>
 </head>
 <body>
@@ -264,6 +295,273 @@
     <h3>{{ book.title }}</h3>
     <p id="converting-msg">首次在线阅读，服务器正在将本书转换为 EPUB 格式，<br>预计需要 1~2 分钟，请耐心等待，转换完成后将自动打开。</p>
   </div>
+  <script>
+    // 阅读辅助开关：章评、划线笔记、阅读笔记悬浮窗、选中文本。
+    // 四个开关归入阅读器自己的「设置」面板，状态存在浏览器本地（与 candle-reader 的 readerSettings 同一层），
+    // 关掉之后正文里对应的标注、入口与交互都不再出现，刷新页面或换一本书依然生效。
+    // 这一段对未登录读者同样生效，因此「选中文本」这类与账号无关的开关放在这里。
+    (function () {
+      const STORAGE_KEY = 'talebookReaderPrefs';
+      const DEFAULTS = { chapterComments: true, highlights: true, notePanel: true, textSelection: true };
+      const PANEL_ID = 'talebook-reader-prefs';
+      const ROWS = [
+        { key: 'chapterComments', label: '章评' },
+        { key: 'highlights', label: '划线笔记' },
+        { key: 'notePanel', label: '阅读笔记悬浮窗' },
+        { key: 'textSelection', label: '选中文本' },
+      ];
+      const listeners = [];
+
+      function read() {
+        const result = Object.assign({}, DEFAULTS);
+        let raw = null;
+        try { raw = window.localStorage.getItem(STORAGE_KEY); } catch (error) { raw = null; }
+        if (!raw) return result;
+        try {
+          const saved = JSON.parse(raw);
+          Object.keys(DEFAULTS).forEach(function (key) {
+            if (typeof saved[key] === 'boolean') result[key] = saved[key];
+          });
+        } catch (error) {
+          console.warn('Talebook reader preferences could not be read:', error);
+        }
+        return result;
+      }
+
+      let prefs = read();
+
+      function get() { return Object.assign({}, prefs); }
+
+      function save() {
+        try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch (error) { /* 无痕模式下写不进去，忽略 */ }
+      }
+
+      function subscribe(listener) {
+        listeners.push(listener);
+        listener(get());
+      }
+
+      function notify() {
+        const snapshot = get();
+        listeners.slice().forEach(function (listener) {
+          try { listener(snapshot); } catch (error) { console.error('Talebook reader preference listener failed:', error); }
+        });
+      }
+
+      function setPref(key, value) {
+        if (!(key in DEFAULTS) || prefs[key] === value) return;
+        prefs[key] = value;
+        save();
+        renderPanel();
+        applyBookCommentEntry();
+        applyBuiltinChapterCommentRow();
+        applyTextSelectionLock();
+        notify();
+      }
+
+      function buildTitle() {
+        const title = document.createElement('div');
+        title.className = 'talebook-prefs-title';
+        title.textContent = '阅读辅助';
+        return title;
+      }
+
+      function buildRow(row) {
+        const item = document.createElement('div');
+        item.className = 'v-list-item v-list-item--density-compact v-list-item--one-line rounded-0 v-list-item--variant-text my-2';
+        item.setAttribute('role', 'listitem');
+        item.dataset.talebookPrefRow = row.key;
+
+        const content = document.createElement('div');
+        content.className = 'v-list-item__content';
+        content.setAttribute('data-no-activator', '');
+
+        const grid = document.createElement('div');
+        grid.className = 'v-row align-center';
+
+        const labelCol = document.createElement('div');
+        labelCol.className = 'v-col v-col-2';
+        const label = document.createElement('span');
+        label.textContent = row.label;
+        label.id = 'talebook-pref-label-' + row.key;
+        labelCol.appendChild(label);
+
+        const switchCol = document.createElement('div');
+        switchCol.className = 'v-col v-col-10';
+        const group = document.createElement('div');
+        group.className = 'talebook-pref-group';
+        // 两颗按钮的可见文案只有「开启 / 关闭」，单独聚焦时读不出属于哪一项设置，
+        // 因此把行标题关联为这一组的可访问名称。
+        group.setAttribute('role', 'group');
+        group.setAttribute('aria-labelledby', label.id);
+        [[true, '开启'], [false, '关闭']].forEach(function (pair) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.textContent = pair[1];
+          button.dataset.talebookPrefValue = String(pair[0]);
+          button.setAttribute('aria-pressed', 'false');
+          button.addEventListener('click', function () { setPref(row.key, pair[0]); });
+          group.appendChild(button);
+        });
+        switchCol.appendChild(group);
+
+        grid.appendChild(labelCol);
+        grid.appendChild(switchCol);
+        content.appendChild(grid);
+        item.appendChild(content);
+        return item;
+      }
+
+      function renderPanel() {
+        const panel = document.getElementById(PANEL_ID);
+        if (!panel) return;
+        ROWS.forEach(function (row) {
+          const item = panel.querySelector('[data-talebook-pref-row="' + row.key + '"]');
+          if (!item) return;
+          item.querySelectorAll('[data-talebook-pref-value]').forEach(function (button) {
+            const active = (button.dataset.talebookPrefValue === 'true') === prefs[row.key];
+            button.setAttribute('aria-pressed', String(active));
+          });
+        });
+      }
+
+      // candle-reader 的设置面板是它自己渲染的 Vue 子树，宿主页只在末尾追加分组，不参与其 vdom 更新。
+      // 用「带亮度滑杆的那张 bottom-sheet」定位设置面板，不依赖具体版本里的组件 scope id。
+      function settingsList() {
+        const lists = document.querySelectorAll('.v-bottom-sheet .v-list');
+        for (let index = 0; index < lists.length; index += 1) {
+          if (lists[index].querySelector('.v-slider')) return lists[index];
+        }
+        return null;
+      }
+
+      function mountPanel() {
+        const list = settingsList();
+        if (!list) return false;
+        if (!document.getElementById(PANEL_ID)) {
+          const holder = document.createElement('div');
+          holder.id = PANEL_ID;
+          holder.setAttribute('role', 'presentation');
+          holder.appendChild(buildTitle());
+          ROWS.forEach(function (row) { holder.appendChild(buildRow(row)); });
+          list.appendChild(holder);
+        }
+        renderPanel();
+        applyBuiltinChapterCommentRow();
+        return true;
+      }
+
+      function readerProxy() {
+        const reader = document.getElementById('reader');
+        let instance = reader && reader.__vueParentComponent;
+        while (instance) {
+          if (instance.proxy && instance.proxy.settings && instance.proxy.rendition) return instance.proxy;
+          instance = instance.parent;
+        }
+        return null;
+      }
+
+      // 正文渲染在 epub.js 的 iframe 里，宿主页写的样式管不到它，只能通过 rendition 的
+      // themes.override 把规则写进 content 文档的 body 行内样式。epub.js 把 overrides 挂在
+      // rendition 的 content hook 上，换章新建的 content 会自动补上，这里登记一次即可。
+      const SELECTION_LOCK = [
+        ['user-select', 'none'],
+        ['-webkit-user-select', 'none'],
+        // iOS 长按正文即使选不中也还会弹出系统菜单，一并收掉
+        ['-webkit-touch-callout', 'none'],
+      ];
+      let lockedRendition = null;
+      let lockedState = null;
+
+      function applyTextSelectionLock() {
+        const locked = !prefs.textSelection;
+        const proxy = readerProxy();
+        const rendition = proxy && proxy.rendition;
+        // 阅读器还没挂载好就等下一轮：watch() 的观察器会在挂载过程中不断触发。
+        if (!rendition || !rendition.themes) return;
+        if (rendition === lockedRendition && locked === lockedState) return;
+        lockedRendition = rendition;
+        lockedState = locked;
+        SELECTION_LOCK.forEach(function (pair) {
+          try {
+            if (locked) rendition.themes.override(pair[0], pair[1], true);
+            else rendition.themes.removeOverride(pair[0]);
+          } catch (error) {
+            console.warn('Talebook text selection lock could not be applied:', pair[0], error);
+          }
+        });
+        if (!locked) return;
+        // 锁只拦得住新的选择动作，关掉开关时已经选中的那段要手动清掉
+        try {
+          (rendition.getContents() || []).forEach(function (content) {
+            content.window?.getSelection()?.removeAllRanges();
+          });
+        } catch (error) { /* 拿不到选区不影响锁本身 */ }
+      }
+
+      // candle-reader 自带的「章评」开关管的是它内建的段评气泡；在 Talebook 里这套气泡已经交给注解层接管，
+      // 所以把它那一行收起，统一由这里的分组控制，并把开关同步给阅读器。
+      function rowLabel(item) {
+        const named = Array.from(item.querySelectorAll('span')).find(function (span) {
+          return (span.textContent || '').trim().length > 0;
+        });
+        return named ? named.textContent.trim() : '';
+      }
+
+      function applyBuiltinChapterCommentRow() {
+        const list = settingsList();
+        if (list) {
+          Array.from(list.querySelectorAll('.v-list-item')).forEach(function (item) {
+            if (item.closest('#' + PANEL_ID)) return;
+            if (rowLabel(item).replace(/\*+$/, '') !== '章评') return;
+            if (item.style.display !== 'none') item.style.display = 'none';
+          });
+        }
+        const proxy = readerProxy();
+        if (proxy && proxy.settings.show_comments !== prefs.chapterComments) {
+          proxy.settings.show_comments = prefs.chapterComments;
+        }
+      }
+
+      // 「章评」关掉后，底部导航的「评论」入口也一并隐藏。
+      function applyBookCommentEntry() {
+        document.querySelectorAll('.v-bottom-navigation .v-btn').forEach(function (button) {
+          if ((button.textContent || '').trim().indexOf('评论') < 0) return;
+          const display = prefs.chapterComments ? '' : 'none';
+          const hidden = String(!prefs.chapterComments);
+          if (button.style.display !== display) button.style.display = display;
+          if (button.getAttribute('aria-hidden') !== hidden) button.setAttribute('aria-hidden', hidden);
+        });
+      }
+
+      let scheduled = false;
+      function scheduleApply() {
+        if (scheduled) return;
+        scheduled = true;
+        // 用 setTimeout 而不是 requestAnimationFrame：页面不可见时 rAF 会被节流，补挂会迟迟不发生。
+        window.setTimeout(function () {
+          scheduled = false;
+          mountPanel();
+          applyBookCommentEntry();
+          applyBuiltinChapterCommentRow();
+          applyTextSelectionLock();
+        }, 0);
+      }
+
+      function watch() {
+        scheduleApply();
+        const root = document.getElementById('app') || document.body;
+        if (typeof MutationObserver === 'undefined') return;
+        // 设置面板与底部导航都由 candle-reader 挂载后才有，面板存在期间可能被重渲染，这里跟着补回。
+        new MutationObserver(scheduleApply).observe(root, { childList: true, subtree: true });
+      }
+
+      window.__talebookReaderPrefs = { get: get, set: setPref, subscribe: subscribe };
+
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watch);
+      else watch();
+    })();
+  </script>
   {% if request.user %}
   <button id="annotation-toggle" type="button" aria-controls="annotation-shell" aria-expanded="false" aria-label="打开阅读笔记">
     <span class="annotation-toggle__icon" aria-hidden="true">✎</span><span class="annotation-toggle__label">阅读笔记</span><span id="annotation-count" hidden>0</span>
@@ -310,11 +608,69 @@
       const feedbackDismiss = document.getElementById('annotation-feedback-dismiss');
       const annotationApi = '{{RES}}/api/book/{{book.id}}/annotations';
       const renderedAnnotations = new Set();
+      const renderedAnnotationMap = new Map();
+      let readerPrefs = { chapterComments: true, highlights: true, notePanel: true, textSelection: true };
       let selectedPassage = null;
       let annotationSaveInFlight = false;
       let chapterRequest = 0;
       let feedbackTimer = null;
+      let annotationRefreshTimer = null;
       let chapterAnnotationCount = 0;
+
+      // 章评是 annotation_type=chapter_comment 的公开标注，划线笔记是 highlight / note。
+      function shouldRenderAnnotation(annotation) {
+        if (!annotation) return false;
+        if (annotation.annotation_type === 'chapter_comment') return readerPrefs.chapterComments;
+        return readerPrefs.highlights;
+      }
+
+      function dropRenderedAnnotation(rendition, id) {
+        const annotation = renderedAnnotationMap.get(id);
+        if (!annotation) return;
+        try {
+          rendition.annotations.remove(annotation.cfi, 'highlight');
+        } catch (error) {
+          console.warn('Talebook annotation could not be removed:', id, error);
+        }
+        renderedAnnotationMap.delete(id);
+        renderedAnnotations.delete(id);
+      }
+
+      function updateAnnotationCount(count) {
+        chapterAnnotationCount = count;
+        annotationCount.textContent = String(count);
+        annotationCount.hidden = count === 0;
+        updateToggleLabel();
+      }
+
+      function refreshRenderedAnnotations() {
+        const proxy = readerProxy();
+        if (proxy) {
+          Array.from(renderedAnnotationMap.keys()).forEach(function (id) {
+            if (!shouldRenderAnnotation(renderedAnnotationMap.get(id))) dropRenderedAnnotation(proxy.rendition, id);
+          });
+        }
+        window.clearTimeout(annotationRefreshTimer);
+        annotationRefreshTimer = window.setTimeout(function () {
+          const current = readerProxy();
+          if (current) loadChapterAnnotations(current);
+        }, 0);
+      }
+
+      function applyReaderPrefs(next) {
+        readerPrefs = next;
+        toggle.hidden = !next.notePanel;
+        if (!next.notePanel) {
+          if (shell.dataset.open === 'true') setPanel(false);
+        } else {
+          updateToggleLabel();
+        }
+        // 关掉划线笔记或关掉选中文本，已经弹出来的划词工具栏都要收掉
+        if (!next.highlights || !next.textSelection) hideSelectionToolbar();
+        refreshRenderedAnnotations();
+      }
+
+      if (window.__talebookReaderPrefs) window.__talebookReaderPrefs.subscribe(applyReaderPrefs);
 
       function updateToggleLabel() {
         const action = shell.dataset.open === 'true' ? '关闭' : '打开';
@@ -378,6 +734,10 @@
       }
 
       function handleSelection(cfiRange, contents) {
+        // 「划线笔记」关掉后不再弹划词工具栏，也就无法新增划线或笔记。
+        // 「选中文本」关掉后正常路径下根本选不中（正文 body 已被 user-select: none 锁住），
+        // 这一层兜底挡住键盘等非常规路径产生的选区。
+        if (!readerPrefs.highlights || !readerPrefs.textSelection) return;
         const proxy = readerProxy();
         if (!proxy) return;
         try {
@@ -411,6 +771,7 @@
 
       function renderAnnotation(rendition, annotation) {
         if (!annotation?.cfi || renderedAnnotations.has(annotation.id)) return;
+        if (!shouldRenderAnnotation(annotation)) return;
         try {
           rendition.annotations.highlight(
             annotation.cfi,
@@ -420,12 +781,17 @@
             { fill: annotationColor(annotation), 'fill-opacity': '0.38', 'mix-blend-mode': 'multiply' },
           );
           renderedAnnotations.add(annotation.id);
+          renderedAnnotationMap.set(annotation.id, annotation);
         } catch (error) {
           console.warn('Talebook annotation could not be rendered:', annotation.id, error);
         }
       }
 
       async function loadChapterAnnotations(proxy) {
+        if (!readerPrefs.highlights && !readerPrefs.chapterComments) {
+          updateAnnotationCount(0);
+          return;
+        }
         const chapter = String(proxy.current_toc_title || proxy.current_toc?.label || '').trim();
         if (!chapter) return;
         const request = ++chapterRequest;
@@ -434,11 +800,8 @@
           const response = await fetch(`${annotationApi}?${query.toString()}`, { credentials: 'same-origin' });
           const data = await response.json();
           if (request !== chapterRequest || data.err !== 'ok') return;
-          const annotations = Array.isArray(data.annotations) ? data.annotations : [];
-          chapterAnnotationCount = annotations.length;
-          annotationCount.textContent = String(annotations.length);
-          annotationCount.hidden = annotations.length === 0;
-          updateToggleLabel();
+          const annotations = (Array.isArray(data.annotations) ? data.annotations : []).filter(shouldRenderAnnotation);
+          updateAnnotationCount(annotations.length);
           annotations.forEach(function (annotation) { renderAnnotation(proxy.rendition, annotation); });
         } catch (error) {
           console.warn('Talebook chapter annotations could not be loaded:', error);
