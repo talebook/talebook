@@ -627,6 +627,17 @@ class TestBook(TestWithUserLogin):
         self.assertEqual(rsp.code, 206)
         self.assertEqual(rsp.body, book_body[1:])
 
+    def test_pdf_download_and_inline_preview_use_distinct_dispositions(self):
+        rsp = self.fetch(f"/api/book/{BID_PDF}.pdf")
+        self.assertEqual(rsp.code, 200)
+        self.assertEqual(rsp.headers["Content-Type"], "application/pdf")
+        self.assertTrue(rsp.headers["Content-Disposition"].startswith("attachment;"))
+
+        rsp = self.fetch(f"/api/book/{BID_PDF}.pdf?inline=1")
+        self.assertEqual(rsp.code, 200)
+        self.assertEqual(rsp.headers["Content-Type"], "application/pdf")
+        self.assertTrue(rsp.headers["Content-Disposition"].startswith("inline;"))
+
     def test_download_permission(self):
         with mock_permission() as user:
             user.set_permission("S")  # forbid
@@ -890,6 +901,12 @@ class TestBook(TestWithUserLogin):
             for bid in BIDS:
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
+
+    def test_pdf_read_redirect_requests_inline_preview(self):
+        rsp = self.fetch(f"/read/{BID_PDF}", follow_redirects=False)
+
+        self.assertEqual(rsp.code, 302)
+        self.assertIn(urllib.parse.quote_plus(f"/api/book/{BID_PDF}.PDF?inline=1"), rsp.headers["Location"])
 
     def test_read_waits_for_conversion(self):
         with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
