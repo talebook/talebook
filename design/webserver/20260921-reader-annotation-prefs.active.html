@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="在 Talebook 的 EPUB 阅读器里给读者四个阅读辅助开关：章评、划线笔记、阅读笔记悬浮窗、选中文本。" />
+    <link rel="icon" href="data:," />
+    <title>阅读器新增阅读辅助开关：关闭章评、划线笔记、阅读笔记悬浮窗与选中文本 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 46px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+      .partial { color: #9a4d0c; font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <h1>阅读器新增阅读辅助开关：关闭章评、划线笔记、阅读笔记悬浮窗与选中文本</h1>
+        <p class="sub">Talebook 的 EPUB 阅读器把章评标记、划线高亮和「阅读笔记」悬浮窗都叠在正文上，读者没有任何办法把它们收起来；只想安静读几页时，鼠标一拖还会把正文选中、弹出划词工具栏。本方案在阅读器自己的「设置」面板末尾补一个阅读辅助分组，四个开关按浏览器本地保存，关掉之后对应的标记、入口与交互立即消失。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-09-21</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：webserver/resources/book/creader.html、spec/划线笔记.md、spec/阅读器.md</span>
+          <span class="chip">需求来源：读者原话「让其中的 EPUB 阅读器 Candle Reader 支持关闭章评、划线笔记和阅读笔记悬浮窗功能」「能不能调整成可关闭文本选中功能，有时候只想看书，会不小心选中文本」</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“给这个项目提交一个 PR，让其中的 EPUB 阅读器 Candle Reader 支持关闭章评、划线笔记和阅读笔记悬浮窗功能。”<br />“能不能调整成可关闭文本选中功能，有时候只想看书，会不小心选中文本。”</div>
+            <p>澄清后确认两点：开关放在阅读器「设置」面板里（读书时随手开关、只影响当前浏览器）；「章评」既指正文里的章评标记，也指底部导航的「评论」入口。第二条诉求来自实际使用反馈——正文只要被拖到就会选中并弹出划词工具栏，读者只想要一个「别理我，让我读」的开关。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul>
+                <li>阅读器「设置」面板出现「章评 / 划线笔记 / 阅读笔记悬浮窗 / 选中文本」四个开关，默认全部开启，行为与改动前一致。</li>
+                <li>关掉某个开关后立即生效，不需要刷新：正文里对应的高亮被移除、划词工具栏不再弹出、「评论」入口与「阅读笔记」悬浮按钮隐藏、正文不再被选中。</li>
+                <li>开关状态存在浏览器本地，刷新页面、换一本书、重新打开阅读器后依然生效。</li>
+                <li>读者没有任何操作时，正文渲染、笔记创建、笔记面板等既有行为不变。</li>
+              </ul></article>
+              <article class="choice"><h3>非目标</h3><ul>
+                <li>不改变服务端注解接口与可见性规则，<code>/api/book/&lt;book_id&gt;/annotations</code> 契约不动。</li>
+                <li>不做站点级或账号级开关，也不新增用户偏好接口；开关只是阅读器里的一份本地显示偏好。</li>
+                <li>不重建 candle-reader 阅读器本体与其内置设置面板，四个开关由宿主页 <code>webserver/resources/book/creader.html</code> 追加到面板末尾。</li>
+                <li>不改变「关闭」的含义——关掉只是不显示，数据仍在服务端，重新打开即恢复。</li>
+                <li>不做 i18n；阅读器宿主页现存文案同样是中文硬编码。</li>
+              </ul></article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <p>行是读者能在阅读器里完成的任务。游客能看到「设置」面板与四个开关：前三个对游客是空操作（游客本来就没有注解层），「选中文本」对游客同样有效（正文就在眼前，能不能选中与账号无关）。</p>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-conditional">条件支持</span>
+              <span class="matrix-no">不支持 / 不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>Web</th><th>移动端</th><th>API / 协议</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">阅读辅助</th>
+                    <td><strong>关掉正文里的章评标记与底部「评论」入口</strong><br /><span class="matrix-note">读到一半不想被别人的评论打断</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td>关掉后 <code>chapter_comment</code> 类型高亮被移除且不再渲染，底部「评论」按钮不可见；重新打开后两者恢复</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">阅读辅助</th>
+                    <td><strong>关掉自己与他人留在正文上的划线高亮</strong><br /><span class="matrix-note">让正文回到干净的白纸状态</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td>关掉后 <code>highlight</code>、<code>note</code> 两类高亮被移除且不再渲染，划词工具栏不再弹出；<code>chapter_comment</code> 不受影响</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">阅读辅助</th>
+                    <td><strong>收起右上角「阅读笔记」悬浮按钮与侧边面板</strong><br /><span class="matrix-note">小屏上少一个常驻浮层</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td>关掉后悬浮按钮不可见；若面板当时是打开的则一并收起</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">阅读辅助</th>
+                    <td><strong>让正文不能被选中</strong><br /><span class="matrix-note">只想翻页看书，不想误拖出选区与划词工具栏</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td>关掉后用鼠标在正文里拖选得到空选区、不再弹出划词工具栏；换章与刷新后依然锁住；重新打开立即恢复可选中</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">笔记数据</th>
+                    <td><strong>关闭显示不影响任何笔记数据</strong><br /><span class="matrix-note">读者只是不想看见，不是要删除</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">不涉及</span></td>
+                    <td>开关只写 <code>localStorage.talebookReaderPrefs</code>；注解接口与数据库无写入</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>正文上的章评与划线高亮没有任何关闭入口</td>
+                    <td><code>webserver/resources/book/creader.html:718</code> <code>renderAnnotation()</code>、<code>:736</code> <code>loadChapterAnnotations()</code> 无条件渲染注解</td>
+                    <td>Talebook 自己叠加的注解层（划线与章评）在渲染前没有可见性判断</td>
+                  </tr>
+                  <tr>
+                    <td>右上角「阅读笔记」按钮与侧边面板常驻</td>
+                    <td><code>creader.html:515</code> <code>#annotation-toggle</code>、<code>:538</code> <code>#annotation-shell</code></td>
+                    <td>悬浮层由模板里的 <code>request.user</code> 判断控制是否输出，读者无法再关掉</td>
+                  </tr>
+                  <tr>
+                    <td>划词工具栏会在选中文字时弹出</td>
+                    <td><code>creader.html:684</code> <code>handleSelection()</code>、<code>:849</code> <code>rendition.on('selected', handleSelection)</code></td>
+                    <td>选段即弹，没有「不需要划线」的退路</td>
+                  </tr>
+                  <tr>
+                    <td>candle-reader 自带的章评开关在 Talebook 里已经失效</td>
+                    <td><code>creader.html:850</code> <code>proxy.load_comments_summary = function () {};</code>；<code>:153</code> <code>#comments-toolbar { display: none !important; }</code></td>
+                    <td>阅读器内建的段评气泡与段评工具栏被宿主页停用，注解层接管了章评；那行「章评*」开关因此名不副实</td>
+                  </tr>
+                  <tr>
+                    <td>阅读器的设置面板由阅读器本体渲染，宿主页无法直接改</td>
+                    <td><code>app/public/static/candle-reader/candle-reader.es.js</code> 为构建产物；<code>candle-reader-version.txt</code> 记录 <code>v1.1.0</code></td>
+                    <td>talebook 仓库里没有阅读器源码，设置项只能由宿主页追加</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与推断：</strong>未验证的假设只有一个——「设置面板的 DOM 结构在阅读器升级后仍然稳定」。因此定位面板时不用组件 scope id，而是找「包含亮度滑杆的那张 bottom-sheet」，并用 <code>MutationObserver</code> 在面板重渲染后补回注入节点；结构真的变了，最坏结果是四个开关不出现，阅读器其余功能不受影响。</div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>偏好归宿主页 <code>creader.html</code> 所有，存在 <code>localStorage.talebookReaderPrefs</code>；宿主页负责渲染开关、执行显隐，并在开关变化时通知注解层。注解层只增加一个「这条注解该不该显示」的判断和一次重算，不引入新的接口与数据。</div>
+
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Input</span><b>读者点开关</b><p>四个开关位于阅读器设置面板末尾的「阅读辅助」分组，点击即写本地偏好</p></article>
+              <article class="step"><span class="label">Guard</span><b>面板与阅读器可能还没就绪</b><p>设置面板是懒挂载的 Vue 子树，面板关闭时整块被卸载；用观察器在出现后补挂注入节点，同时在这一轮里尝试给正文加锁</p></article>
+              <article class="step"><span class="label">Core</span><b>宿主页执行显隐与锁</b><p>隐藏「评论」入口与「阅读笔记」悬浮层；把偏好广播给注解层；把 <code>user-select: none</code> 交给 <code>rendition.themes</code> 写进正文文档</p></article>
+              <article class="step"><span class="label">Output</span><b>正文与入口同步收敛</b><p>不可见的注解被撤销渲染，可见的重新渲染；两项全关时不再请求注解接口；正文拖不出选区</p></article>
+            </div>
+
+            <h3>四个开关的边界</h3>
+            <div class="table-wrap" role="region" aria-label="开关边界" tabindex="0">
+              <table>
+                <thead><tr><th>开关</th><th>关掉后不显示 / 不可用</th><th>关掉后仍然照常</th></tr></thead>
+                <tbody>
+                  <tr><td>章评</td><td><code>chapter_comment</code> 注解高亮、底部导航「评论」入口</td><td>划线、笔记两类高亮与「阅读笔记」悬浮按钮</td></tr>
+                  <tr><td>划线笔记</td><td><code>highlight</code> 与 <code>note</code> 注解高亮、划词工具栏</td><td><code>chapter_comment</code> 注解高亮与「评论」入口</td></tr>
+                  <tr><td>阅读笔记悬浮窗</td><td>右上角悬浮按钮、侧边笔记面板</td><td>正文里的三类高亮与底部「评论」入口</td></tr>
+                  <tr><td>选中文本</td><td>正文的选中能力（连带划词工具栏，因为选不中）</td><td>正文里的三类高亮、底部「评论」入口、「阅读笔记」悬浮按钮</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>开关归谁所有</td>
+                    <td>宿主页 <code>creader.html</code>，写 <code>localStorage</code></td>
+                    <td>四个开关里有三个（划线高亮、阅读笔记悬浮窗、选中文本锁）本来就是宿主页的 DOM；本地偏好与阅读器自己的 <code>readerSettings</code> 同一层，无需接口与迁移</td>
+                    <td>改 candle-reader 的 <code>Settings.vue</code> 并发版——那需要先发阅读器版本再升 <code>candle-reader-version.txt</code>，跨两个仓库、两个发布周期</td>
+                  </tr>
+                  <tr>
+                    <td>开关放在哪</td>
+                    <td>追加到阅读器设置面板末尾，加「阅读辅助」小标题</td>
+                    <td>读者开关阅读相关设置的地方就在那里；面板由阅读器渲染，宿主页只在末尾追加、不参与其 vdom 更新</td>
+                    <td>新开一个悬浮设置入口——阅读器已经有一个悬浮按钮，再加一个会让小屏更挤</td>
+                  </tr>
+                  <tr>
+                    <td>与内置「章评*」开关的关系</td>
+                    <td>收起那一行，并把章评开关同步给阅读器 <code>settings.show_comments</code></td>
+                    <td>内置开关管的是已被宿主页停用的段评气泡，留着会与本方案的「章评」重名且互相矛盾</td>
+                    <td>两个同名开关并存；或直接删掉阅读器里的设置项——那是阅读器本体的代码，宿主页不该改</td>
+                  </tr>
+                  <tr>
+                    <td>关掉后如何处理已渲染的高亮</td>
+                    <td>调用 <code>rendition.annotations.remove(cfi, 'highlight')</code> 逐条撤销</td>
+                    <td>不撤销就要等重新渲染才消失，读者会以为开关没生效</td>
+                    <td>整页重排或刷新——会丢失阅读位置附近的状态</td>
+                  </tr>
+                  <tr>
+                    <td>面板结构改动的兜底</td>
+                    <td>用「含亮度滑杆的 bottom-sheet」定位，<code>MutationObserver</code> 补挂</td>
+                    <td>宿主页读不到阅读器源码，不能依赖组件 scope id；结构变化时降级为「开关不出现」而不是报错</td>
+                    <td>硬编码 <code>data-v-*</code> scope id 选择器</td>
+                  </tr>
+                  <tr>
+                    <td>怎么让正文不能被选中</td>
+                    <td>用 epub.js 的 <code>rendition.themes.override('user-select', 'none', true)</code></td>
+                    <td>正文在阅读器的 iframe 里，宿主页的样式够不着；<code>themes.override</code> 把规则写进每个 content 文档，并且挂在 <code>rendition.hooks.content</code> 上，换章新建的文档会自动补上，不需要宿主页追着每次渲染补样式。<code>removeOverride</code> 能干净撤销，开关可来回切</td>
+                    <td>宿主页自己遍历 iframe 注入 <code>&lt;style&gt;</code>——要额外监听章节切换与文档重建，容易漏掉新章节；也不能用 <code>rendition.annotations</code>（那是往正文加东西，不是拦选择）</td>
+                  </tr>
+                  <tr>
+                    <td>「选中文本」放在哪段脚本</td>
+                    <td>放在未登录也输出的那段偏好模块里</td>
+                    <td>未登录读者同样能打开阅读器，而「选中文本」与账号、与注解层都无关；若放进登录态那段脚本（<code>request.user</code> 判断之内），游客会看到一个点了没反应的开关</td>
+                    <td>跟着其余三个开关一起放进登录态脚本——省事但会留下一个对游客失效的死开关</td>
+                  </tr>
+                  <tr>
+                    <td>「选中文本」与「划线笔记」的关系</td>
+                    <td>两个独立开关，不互相联动</td>
+                    <td>想安静读书和想临时复制一段文字是两件事；关划线笔记但仍想选中正文复制，是合理组合</td>
+                    <td>关掉划线笔记时顺带把选中一起锁上——看着省一个开关，实际把「能不能复制」也绑进了注解偏好</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <pre aria-label="关键代码"><code>// 阅读辅助偏好（宿主页）
+const STORAGE_KEY = 'talebookReaderPrefs';
+const DEFAULTS = { chapterComments: true, highlights: true, notePanel: true, textSelection: true };
+
+// 正文在阅读器的 iframe 里：把「不能选中」交给 epub.js 的主题覆盖，
+// 它挂在 rendition 的 content hook 上，换章新建的文档会自动补上
+const SELECTION_LOCK = [
+  ['user-select', 'none'],
+  ['-webkit-user-select', 'none'],
+  ['-webkit-touch-callout', 'none'],
+];
+
+function applyTextSelectionLock() {
+  const locked = !prefs.textSelection;
+  const rendition = readerProxy()?.rendition;
+  if (!rendition || !rendition.themes) return;      // 阅读器还没挂载好，等下一轮观察器再试
+  SELECTION_LOCK.forEach(function (pair) {
+    if (locked) rendition.themes.override(pair[0], pair[1], true);
+    else rendition.themes.removeOverride(pair[0]);
+  });
+}
+
+// 注解层：按类型决定这条注解该不该出现在正文里
+function shouldRenderAnnotation(annotation) {
+  if (annotation.annotation_type === 'chapter_comment') return readerPrefs.chapterComments;
+  return readerPrefs.highlights;
+}
+
+// 开关变化后：撤销不再可见的，再重算当前章节
+function refreshRenderedAnnotations() {
+  const proxy = readerProxy();
+  if (proxy) {
+    Array.from(renderedAnnotationMap.keys()).forEach(function (id) {
+      if (!shouldRenderAnnotation(renderedAnnotationMap.get(id))) dropRenderedAnnotation(proxy.rendition, id);
+    });
+  }
+  annotationRefreshTimer = window.setTimeout(function () {
+    const current = readerProxy();
+    if (current) loadChapterAnnotations(current);
+  }, 0);
+}</code></pre>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p><code>webserver/resources/book/creader.html</code> 新增一个偏好模块、注解层的一处可见性判断与一次 <code>rendition.themes</code> 覆盖；产品行为变化涉及 <code>spec/划线笔记.md</code>（阅读器里的显示开关）与 <code>spec/阅读器.md</code>（阅读器功能与界面用词），两份都已在本 PR 内更新。不涉及接口、数据表、配置、权限与部署。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>注解接口与可见性规则、笔记数据、阅读进度、主题与皮肤、有声书同步、<code>/read/&lt;id&gt;</code> 入口与权限判定全部不动。默认四个开关全开，读者不做任何操作时阅读器与改动前一致。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>阅读器升级后设置面板 DOM 变化，注入节点找不到位置（触发条件：<code>candle-reader-version.txt</code> 升版且面板结构改动）。表现为四个开关不出现，正文渲染与笔记功能不受影响。缓解：定位不依赖 scope id，解析不到就直接放弃注入；<code>tests/test_candle_reader_host.py</code> 守住宿主页模板里的关键片段，不随阅读器升级静默丢失。</div>
+            <div class="callout"><strong>已知交互：</strong>「选中文本」关掉后，横向拖拽不再被选中动作消费，会落到阅读器自己的翻页手势上（滑动翻页模式下表现为翻页）。这是阅读器既有行为，不是本方案引入的；不想翻页就用点击区域翻页或滚轮。</div>
+            <div class="callout"><strong>回滚：</strong>回滚单位是 <code>creader.html</code> 这一个文件，无数据迁移。<code>rendition.themes</code> 的覆盖只活在当前页面里，刷新即失效。读者浏览器里可能残留 <code>localStorage.talebookReaderPrefs</code>；因为旧代码不读这个键，残留值不会影响行为。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>单元 / 模板</td><td><code>python -m pytest tests/test_candle_reader_host.py -q</code></td><td>模板渲染后含偏好模块、四个开关键、注解层可见性判断、<code>user-select</code> 覆盖与撤销，以及让 <code>hidden</code> 真正生效的 <code>[hidden]</code> 规则；游客态不输出注解界面但仍带选中锁</td><td class="verified">18 passed</td></tr>
+                  <tr><td>集成 / 浏览器行为</td><td>本地复刻 <code>creader.html</code> 的测试页 + Playwright（msedge，headless）：<code>node prefs.test.js</code></td><td>43 条断言覆盖默认全开、四个开关各自的生效与恢复、面板卸载后重新注入、刷新后保持、开关组的可访问名称、控件在渲染盒层面真的不可见、页面无 JS 异常</td><td class="verified">43 passed, 0 failed</td></tr>
+                  <tr><td>集成 / 真实拖选（选中文本）</td><td>同一测试页：Playwright 真实鼠标在正文里拖选，断言正文文档里实际得到的选区</td><td>程序化 <code>range.selectNode</code> 不受 <code>user-select</code> 限制，必须用真实鼠标事件；关掉后同一坐标得到空选区，换章、切换昼夜主题、刷新后依旧为空，重新打开后恢复可选中</td><td class="verified">允许时 10 字选区；关掉后 0 字，三种状态下均为 0</td></tr>
+                  <tr><td>实际渲染 / 运行</td><td>同一测试页：桌面 1280×900、夜间主题、手机 390×844 三种状态下打开设置面板截图</td><td>四个开关可见、可点，昼夜主题文字可读，手机宽度不溢出</td><td class="verified">通过，截图见 <code>document/screenshots/reader-annotation-prefs/</code></td></tr>
+                  <tr><td>质量门禁</td><td><code>python scripts/check_design_docs.py</code>、<code>python scripts/check_spec.py</code></td><td>方案与 spec 结构、互链、资源内联全部合规</td><td class="verified">两份脚本均通过</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review</code> skill，<code>full</code> 模式，审查当前分支相对默认分支的全部本地变更</td><td>每个可交互控件都有可区分、可访问的名称与可见焦点指示，昼/夜主题下可读</td><td class="verified">第二轮（新增「选中文本」行）：<code>role="group"</code> + <code>aria-labelledby</code> 与 <code>:focus-visible</code> 焦点圈沿同一套样式生效，0 条 MEDIUM/HIGH；两处连带效果已记入「已知交互」与决策记录。第一轮 1 条 MEDIUM 已在审查中修复，其余 Clear，结论 Approve</td></tr>
+                  <tr><td>移动端可达性</td><td>同一测试页 390×844：把设置面板滚到底，再用 <code>elementFromPoint</code> 命中第四行按钮并真点一次</td><td>新增一行后第四行会落到折叠线以下，面板必须可滚动且按钮真的点得到</td><td class="verified">可滚动、按钮在视口内、命中测试落在按钮上、点击后偏好翻转</td></tr>
+                  <tr><td>可读性实测</td><td>同一测试页：<code>node contrast.js</code> 计算渲染后的实际对比度</td><td>标题与两颗按钮的文本对比度满足 WCAG AA（正文 4.5:1）</td><td class="verified">昼 4.93 / 夜 6.98（标题），行标题 13.69 / 13.97，两颗按钮 11.33–13.97</td></tr>
+                  <tr><td>质量门禁</td><td><code>make pytest</code>、<code>make lint-py</code></td><td>后端全量用例与 flake8</td><td class="partial">未执行：本机无法安装后端完整依赖（Calibre 等）与 Docker。改动只涉及一个 Tornado 模板，未触碰 Python 代码；替代验证为模板渲染用例与仓库文档门禁。</td></tr>
+                  <tr><td>集成 / 真实站点</td><td>Docker 后端 + 真实书库点开一本书</td><td>真实书籍下的章评与划线渲染、悬浮面板开关</td><td class="partial">未执行：本机无可用 Docker 后端。替代验证为复刻宿主页的浏览器测试页（同一份 <code>creader.html</code> 与同一份 candle-reader 构建产物）。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout warn"><strong>已知限制：</strong>headless 下 epub.js 画不出高亮 svg（仓库既有 e2e 也记录了同类现象），因此浏览器断言的是「epub.js 收到的 <code>highlight</code> / <code>remove</code> 入参集合随开关变化」，而不是 svg 计数。开关本身的可见性与显隐行为是直接断言 DOM 的。</div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-09-21：</strong>确认开关放在阅读器自带的设置面板，而不是站点后台或账号偏好——读者要的是「读这本书时随手关掉」，不是全局设置。</li>
+              <li><strong>2026-09-21：</strong>确认「章评」同时覆盖正文章评标记与底部「评论」入口；「划线笔记」覆盖高亮与笔记两类，并连带停用划词工具栏，避免出现「关掉了还能新建」的矛盾。</li>
+              <li><strong>2026-09-21：</strong>实现期发现阅读器内置的「章评*」开关在 Talebook 下已被宿主页停用（<code>load_comments_summary</code> 被替换为空函数），于是把它收起并把开关同步给 <code>settings.show_comments</code>，避免两个同名开关并存。</li>
+              <li><strong>2026-09-21：</strong>实现期发现设置面板关闭时整块被卸载、注入节点随之消失，改为面板出现后按需补挂，并覆盖「关闭再打开设置面板」的回归用例。</li>
+              <li><strong>2026-09-21：</strong><code>interface-review</code>（<code>full</code>）发现三行开关的两颗按钮可见文案都只有「开启 / 关闭」，行标题没有和开关组关联，屏幕阅读器单独聚焦按钮时无法分辨是哪一项设置。给行标题加 id，并把开关组标为 <code>role="group"</code> 且以该标题作 <code>aria-labelledby</code>；保留 <code>aria-pressed</code> 表达状态，不改视觉与交互。</li>
+              <li><strong>2026-09-21（评审反馈后修复）：</strong>实际使用中发现「阅读笔记悬浮窗」开关关掉后按钮仍挂在页面上。根因是 <code>hidden</code> 属性只靠浏览器默认样式 <code>[hidden] { display: none }</code> 生效，而本文件给 <code>#annotation-toggle</code> 写了作者样式 <code>display: inline-flex</code>，作者样式优先级更高，把默认规则整个盖掉，于是 <code>toggle.hidden = true</code> 只改了属性、渲染盒仍是 130×46。本文件对 <code>#talebook-selection-toolbar</code> 与 <code>#annotation-feedback</code> 本来就有配套的 <code>[hidden]</code> 规则，只有悬浮按钮与计数徽标漏了，这次按同一约定补齐 <code>#annotation-toggle[hidden]</code> 与 <code>#annotation-count[hidden]</code>。计数徽标属于同源的老问题（<code>annotationCount.hidden = count === 0</code> 一直没生效，0 条时也显示「0」），一并修掉。</li>
+              <li><strong>2026-09-21（第二批评审反馈）：</strong>读者提出「只想看书时会不小心选中文本」。排查后确认「选中」是浏览器对正文的默认行为，与注解层无关，因此不复用「划线笔记」开关（那个开关管的是划词工具栏），而是新增第四个开关「选中文本」；默认开启，行为与改动前一致。实现走 epub.js 的 <code>rendition.themes.override</code>，并在 <code>handleSelection()</code> 里加一道兜底判断。</li>
+              <li><strong>2026-09-21：</strong>该开关与账号无关，而未登录读者同样能打开阅读器（<code>BookRead.get</code> 在 <code>ALLOW_GUEST_READ</code> 打开时允许游客在线阅读），因此把它的实现放在未登录也输出的那段偏好模块里，并补了一条「游客态也带锁」的模板用例。其余三个开关对游客本就是空操作，维持原状。</li>
+              <li><strong>2026-09-21：</strong>浏览器行为用例改用真实鼠标拖选来验证这条规则。程序化的 <code>range.selectNode</code> 不受 <code>user-select</code> 限制，用它测会假通过；实测结论是：允许选中时同一坐标能选出内容，关掉后同一坐标得到空选区，换章与刷新后依旧为空。</li>
+              <li><strong>2026-09-21：</strong>实测发现关掉后横向拖拽会落回阅读器自己的翻页手势（滑动翻页模式下表现为翻页）。这是阅读器既有行为、不是本方案引入的，已记入「已知交互」，不在本次改动里处理。</li>
+              <li><strong>2026-09-21（测试修正）：</strong>上面这个 bug 之所以没被自动化测试拦住，是因为可见性判定用了 <code>element.offsetParent !== null</code>，而 <code>position: fixed</code> 元素的 <code>offsetParent</code> 恒为 <code>null</code>，断言永远「看不见」，属假通过。改为读取计算样式与渲染盒（<code>getComputedStyle().display</code> 与 <code>getBoundingClientRect()</code>），并补一条模板层用例守住 <code>[hidden]</code> 规则本身，让同类回归不依赖浏览器也能被拦住。</li>
+            </ol>
+          </section>
+        </main>
+      </div>
+
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-09-21</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>
