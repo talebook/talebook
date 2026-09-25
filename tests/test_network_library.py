@@ -151,15 +151,15 @@ class TestNetworkLibrary(TestWithUserLogin):
             cleanup.commit()
 
         self.addCleanup(restore)
-        with mock.patch("webserver.services.source_catalog.SourceCatalogService.prepare_search", return_value=[]), mock.patch(
-            "webserver.handlers.network_library.SearchTaskService.configure"
-        ) as configure, mock.patch(
-            "webserver.handlers.network_library.SearchTaskService.create_task",
-            return_value={"task_id": "configured", "total": 1},
+        with (
+            mock.patch("webserver.services.source_catalog.SourceCatalogService.prepare_search", return_value=[]),
+            mock.patch("webserver.handlers.network_library.SearchTaskService.configure") as configure,
+            mock.patch(
+                "webserver.handlers.network_library.SearchTaskService.create_task",
+                return_value={"task_id": "configured", "total": 1},
+            ),
         ):
-            result = self.json(
-                "/api/book-sources/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid))
-            )
+            result = self.json("/api/book-sources/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
 
         self.assertEqual(result["err"], "ok")
         configure.assert_called_once_with(7)
@@ -212,7 +212,9 @@ class TestNetworkLibrary(TestWithUserLogin):
             .count()
         )
 
-        created = self.json("/api/network/search?key=%s&mode=all" % Q("剑来"))
+        created = self.json(
+            "/api/network/search?key=%s&mode=all&sources=%s" % (Q("剑来"), Q("legado:%s,legado:%s" % (self.sid, second.id)))
+        )
         result = self._wait_finished(created["task_id"])
         self.assertTrue(result["finished"])
 
@@ -242,7 +244,7 @@ class TestNetworkLibrary(TestWithUserLogin):
             .first()
         )
         previous_run_id = previous_run.id if previous_run is not None else 0
-        created = self.json("/api/network/search?key=%s" % Q("剑来"))
+        created = self.json("/api/network/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
         self.assertTrue(created["task_id"])
 
         deadline = time.time() + 5
@@ -276,7 +278,7 @@ class TestNetworkLibrary(TestWithUserLogin):
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_search_empty_result(self, m_session):
         m_session.return_value = FakeSession({})  # 无任何响应 -> 空结果
-        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        d = self.json("/api/network/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
         self.assertEqual(d["err"], "ok")
         s = self._wait_finished(d["task_id"])
         self.assertTrue(s["finished"])
@@ -291,7 +293,7 @@ class TestNetworkLibrary(TestWithUserLogin):
     def test_search_weight_increment(self, m_session):
         m_session.return_value = self._fake()
         # 搜索并等完成：命中的源权重应 +1（用于“近期可用”排序）
-        d = self.json("/api/network/search?key=%s" % Q("剑来"))
+        d = self.json("/api/network/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
         s = self._wait_finished(d["task_id"])
         self.assertTrue(s["finished"])
         self.assertEqual(len(s["results"]), 1)

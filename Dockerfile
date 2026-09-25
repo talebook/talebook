@@ -202,6 +202,19 @@ RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
     chmod +x /var/www/talebook/server.py && \
     chmod +x /var/www/talebook/webserver/migrate_db.py
 
+# Immutable upgrade executor and actual runtime attestation. No application package can replace it.
+ARG UPGRADE_SEQUENCE="0"
+ARG GIT_COMMIT=""
+ENV TALEBOOK_UPGRADE_MODE=spa
+COPY scripts/upgrade/protocol.py scripts/upgrade/executor.py scripts/upgrade/fingerprint.py /opt/talebook-upgrade/
+COPY webserver/self_check.py /opt/talebook-upgrade/self_check.py
+COPY Dockerfile requirements.txt /opt/talebook-contract/
+COPY conf/ /opt/talebook-contract/conf/
+COPY docker/start.sh /opt/talebook-contract/docker/start.sh
+COPY webserver/models.py webserver/migrate_db.py webserver/self_check.py /opt/talebook-contract/webserver/
+RUN python3 /opt/talebook-upgrade/fingerprint.py /opt/talebook-contract /opt/talebook-upgrade/image.json \
+    "$TARGETARCH$TARGETVARIANT" "$GIT_VERSION" "$UPGRADE_SEQUENCE" "$GIT_COMMIT"
+
 EXPOSE 80 443
 
 VOLUME ["/data"]
@@ -212,6 +225,7 @@ CMD ["/var/www/talebook/docker/start.sh"]
 # ----------------------------------------
 # 生产环境（server side render版)
 FROM production AS production-ssr
+ENV TALEBOOK_UPGRADE_MODE=ssr
 
 USER root
 RUN mkdir -p /var/lib/apt/lists/partial && \
@@ -248,6 +262,7 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 # 构建：docker build --target dev -t talebook/talebook:dev .
 # 使用：docker-compose -f dev.yml up
 FROM test AS dev
+ENV TALEBOOK_UPGRADE_MODE=dev
 ARG BUILD_COUNTRY=""
 ARG GIT_VERSION=""
 ARG TARGETARCH

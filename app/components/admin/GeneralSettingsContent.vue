@@ -441,48 +441,7 @@
                         </template>
 
                         <template v-if="card.show_update">
-                            <div class="pa-2">
-                                <div class="d-flex align-center mb-2">
-                                    <v-icon color="primary" class="mr-2">mdi-update</v-icon>
-                                    <span class="text-subtitle-2 font-weight-medium">{{ t('admin.settings.label.currentVersion') }}:</span>
-                                    <v-chip size="small" class="ml-2" color="primary">{{ updateInfo.current_version || '—' }}</v-chip>
-                                </div>
-                                <div v-if="updateInfo.has_update" class="d-flex align-center mb-2">
-                                    <v-icon color="success" class="mr-2">mdi-arrow-up-bold</v-icon>
-                                    <span class="text-subtitle-2 font-weight-medium">{{ t('admin.settings.label.latestVersion') }}:</span>
-                                    <v-chip size="small" class="ml-2" color="success">{{ updateInfo.latest_version }}</v-chip>
-                                    <v-btn
-                                        v-if="updateInfo.latest_release_url"
-                                        variant="text"
-                                        size="small"
-                                        class="ml-2"
-                                        :href="updateInfo.latest_release_url"
-                                        target="_blank"
-                                    >
-                                        <v-icon start size="small">mdi-open-in-new</v-icon>{{ t('admin.settings.button.viewRelease') }}
-                                    </v-btn>
-                                </div>
-                                <div v-else-if="updateInfo.latest_version" class="d-flex align-center mb-2">
-                                    <v-icon color="success" class="mr-2">mdi-check-circle</v-icon>
-                                    <span class="text-success">{{ t('admin.settings.message.upToDate') }}</span>
-                                </div>
-                                <p v-if="updateInfo.check_error" class="text-error text-caption mb-2">
-                                    {{ t('admin.settings.message.checkError') }}: {{ updateInfo.check_error }}
-                                </p>
-                                <p v-if="updateInfo.last_check_time" class="text-caption text-medium-emphasis mb-2">
-                                    {{ t('admin.settings.label.lastCheckTime') }}: {{ formatCheckTime(updateInfo.last_check_time) }}
-                                </p>
-                                <div v-if="updateInfo.has_update && updateInfo.latest_release_body" class="mb-2">
-                                    <div class="text-caption text-medium-emensity" style="white-space: pre-wrap; max-height: 200px; overflow-y: auto;" v-html="marked(updateInfo.latest_release_body)"></div>
-                                </div>
-                                <v-btn
-                                    color="primary"
-                                    :loading="updateChecking"
-                                    @click="checkForUpdate"
-                                >
-                                    <v-icon start>mdi-refresh</v-icon>{{ t('admin.settings.button.checkUpdate') }}
-                                </v-btn>
-                            </div>
+                            <AdminApplicationUpgrade :current-version="updateInfo.current_version" />
                         </template>
 
                         <template v-if="card.show_trash">
@@ -560,8 +519,6 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue';
-import { marked } from 'marked';
-marked.setOptions({ breaks: true, gfm: true });
 import { useI18n } from 'vue-i18n';
 import { useDisplay } from 'vuetify';
 import SSLManager from '~/components/SSLManager.vue';
@@ -592,7 +549,6 @@ const updateInfo = ref({
     check_error: null,
     last_check_time: null,
 });
-const updateChecking = ref(false);
 
 // Database management state
 const dbNewType = ref('mysql');
@@ -1115,33 +1071,6 @@ const fetchUpdateStatus = () => {
             updateInfo.value = rsp.status;
         }
     });
-};
-
-const checkForUpdate = () => {
-    updateChecking.value = true;
-    $backend('/admin/update', {
-        method: 'POST',
-    }).then(rsp => {
-        updateChecking.value = false;
-        if (rsp && rsp.err === 'ok' && rsp.status) {
-            updateInfo.value = rsp.status;
-            if (rsp.status.has_update) {
-                if ($alert) $alert('info', t('admin.settings.message.updateAvailable', { version: rsp.status.latest_version }));
-            } else if (rsp.status.check_error) {
-                if ($alert) $alert('error', t('admin.settings.message.checkError') + ': ' + rsp.status.check_error);
-            } else {
-                if ($alert) $alert('success', t('admin.settings.message.upToDate'));
-            }
-        }
-    }).catch(() => {
-        updateChecking.value = false;
-    });
-};
-
-const formatCheckTime = (timestamp) => {
-    if (!timestamp) return '';
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString();
 };
 
 useHead(() => ({
