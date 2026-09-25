@@ -1,3 +1,4 @@
+import { withBasePath } from '@/utils/base-path';
 import { useMainStore } from '@/stores/main';
 
 export default defineNuxtPlugin((nuxtApp) => {
@@ -82,7 +83,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         'X-Scheme': headers['x-scheme'],
       };
     } else {
-      server = window.location.origin;
+      server = window.location.origin + withBasePath('/').replace(/\/$/, '');
     }
 
     var full_url = server + '/api' + url;
@@ -150,7 +151,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     };
 
     const config = useRuntimeConfig();
-    const server = import.meta.server ? config.public.api_url : window.location.origin;
+    const server = import.meta.server ? config.public.api_url : window.location.origin + withBasePath('/').replace(/\/$/, '');
 
     if (options !== undefined) {
       Object.assign(args, options);
@@ -201,7 +202,7 @@ const STATUS_CODE_HINTS = {
 
 const STATUS_STARTING_MSG = '服务器正在启动中，请稍候...';
 const STATUS_FAILED_FALLBACK_MSG = '服务器启动失败。';
-const STATUS_PAGE_LINK = '<br/><a href="/status_page.html" target="_blank">查看详细启动状态</a>';
+const STATUS_PAGE_LINK = `<br/><a href="${withBasePath('/status_page.html')}" target="_blank">查看详细启动状态</a>`;
 
 // 根据 /status.json 的内容为 502 场景生成提示：拿不到该文件（老镜像/尚未生成）或
 // phase 还在 starting，保留原有的通用"启动中"提示；phase 为 failed 时换成具体建议，

@@ -11,6 +11,7 @@ import tornado.escape
 import tornado.ioloop
 import tornado.web
 
+from webserver.base_path import public_url
 from webserver.handlers.base import BaseHandler, auth, js
 from webserver.i18n import _, get_language
 from webserver.models import Item, Reader, ReadingState
@@ -171,7 +172,7 @@ class ComicManifestHandler(ComicHandlerMixin, BaseHandler):
     def _public_page(self, book_id, revision, page):
         data = page.to_public_dict(book_id, revision)
         token = self.create_page_token(book_id, page.index, revision)
-        data["url"] += "&token=" + urllib.parse.quote(token, safe="")
+        data["url"] = public_url(data["url"]) + "&token=" + urllib.parse.quote(token, safe="")
         return data
 
 

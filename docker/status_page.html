@@ -75,7 +75,7 @@ function render(doc) {
 }
 
 function poll() {
-  fetch('/status.json', { cache: 'no-store' })
+  fetch('./status.json', { cache: 'no-store' })
     .then(function (rsp) {
       if (!rsp.ok) { throw new Error('status ' + rsp.status); }
       return rsp.json();
