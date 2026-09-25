@@ -17,8 +17,10 @@ from webserver.services.external_index import (
     EXTERNAL_INDEX_FLAG,
     add_external_index_record,
 )
+from webserver.services.import_metadata import filename_metadata, matching_import_books
 from webserver.services.media_analysis import (
     COMIC_CONTAINER_FORMATS,
+    MANAGED_DOCUMENT_FORMATS,
     SUPPORTED_MEDIA_FORMATS,
     InvalidMediaError,
     analyze_media_file,
@@ -313,7 +315,9 @@ class ScanService(AsyncService):
             self._set_row_data(row, **analysis.to_dict())
 
             mi = None
-            if fmt in COMIC_CONTAINER_FORMATS:
+            if fmt in MANAGED_DOCUMENT_FORMATS:
+                mi = filename_metadata(fpath)
+            elif fmt in COMIC_CONTAINER_FORMATS:
                 from calibre.ebooks.metadata.book.base import Metadata
 
                 mi = Metadata(os.path.splitext(fname)[0], [_("佚名")])
@@ -360,12 +364,12 @@ class ScanService(AsyncService):
             ids = self.db.books_with_same_title(mi)
             if ids:
                 # 区分同名同作者和同名不同作者的书籍
-                for b in self.db.get_data_as_dict(ids=list(ids)):
+                for b in matching_import_books(mi, fmt, self.db.get_data_as_dict(ids=list(ids))):
                     book_authors = b.get("authors", [])
                     mi_authors = mi.authors
 
                     # 检查作者是否相同
-                    if set(book_authors) == set(mi_authors):
+                    if fmt in MANAGED_DOCUMENT_FORMATS or set(book_authors) == set(mi_authors):
                         if fmt.upper() in b.get("available_formats", ""):
                             row.book_id = b["id"]
                             row.status = ScanFile.EXIST
@@ -472,7 +476,10 @@ class ScanService(AsyncService):
             **{EXTERNAL_INDEX_FLAG: True},
             index_note=_("仅索引模式已将原始文件路径写入 Calibre 书库"),
         )
-        return self.save_or_rollback(row)
+        saved = self.save_or_rollback(row)
+        if saved and fmt in MANAGED_DOCUMENT_FORMATS:
+            AutoFillService().auto_fill(book_id)
+        return saved
 
     @AsyncService.register_service
     def do_import(self, hashlist, user_id, delete_after=False, import_mode=None):
@@ -516,7 +523,9 @@ class ScanService(AsyncService):
             self._set_row_data(row, **analysis.to_dict())
 
             mi = None
-            if fmt in COMIC_CONTAINER_FORMATS:
+            if fmt in MANAGED_DOCUMENT_FORMATS:
+                mi = filename_metadata(fpath)
+            elif fmt in COMIC_CONTAINER_FORMATS:
                 from calibre.ebooks.metadata.book.base import Metadata
 
                 mi = Metadata(os.path.splitext(fname)[0], [_("佚名")])
@@ -555,12 +564,12 @@ class ScanService(AsyncService):
                 # 区分同名同作者和同名不同作者的书籍
                 same_author_book_id = None
 
-                for b in self.db.get_data_as_dict(ids=list(ids)):
+                for b in matching_import_books(mi, fmt, self.db.get_data_as_dict(ids=list(ids))):
                     book_authors = b.get("authors", [])
                     mi_authors = mi.authors
 
                     # 检查作者是否相同
-                    if set(book_authors) == set(mi_authors):
+                    if fmt in MANAGED_DOCUMENT_FORMATS or set(book_authors) == set(mi_authors):
                         same_author_book_id = b["id"]
                         if fmt.upper() in b.get("available_formats", ""):
                             row.status = ScanFile.EXIST
@@ -589,6 +598,8 @@ class ScanService(AsyncService):
                     self.db.add_format(row.book_id, fmt.upper(), fpath, True)
                     self._set_item_media_type(row.book_id, user_id, analysis.media_type)
                     self._mark_imported(row, fpath, fmt, import_mode)
+                    if fmt in MANAGED_DOCUMENT_FORMATS:
+                        imported.append(row.book_id)
                 elif row.status != ScanFile.EXIST:
                     if import_mode == IMPORT_MODE_INDEX:
                         logging.info("index [%s] from %s as new external file", repr(mi.title), fpath)

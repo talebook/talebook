@@ -372,7 +372,7 @@
                                 variant="outlined"
                                 density="compact"
                                 show-size
-                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.cbz,.zip,.cbr,.rar"
+                                accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.djvu,.uvz,.cbz,.zip,.cbr,.rar"
                                 prepend-icon="mdi-file-document"
                             />
                             <v-alert

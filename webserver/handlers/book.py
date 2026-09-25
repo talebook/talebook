@@ -60,9 +60,11 @@ from webserver.services.external_index import (
     set_metadata_preserving_external_paths,
 )
 from webserver.services.extract import ExtractService
+from webserver.services.import_metadata import filename_metadata, matching_import_books
 from webserver.services.mail import MailService
 from webserver.services.media_analysis import (
     COMIC_CONTAINER_FORMATS,
+    MANAGED_DOCUMENT_FORMATS,
     InvalidMediaError,
     analyze_media_file,
     has_mixed_media_formats,
@@ -1094,6 +1096,13 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
             self.set_header("Content-Type", "application/octet-stream")
         return path
 
+    def get_content_type(self):
+        # StaticFileHandler sets this after parse_url_path; keep managed-only
+        # formats as downloads instead of using the host's MIME association.
+        if os.path.splitext(self.absolute_path)[1].lower().lstrip(".") in MANAGED_DOCUMENT_FORMATS:
+            return "application/octet-stream"
+        return super().get_content_type()
+
     @classmethod
     def get_absolute_path(cls, root: str, path: str) -> str:
         return path
@@ -1377,7 +1386,9 @@ class BookUploadBase(BaseHandler):
             return {"err": "params.format", "msg": _("文件校验失败：%s") % err.message}
 
         # 漫画容器不解压读取元数据，使用文件名构造最小 Calibre metadata。
-        if fmt in COMIC_CONTAINER_FORMATS:
+        if fmt in MANAGED_DOCUMENT_FORMATS:
+            mi = filename_metadata(fpath)
+        elif fmt in COMIC_CONTAINER_FORMATS:
             from calibre.ebooks.metadata.book.base import Metadata
 
             mi = Metadata(os.path.splitext(os.path.basename(fpath))[0], [_("佚名")])
@@ -1403,19 +1414,28 @@ class BookUploadBase(BaseHandler):
 
         if books:
             # 区分同名同作者和同名不同作者的书籍
-            for b in self.db.get_data_as_dict(ids=books):
+            candidates = self.db.get_data_as_dict(ids=books)
+            if fmt in MANAGED_DOCUMENT_FORMATS:
+                candidates = [
+                    book
+                    for book in candidates
+                    if self.current_user
+                    and self.current_user.can_edit()
+                    and (self.is_admin() or self.is_book_owner(book["id"], self.user_id()))
+                ]
+            for b in matching_import_books(mi, fmt, candidates):
                 book_authors = b.get("authors", [])
                 mi_authors = mi.authors
 
                 # 检查作者是否相同
-                if set(book_authors) == set(mi_authors):
+                if fmt in MANAGED_DOCUMENT_FORMATS or set(book_authors) == set(mi_authors):
                     same_author_book_id = b.get("id")
                     # 检查是否已存在相同格式。重传也会回填旧记录的媒体分类。
                     if fmt.upper() in b.get("available_formats", ""):
                         self._save_media_type(same_author_book_id, analysis.media_type)
                         return {
                             "err": "samebook",
-                            "msg": _("同名同作者书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
+                            "msg": _("书籍《%s》已存在这一图书格式 %s") % (mi.title, fmt),
                             "book_id": same_author_book_id,
                         }
 
