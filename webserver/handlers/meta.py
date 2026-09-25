@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 import logging
 from functools import cmp_to_key
+from urllib.parse import quote
 
 import tornado.escape
 
@@ -39,7 +40,7 @@ class AuthorBooksUpdate(ListHandler):
         ids = self.db.get_books_for_category(category, author_id)
         for book_id in list(ids)[:40]:
             self.do_book_update(book_id)
-        self.redirect("/author/%s" % name, 302)
+        self.redirect("/author/%s" % quote(name, safe=""), status=302)
 
 
 class PubBooksUpdate(ListHandler):
@@ -54,7 +55,7 @@ class PubBooksUpdate(ListHandler):
             ids = [b["id"] for b in books if not b["publisher"]]
         for book_id in list(ids)[:40]:
             self.do_book_update(book_id)
-        self.redirect("/publisher/%s" % name, 302)
+        self.redirect("/publisher/%s" % quote(name, safe=""), status=302)
 
 
 class MetaList(ListHandler):

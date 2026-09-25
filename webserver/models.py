@@ -6,7 +6,7 @@ import hashlib
 import json
 import logging
 import os
-import time
+import secrets
 
 import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
@@ -110,7 +110,8 @@ class Reader(Base, SQLAlchemyMixin):
     OVERSIZE_SHRINK_RATE = 0.8
     SQLITE_MAX_LENGTH = 32 * 1024.0
 
-    RE_EMAIL = r"[^@]+@[^@]+\.[^@]+"
+    # Dot-separated domain labels cannot overlap, keeping validation linear.
+    RE_EMAIL = r"[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\Z"
     RE_USERNAME = r"[a-z][a-z0-9_]*"
     RE_PASSWORD = r'[-a-zA-Z0-9!@#$%^&*()_+=[\]{};\':",./<>?\|]*'
 
@@ -166,8 +167,8 @@ class Reader(Base, SQLAlchemyMixin):
         self.init_avatar(social_user)
 
     def reset_password(self):
-        s = "%s%s%s" % (self.username, self.create_time.strftime("%s"), time.time())
-        p = hashlib.md5(s.encode("UTF-8")).hexdigest()[:16]
+        # 96 bits of entropy; preserve the existing 16-character password length.
+        p = secrets.token_urlsafe(12)
         self.set_secure_password(p)
         return p
 

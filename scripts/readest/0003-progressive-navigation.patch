@@ -1,0 +1,435 @@
+diff --git a/apps/readest-app/src/__tests__/services/progressiveNav.test.ts b/apps/readest-app/src/__tests__/services/progressiveNav.test.ts
+new file mode 100644
+index 0000000..10ba51c
+--- /dev/null
++++ b/apps/readest-app/src/__tests__/services/progressiveNav.test.ts
+@@ -0,0 +1,134 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import type { BookDoc } from '@/libs/document';
++import { canDeferBookNav, prepareProgressiveNav, completeProgressiveNav, deferredNavTask } from '@/services/nav/progressive';
++
++vi.mock('@/utils/simplecc', () => ({ initSimpleCC: vi.fn(), runSimpleCC: (s: string) => s }));
++vi.mock('@/libs/document', () => ({ CFI: {
++  fromElements: () => ['/4/2'], joinIndir: (a: string, b: string) => a + b,
++} }));
++
++function fixture(count = 3) {
++  const html = '<html><body><h1 id="chapter">Chapter</h1><p>Text</p></body></html>';
++  const sections = Array.from({ length: count }, (_, i) => ({
++    id: `s${i}`, cfi: `epubcfi(/6/${2 * i + 2})`, size: 3000,
++    loadText: vi.fn(async () => html),
++    createDocument: vi.fn(async () => new DOMParser().parseFromString(html, 'text/html')),
++  }));
++  const book = { metadata: {}, rendition: {}, sections,
++    toc: sections.map((s) => ({ href: `${s.id}#chapter`, label: s.id })),
++    splitTOCHref: (href: string) => href.split('#'),
++  } as unknown as BookDoc;
++  return { book, sections };
++}
++
++afterEach(() => vi.useRealTimers());
++
++describe('progressive navigation', () => {
++  it('prepares usable hrefs and total positions without reading any chapter', () => {
++    const { book, sections } = fixture();
++    prepareProgressiveNav(book);
++    expect(book.toc![1]!.href).toBe('s1#chapter');
++    expect(book.toc![1]!.location?.total).toBeGreaterThan(0);
++    for (const s of sections) {
++      expect(s.loadText).not.toHaveBeenCalled();
++      expect(s.createDocument).not.toHaveBeenCalled();
++    }
++  });
++
++  it('fills precise anchors without replacing live objects, IDs, labels or sizes', async () => {
++    const { book, sections } = fixture();
++    const original = prepareProgressiveNav(book);
++    const toc = book.toc!;
++    const item = toc[1]!;
++    item.id = 42;
++    item.label = 'converted label';
++    const nav = await completeProgressiveNav(book, new AbortController().signal, original);
++    expect(book.toc).not.toBe(toc);
++    expect(book.toc![1]).toBe(item);
++    expect(item.id).toBe(42);
++    expect(item.label).toBe('converted label');
++    expect(item.cfi).toContain('/4/2');
++    expect(nav!.toc[1]!.label).toBe('s1');
++    expect(sections.map((s) => s.size)).toEqual([3000, 3000, 3000]);
++    expect(book.sections[1]!.fragments).toHaveLength(1);
++  });
++
++  it('does not mutate the visible index until all work completes; abort discards it', async () => {
++    const { book, sections } = fixture();
++    const original = prepareProgressiveNav(book);
++    let finish!: (text: string) => void;
++    sections[0]!.loadText.mockImplementation(() => new Promise((r) => { finish = r; }));
++    const controller = new AbortController();
++    const pending = completeProgressiveNav(book, controller.signal, original);
++    await vi.waitFor(() => expect(finish).toBeDefined());
++    expect(book.sections[0]!.fragments).toBeUndefined();
++    controller.abort();
++    finish('done');
++    expect(await pending).toBeNull();
++    expect(book.sections[0]!.fragments).toBeUndefined();
++  });
++
++  it('keeps sparse, sorted, fixed-layout and non-online books on the complete path', () => {
++    const { book } = fixture(100);
++    expect(canDeferBookNav(book, true, false)).toBe(true);
++    expect(canDeferBookNav(book, false, false)).toBe(false);
++    expect(canDeferBookNav(book, true, true)).toBe(false);
++    book.rendition = { layout: 'pre-paginated' } as never;
++    expect(canDeferBookNav(book, true, false)).toBe(false);
++    book.rendition = {} as never;
++    book.toc = book.toc!.slice(0, 1);
++    expect(canDeferBookNav(book, true, false)).toBe(false);
++  });
++
++  it('limits background reads to two and stops queued reads after close', async () => {
++    const { book, sections } = fixture(10);
++    const original = prepareProgressiveNav(book);
++    const releases: Array<(s: string) => void> = [];
++    sections.forEach(s => s.loadText.mockImplementation(() => new Promise(r => releases.push(r))));
++    const controller = new AbortController();
++    const pending = completeProgressiveNav(book, controller.signal, original);
++    await vi.waitFor(() => expect(releases).toHaveLength(2));
++    expect(sections[2]!.loadText).not.toHaveBeenCalled();
++    controller.abort();
++    releases.forEach(release => release('content'));
++    expect(await pending).toBeNull();
++    expect(sections[2]!.loadText).not.toHaveBeenCalled();
++  });
++
++  it('does not apply or cache a partially failed background index', async () => {
++    const { book, sections } = fixture();
++    const original = prepareProgressiveNav(book);
++    sections[1]!.createDocument.mockRejectedValue(new Error('network unavailable'));
++    await expect(completeProgressiveNav(book, new AbortController().signal, original)).rejects.toThrow('network unavailable');
++    expect(book.sections.every(s => !s.fragments)).toBe(true);
++  });
++
++  it('waits for first progress and a paint opportunity, runs once, and cancels pending work', async () => {
++    vi.useFakeTimers();
++    const run = vi.fn(async (_signal: AbortSignal) => {});
++    const task = deferredNavTask(run);
++    await vi.advanceTimersByTimeAsync(1000);
++    expect(run).not.toHaveBeenCalled();
++    task.start(); task.start();
++    await vi.advanceTimersByTimeAsync(99);
++    expect(run).not.toHaveBeenCalled();
++    await vi.advanceTimersByTimeAsync(1);
++    expect(run).toHaveBeenCalledOnce();
++    task.cancel();
++    expect(run.mock.calls[0]![0].aborted).toBe(true);
++    const other = deferredNavTask(run);
++    other.start(); other.cancel();
++    await vi.runAllTimersAsync();
++    expect(run).toHaveBeenCalledOnce();
++  });
++
++  it('contains optional failure instead of rejecting the reader open', async () => {
++    vi.useFakeTimers();
++    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
++    const task = deferredNavTask(async () => { throw new Error('unavailable'); });
++    task.start();
++    await vi.runAllTimersAsync();
++    expect(warning).toHaveBeenCalledOnce();
++    warning.mockRestore();
++  });
++});
+diff --git a/apps/readest-app/src/__tests__/store/reader-store.test.ts b/apps/readest-app/src/__tests__/store/reader-store.test.ts
+index b9f8c45..60d177e 100644
+--- a/apps/readest-app/src/__tests__/store/reader-store.test.ts
++++ b/apps/readest-app/src/__tests__/store/reader-store.test.ts
+@@ -56,6 +56,7 @@ vi.mock('@/utils/path', () => ({
+ }));
+ vi.mock('@/services/constants', () => ({
+   SUPPORTED_LANGNAMES: {},
++  SIZE_PER_LOC: 1500,
+ }));
+ vi.mock('@/libs/document', () => ({
+   DocumentLoader: vi.fn(),
+@@ -120,6 +121,48 @@ describe('readerStore', () => {
+   });
+
+   describe('initViewState', () => {
++    test('online open is readable before optional indexing; close cancels the queued index', async () => {
++      const key = 'progressive-0';
++      window.__MOKE_EMBEDDED = true;
++      window.__MOKE_SOURCE_SERVER_URL = 'https://books.example';
++      const book = { hash: 'progressive', format: 'EPUB', title: 'Book' } as Book;
++      const config = { viewSettings: {}, booknotes: [] } as unknown as BookConfig;
++      const doc = { metadata: { title: 'Book' }, rendition: {},
++        toc: [{ href: 'chapter#start', label: 'Chapter' }],
++        sections: [{ id: 'chapter', size: 3000, cfi: 'epubcfi(/6/2)' }],
++        splitTOCHref: (href: string) => href.split('#'),
++      } as unknown as BookDoc;
++      const service = {
++        loadBookContent: vi.fn(async () => ({ file: new File(['x'], 'book.epub') })),
++        loadBookConfig: vi.fn(async () => config), loadBookNav: vi.fn(async () => null),
++        saveBookNav: vi.fn(),
++      };
++      vi.mocked(useLibraryStore.getState().getBookByHash).mockReturnValue(book);
++      useSettingsStore.setState({ settings: { globalViewSettings: {} } as never });
++      vi.mocked(DocumentLoader).mockImplementation(function () {
++        return { open: async () => ({ book: doc }) };
++      } as never);
++      vi.mocked(computeBookNav).mockClear();
++      vi.mocked(isBookNavCacheCurrent).mockReturnValue(false);
++      try {
++        await useReaderStore.getState().initViewState({ getAppService: async () => service } as never, book.hash, key);
++        expect(useReaderStore.getState().getViewState(key)?.loading).toBe(false);
++        expect(computeBookNav).not.toHaveBeenCalled();
++        const page = { current: 0, next: 1, total: 10 };
++        useReaderStore.getState().setProgress(key, 'epubcfi(/6/2)', doc.toc![0]!, undefined,
++          page, page, { section: 1, total: 10 }, document.createRange(), 0.1);
++        expect(computeBookNav).not.toHaveBeenCalled();
++        useReaderStore.getState().clearViewState(key);
++        await new Promise((resolve) => setTimeout(resolve, 150));
++        expect(computeBookNav).not.toHaveBeenCalled();
++        expect(service.saveBookNav).not.toHaveBeenCalled();
++      } finally {
++        useReaderStore.getState().clearViewState(key);
++        window.__MOKE_EMBEDDED = false;
++        window.__MOKE_SOURCE_SERVER_URL = undefined;
++      }
++    });
++
+     test('starts independent content and sidecar reads and reuses the authorized native path', async () => {
+       let resolveContent!: (content: BookContent) => void;
+       const contentPromise = new Promise<BookContent>((resolve) => {
+diff --git a/apps/readest-app/src/services/nav/enrichment.ts b/apps/readest-app/src/services/nav/enrichment.ts
+index 8f4afc8..dc40ef0 100644
+--- a/apps/readest-app/src/services/nav/enrichment.ts
++++ b/apps/readest-app/src/services/nav/enrichment.ts
+@@ -96,14 +96,19 @@ const hrefSection = (href: string): string => {
+   return idx < 0 ? href : href.slice(0, idx);
+ };
+
++export const needsTocEnrichment = (bookDoc: BookDoc, toc: TOCItem[] = bookDoc.toc ?? []) => {
++  const count = bookDoc.sections?.length ?? 0;
++  const flatCount = collectAllTocItems(toc).length;
++  return count > NAV_ENRICH_MIN_SECTIONS &&
++    (flatCount === 0 || count > NAV_ENRICH_TOC_RATIO * flatCount);
++};
++
+ export const enrichTocFromNavElements = async (
+   bookDoc: BookDoc,
+   tocClone: TOCItem[],
+ ): Promise<boolean> => {
+   const sections = bookDoc.sections ?? [];
+-  if (sections.length <= NAV_ENRICH_MIN_SECTIONS) return false;
+-  const flatCount = collectAllTocItems(tocClone).length;
+-  if (flatCount > 0 && sections.length <= NAV_ENRICH_TOC_RATIO * flatCount) return false;
++  if (!needsTocEnrichment(bookDoc, tocClone)) return false;
+
+   const existingHrefs = new Set<string>();
+   for (const item of collectAllTocItems(tocClone)) {
+diff --git a/apps/readest-app/src/services/nav/index.ts b/apps/readest-app/src/services/nav/index.ts
+index 7e83ebe..5bd7a2a 100644
+--- a/apps/readest-app/src/services/nav/index.ts
++++ b/apps/readest-app/src/services/nav/index.ts
+@@ -134,7 +134,10 @@ export const updateToc = async (
+  * result is persisted to Books/{hash}/nav.json and replayed via
+  * hydrateBookNav on subsequent opens.
+  */
+-export const computeBookNav = async (bookDoc: BookDoc): Promise<BookNav> => {
++export const computeBookNav = async (
++  bookDoc: BookDoc,
++  options: { background?: boolean; signal?: AbortSignal } = {},
++): Promise<BookNav> => {
+   const tocClone = cloneTocItems(bookDoc.toc ?? []);
+   const sections: Record<string, BookNavSection> = {};
+   const enrichedNav = await enrichTocFromNavElements(bookDoc, tocClone);
+@@ -164,8 +167,12 @@ export const computeBookNav = async (bookDoc: BookDoc): Promise<BookNav> => {
+   type SectionEntry = [string, BookNavSection];
+   const taskOutcomes = await runWithConcurrency(
+     Array.from(groups.entries()),
+-    NAV_BUILD_CONCURRENCY,
++    options.background ? 2 : NAV_BUILD_CONCURRENCY,
+     async ([sectionId, { base, fragments }]): Promise<SectionEntry | null> => {
++      if (options.signal?.aborted) return null;
++      // Yield between background sections even when all bytes are cached.
++      if (options.background) await new Promise((resolve) => setTimeout(resolve, 0));
++      if (options.signal?.aborted) return null;
+       const section = sectionMap.get(sectionId);
+       if (!section || fragments.length === 0) return null;
+       if (!section.loadText) return null;
+@@ -177,6 +184,7 @@ export const computeBookNav = async (bookDoc: BookDoc): Promise<BookNav> => {
+       // is one read + one parse, not two reads.
+       const contentP = section.loadText();
+       const docP = section.createDocument().catch((e: unknown) => {
++        if (options.background) throw e;
+         console.warn(`Failed to parse section ${sectionId} for fragment CFIs:`, e);
+         return null;
+       });
+@@ -199,6 +207,7 @@ export const computeBookNav = async (bookDoc: BookDoc): Promise<BookNav> => {
+
+   for (const outcome of taskOutcomes) {
+     if ('error' in outcome) {
++      if (options.background) throw outcome.error;
+       const [sectionId] = outcome.item;
+       console.warn(`Failed to build section ${sectionId} for fragment CFIs:`, outcome.error);
+       continue;
+diff --git a/apps/readest-app/src/services/nav/progressive.ts b/apps/readest-app/src/services/nav/progressive.ts
+new file mode 100644
+index 0000000..b0d156d
+--- /dev/null
++++ b/apps/readest-app/src/services/nav/progressive.ts
+@@ -0,0 +1,72 @@
++import type { BookDoc, TOCItem } from '@/libs/document';
++import { computeBookNav, type BookNav } from './index';
++import { needsTocEnrichment } from './enrichment';
++import { cloneTocItems, collectAllTocItems, groupTocSubitems } from './grouping';
++import { bakeLocationsAndCfis } from './locations';
++
++// Sparse TOCs and sorted TOCs need the complete index before presentation.
++// Fixed layout and native/local reading retain the original initialization.
++export function canDeferBookNav(book: BookDoc, online: boolean, sorted: boolean): boolean {
++  return online && !sorted && book.rendition?.layout !== 'pre-paginated' &&
++    !!book.toc?.length && !needsTocEnrichment(book);
++}
++
++export function prepareProgressiveNav(book: BookDoc) {
++  book.toc = cloneTocItems(book.toc ?? []);
++  groupTocSubitems(book, book.toc);
++  bakeLocationsAndCfis(book.toc, book.sections, (href) => book.splitTOCHref(href));
++  return cloneTocItems(book.toc);
++}
++
++export async function completeProgressiveNav(
++  book: BookDoc, signal: AbortSignal, originalToc: TOCItem[],
++): Promise<BookNav | null> {
++  if (signal.aborted) return null;
++  // computeBookNav writes fragments to its sections. Isolate those writes until
++  // the whole result is ready, preserving the currently readable document.
++  const scratch = Object.assign(Object.create(Object.getPrototypeOf(book)), book, {
++    // Persist original labels, never the per-open Chinese conversion.
++    toc: cloneTocItems(originalToc),
++    sections: book.sections.map((section) => ({ ...section })),
++  }) as BookDoc;
++  const nav = await computeBookNav(scratch, { background: true, signal });
++  if (signal.aborted) return null;
++  const completed = collectAllTocItems(nav.toc);
++  const live = collectAllTocItems(book.toc ?? []);
++  // This path never enriches/reorders the TOC. Refuse an unexpected structural
++  // result rather than invalidating Foliate's private TOCProgress references.
++  if (live.length !== completed.length || live.some((item, i) => item.href !== completed[i]?.href)) {
++    throw new Error('Progressive navigation changed TOC structure');
++  }
++  for (const section of book.sections) section.fragments = nav.sections[section.id]?.fragments;
++  live.forEach((item, i) => {
++    item.cfi = completed[i]!.cfi;
++    item.location = completed[i]!.location;
++  });
++  // Rebuild memoized sidebar rows while retaining TOCProgress's item references.
++  book.toc = [...(book.toc ?? [])];
++  // Keep live IDs, labels, hrefs, object identities and renderer position intact.
++  return nav;
++}
++
++export function deferredNavTask(run: (signal: AbortSignal) => Promise<void>) {
++  const controller = new AbortController();
++  let timer: ReturnType<typeof setTimeout> | undefined;
++  let started = false;
++  return {
++    start() {
++      if (started || controller.signal.aborted) return;
++      started = true;
++      // Triggered by first relocate. Give the browser time to paint the page.
++      timer = setTimeout(() => {
++        void run(controller.signal).catch((error) => {
++          if (!controller.signal.aborted) console.warn('Optional navigation indexing failed:', error);
++        });
++      }, 100);
++    },
++    cancel() {
++      controller.abort();
++      clearTimeout(timer);
++    },
++  };
++}
+diff --git a/apps/readest-app/src/store/readerStore.ts b/apps/readest-app/src/store/readerStore.ts
+index 3fbf40e..f8854dc 100644
+--- a/apps/readest-app/src/store/readerStore.ts
++++ b/apps/readest-app/src/store/readerStore.ts
+@@ -22,6 +22,7 @@ import type { FileSystem } from '@/types/system';
+ import { isFeedBookUrl, parseFeedBookUrl } from '@/services/rss/feedBookUrl';
+ import { openFeedBookDoc } from '@/services/rss/feedReader';
+ import { computeBookNav, hydrateBookNav, isBookNavCacheCurrent, updateToc } from '@/services/nav';
++import { canDeferBookNav, prepareProgressiveNav, completeProgressiveNav, deferredNavTask } from '@/services/nav/progressive';
+ import { formatTitle, getMetadataHash, getPrimaryLanguage } from '@/utils/book';
+ import { getBaseFilename } from '@/utils/path';
+ import { SUPPORTED_LANGNAMES } from '@/services/constants';
+@@ -39,6 +40,11 @@ import {
+ } from '@/services/mokeBridge';
+
+ const pendingNavCacheWrites = new Map<string, () => Promise<void>>();
++const progressiveNavTasks = new Map<string, ReturnType<typeof deferredNavTask>>();
++const cancelProgressiveNav = (key: string) => {
++  progressiveNavTasks.get(key)?.cancel();
++  progressiveNavTasks.delete(key);
++};
+
+ const scheduleNavCacheWrite = (bookHash: string, write: () => Promise<void>) => {
+   pendingNavCacheWrites.set(bookHash, write);
+@@ -162,6 +168,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
+   },
+
+   clearViewState: (key: string) => {
++    cancelProgressiveNav(key);
+     // An open that closes before its first relocate has no reason to persist
+     // a warm-open cache afterward.
+     pendingNavCacheWrites.delete(key.split('-')[0]!);
+@@ -184,6 +191,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
+     isPrimary = true,
+     reload = false,
+   ) => {
++    cancelProgressiveNav(key);
+     // 防重入：已经正在加载或已初始化（且不是显式 reload）时直接跳过，
+     // 避免 book:opened 事件被重复发送。
+     const viewState = get().viewStates[key];
+@@ -291,6 +299,26 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
+         const cachedNav = await cachedNavPromise;
+         if (isBookNavCacheCurrent(cachedNav) && process.env['NODE_ENV'] === 'production') {
+           hydrateBookNav(bookDoc, cachedNav);
++        } else if (canDeferBookNav(
++          bookDoc,
++          typeof window !== 'undefined' && !!window.__MOKE_EMBEDDED &&
++            !!window.__MOKE_SOURCE_SERVER_URL,
++          config.viewSettings?.sortedTOC ?? false,
++        )) {
++          const originalToc = prepareProgressiveNav(bookDoc);
++          const liveDoc = bookDoc;
++          progressiveNavTasks.set(key, deferredNavTask(async (signal) => {
++            const freshNav = await completeProgressiveNav(liveDoc, signal, originalToc);
++            if (!freshNav || signal.aborted ||
++                useBookDataStore.getState().booksData[id]?.bookDoc !== liveDoc) return;
++            // Notify sidebar consumers without replacing the renderer or TOC items.
++            useBookDataStore.setState((state) => ({ booksData: {
++              ...state.booksData,
++              [id]: { ...state.booksData[id]! },
++            } }));
++            const currentBook = useLibraryStore.getState().getBookByHash(book.hash);
++            if (currentBook && !currentBook.deletedAt) await appService.saveBookNav(book, freshNav);
++          }));
+         } else {
+           const freshNav = await computeBookNav(bookDoc);
+           hydrateBookNav(bookDoc, freshNav);
+@@ -385,6 +413,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
+         });
+       }
+     } catch (error) {
++      cancelProgressiveNav(key);
+       pendingNavCacheWrites.delete(id);
+       console.error(error);
+       set((state) => ({
+@@ -552,6 +581,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
+     // bandwidth; later page changes are a no-op after the pending write is
+     // removed from the map.
+     flushNavCacheWrite(id);
++    progressiveNavTasks.get(key)?.start();
+   },
+   setBookmarkRibbonVisibility: (key: string, visible: boolean) =>
+     set((state) => ({

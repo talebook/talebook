@@ -1,0 +1,452 @@
+diff --git a/apps/readest-app/src/__tests__/services/remoteFileCache.test.ts b/apps/readest-app/src/__tests__/services/remoteFileCache.test.ts
+new file mode 100644
+index 0000000..cbd6b76
+--- /dev/null
++++ b/apps/readest-app/src/__tests__/services/remoteFileCache.test.ts
+@@ -0,0 +1,124 @@
++import { describe, expect, it, vi } from 'vitest';
++vi.mock('@/utils/misc', () => ({ getOSPlatform: () => 'linux' }));
++vi.mock('@/services/environment', () => ({ isTauriAppPlatform: () => false }));
++import { RemoteFile } from '@/utils/file';
++
++const BLOCK = 16 * 1024;
++async function fixture(size = BLOCK * 24 + 7) {
++  const bytes = Uint8Array.from({ length: size }, (_, i) => i % 251);
++  const ranges: [number, number][] = [];
++  const transport = {
++    maxCacheChunkSize: BLOCK,
++    maxCoalescedRangeSize: BLOCK * 8,
++    fetch: vi.fn(async (_url: string, init?: RequestInit) => {
++      if (init?.method === 'HEAD') {
++        return new Response(null, { headers: { 'content-length': String(size) } });
++      }
++      const [, first, last] = new Headers(init?.headers).get('range')!.match(/bytes=(\d+)-(\d+)/)!;
++      const start = Number(first),
++        end = Number(last);
++      expect(end).toBeLessThan(size);
++      ranges.push([start, end]);
++      return new Response(bytes.slice(start, end + 1), { status: 206 });
++    }),
++  };
++  const file = await new RemoteFile(
++    'https://books.example/book.epub',
++    'book.epub',
++    '',
++    0,
++    transport,
++  ).open();
++  return { file, bytes, ranges, transport };
++}
++
++describe('online aligned Range cache', () => {
++  it('merges different concurrent slices and returns exact cross-block bytes', async () => {
++    const { file, bytes, ranges } = await fixture();
++    const [first, second] = await Promise.all([
++      file.slice(123, BLOCK * 3 + 400).arrayBuffer(),
++      file.slice(BLOCK - 5, BLOCK * 4).arrayBuffer(),
++    ]);
++    expect(new Uint8Array(first)).toEqual(bytes.slice(123, BLOCK * 3 + 400));
++    expect(new Uint8Array(second)).toEqual(bytes.slice(BLOCK - 5, BLOCK * 4));
++    expect(ranges).toEqual([[0, BLOCK * 8 - 1]]);
++    await file.slice(10, BLOCK * 6).arrayBuffer();
++    expect(ranges).toHaveLength(1);
++  });
++
++  it('keeps distant partial-hash probes small and deduplicates adjacent probes', async () => {
++    const { file, ranges } = await fixture();
++    await Promise.all([
++      file.slice(0, 1024).arrayBuffer(),
++      file.slice(1024, 2048).arrayBuffer(),
++      file.slice(BLOCK * 20, BLOCK * 20 + 1024).arrayBuffer(),
++    ]);
++    expect(ranges).toEqual([
++      [0, BLOCK - 1],
++      [BLOCK * 20, BLOCK * 21 - 1],
++    ]);
++  });
++
++  it('does not refetch cached probe blocks when coalescing larger reads', async () => {
++    const { file, bytes, ranges } = await fixture();
++    await file.slice(BLOCK * 3, BLOCK * 3 + 3).arrayBuffer();
++    expect(new Uint8Array(await file.slice(0, BLOCK * 9).arrayBuffer())).toEqual(
++      bytes.slice(0, BLOCK * 9),
++    );
++    for (let i = 0; i < ranges.length; i++)
++      for (let j = i + 1; j < ranges.length; j++) {
++        expect(ranges[i]![1] < ranges[j]![0] || ranges[j]![1] < ranges[i]![0]).toBe(true);
++      }
++  });
++
++  it('clamps EOF, handles empty slices, and includes the byte after a cached boundary', async () => {
++    const { file, bytes } = await fixture();
++    await file.slice(0, 1024).arrayBuffer();
++    expect(new Uint8Array(await file.slice(BLOCK - 1, BLOCK + 1).arrayBuffer())).toEqual(
++      bytes.slice(BLOCK - 1, BLOCK + 1),
++    );
++    expect(
++      new Uint8Array(await file.slice(bytes.length - 10, bytes.length + 100).arrayBuffer()),
++    ).toEqual(bytes.slice(-10));
++    expect((await file.slice(bytes.length, bytes.length).arrayBuffer()).byteLength).toBe(0);
++  });
++
++  it('does not cache failures and retries without poisoned in-flight blocks', async () => {
++    const { file, transport, bytes } = await fixture();
++    transport.fetch.mockRejectedValueOnce(new Error('network'));
++    await expect(file.slice(0, BLOCK * 3).arrayBuffer()).rejects.toThrow('network');
++    expect(new Uint8Array(await file.slice(0, BLOCK * 3).arrayBuffer())).toEqual(
++      bytes.slice(0, BLOCK * 3),
++    );
++  });
++
++  it('does not repopulate caches after close or delete a reopened pending request', async () => {
++    const { file, transport, bytes } = await fixture();
++    let resolve!: (r: Response) => void;
++    transport.fetch.mockImplementationOnce(
++      () =>
++        new Promise((r) => {
++          resolve = r;
++        }),
++    );
++    const old = file.slice(0, 1024).arrayBuffer();
++    const rejected = expect(old).rejects.toThrow('Remote file closed');
++    await file.close();
++    await file.open();
++    const current = file.slice(0, 1024).arrayBuffer();
++    resolve(new Response(bytes.slice(0, BLOCK), { status: 206 }));
++    await rejected;
++    expect(new Uint8Array(await current)).toEqual(bytes.slice(0, 1024));
++  });
++
++  it('evicts least-recently-used blocks beyond the 16 MiB per-file limit', async () => {
++    const { file, ranges } = await fixture(17 * 1024 * 1024);
++    for (let offset = 0; offset < 17 * 1024 * 1024; offset += BLOCK * 8) {
++      await file.slice(offset, offset + BLOCK * 8).arrayBuffer();
++    }
++    const count = ranges.length;
++    await file.slice(0, 1).arrayBuffer();
++    expect(ranges).toHaveLength(count + 1);
++    expect(ranges.at(-1)).toEqual([0, BLOCK - 1]);
++  });
++});
+diff --git a/apps/readest-app/src/__tests__/services/transientPrecheck.test.ts b/apps/readest-app/src/__tests__/services/transientPrecheck.test.ts
+new file mode 100644
+index 0000000..6997bd9
+--- /dev/null
++++ b/apps/readest-app/src/__tests__/services/transientPrecheck.test.ts
+@@ -0,0 +1,40 @@
++import { afterEach, describe, expect, it, vi } from 'vitest';
++vi.mock('@/utils/md5', () => ({ partialMD5: vi.fn(async () => 'original-hash') }));
++import { partialMD5 } from '@/utils/md5';
++import type { Book } from '@/types/book';
++import { precheckManagedBookHash, transientImportOptions } from '@/app/reader/utils/transientReader';
++
++afterEach(() => { window.__MOKE_EMBEDDED = false; window.__MOKE_SOURCE_SERVER_URL = null; });
++
++it('skips library-cover downloads only for embedded online imports', () => {
++  expect(transientImportOptions()).toEqual({ transient: true });
++  window.__MOKE_EMBEDDED = true;
++  expect(transientImportOptions()).toEqual({ transient: true });
++  window.__MOKE_SOURCE_SERVER_URL = 'https://books.example';
++  expect(transientImportOptions()).toEqual({ transient: true, saveCover: false });
++  window.__MOKE_EMBEDDED = false;
++  expect(transientImportOptions()).toEqual({ transient: true });
++});
++
++describe('managed-book hash precheck', () => {
++  it.each([{ library: [] }, { library: [{ deletedAt: 1 }] }])('skips file I/O when there are no managed books: %j', async ({ library }) => {
++    const open = vi.fn();
++    expect(await precheckManagedBookHash('book.epub', library as Book[], open)).toBeUndefined();
++    expect(open).not.toHaveBeenCalled();
++  });
++  it('preserves the original hash and closes the file when managed books exist', async () => {
++    const close = vi.fn();
++    const file = Object.assign(new File(['book'], 'book.epub'), { close });
++    const open = vi.fn(async () => file);
++    expect(await precheckManagedBookHash('book.epub', [{}] as Book[], open)).toBe('original-hash');
++    expect(open).toHaveBeenCalledWith('book.epub');
++    expect(close).toHaveBeenCalledOnce();
++  });
++  it('closes a managed precheck file on hashing failure', async () => {
++    vi.mocked(partialMD5).mockRejectedValueOnce(new Error('hash failed'));
++    const close = vi.fn();
++    await expect(precheckManagedBookHash('book.epub', [{}] as Book[], async () =>
++      Object.assign(new File([], 'book.epub'), { close }))).rejects.toThrow('hash failed');
++    expect(close).toHaveBeenCalledOnce();
++  });
++});
+diff --git a/apps/readest-app/src/app/reader/components/ReaderContent.tsx b/apps/readest-app/src/app/reader/components/ReaderContent.tsx
+index 65e7b22..41419f4 100644
+--- a/apps/readest-app/src/app/reader/components/ReaderContent.tsx
++++ b/apps/readest-app/src/app/reader/components/ReaderContent.tsx
+@@ -23,7 +23,6 @@ import { isTauriAppPlatform } from '@/services/environment';
+ import { invoke } from '@tauri-apps/api/core';
+ import { splitLibraryOpenIds } from '@/utils/audiobook';
+ import { uniqueId } from '@/utils/misc';
+-import { partialMD5 } from '@/utils/md5';
+ import { eventDispatcher } from '@/utils/event';
+ import {
+   closeReaderWindowOrGoToLibrary,
+@@ -48,7 +47,7 @@ import SideBar from './sidebar/SideBar';
+ import LazyNotebook from './notebook/LazyNotebook';
+ import LocalSendManager from '@/components/localsend/LocalSendManager';
+ import BooksGrid from './BooksGrid';
+-import { runTransientReaderBootstrap } from '../utils/transientReader';
++import { precheckManagedBookHash, runTransientReaderBootstrap, transientImportOptions } from '../utils/transientReader';
+
+ // These dialogs pull in metadata, sync-provider, and AI integrations that are
+ // not needed to paint or open a book. Keep them out of the cold-start path and
+@@ -94,7 +93,9 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
+   const closingBooksRef = useRef<{ bookKeys: string; promise: Promise<void> } | null>(null);
+   const [loading, setLoading] = useState(false);
+   const [errorLoading, setErrorLoading] = useState(false);
+-  const [remoteSourceError, setRemoteSourceError] = useState<MokeRemoteSourceErrorDetail | null>(null);
++  const [remoteSourceError, setRemoteSourceError] = useState<MokeRemoteSourceErrorDetail | null>(
++    null,
++  );
+
+   useBookShortcuts({ sideBarBookKey, bookKeys });
+   useMokeCommandListener(bookKeys);
+@@ -237,13 +238,8 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
+           // would otherwise rewrite that entry's filePath/createdAt.
+           let existingHash: string | undefined;
+           try {
+-            const fileobj = await appService.openFile(file, 'None');
+-            try {
+-              existingHash = await partialMD5(fileobj);
+-            } finally {
+-              const closable = fileobj as File & { close?: () => Promise<void> };
+-              if (closable.close) await closable.close();
+-            }
++            existingHash = await precheckManagedBookHash(file, library,
++              (path) => appService.openFile(path, 'None'));
+           } catch (e) {
+             console.warn('Pre-hash failed, falling back to transient import:', file, e);
+           }
+@@ -256,7 +252,7 @@ const ReaderContent: React.FC<{ ids?: string; settings: SystemSettings }> = ({ i
+             }
+           }
+
+-          const book = await appService.importBook(file, library, { transient: true });
++          const book = await appService.importBook(file, library, transientImportOptions());
+           if (book) {
+             bookIds.push(book.hash);
+             libraryMutated = true;
+diff --git a/apps/readest-app/src/app/reader/utils/transientReader.ts b/apps/readest-app/src/app/reader/utils/transientReader.ts
+index 0a123d5..487ca63 100644
+--- a/apps/readest-app/src/app/reader/utils/transientReader.ts
++++ b/apps/readest-app/src/app/reader/utils/transientReader.ts
+@@ -1,3 +1,15 @@
++import type { Book, ImportBookOptions } from '@/types/book';
++import type { ClosableFile } from '@/utils/file';
++import { partialMD5 } from '@/utils/md5';
++
++export function transientImportOptions(): ImportBookOptions {
++  const online = typeof window !== 'undefined' && window.__MOKE_EMBEDDED &&
++    !!window.__MOKE_SOURCE_SERVER_URL;
++  // The embedded online reader has no library cover grid. The cover inside
++  // the EPUB is still rendered normally; do not download it twice on open.
++  return online ? { transient: true, saveCover: false } : { transient: true };
++}
++
+ export async function runTransientReaderBootstrap(
+   openFiles: () => Promise<void>,
+   onFailure: (error: unknown) => void,
+@@ -9,3 +21,19 @@ export async function runTransientReaderBootstrap(
+     onFailure(error);
+   }
+ }
++
++export async function precheckManagedBookHash(
++  file: string,
++  library: Book[],
++  openFile: (path: string) => Promise<File>,
++): Promise<string | undefined> {
++  // Import still computes the original hash. This pass only protects managed
++  // entries from being rewritten by a transient import, so skip an empty set.
++  if (!library.some((book) => !book.deletedAt)) return undefined;
++  const opened = await openFile(file);
++  try {
++    return await partialMD5(opened);
++  } finally {
++    await (opened as Partial<ClosableFile>).close?.();
++  }
++}
+diff --git a/apps/readest-app/src/services/mokeRemoteSource.ts b/apps/readest-app/src/services/mokeRemoteSource.ts
+index 78a4a86..818d568 100644
+--- a/apps/readest-app/src/services/mokeRemoteSource.ts
++++ b/apps/readest-app/src/services/mokeRemoteSource.ts
+@@ -191,7 +191,11 @@ export function createMokeRemoteSourceTransport(
+   let expectedSize: number | null = null;
+   let expectedEtag: string | null = null;
+
+-  const releaseAfterBody = (response: Response, controller: AbortController, expectedLength: number) => {
++  const releaseAfterBody = (
++    response: Response,
++    controller: AbortController,
++    expectedLength: number,
++  ) => {
+     const readBody = response.arrayBuffer.bind(response);
+     Object.defineProperty(response, 'arrayBuffer', {
+       configurable: true,
+@@ -219,6 +223,7 @@ export function createMokeRemoteSourceTransport(
+     // avoids turning those probes into an accidental whole-file transfer for
+     // ordinary EPUBs while preserving larger ranges requested by the parser.
+     maxCacheChunkSize: 16 * 1024,
++    maxCoalescedRangeSize: 128 * 1024,
+     async fetch(url, init = {}) {
+       if (url !== context.url) throw new MokeRemoteSourceError('online.response_invalid');
+       const method = (init.method || 'GET').toUpperCase();
+@@ -260,7 +265,10 @@ export function createMokeRemoteSourceTransport(
+         }
+
+         if (method === 'HEAD') {
+-          if (response.status !== 200 || response.headers.get('accept-ranges')?.toLowerCase() !== 'bytes') {
++          if (
++            response.status !== 200 ||
++            response.headers.get('accept-ranges')?.toLowerCase() !== 'bytes'
++          ) {
+             throw new MokeRemoteSourceError('online.range_unsupported', response.status);
+           }
+           const size = Number(response.headers.get('content-length'));
+diff --git a/apps/readest-app/src/utils/file.ts b/apps/readest-app/src/utils/file.ts
+index c682f70..f3ef617 100644
+--- a/apps/readest-app/src/utils/file.ts
++++ b/apps/readest-app/src/utils/file.ts
+@@ -61,6 +61,8 @@ export interface RemoteFileTransport {
+   close?(): void;
+   /** Optional source-specific cache window; online books keep this small. */
+   maxCacheChunkSize?: number;
++  /** Opt-in aligned cache, coalescing adjacent blocks into bounded requests. */
++  maxCoalescedRangeSize?: number;
+ }
+
+ const defaultRemoteFileTransport: RemoteFileTransport = {
+@@ -307,6 +309,7 @@ export class RemoteFile extends File implements ClosableFile {
+   #queryRange = false;
+   #transport: RemoteFileTransport;
+   #maxCacheChunkSize: number;
++  #generation = 0;
+
+   static MAX_CACHE_CHUNK_SIZE = 1024 * 128;
+   static MAX_CACHE_ITEMS_SIZE: number = 128;
+@@ -439,9 +442,11 @@ export class RemoteFile extends File implements ClosableFile {
+   }
+
+   async close(): Promise<void> {
++    this.#generation++;
+     this.#transport.close?.();
+     this.#cache.clear();
+     this.#order = [];
++    this.#pendingFetches.clear();
+   }
+
+   async fetchRangePart(start: number, end: number) {
+@@ -461,6 +466,9 @@ export class RemoteFile extends File implements ClosableFile {
+
+   // inclusive reading of the end: [start, end]
+   async fetchRange(start: number, end: number): Promise<ArrayBuffer> {
++    if (this.#transport.maxCoalescedRangeSize) {
++      return this.#fetchAlignedRange(start, end);
++    }
+     const rangeSize = end - start + 1;
+     const MAX_RANGE_LEN = 1024 * 1000;
+
+@@ -484,7 +492,7 @@ export class RemoteFile extends File implements ClosableFile {
+       const cachedChunkStart = Array.from(this.#cache.keys()).find((chunkStart) => {
+         const buffer = this.#cache.get(chunkStart)!;
+         const bufferSize = buffer.byteLength;
+-        return start >= chunkStart && end <= chunkStart + bufferSize;
++        return start >= chunkStart && end < chunkStart + bufferSize;
+       });
+       if (cachedChunkStart !== undefined) {
+         this.#updateAccessOrder(cachedChunkStart);
+@@ -510,6 +518,77 @@ export class RemoteFile extends File implements ClosableFile {
+     }
+   }
+
++  async #fetchAlignedRange(start: number, end: number): Promise<ArrayBuffer> {
++    start = Math.max(0, start);
++    end = Math.min(this.size - 1, end);
++    if (end < start) return new ArrayBuffer(0);
++    const blockSize = this.#maxCacheChunkSize;
++    const first = Math.floor(start / blockSize) * blockSize;
++    const last = Math.floor(end / blockSize) * blockSize;
++    const generation = this.#generation;
++    const blocks: Promise<ArrayBuffer>[] = [];
++    // Small hash and ZIP probes must not prefetch 128 KiB at distant offsets.
++    const windowSize = end - start + 1 <= 1024 ? blockSize : this.#transport.maxCoalescedRangeSize!;
++    for (let offset = first; offset <= last; offset += blockSize) {
++      const cached = this.#cache.get(offset);
++      if (cached) {
++        this.#updateAccessOrder(offset);
++        blocks.push(Promise.resolve(cached));
++        continue;
++      }
++      const key = String(offset);
++      let pending = this.#pendingFetches.get(key);
++      if (!pending) {
++        let limit = Math.min(this.size, offset + windowSize);
++        // Never fetch over a cached or in-flight block, even when two reads
++        // overlap but request different slice boundaries.
++        for (let next = offset + blockSize; next < limit; next += blockSize) {
++          if (this.#cache.has(next) || this.#pendingFetches.has(String(next))) {
++            limit = next;
++            break;
++          }
++        }
++        const rangeStart = offset;
++        const request = this.fetchRangePart(rangeStart, limit - 1);
++        for (let next = offset; next < limit; next += blockSize) {
++          const blockStart = next;
++          const blockKey = String(next);
++          const block = request
++            .then((buffer) => {
++              if (generation !== this.#generation) throw new Error('Remote file closed');
++              const value = buffer.slice(
++                blockStart - rangeStart,
++                Math.min(blockStart + blockSize, limit) - rangeStart,
++              );
++              this.#cache.set(blockStart, value);
++              this.#updateAccessOrder(blockStart);
++              this.#ensureCacheSize();
++              return value;
++            })
++            .finally(() => {
++              if (this.#pendingFetches.get(blockKey) === block) {
++                this.#pendingFetches.delete(blockKey);
++              }
++            });
++          // Read-ahead blocks may have no consumer if the request fails.
++          void block.catch(() => undefined);
++          this.#pendingFetches.set(blockKey, block);
++        }
++        pending = this.#pendingFetches.get(key)!;
++      }
++      blocks.push(pending);
++    }
++    const values = await Promise.all(blocks);
++    const output = new Uint8Array(end - start + 1);
++    values.forEach((value, index) => {
++      const blockStart = first + index * blockSize;
++      const from = Math.max(start, blockStart);
++      const to = Math.min(end + 1, blockStart + value.byteLength);
++      output.set(new Uint8Array(value, from - blockStart, to - from), from - start);
++    });
++    return output.buffer;
++  }
++
+   async #fetchAndCacheChunkSafe(
+     start: number,
+     end: number,
+@@ -537,7 +616,10 @@ export class RemoteFile extends File implements ClosableFile {
+   }
+
+   #ensureCacheSize() {
+-    while (this.#cache.size > RemoteFile.MAX_CACHE_ITEMS_SIZE) {
++    const limit = this.#transport.maxCoalescedRangeSize
++      ? Math.floor((16 * 1024 * 1024) / this.#maxCacheChunkSize)
++      : RemoteFile.MAX_CACHE_ITEMS_SIZE;
++    while (this.#cache.size > limit) {
+       const oldestKey = this.#order.pop();
+       if (oldestKey !== undefined) {
+         this.#cache.delete(oldestKey);

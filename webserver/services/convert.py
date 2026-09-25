@@ -3,6 +3,7 @@
 
 import logging
 import os
+import re
 import subprocess
 import time
 import traceback
@@ -27,6 +28,8 @@ CONVERSION_TARGETS = (
     ("azw3", ("epub",)),
     ("pdf", ("epub", "azw3", "mobi", "azw")),
 )
+BOOK_ID_RE = re.compile(r"[0-9]+")
+CONVERSION_FORMAT_RE = re.compile(r"(?:epub|azw3|pdf)")
 
 CONF = loader.get_settings()
 
@@ -192,18 +195,39 @@ class ConvertService(AsyncService):
     def convert_and_save(self, user_id, book, fpath, new_fmt):
         if new_fmt == "":
             new_fmt = "epub"
-        new_path = os.path.join(
-            CONF["convert_path"],
-            "book-%s-%s.%s" % (book["id"], int(time.time()), new_fmt),
+        if not isinstance(new_fmt, str):
+            raise ValueError("invalid conversion format")
+        new_fmt = new_fmt.lower()
+        if not CONVERSION_FORMAT_RE.fullmatch(new_fmt):
+            raise ValueError("invalid conversion format")
+
+        book_id_text = str(book.get("id", ""))
+        if not BOOK_ID_RE.fullmatch(book_id_text):
+            raise ValueError("invalid book id")
+        book_id = int(book_id_text)
+
+        convert_root = os.path.realpath(CONF["convert_path"])
+        if os.path.dirname(convert_root) == convert_root:
+            raise ValueError("conversion output root cannot be the filesystem root")
+        new_path = os.path.realpath(
+            os.path.join(
+                convert_root,
+                "book-%s-%s.%s" % (book_id, int(time.time()), new_fmt),
+            )
         )
-        progress_file = ConvertService().get_path_progress(book["id"])
+        # Keep the normalized-prefix guard inline: CodeQL recognizes this form
+        # as a path-injection barrier before the open/remove sinks below.
+        if not new_path.startswith(convert_root + os.sep):
+            raise ValueError("conversion output path escapes configured root")
+
+        progress_file = ConvertService().get_path_progress(book_id)
         logging.info("convert book: %s => %s, progress: %s" % (fpath, new_path, progress_file))
 
         title = book.get("title", "Unknown Title")
         if len(title) > 20:
             title = title[0:19] + "..."
-        service_item = f"[{book['id']}]{title}"
-        task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_CONVERT, service_item, book_id=book["id"])
+        service_item = f"[{book_id}]{title}"
+        task = BackgroundService().add_task(BackgroundTask.SERVICE_TYPE_CONVERT, service_item, book_id=book_id)
         ok = ConvertService().do_ebook_convert(fpath, new_path, progress_file, book=book)
         if task:
             BackgroundService().complete_task(task.id)
@@ -212,14 +236,13 @@ class ConvertService(AsyncService):
             return
 
         with open(new_path, "rb") as f:
-            self.db.add_format(book["id"], new_fmt, f, index_is_id=True)
+            self.db.add_format(book_id, new_fmt, f, index_is_id=True)
             logging.info("added new book: %s", new_path)
 
         # Write metadata to the new file (including cover)
         try:
             from calibre.ebooks.metadata.meta import set_metadata
 
-            book_id = book["id"]
             mi = self.db.get_metadata(book_id, index_is_id=True)
             if mi:
                 if mi.title:
@@ -239,7 +262,7 @@ class ConvertService(AsyncService):
                 else:
                     logging.warning(f"[CONVERT] Cannot find converted file path for book {book_id} fmt {new_fmt}")
         except Exception:
-            logging.error(f"[CONVERT] Failed to write metadata after conversion for book {book['id']}")
+            logging.error(f"[CONVERT] Failed to write metadata after conversion for book {book_id}")
             logging.error(traceback.format_exc())
 
         self.add_msg(user_id, "success", _("[%s]文件格式转换成功" % service_item))
