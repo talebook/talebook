@@ -84,6 +84,8 @@ tools/proot-talebook.sh restart
 
 日志位于 `/data/log/talebook.log`，PID 位于 `/data/run/talebook.pid`。首次启动后访问 `http://设备地址:8080/` 完成管理员设置。若只允许本机访问，请保持默认的 `TALEBOOK_HOST=127.0.0.1`。
 
+脚本会同时记录进程启动时间和一次性标识，并在停止前通过 `/proc` 核对身份。PID 文件过期或 PID 已被其他进程复用时，脚本只清理 PID 文件，不会向该进程发送信号。不要手工修改 PID 文件；无法读取 `/proc` 时脚本会拒绝把进程识别为 Talebook。
+
 ## 最小验收
 
 ```sh
@@ -94,6 +96,16 @@ curl -fsS http://127.0.0.1:8080/read/1 >/tmp/read.html
 ```
 
 还应通过页面实际完成登录、上传一本测试 EPUB，并确认书库数量增加。Calibre 转换属于可选但重要的复核项：从书籍详情发起 EPUB→AZW3，等待任务结束后确认下载列表出现 AZW3。上传或元数据提取时若看到 Calibre 渲染子进程 `EOFError`，需要检查封面/预览结果；文件导入成功并不代表所有 Calibre 子功能都正常。
+
+提交者在 Linux amd64 的 Debian 12 PRoot 基线上实测了本节 API、下载、阅读入口、上传和转换流程；QA 独立复核仅完成脚本语法与变更检查，未获得 PRoot rootfs、Calibre 或可运行的项目测试环境。封面结果、完整前端构建、Android/Termux、arm64 以及真实浏览器阅读仍属于待独立复核项，不能从提交者实测结果外推为已支持。
+
+PID 生命周期回归测试不依赖 Calibre，可在 Linux `/proc` 环境直接运行：
+
+```sh
+python3 -m unittest tests.test_proot_talebook
+```
+
+它覆盖 PID 指向无关进程、过期 PID、正常启停和重启，并确认无关进程不会收到停止信号。
 
 ## 升级与回滚
 

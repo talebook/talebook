@@ -12,10 +12,28 @@ LOG_DIR=$DATA_DIR/log
 PID_FILE=$RUN_DIR/talebook.pid
 LOG_FILE=$LOG_DIR/talebook.log
 
+process_start_ticks() {
+    [ -r "/proc/$1/stat" ] || return 1
+    awk '{
+        line = $0
+        sub(/^[^)]*\) /, "", line)
+        count = split(line, field, " ")
+        if (count >= 20) print field[20]
+    }' "/proc/$1/stat"
+}
+
 is_running() {
     [ -s "$PID_FILE" ] || return 1
     pid=$(sed -n '1p' "$PID_FILE")
-    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+    expected_start_ticks=$(sed -n '2p' "$PID_FILE")
+    run_token=$(sed -n '3p' "$PID_FILE")
+    case $pid:$expected_start_ticks:$run_token in
+        *[!0-9A-Za-z._:-]* | :* | *::* | *:) return 1 ;;
+    esac
+    kill -0 "$pid" 2>/dev/null || return 1
+    [ "$(process_start_ticks "$pid")" = "$expected_start_ticks" ] || return 1
+    tr '\000' '\n' <"/proc/$pid/environ" 2>/dev/null |
+        grep -Fqx "TALEBOOK_RUN_TOKEN=$run_token"
 }
 
 start() {
@@ -23,6 +41,8 @@ start() {
         echo "Talebook is already running (PID $pid)"
         return 0
     fi
+    # Never signal a process whose PID was reused or whose identity is unknown.
+    rm -f "$PID_FILE"
 
     # Some older PRoot builds misreport executable checks that use statx.
     # Existence plus the real exec below gives a reliable error without it.
@@ -34,17 +54,28 @@ start() {
 
     mkdir -p "$RUN_DIR" "$LOG_DIR"
     cd "$ROOT_DIR"
-    nohup "$VENV_DIR/bin/python" server.py \
+    run_token="talebook-$$-$(date +%s)"
+    TALEBOOK_RUN_TOKEN=$run_token nohup "$VENV_DIR/bin/python" server.py \
         --host="$HOST" \
         --port="$PORT" \
         --log-file-prefix="$LOG_FILE" \
         </dev/null >>"$LOG_FILE" 2>&1 &
     pid=$!
-    echo "$pid" >"$PID_FILE"
 
     sleep 1
     if ! kill -0 "$pid" 2>/dev/null; then
         echo "Talebook failed to start; inspect $LOG_FILE" >&2
+        return 1
+    fi
+    start_ticks=$(process_start_ticks "$pid")
+    if [ -z "$start_ticks" ]; then
+        echo "Cannot identify Talebook process $pid via /proc" >&2
+        return 1
+    fi
+    printf '%s\n%s\n%s\n' "$pid" "$start_ticks" "$run_token" >"$PID_FILE"
+    if ! is_running; then
+        rm -f "$PID_FILE"
+        echo "Cannot verify Talebook process identity (PID $pid)" >&2
         return 1
     fi
     echo "Talebook started (PID $pid, http://$HOST:$PORT)"
@@ -52,7 +83,12 @@ start() {
 
 stop() {
     if ! is_running; then
-        echo "Talebook is not running"
+        if [ -e "$PID_FILE" ]; then
+            rm -f "$PID_FILE"
+            echo "Removed stale Talebook PID file; no process was signalled"
+        else
+            echo "Talebook is not running"
+        fi
         return 0
     fi
 
