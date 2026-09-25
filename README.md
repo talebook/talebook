@@ -169,6 +169,8 @@ docker-compose -f docker-compose.yml  up -d
 
 `mkdir -p "$PWD/data" && docker run -d --name talebook -p 8080:80 -v "$PWD/data:/data" talebook/talebook`
 
+需要在无 Docker、无 systemd 的 PRoot Linux 中进行实验性部署时，请参阅 [PRoot 部署指南](document/Deployment.proot.zh_CN.md)。目前仅完成 Debian 12 amd64 验证，Android/arm64 尚未验证。
+
 
 ## Star History
  <picture>
