@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PR #977 CodeQL 复扫修复</title>
+  <style>
+    body { max-width: 52rem; margin: 2rem auto; padding: 0 1rem; color: #202d3c; background: #f8fafc; font: 1rem/1.65 system-ui, sans-serif; }
+    h1, h2 { line-height: 1.25; }
+    section { margin: 1rem 0; padding: 1rem 1.5rem; background: white; border: 1px solid #d4dce6; border-radius: .75rem; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <h1>PR #977 CodeQL 复扫修复</h1>
+  <p>2026-09-27 · ACTIVE · 续接 2026-09-06 的安全方案</p>
+  <section><h2>原始诉求</h2><p>开发者要求修复 PR #977 当前的 code scanning 报错。基线 f3fc6d0234b834e0e332e52dae4a17a924420088 的 CodeQL 汇总含四条 high 与两条 medium：邮箱正则两处、布局测试 HTML 过滤两处、元数据更新跳转两处。</p></section>
+  <section><h2>目标与影响范围</h2><p>消除告警并维持原有行为。影响 <code>webserver/models.py</code>、注册/安装/Kindle 邮箱校验入口、两个旧元数据更新跳转，以及 <code>scripts/readest/layout.test.cjs</code>。无数据库、接口路径、页面或产品规格变化；<code>spec/</code> 无需更新。现有入口仍允许 Unicode 邮箱、加号本地部分、多级域名。</p></section>
+  <section><h2>方案</h2><p>邮箱按单个 @ 分隔，检查空白和域名点分段，复杂度随输入长度线性增长。布局测试保留完整 HTML，以浏览器请求拦截阻止外链脚本；不使用正则删除标签。跳转仍将名称编码为单个路径段，以固定站内路径为左操作数拼接，使同源前缀在代码和 CodeQL 数据流中都明确。保留 302。</p></section>
+  <section><h2>验证结果</h2><p>项目测试镜像执行 <code>pytest tests/test_codeql_security.py tests/test_models.py tests/test_admin.py tests/test_main.py -q --tb=short</code>：189 passed、1 skipped。改动跳转表达式后重跑 <code>pytest tests/test_codeql_security.py::TestMetadataUpdateRedirects -q --tb=short</code>：1 passed。<code>node --test scripts/readest/layout.test.cjs</code>：1 passed。<code>make lint-py-fix</code>、Ruff 检查及格式校验通过；<code>git diff --check</code> 通过。方案文档完成后运行 <code>make check-design</code>。未重复完整后端套件，因为本次只改邮箱判断、等价跳转拼接和测试脚本；远端 CodeQL 由推送触发，本次不等待 CI。</p></section>
+  <section><h2>风险</h2><p>邮箱校验按旧表达式的实际语义迁移，不实现完整 RFC 邮箱语法。跨源跳转仍受固定路径前缀和路径段编码约束；远端 CodeQL 结果需在推送后确认。没有用户界面代码或可视结果变化，故无需界面审查。</p></section>
+</body>
+</html>

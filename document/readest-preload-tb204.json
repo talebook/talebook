@@ -1,0 +1,6971 @@
+[
+  {
+    "variant": "baseline",
+    "trial": 1,
+    "readyMs": 15482,
+    "bootstrapEndMs": 430.2920000627637,
+    "readerStartMs": 432.3410000652075,
+    "earlyAssetCount": 0,
+    "staticBytes": 1641229,
+    "earlyAssets": [],
+    "network": [
+      {
+        "path": "/readest/talebook-launch.html",
+        "type": "Document",
+        "initiator": "other",
+        "startMs": 105.2170000039041,
+        "status": 200,
+        "cached": false,
+        "endMs": 209.29400017485023,
+        "bytes": 1888
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 213.7750000692904,
+        "status": 200,
+        "cached": false,
+        "endMs": 320.4730001743883,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/talebook-launch.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 214.00700020603836,
+        "status": 200,
+        "cached": false,
+        "endMs": 324.8170001897961,
+        "bytes": 6290
+      },
+      {
+        "path": "/api/book/10/reader-bootstrap",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 326.8030001781881,
+        "status": 200,
+        "cached": false,
+        "endMs": 430.2920000627637,
+        "bytes": 1476
+      },
+      {
+        "path": "/readest/reader.html",
+        "type": "Document",
+        "initiator": "script",
+        "startMs": 432.3410000652075,
+        "status": 200,
+        "cached": false,
+        "endMs": 536.4800000097603,
+        "bytes": 1891
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 585.8670000452548,
+        "status": 200,
+        "cached": false,
+        "endMs": 693.5210002120584,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/_next/static/css/3ac2be450e571eda.css",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 586.115000071004,
+        "status": 200,
+        "cached": false,
+        "endMs": 940.8790001180023,
+        "bytes": 175744
+      },
+      {
+        "path": "/readest/_next/static/chunks/webpack-7bead95e146958b8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.3510000053793,
+        "status": 200,
+        "cached": false,
+        "endMs": 710.6540000531822,
+        "bytes": 3786
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.4810000639409,
+        "status": 200,
+        "cached": false,
+        "endMs": 845.1900000218302,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.5970000158995,
+        "status": 200,
+        "cached": false,
+        "endMs": 810.7470001559705,
+        "bytes": 41062
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/_app-949d21ae6acb708e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.6610000375658,
+        "status": 200,
+        "cached": false,
+        "endMs": 712.1449999976903,
+        "bytes": 642
+      },
+      {
+        "path": "/readest/_next/static/chunks/93c975d7-562eb60b13a129b1.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.7150002159178,
+        "status": 200,
+        "cached": false,
+        "endMs": 798.9000000525266,
+        "bytes": 1045
+      },
+      {
+        "path": "/readest/_next/static/chunks/c884d9bd-3ffd797021daa818.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.7760002147406,
+        "status": 200,
+        "cached": false,
+        "endMs": 815.6310000922531,
+        "bytes": 1294
+      },
+      {
+        "path": "/readest/_next/static/chunks/675145d0-6edac469cf028d29.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.8400000035763,
+        "status": 200,
+        "cached": false,
+        "endMs": 821.3980000000447,
+        "bytes": 1527
+      },
+      {
+        "path": "/readest/_next/static/chunks/432c8c81-00737adf06944c99.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.8900001514703,
+        "status": 200,
+        "cached": false,
+        "endMs": 908.995000179857,
+        "bytes": 5461
+      },
+      {
+        "path": "/readest/_next/static/chunks/e07b0497-74dc09b64a9bc1c4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 586.9520001579076,
+        "status": 200,
+        "cached": false,
+        "endMs": 918.5510000679642,
+        "bytes": 3277
+      },
+      {
+        "path": "/readest/_next/static/chunks/18d0c3b8-ac9d0cc89f42c5a4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.0100001338869,
+        "status": 200,
+        "cached": false,
+        "endMs": 931.685000192374,
+        "bytes": 7261
+      },
+      {
+        "path": "/readest/_next/static/chunks/e9f0445e-b3b8c1b3d6eea83e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.0640000794083,
+        "status": 200,
+        "cached": false,
+        "endMs": 925.584000069648,
+        "bytes": 1275
+      },
+      {
+        "path": "/readest/_next/static/chunks/3cf8cea4-91a27969355594b5.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.1150000020862,
+        "status": 200,
+        "cached": false,
+        "endMs": 949.3160001002252,
+        "bytes": 1182
+      },
+      {
+        "path": "/readest/_next/static/chunks/edd57365-543d8cf1f03817fa.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.1660001575947,
+        "status": 200,
+        "cached": false,
+        "endMs": 1015.4870001133531,
+        "bytes": 5240
+      },
+      {
+        "path": "/readest/_next/static/chunks/f260128c-9f0d6592ca6b33f6.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.222000118345,
+        "status": 200,
+        "cached": false,
+        "endMs": 1023.176999995485,
+        "bytes": 1509
+      },
+      {
+        "path": "/readest/_next/static/chunks/d3edc095-478803bdf570adcd.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.2950002085418,
+        "status": 200,
+        "cached": false,
+        "endMs": 1029.191000154242,
+        "bytes": 1112
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbbacad5-cd9ae0b3a6e11f34.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.3520001769066,
+        "status": 200,
+        "cached": false,
+        "endMs": 1035.2480001747608,
+        "bytes": 970
+      },
+      {
+        "path": "/readest/_next/static/chunks/70c2d073-d1ef65c0e1ae7980.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.4080001376569,
+        "status": 200,
+        "cached": false,
+        "endMs": 1044.499000068754,
+        "bytes": 2813
+      },
+      {
+        "path": "/readest/_next/static/chunks/6f4b2082-7b5bf3ab60fef9f4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.4650001060218,
+        "status": 200,
+        "cached": false,
+        "endMs": 1056.3390001188964,
+        "bytes": 4051
+      },
+      {
+        "path": "/readest/_next/static/chunks/8f786f43-a33bb4d96ec63083.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.5320001505315,
+        "status": 200,
+        "cached": false,
+        "endMs": 1120.2670000493526,
+        "bytes": 1248
+      },
+      {
+        "path": "/readest/_next/static/chunks/f52c12b5-7e873c2478d07d02.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.5900001265109,
+        "status": 200,
+        "cached": false,
+        "endMs": 1262.1580001432449,
+        "bytes": 47787
+      },
+      {
+        "path": "/readest/_next/static/chunks/9332fda6-60742933ff93e2e9.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.6430000644177,
+        "status": 200,
+        "cached": false,
+        "endMs": 1382.905000122264,
+        "bytes": 79689
+      },
+      {
+        "path": "/readest/_next/static/chunks/f70018de-de8278e5fb8148ef.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.6980000175536,
+        "status": 200,
+        "cached": false,
+        "endMs": 1384.3710001092404,
+        "bytes": 76907
+      },
+      {
+        "path": "/readest/_next/static/chunks/97e934a9-62876e9f1291f912.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.7559999935329,
+        "status": 200,
+        "cached": false,
+        "endMs": 1247.2050001379102,
+        "bytes": 27114
+      },
+      {
+        "path": "/readest/_next/static/chunks/5-36a4698bba927409.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.8070001490414,
+        "status": 200,
+        "cached": false,
+        "endMs": 1187.3350001405925,
+        "bytes": 7367
+      },
+      {
+        "path": "/readest/_next/static/chunks/1478-79f7af6b0f13e2e8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.8600000869483,
+        "status": 200,
+        "cached": false,
+        "endMs": 1891.1610001232475,
+        "bytes": 367125
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/reader-ea06f1a025fcb505.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 587.9570001270622,
+        "status": 200,
+        "cached": false,
+        "endMs": 2015.364000108093,
+        "bytes": 496753
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_buildManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 588.0330000072718,
+        "status": 200,
+        "cached": false,
+        "endMs": 1353.6710001062602,
+        "bytes": 1119
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_ssgManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 588.1120001431555,
+        "status": 200,
+        "cached": false,
+        "endMs": 1368.349000113085,
+        "bytes": 480
+      },
+      {
+        "path": "/readest/_next/static/chunks/9908.15e22a8495c96cc6.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2120.7960001192987,
+        "status": 200,
+        "cached": false,
+        "endMs": 2232.623000163585,
+        "bytes": 4507
+      },
+      {
+        "path": "/readest/_next/static/chunks/6361.21fa690b92b73803.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2345.938000129536,
+        "status": 200,
+        "cached": false,
+        "endMs": 2462.834000121802,
+        "bytes": 10390
+      },
+      {
+        "path": "/readest/_next/static/chunks/373.df54e8d9d7aff18d.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2346.529000205919,
+        "status": 200,
+        "cached": false,
+        "endMs": 2452.474000165239,
+        "bytes": 2912
+      },
+      {
+        "path": "/fonts/InterVariable.woff2",
+        "type": "Font",
+        "initiator": "parser",
+        "startMs": 2352.526000002399,
+        "status": 200,
+        "cached": false,
+        "endMs": 2458.9600001927465,
+        "bytes": 1571
+      },
+      {
+        "path": "/locales/en/translation.json",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2356.995000038296,
+        "status": 200,
+        "cached": false,
+        "endMs": 2464.2820002045482,
+        "bytes": 1571
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2516.85700006783,
+        "status": 200,
+        "cached": false,
+        "endMs": 2620.248000137508,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2622.3300001583993,
+        "status": 206,
+        "cached": false,
+        "endMs": 2738.264000043273,
+        "bytes": 16913
+      },
+      {
+        "path": "/readest/_next/static/chunks/6896.84556ceba78a2e8e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2739.759000018239,
+        "status": 200,
+        "cached": false,
+        "endMs": 2901.236000005156,
+        "bytes": 71081
+      },
+      {
+        "path": "/readest/_next/static/chunks/4519.77fdafc007b25a92.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2740.0890002027154,
+        "status": 200,
+        "cached": false,
+        "endMs": 2846.8800000846386,
+        "bytes": 1038
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2911.2930002156645,
+        "status": 206,
+        "cached": false,
+        "endMs": 3022.6340000517666,
+        "bytes": 11276
+      },
+      {
+        "path": "/readest/_next/static/chunks/6710.b6a22542ffd3295e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 3025.4810000769794,
+        "status": 200,
+        "cached": false,
+        "endMs": 3135.881000198424,
+        "bytes": 9873
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3161.8850000668317,
+        "status": 206,
+        "cached": false,
+        "endMs": 3277.6430000085384,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3287.406000075862,
+        "status": 206,
+        "cached": false,
+        "endMs": 3404.617000138387,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3287.8650000784546,
+        "status": 206,
+        "cached": false,
+        "endMs": 3506.8170002195984,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3288.735000183806,
+        "status": 206,
+        "cached": false,
+        "endMs": 3610.1780000608414,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3289.242000086233,
+        "status": 206,
+        "cached": false,
+        "endMs": 3711.733000120148,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3289.7280000615865,
+        "status": 206,
+        "cached": false,
+        "endMs": 3814.369000028819,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3828.613000223413,
+        "status": 200,
+        "cached": false,
+        "endMs": 3931.4420002046973,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3932.4100001249462,
+        "status": 206,
+        "cached": false,
+        "endMs": 4049.081000033766,
+        "bytes": 16913
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4050.0170001760125,
+        "status": 206,
+        "cached": false,
+        "endMs": 4160.85600014776,
+        "bytes": 11276
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4164.288000203669,
+        "status": 206,
+        "cached": false,
+        "endMs": 4280.631000176072,
+        "bytes": 16921
+      },
+      {
+        "path": "/readest/_next/static/chunks/4954.94e3000c37bf66df.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 4288.1950000301,
+        "status": 200,
+        "cached": false,
+        "endMs": 4392.372000031173,
+        "bytes": 1625
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4395.4400001093745,
+        "status": 206,
+        "cached": false,
+        "endMs": 4512.019000016153,
+        "bytes": 16918
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4396.0640002042055,
+        "status": 206,
+        "cached": false,
+        "endMs": 4614.2830001190305,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4396.772000007331,
+        "status": 206,
+        "cached": false,
+        "endMs": 4716.82700002566,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4397.421000059694,
+        "status": 206,
+        "cached": false,
+        "endMs": 4820.849000010639,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4398.022000212222,
+        "status": 206,
+        "cached": false,
+        "endMs": 4925.20200018771,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4398.721000179648,
+        "status": 206,
+        "cached": false,
+        "endMs": 5026.461000088602,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4399.403000017628,
+        "status": 206,
+        "cached": false,
+        "endMs": 5130.161000182852,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4400.010000215843,
+        "status": 206,
+        "cached": false,
+        "endMs": 5233.708000043407,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4400.894000194967,
+        "status": 206,
+        "cached": false,
+        "endMs": 5336.323000025004,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4401.754000224173,
+        "status": 206,
+        "cached": false,
+        "endMs": 5489.640000043437,
+        "bytes": 82453
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4512.902999995276,
+        "status": 206,
+        "cached": false,
+        "endMs": 5606.689000036567,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4615.264000138268,
+        "status": 206,
+        "cached": false,
+        "endMs": 5710.3650001809,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4717.726000119001,
+        "status": 206,
+        "cached": false,
+        "endMs": 5800.932000158355,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4821.722000138834,
+        "status": 206,
+        "cached": false,
+        "endMs": 5903.2970000989735,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4926.1570000089705,
+        "status": 206,
+        "cached": false,
+        "endMs": 6018.857000162825,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5027.38400013186,
+        "status": 206,
+        "cached": false,
+        "endMs": 6107.7070001047105,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5131.040000123903,
+        "status": 206,
+        "cached": false,
+        "endMs": 6224.413000047207,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5234.622000018135,
+        "status": 206,
+        "cached": false,
+        "endMs": 6315.738000208512,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5337.5340001657605,
+        "status": 206,
+        "cached": false,
+        "endMs": 6458.008000161499,
+        "bytes": 131609
+      },
+      {
+        "path": "/readest/_next/static/chunks/8493.756cdcf930a66a19.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6522.925000172108,
+        "status": 200,
+        "cached": false,
+        "endMs": 6631.623000139371,
+        "bytes": 6024
+      },
+      {
+        "path": "/readest/_next/static/chunks/4197.f5ca6b6b11253e2f.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6538.880000123754,
+        "status": 200,
+        "cached": false,
+        "endMs": 6642.005000030622,
+        "bytes": 1304
+      },
+      {
+        "path": "/readest/_next/static/chunks/2043.6a970d9a099d90b5.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6634.970000013709,
+        "status": 200,
+        "cached": false,
+        "endMs": 6780.010000104085,
+        "bytes": 20263
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbc8e5a0.18e5d908d87f40a8.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6643.214000156149,
+        "status": 200,
+        "cached": false,
+        "endMs": 6824.620000086725,
+        "bytes": 40250
+      },
+      {
+        "path": "/readest/_next/static/chunks/1da4221a.2f23aec3ed62f9d3.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6643.4540001209825,
+        "status": 200,
+        "cached": false,
+        "endMs": 6808.121000183746,
+        "bytes": 21681
+      },
+      {
+        "path": "/readest/_next/static/chunks/2018.cdca4e5385ef61bc.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6643.683000002056,
+        "status": 200,
+        "cached": false,
+        "endMs": 6812.357000075281,
+        "bytes": 24644
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6808.330000145361,
+        "status": 206,
+        "cached": false,
+        "endMs": 7093.616000143811,
+        "bytes": 131610
+      },
+      {
+        "path": "/readest/_next/static/media/turso.wasm32-wasi.a2aafc3f.wasm",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6835.388000123203,
+        "status": 200,
+        "cached": false
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7095.197000075132,
+        "status": 206,
+        "cached": false,
+        "endMs": 7406.39300015755,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7408.670000033453,
+        "status": 206,
+        "cached": false,
+        "endMs": 7720.0860001612455,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7722.116000019014,
+        "status": 206,
+        "cached": false,
+        "endMs": 8033.919000066817,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8035.9840001910925,
+        "status": 206,
+        "cached": false,
+        "endMs": 8347.110000206158,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8348.98900007829,
+        "status": 206,
+        "cached": false,
+        "endMs": 8660.866999998689,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8662.660000147298,
+        "status": 206,
+        "cached": false,
+        "endMs": 8974.35100004077,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8976.758000208065,
+        "status": 206,
+        "cached": false,
+        "endMs": 9287.717000115663,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9289.918000111356,
+        "status": 206,
+        "cached": false,
+        "endMs": 9601.517000002787,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9603.573000058532,
+        "status": 206,
+        "cached": false,
+        "endMs": 9912.54200018011,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9915.17600021325,
+        "status": 206,
+        "cached": false,
+        "endMs": 10226.307000033557,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10228.193000191823,
+        "status": 206,
+        "cached": false,
+        "endMs": 10540.877000195906,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10542.990000220016,
+        "status": 206,
+        "cached": false,
+        "endMs": 10858.636000193655,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10861.321000149474,
+        "status": 206,
+        "cached": false,
+        "endMs": 11173.73300017789,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11175.793000031263,
+        "status": 206,
+        "cached": false,
+        "endMs": 11488.055000081658,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11490.16400007531,
+        "status": 206,
+        "cached": false,
+        "endMs": 11800.985000096262,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11803.448999999091,
+        "status": 206,
+        "cached": false,
+        "endMs": 12116.761000128463,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12118.929000105709,
+        "status": 206,
+        "cached": false,
+        "endMs": 12429.84600015916,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12431.967000011355,
+        "status": 206,
+        "cached": false,
+        "endMs": 12744.483000133187,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12746.430000057444,
+        "status": 206,
+        "cached": false,
+        "endMs": 13058.577000163496,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13061.524000018835,
+        "status": 206,
+        "cached": false,
+        "endMs": 13373.139000032097,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13374.93300018832,
+        "status": 206,
+        "cached": false,
+        "endMs": 13686.51400017552,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13688.586000120267,
+        "status": 206,
+        "cached": false,
+        "endMs": 13999.165000161156,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14001.061000162736,
+        "status": 206,
+        "cached": false,
+        "endMs": 14312.815000070259,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14314.72700019367,
+        "status": 206,
+        "cached": false,
+        "endMs": 14625.390000175685,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14627.69200000912,
+        "status": 206,
+        "cached": false,
+        "endMs": 14938.449000008404,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14941.44200021401,
+        "status": 206,
+        "cached": false,
+        "endMs": 15260.862000053748,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 15262.999000027776,
+        "status": 206,
+        "cached": false,
+        "endMs": 15392.081000143662,
+        "bytes": 16921
+      },
+      {
+        "path": "http://127.0.0.1:39209/171880c5-43f1-473c-a04d-6f5eb4239cb9",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 15408.149000024423,
+        "status": 200,
+        "cached": false,
+        "endMs": 15408.745000138879,
+        "bytes": 0
+      },
+      {
+        "path": "http://127.0.0.1:39209/28de67b6-2866-4866-970c-895bf60d169a",
+        "type": "Image",
+        "initiator": "parser",
+        "startMs": 15410.046000033617,
+        "status": 200,
+        "cached": false,
+        "endMs": 15413.70900021866,
+        "bytes": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "variant": "preload",
+    "trial": 1,
+    "readyMs": 15436,
+    "bootstrapEndMs": 438.35199996829033,
+    "readerStartMs": 440.2409999165684,
+    "earlyAssetCount": 2,
+    "staticBytes": 1641229,
+    "earlyAssets": [
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.80499990098178,
+        "status": 200,
+        "cached": false,
+        "endMs": 405.4779999423772,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.90699997916818,
+        "status": 200,
+        "cached": false,
+        "endMs": 390.40499995462596,
+        "bytes": 41062
+      }
+    ],
+    "network": [
+      {
+        "path": "/readest/talebook-launch.html",
+        "type": "Document",
+        "initiator": "other",
+        "startMs": 103.79799990914762,
+        "status": 200,
+        "cached": false,
+        "endMs": 209.30599980056286,
+        "bytes": 2004
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.40899991244078,
+        "status": 200,
+        "cached": false,
+        "endMs": 321.5079999063164,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/talebook-launch.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.68599992617965,
+        "status": 200,
+        "cached": false,
+        "endMs": 332.5930000282824,
+        "bytes": 6290
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.80499990098178,
+        "status": 200,
+        "cached": false,
+        "endMs": 405.4779999423772,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.90699997916818,
+        "status": 200,
+        "cached": false,
+        "endMs": 390.40499995462596,
+        "bytes": 41062
+      },
+      {
+        "path": "/api/book/10/reader-bootstrap",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 334.81999998912215,
+        "status": 200,
+        "cached": false,
+        "endMs": 438.35199996829033,
+        "bytes": 1476
+      },
+      {
+        "path": "/readest/reader.html",
+        "type": "Document",
+        "initiator": "script",
+        "startMs": 440.2409999165684,
+        "status": 200,
+        "cached": false,
+        "endMs": 546.0719999391586,
+        "bytes": 1891
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.4799998048693,
+        "status": 200,
+        "cached": false,
+        "endMs": 671.7139999382198,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/_next/static/css/3ac2be450e571eda.css",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 566.7179999873042,
+        "status": 200,
+        "cached": false,
+        "endMs": 838.1409998983145,
+        "bytes": 175744
+      },
+      {
+        "path": "/readest/_next/static/chunks/webpack-7bead95e146958b8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.8459997978061,
+        "status": 200,
+        "cached": false,
+        "endMs": 695.3199999406934,
+        "bytes": 3786
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.9479998759925,
+        "status": 200,
+        "cached": true,
+        "endMs": 590.2189998887479,
+        "bytes": 0
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.0189999509603,
+        "status": 200,
+        "cached": true,
+        "endMs": 590.0789999868721,
+        "bytes": 0
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/_app-949d21ae6acb708e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.0819999650121,
+        "status": 200,
+        "cached": false,
+        "endMs": 690.9519999753684,
+        "bytes": 642
+      },
+      {
+        "path": "/readest/_next/static/chunks/93c975d7-562eb60b13a129b1.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.1639998909086,
+        "status": 200,
+        "cached": false,
+        "endMs": 693.1749999057502,
+        "bytes": 1045
+      },
+      {
+        "path": "/readest/_next/static/chunks/c884d9bd-3ffd797021daa818.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.2559998929501,
+        "status": 200,
+        "cached": false,
+        "endMs": 696.0869999602437,
+        "bytes": 1294
+      },
+      {
+        "path": "/readest/_next/static/chunks/675145d0-6edac469cf028d29.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.3539999406785,
+        "status": 200,
+        "cached": false,
+        "endMs": 776.4629998710006,
+        "bytes": 1527
+      },
+      {
+        "path": "/readest/_next/static/chunks/432c8c81-00737adf06944c99.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.4369998741895,
+        "status": 200,
+        "cached": false,
+        "endMs": 805.8409998193383,
+        "bytes": 5461
+      },
+      {
+        "path": "/readest/_next/static/chunks/e07b0497-74dc09b64a9bc1c4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.5349999219179,
+        "status": 200,
+        "cached": false,
+        "endMs": 809.6299997996539,
+        "bytes": 3277
+      },
+      {
+        "path": "/readest/_next/static/chunks/18d0c3b8-ac9d0cc89f42c5a4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.1679998524487,
+        "status": 200,
+        "cached": false,
+        "endMs": 815.4729998204857,
+        "bytes": 7261
+      },
+      {
+        "path": "/readest/_next/static/chunks/e9f0445e-b3b8c1b3d6eea83e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.2510000187904,
+        "status": 200,
+        "cached": false,
+        "endMs": 804.6089999843389,
+        "bytes": 1275
+      },
+      {
+        "path": "/readest/_next/static/chunks/3cf8cea4-91a27969355594b5.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.3089999947697,
+        "status": 200,
+        "cached": false,
+        "endMs": 879.3029999360442,
+        "bytes": 1182
+      },
+      {
+        "path": "/readest/_next/static/chunks/edd57365-543d8cf1f03817fa.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.3619999326766,
+        "status": 200,
+        "cached": false,
+        "endMs": 910.9409998636693,
+        "bytes": 5240
+      },
+      {
+        "path": "/readest/_next/static/chunks/f260128c-9f0d6592ca6b33f6.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.4249999467283,
+        "status": 200,
+        "cached": false,
+        "endMs": 907.4349999427795,
+        "bytes": 1509
+      },
+      {
+        "path": "/readest/_next/static/chunks/d3edc095-478803bdf570adcd.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.4929999988526,
+        "status": 200,
+        "cached": false,
+        "endMs": 912.917000008747,
+        "bytes": 1112
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbbacad5-cd9ae0b3a6e11f34.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.5669998638332,
+        "status": 200,
+        "cached": false,
+        "endMs": 918.8679999206215,
+        "bytes": 970
+      },
+      {
+        "path": "/readest/_next/static/chunks/70c2d073-d1ef65c0e1ae7980.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.633999908343,
+        "status": 200,
+        "cached": false,
+        "endMs": 942.740999860689,
+        "bytes": 2813
+      },
+      {
+        "path": "/readest/_next/static/chunks/6f4b2082-7b5bf3ab60fef9f4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.6839998234063,
+        "status": 200,
+        "cached": false,
+        "endMs": 984.7799998242408,
+        "bytes": 4051
+      },
+      {
+        "path": "/readest/_next/static/chunks/8f786f43-a33bb4d96ec63083.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.7529998831451,
+        "status": 200,
+        "cached": false,
+        "endMs": 1010.0489999167621,
+        "bytes": 1248
+      },
+      {
+        "path": "/readest/_next/static/chunks/f52c12b5-7e873c2478d07d02.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.8089998438954,
+        "status": 200,
+        "cached": false,
+        "endMs": 1161.2229999154806,
+        "bytes": 47787
+      },
+      {
+        "path": "/readest/_next/static/chunks/9332fda6-60742933ff93e2e9.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.859999999404,
+        "status": 200,
+        "cached": false,
+        "endMs": 1252.0549998153,
+        "bytes": 79689
+      },
+      {
+        "path": "/readest/_next/static/chunks/f70018de-de8278e5fb8148ef.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.9139999449253,
+        "status": 200,
+        "cached": false,
+        "endMs": 1257.151999976486,
+        "bytes": 76907
+      },
+      {
+        "path": "/readest/_next/static/chunks/97e934a9-62876e9f1291f912.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 568.9709999132901,
+        "status": 200,
+        "cached": false,
+        "endMs": 1146.6769999824464,
+        "bytes": 27114
+      },
+      {
+        "path": "/readest/_next/static/chunks/5-36a4698bba927409.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 569.0509998239577,
+        "status": 200,
+        "cached": false,
+        "endMs": 1115.1329998392612,
+        "bytes": 7367
+      },
+      {
+        "path": "/readest/_next/static/chunks/1478-79f7af6b0f13e2e8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 569.1070000175387,
+        "status": 200,
+        "cached": false,
+        "endMs": 1769.3049998488277,
+        "bytes": 367125
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/reader-ea06f1a025fcb505.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 569.1639999859035,
+        "status": 200,
+        "cached": false,
+        "endMs": 1904.6669998206198,
+        "bytes": 496753
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_buildManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 569.2199999466538,
+        "status": 200,
+        "cached": false,
+        "endMs": 1254.5329998247325,
+        "bytes": 1119
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_ssgManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 569.2709998693317,
+        "status": 200,
+        "cached": false,
+        "endMs": 1263.7739998754114,
+        "bytes": 480
+      },
+      {
+        "path": "/readest/_next/static/chunks/9908.15e22a8495c96cc6.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2009.4259998295456,
+        "status": 200,
+        "cached": false,
+        "endMs": 2118.496999843046,
+        "bytes": 4507
+      },
+      {
+        "path": "/readest/_next/static/chunks/6361.21fa690b92b73803.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2217.0720000285655,
+        "status": 200,
+        "cached": false,
+        "endMs": 2334.529999876395,
+        "bytes": 10390
+      },
+      {
+        "path": "/readest/_next/static/chunks/373.df54e8d9d7aff18d.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2217.6359998993576,
+        "status": 200,
+        "cached": false,
+        "endMs": 2322.797999950126,
+        "bytes": 2912
+      },
+      {
+        "path": "/fonts/InterVariable.woff2",
+        "type": "Font",
+        "initiator": "parser",
+        "startMs": 2222.0769999548793,
+        "status": 200,
+        "cached": false,
+        "endMs": 2328.0539999250323,
+        "bytes": 1571
+      },
+      {
+        "path": "/locales/en/translation.json",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2226.6429997980595,
+        "status": 200,
+        "cached": false,
+        "endMs": 2333.1169998273253,
+        "bytes": 1571
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2387.299999827519,
+        "status": 200,
+        "cached": false,
+        "endMs": 2490.15500000678,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2492.5849998835474,
+        "status": 206,
+        "cached": false,
+        "endMs": 2610.277999890968,
+        "bytes": 16913
+      },
+      {
+        "path": "/readest/_next/static/chunks/6896.84556ceba78a2e8e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2611.4489999599755,
+        "status": 200,
+        "cached": false,
+        "endMs": 2772.4229998420924,
+        "bytes": 71081
+      },
+      {
+        "path": "/readest/_next/static/chunks/4519.77fdafc007b25a92.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2611.7819999344647,
+        "status": 200,
+        "cached": false,
+        "endMs": 2718.1090000085533,
+        "bytes": 1038
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2781.6049999091774,
+        "status": 206,
+        "cached": false,
+        "endMs": 2893.6860000249,
+        "bytes": 11276
+      },
+      {
+        "path": "/readest/_next/static/chunks/6710.b6a22542ffd3295e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2896.263999864459,
+        "status": 200,
+        "cached": false,
+        "endMs": 3007.992999861017,
+        "bytes": 9873
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3030.966999940574,
+        "status": 206,
+        "cached": false,
+        "endMs": 3146.5119998902082,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3156.397999962792,
+        "status": 206,
+        "cached": false,
+        "endMs": 3273.2189998496324,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3156.8249999545515,
+        "status": 206,
+        "cached": false,
+        "endMs": 3376.7289998941123,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3157.2310000192374,
+        "status": 206,
+        "cached": false,
+        "endMs": 3478.874000022188,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3158.0149999354035,
+        "status": 206,
+        "cached": false,
+        "endMs": 3581.0379998292774,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3158.4879998117685,
+        "status": 206,
+        "cached": false,
+        "endMs": 3685.687999939546,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3722.3509999457747,
+        "status": 200,
+        "cached": false,
+        "endMs": 3824.9639999121428,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3825.961999827996,
+        "status": 206,
+        "cached": false,
+        "endMs": 3943.4729998465627,
+        "bytes": 16913
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3944.4430000148714,
+        "status": 206,
+        "cached": false,
+        "endMs": 4056.5459998324513,
+        "bytes": 11276
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4060.0019998382777,
+        "status": 206,
+        "cached": false,
+        "endMs": 4176.458999980241,
+        "bytes": 16921
+      },
+      {
+        "path": "/readest/_next/static/chunks/4954.94e3000c37bf66df.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 4184.124999912456,
+        "status": 200,
+        "cached": false,
+        "endMs": 4288.423999911174,
+        "bytes": 1625
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4291.406999807805,
+        "status": 206,
+        "cached": false,
+        "endMs": 4409.540999913588,
+        "bytes": 16918
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4292.816999834031,
+        "status": 206,
+        "cached": false,
+        "endMs": 4511.980999959633,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4293.5609999112785,
+        "status": 206,
+        "cached": false,
+        "endMs": 4614.475999958813,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4294.297999935225,
+        "status": 206,
+        "cached": false,
+        "endMs": 4717.997999861836,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4294.927999842912,
+        "status": 206,
+        "cached": false,
+        "endMs": 4820.5239998642355,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4296.043999958783,
+        "status": 206,
+        "cached": false,
+        "endMs": 4925.36999983713,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4296.965999994427,
+        "status": 206,
+        "cached": false,
+        "endMs": 5027.966999914497,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4297.72699996829,
+        "status": 206,
+        "cached": false,
+        "endMs": 5134.283999912441,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4298.4159998595715,
+        "status": 206,
+        "cached": false,
+        "endMs": 5236.244000028819,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4299.419999821112,
+        "status": 206,
+        "cached": false,
+        "endMs": 5390.825999900699,
+        "bytes": 82453
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4410.451999865472,
+        "status": 206,
+        "cached": false,
+        "endMs": 5507.048999890685,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4513.032999821007,
+        "status": 206,
+        "cached": false,
+        "endMs": 5610.268999822438,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4615.473999874666,
+        "status": 206,
+        "cached": false,
+        "endMs": 5700.589000014588,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4719.306999817491,
+        "status": 206,
+        "cached": false,
+        "endMs": 5805.2099999040365,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4821.7139998450875,
+        "status": 206,
+        "cached": false,
+        "endMs": 5922.062000026926,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4926.660999888554,
+        "status": 206,
+        "cached": false,
+        "endMs": 6010.974999982864,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5029.480000026524,
+        "status": 206,
+        "cached": false,
+        "endMs": 6126.289999810979,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5135.074999881908,
+        "status": 206,
+        "cached": false,
+        "endMs": 6216.649999842048,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5237.210999941453,
+        "status": 206,
+        "cached": false,
+        "endMs": 6357.814999995753,
+        "bytes": 131609
+      },
+      {
+        "path": "/readest/_next/static/chunks/8493.756cdcf930a66a19.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6418.714999919757,
+        "status": 200,
+        "cached": false,
+        "endMs": 6527.860999805853,
+        "bytes": 6024
+      },
+      {
+        "path": "/readest/_next/static/chunks/4197.f5ca6b6b11253e2f.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6434.378999983892,
+        "status": 200,
+        "cached": false,
+        "endMs": 6537.311999825761,
+        "bytes": 1304
+      },
+      {
+        "path": "/readest/_next/static/chunks/2043.6a970d9a099d90b5.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6532.217999920249,
+        "status": 200,
+        "cached": false,
+        "endMs": 6682.430999819189,
+        "bytes": 20263
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbc8e5a0.18e5d908d87f40a8.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6538.494999986142,
+        "status": 200,
+        "cached": false,
+        "endMs": 6721.112999832258,
+        "bytes": 40250
+      },
+      {
+        "path": "/readest/_next/static/chunks/1da4221a.2f23aec3ed62f9d3.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6538.77400001511,
+        "status": 200,
+        "cached": false,
+        "endMs": 6703.891000011936,
+        "bytes": 21681
+      },
+      {
+        "path": "/readest/_next/static/chunks/2018.cdca4e5385ef61bc.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6538.975999923423,
+        "status": 200,
+        "cached": false,
+        "endMs": 6710.10799985379,
+        "bytes": 24644
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6712.7409998793155,
+        "status": 206,
+        "cached": false,
+        "endMs": 7008.016999810934,
+        "bytes": 131610
+      },
+      {
+        "path": "/readest/_next/static/media/turso.wasm32-wasi.a2aafc3f.wasm",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6731.874999823049,
+        "status": 200,
+        "cached": false
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7009.567999979481,
+        "status": 206,
+        "cached": false,
+        "endMs": 7320.322999963537,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7323.6209999304265,
+        "status": 206,
+        "cached": false,
+        "endMs": 7636.097999988124,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7638.2420000154525,
+        "status": 206,
+        "cached": false,
+        "endMs": 7952.436999883503,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7954.455999890342,
+        "status": 206,
+        "cached": false,
+        "endMs": 8265.421999851242,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8267.428999999538,
+        "status": 206,
+        "cached": false,
+        "endMs": 8578.928999835625,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8580.67399985157,
+        "status": 206,
+        "cached": false,
+        "endMs": 8890.89999999851,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8892.694999929518,
+        "status": 206,
+        "cached": false,
+        "endMs": 9203.235999913886,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9205.0749999471,
+        "status": 206,
+        "cached": false,
+        "endMs": 9516.64699986577,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9519.191999919713,
+        "status": 206,
+        "cached": false,
+        "endMs": 9830.889999866486,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9833.086999831721,
+        "status": 206,
+        "cached": false,
+        "endMs": 10144.836999941617,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10147.112999809906,
+        "status": 206,
+        "cached": false,
+        "endMs": 10461.2059998326,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10463.773999828845,
+        "status": 206,
+        "cached": false,
+        "endMs": 10776.71999996528,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10779.351999983191,
+        "status": 206,
+        "cached": false,
+        "endMs": 11092.022999888286,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11094.105999916792,
+        "status": 206,
+        "cached": false,
+        "endMs": 11404.900999972597,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11406.914999941364,
+        "status": 206,
+        "cached": false,
+        "endMs": 11717.999999877065,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11720.197999849916,
+        "status": 206,
+        "cached": false,
+        "endMs": 12031.10000002198,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12033.27599982731,
+        "status": 206,
+        "cached": false,
+        "endMs": 12345.363999949768,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12347.506999969482,
+        "status": 206,
+        "cached": false,
+        "endMs": 12659.230999881402,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12661.171999992803,
+        "status": 206,
+        "cached": false,
+        "endMs": 12972.299000015482,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12974.304999923334,
+        "status": 206,
+        "cached": false,
+        "endMs": 13285.887999925762,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13287.93999995105,
+        "status": 206,
+        "cached": false,
+        "endMs": 13598.564999876544,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13600.429999874905,
+        "status": 206,
+        "cached": false,
+        "endMs": 13911.948999855667,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13914.310999913141,
+        "status": 206,
+        "cached": false,
+        "endMs": 14227.283000014722,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14229.249999858439,
+        "status": 206,
+        "cached": false,
+        "endMs": 14542.846999829635,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14547.678999835625,
+        "status": 206,
+        "cached": false,
+        "endMs": 14859.572999877855,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14861.794000025839,
+        "status": 206,
+        "cached": false,
+        "endMs": 15174.457999877632,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 15176.473999861628,
+        "status": 206,
+        "cached": false,
+        "endMs": 15305.840999819338,
+        "bytes": 16921
+      },
+      {
+        "path": "http://127.0.0.1:39211/3a246ec9-7f19-4190-907a-0334c87b1de2",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 15324.991999892518,
+        "status": 200,
+        "cached": false,
+        "endMs": 15327.19699991867,
+        "bytes": 0
+      },
+      {
+        "path": "http://127.0.0.1:39211/e95d1386-7e76-4e0e-9c9b-d6e54bbb23ed",
+        "type": "Image",
+        "initiator": "parser",
+        "startMs": 15325.907999882475,
+        "status": 200,
+        "cached": false,
+        "endMs": 15330.404999898747,
+        "bytes": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "variant": "preload",
+    "trial": 2,
+    "readyMs": 15406,
+    "bootstrapEndMs": 437.91099986992776,
+    "readerStartMs": 440.4239999130368,
+    "earlyAssetCount": 2,
+    "staticBytes": 1641229,
+    "earlyAssets": [
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.24400005303323,
+        "status": 200,
+        "cached": false,
+        "endMs": 406.76699997857213,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.42800005711615,
+        "status": 200,
+        "cached": false,
+        "endMs": 389.66099987737834,
+        "bytes": 41062
+      }
+    ],
+    "network": [
+      {
+        "path": "/readest/talebook-launch.html",
+        "type": "Document",
+        "initiator": "other",
+        "startMs": 103.51200005970895,
+        "status": 200,
+        "cached": false,
+        "endMs": 207.5179999228567,
+        "bytes": 2004
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.90900006331503,
+        "status": 200,
+        "cached": false,
+        "endMs": 317.81699997372925,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/talebook-launch.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.13899995200336,
+        "status": 200,
+        "cached": false,
+        "endMs": 332.5090000871569,
+        "bytes": 6290
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.24400005303323,
+        "status": 200,
+        "cached": false,
+        "endMs": 406.76699997857213,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.42800005711615,
+        "status": 200,
+        "cached": false,
+        "endMs": 389.66099987737834,
+        "bytes": 41062
+      },
+      {
+        "path": "/api/book/10/reader-bootstrap",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 334.52600007876754,
+        "status": 200,
+        "cached": false,
+        "endMs": 437.91099986992776,
+        "bytes": 1476
+      },
+      {
+        "path": "/readest/reader.html",
+        "type": "Document",
+        "initiator": "script",
+        "startMs": 440.4239999130368,
+        "status": 200,
+        "cached": false,
+        "endMs": 547.0330000389367,
+        "bytes": 1891
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 576.8919999245554,
+        "status": 200,
+        "cached": false,
+        "endMs": 682.8109999187291,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/_next/static/css/3ac2be450e571eda.css",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 577.1359999198467,
+        "status": 200,
+        "cached": false,
+        "endMs": 867.1200000680983,
+        "bytes": 175744
+      },
+      {
+        "path": "/readest/_next/static/chunks/webpack-7bead95e146958b8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.3020000196993,
+        "status": 200,
+        "cached": false,
+        "endMs": 696.9550000503659,
+        "bytes": 3786
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.4270000401884,
+        "status": 200,
+        "cached": true,
+        "endMs": 593.2239999528974,
+        "bytes": 0
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.5220000650734,
+        "status": 200,
+        "cached": true,
+        "endMs": 604.0650000795722,
+        "bytes": 0
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/_app-949d21ae6acb708e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.6289999485016,
+        "status": 200,
+        "cached": false,
+        "endMs": 704.626000020653,
+        "bytes": 642
+      },
+      {
+        "path": "/readest/_next/static/chunks/93c975d7-562eb60b13a129b1.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.7109998743981,
+        "status": 200,
+        "cached": false,
+        "endMs": 706.2480000313371,
+        "bytes": 1045
+      },
+      {
+        "path": "/readest/_next/static/chunks/c884d9bd-3ffd797021daa818.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.8069999068975,
+        "status": 200,
+        "cached": false,
+        "endMs": 708.1750000361353,
+        "bytes": 1294
+      },
+      {
+        "path": "/readest/_next/static/chunks/675145d0-6edac469cf028d29.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 577.9249998740852,
+        "status": 200,
+        "cached": false,
+        "endMs": 788.3490000385791,
+        "bytes": 1527
+      },
+      {
+        "path": "/readest/_next/static/chunks/432c8c81-00737adf06944c99.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 578.0150000937283,
+        "status": 200,
+        "cached": false,
+        "endMs": 806.9390000309795,
+        "bytes": 5461
+      },
+      {
+        "path": "/readest/_next/static/chunks/e07b0497-74dc09b64a9bc1c4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 578.1099998857826,
+        "status": 200,
+        "cached": false,
+        "endMs": 817.4159999471158,
+        "bytes": 3277
+      },
+      {
+        "path": "/readest/_next/static/chunks/18d0c3b8-ac9d0cc89f42c5a4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 578.203999903053,
+        "status": 200,
+        "cached": false,
+        "endMs": 824.2629999294877,
+        "bytes": 7261
+      },
+      {
+        "path": "/readest/_next/static/chunks/e9f0445e-b3b8c1b3d6eea83e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 580.5709999985993,
+        "status": 200,
+        "cached": false,
+        "endMs": 813.8009998947382,
+        "bytes": 1275
+      },
+      {
+        "path": "/readest/_next/static/chunks/3cf8cea4-91a27969355594b5.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 580.7010000571609,
+        "status": 200,
+        "cached": false,
+        "endMs": 891.1760000046343,
+        "bytes": 1182
+      },
+      {
+        "path": "/readest/_next/static/chunks/edd57365-543d8cf1f03817fa.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 580.7769999373704,
+        "status": 200,
+        "cached": false,
+        "endMs": 913.1610000040382,
+        "bytes": 5240
+      },
+      {
+        "path": "/readest/_next/static/chunks/f260128c-9f0d6592ca6b33f6.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 580.8669999241829,
+        "status": 200,
+        "cached": false,
+        "endMs": 915.8270000480115,
+        "bytes": 1509
+      },
+      {
+        "path": "/readest/_next/static/chunks/d3edc095-478803bdf570adcd.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 580.9800000861287,
+        "status": 200,
+        "cached": false,
+        "endMs": 921.8079999554902,
+        "bytes": 1112
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbbacad5-cd9ae0b3a6e11f34.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.0739998705685,
+        "status": 200,
+        "cached": false,
+        "endMs": 926.4449998736382,
+        "bytes": 970
+      },
+      {
+        "path": "/readest/_next/static/chunks/70c2d073-d1ef65c0e1ae7980.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.1759999487549,
+        "status": 200,
+        "cached": false,
+        "endMs": 972.542000003159,
+        "bytes": 2813
+      },
+      {
+        "path": "/readest/_next/static/chunks/6f4b2082-7b5bf3ab60fef9f4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.2579998746514,
+        "status": 200,
+        "cached": false,
+        "endMs": 996.5059999376535,
+        "bytes": 4051
+      },
+      {
+        "path": "/readest/_next/static/chunks/8f786f43-a33bb4d96ec63083.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.3589999452233,
+        "status": 200,
+        "cached": false,
+        "endMs": 1016.5299999061972,
+        "bytes": 1248
+      },
+      {
+        "path": "/readest/_next/static/chunks/f52c12b5-7e873c2478d07d02.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.4449999015778,
+        "status": 200,
+        "cached": false,
+        "endMs": 1139.6810000296682,
+        "bytes": 47787
+      },
+      {
+        "path": "/readest/_next/static/chunks/9332fda6-60742933ff93e2e9.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.5240000374615,
+        "status": 200,
+        "cached": false,
+        "endMs": 1251.1509999167174,
+        "bytes": 79689
+      },
+      {
+        "path": "/readest/_next/static/chunks/f70018de-de8278e5fb8148ef.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.6049999557436,
+        "status": 200,
+        "cached": false,
+        "endMs": 1252.485000062734,
+        "bytes": 76907
+      },
+      {
+        "path": "/readest/_next/static/chunks/97e934a9-62876e9f1291f912.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.6840000916272,
+        "status": 200,
+        "cached": false,
+        "endMs": 1173.8919999916106,
+        "bytes": 27114
+      },
+      {
+        "path": "/readest/_next/static/chunks/5-36a4698bba927409.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.7579999566078,
+        "status": 200,
+        "cached": false,
+        "endMs": 1127.7959998697042,
+        "bytes": 7367
+      },
+      {
+        "path": "/readest/_next/static/chunks/1478-79f7af6b0f13e2e8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.8330000620335,
+        "status": 200,
+        "cached": false,
+        "endMs": 1770.0690000783652,
+        "bytes": 367125
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/reader-ea06f1a025fcb505.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.9089999422431,
+        "status": 200,
+        "cached": false,
+        "endMs": 1904.8069999553263,
+        "bytes": 496753
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_buildManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 581.9860000628978,
+        "status": 200,
+        "cached": false,
+        "endMs": 1248.5219999216497,
+        "bytes": 1119
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_ssgManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 582.0549998898059,
+        "status": 200,
+        "cached": false,
+        "endMs": 1278.6310000810772,
+        "bytes": 480
+      },
+      {
+        "path": "/readest/_next/static/chunks/9908.15e22a8495c96cc6.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2006.1240000650287,
+        "status": 200,
+        "cached": false,
+        "endMs": 2114.867999916896,
+        "bytes": 4507
+      },
+      {
+        "path": "/readest/_next/static/chunks/6361.21fa690b92b73803.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2228.5179998725653,
+        "status": 200,
+        "cached": false,
+        "endMs": 2345.9890000522137,
+        "bytes": 10390
+      },
+      {
+        "path": "/readest/_next/static/chunks/373.df54e8d9d7aff18d.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2229.094000067562,
+        "status": 200,
+        "cached": false,
+        "endMs": 2335.2310000918806,
+        "bytes": 2912
+      },
+      {
+        "path": "/fonts/InterVariable.woff2",
+        "type": "Font",
+        "initiator": "parser",
+        "startMs": 2233.6709999945015,
+        "status": 200,
+        "cached": false,
+        "endMs": 2338.2039999123663,
+        "bytes": 1571
+      },
+      {
+        "path": "/locales/en/translation.json",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2237.7039999701083,
+        "status": 200,
+        "cached": false,
+        "endMs": 2343.3369998820126,
+        "bytes": 1571
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2395.513999974355,
+        "status": 200,
+        "cached": false,
+        "endMs": 2498.270999873057,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2500.3249999135733,
+        "status": 206,
+        "cached": false,
+        "endMs": 2616.658000042662,
+        "bytes": 16913
+      },
+      {
+        "path": "/readest/_next/static/chunks/6896.84556ceba78a2e8e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2617.9319999646395,
+        "status": 200,
+        "cached": false,
+        "endMs": 2779.1520000901073,
+        "bytes": 71081
+      },
+      {
+        "path": "/readest/_next/static/chunks/4519.77fdafc007b25a92.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2618.214000016451,
+        "status": 200,
+        "cached": false,
+        "endMs": 2722.9309999383986,
+        "bytes": 1038
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2788.6310000903904,
+        "status": 206,
+        "cached": false,
+        "endMs": 2902.564999880269,
+        "bytes": 11276
+      },
+      {
+        "path": "/readest/_next/static/chunks/6710.b6a22542ffd3295e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2905.1310000941157,
+        "status": 200,
+        "cached": false,
+        "endMs": 3015.6300000380725,
+        "bytes": 9873
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3040.307000046596,
+        "status": 206,
+        "cached": false,
+        "endMs": 3158.062000060454,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3168.072999920696,
+        "status": 206,
+        "cached": false,
+        "endMs": 3287.889000028372,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3168.470999924466,
+        "status": 206,
+        "cached": false,
+        "endMs": 3391.1349999252707,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3168.8129999674857,
+        "status": 206,
+        "cached": false,
+        "endMs": 3493.102999869734,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3169.15600001812,
+        "status": 206,
+        "cached": false,
+        "endMs": 3596.0500000510365,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3169.567999895662,
+        "status": 206,
+        "cached": false,
+        "endMs": 3698.907000012696,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3728.0609998852015,
+        "status": 200,
+        "cached": false,
+        "endMs": 3830.450000008568,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3831.571999937296,
+        "status": 206,
+        "cached": false,
+        "endMs": 3947.1020000055432,
+        "bytes": 16913
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3947.965000057593,
+        "status": 206,
+        "cached": false,
+        "endMs": 4060.560999903828,
+        "bytes": 11276
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4063.9150000642985,
+        "status": 206,
+        "cached": false,
+        "endMs": 4180.6159999687225,
+        "bytes": 16921
+      },
+      {
+        "path": "/readest/_next/static/chunks/4954.94e3000c37bf66df.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 4187.35900009051,
+        "status": 200,
+        "cached": false,
+        "endMs": 4292.632000055164,
+        "bytes": 1625
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4295.628000050783,
+        "status": 206,
+        "cached": false,
+        "endMs": 4411.873999983072,
+        "bytes": 16918
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4296.28699994646,
+        "status": 206,
+        "cached": false,
+        "endMs": 4515.049000037834,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4296.972000040114,
+        "status": 206,
+        "cached": false,
+        "endMs": 4618.725999956951,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4297.72699996829,
+        "status": 206,
+        "cached": false,
+        "endMs": 4722.139999968931,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4298.406000016257,
+        "status": 206,
+        "cached": false,
+        "endMs": 4823.657999979332,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4299.0170000121,
+        "status": 206,
+        "cached": false,
+        "endMs": 4925.915000028908,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4299.666000064462,
+        "status": 206,
+        "cached": false,
+        "endMs": 5029.239000054076,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4300.5329999141395,
+        "status": 206,
+        "cached": false,
+        "endMs": 5131.763000041246,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4301.165000069886,
+        "status": 206,
+        "cached": false,
+        "endMs": 5234.42199989222,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4302.018000045791,
+        "status": 206,
+        "cached": false,
+        "endMs": 5388.848999980837,
+        "bytes": 82453
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4412.856000009924,
+        "status": 206,
+        "cached": false,
+        "endMs": 5504.738999996334,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4516.030000057071,
+        "status": 206,
+        "cached": false,
+        "endMs": 5608.557000057772,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4619.869000045583,
+        "status": 206,
+        "cached": false,
+        "endMs": 5697.294000070542,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4723.177999956533,
+        "status": 206,
+        "cached": false,
+        "endMs": 5800.645000068471,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4824.5520000346005,
+        "status": 206,
+        "cached": false,
+        "endMs": 5915.374000091106,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4926.816999912262,
+        "status": 206,
+        "cached": false,
+        "endMs": 6005.662000039592,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5030.108999926597,
+        "status": 206,
+        "cached": false,
+        "endMs": 6123.545999871567,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5132.620000047609,
+        "status": 206,
+        "cached": false,
+        "endMs": 6214.720000047237,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5235.313999932259,
+        "status": 206,
+        "cached": false,
+        "endMs": 6362.425999948755,
+        "bytes": 131609
+      },
+      {
+        "path": "/readest/_next/static/chunks/8493.756cdcf930a66a19.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6432.641000021249,
+        "status": 200,
+        "cached": false,
+        "endMs": 6542.886999901384,
+        "bytes": 6024
+      },
+      {
+        "path": "/readest/_next/static/chunks/4197.f5ca6b6b11253e2f.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6452.242000028491,
+        "status": 200,
+        "cached": false,
+        "endMs": 6557.152000023052,
+        "bytes": 1304
+      },
+      {
+        "path": "/readest/_next/static/chunks/2043.6a970d9a099d90b5.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6547.634999966249,
+        "status": 200,
+        "cached": false,
+        "endMs": 6681.522999890149,
+        "bytes": 20263
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbc8e5a0.18e5d908d87f40a8.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6558.7009999435395,
+        "status": 200,
+        "cached": false,
+        "endMs": 6736.854000017047,
+        "bytes": 40250
+      },
+      {
+        "path": "/readest/_next/static/chunks/1da4221a.2f23aec3ed62f9d3.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6559.027000097558,
+        "status": 200,
+        "cached": false,
+        "endMs": 6718.047000002116,
+        "bytes": 21681
+      },
+      {
+        "path": "/readest/_next/static/chunks/2018.cdca4e5385ef61bc.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6559.270000085235,
+        "status": 200,
+        "cached": false,
+        "endMs": 6724.949999945238,
+        "bytes": 24644
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6712.12700009346,
+        "status": 206,
+        "cached": false,
+        "endMs": 6993.4149999171495,
+        "bytes": 131610
+      },
+      {
+        "path": "/readest/_next/static/media/turso.wasm32-wasi.a2aafc3f.wasm",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6747.322999872267,
+        "status": 200,
+        "cached": false
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6995.0109999626875,
+        "status": 206,
+        "cached": false,
+        "endMs": 7306.650999933481,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7308.903000084683,
+        "status": 206,
+        "cached": false,
+        "endMs": 7620.46099989675,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7622.50699987635,
+        "status": 206,
+        "cached": false,
+        "endMs": 7933.683000039309,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7935.723999980837,
+        "status": 206,
+        "cached": false,
+        "endMs": 8251.652000006288,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8253.498999867588,
+        "status": 206,
+        "cached": false,
+        "endMs": 8564.226999878883,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8566.090000094846,
+        "status": 206,
+        "cached": false,
+        "endMs": 8877.627999987453,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8879.634999902919,
+        "status": 206,
+        "cached": false,
+        "endMs": 9191.789000062272,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9194.203000050038,
+        "status": 206,
+        "cached": false,
+        "endMs": 9506.457000039518,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9508.528999984264,
+        "status": 206,
+        "cached": false,
+        "endMs": 9820.671000052243,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9822.715000016615,
+        "status": 206,
+        "cached": false,
+        "endMs": 10136.419999878854,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10138.805999886245,
+        "status": 206,
+        "cached": false,
+        "endMs": 10452.474999940023,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10454.861999955028,
+        "status": 206,
+        "cached": false,
+        "endMs": 10765.704999910668,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10767.564999870956,
+        "status": 206,
+        "cached": false,
+        "endMs": 11078.8449998945,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11080.913000041619,
+        "status": 206,
+        "cached": false,
+        "endMs": 11392.01799989678,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11394.118000054732,
+        "status": 206,
+        "cached": false,
+        "endMs": 11706.08099992387,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11708.16699997522,
+        "status": 206,
+        "cached": false,
+        "endMs": 12020.17299993895,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12022.887999890372,
+        "status": 206,
+        "cached": false,
+        "endMs": 12334.49300006032,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12336.571000050753,
+        "status": 206,
+        "cached": false,
+        "endMs": 12647.30399986729,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12649.444999871776,
+        "status": 206,
+        "cached": false,
+        "endMs": 12962.04199991189,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12963.824999984354,
+        "status": 206,
+        "cached": false,
+        "endMs": 13275.785000063479,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13277.898000087589,
+        "status": 206,
+        "cached": false,
+        "endMs": 13590.336000081152,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13592.491999967024,
+        "status": 206,
+        "cached": false,
+        "endMs": 13903.599000070244,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13905.679000075907,
+        "status": 206,
+        "cached": false,
+        "endMs": 14217.3190000467,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14219.683999894187,
+        "status": 206,
+        "cached": false,
+        "endMs": 14530.186000047252,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14532.076000003144,
+        "status": 206,
+        "cached": false,
+        "endMs": 14844.967999961227,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14847.043999936432,
+        "status": 206,
+        "cached": false,
+        "endMs": 15158.483000006527,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 15160.569000057876,
+        "status": 206,
+        "cached": false,
+        "endMs": 15290.180000010878,
+        "bytes": 16921
+      },
+      {
+        "path": "http://127.0.0.1:39211/7e6f336f-8048-49b6-a07d-693ff9003abe",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 15314.269999973476,
+        "status": 200,
+        "cached": false,
+        "endMs": 15315.242999931797,
+        "bytes": 0
+      },
+      {
+        "path": "http://127.0.0.1:39211/729493f9-72b6-49df-a229-c0a6eb920136",
+        "type": "Image",
+        "initiator": "parser",
+        "startMs": 15315.126999979839,
+        "status": 200,
+        "cached": false,
+        "endMs": 15320.015999954194,
+        "bytes": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "variant": "baseline",
+    "trial": 2,
+    "readyMs": 15513,
+    "bootstrapEndMs": 428.38499997742474,
+    "readerStartMs": 430.08399987593293,
+    "earlyAssetCount": 0,
+    "staticBytes": 1641229,
+    "earlyAssets": [],
+    "network": [
+      {
+        "path": "/readest/talebook-launch.html",
+        "type": "Document",
+        "initiator": "other",
+        "startMs": 102.72599989548326,
+        "status": 200,
+        "cached": false,
+        "endMs": 207.18399994075298,
+        "bytes": 1888
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.10199997201562,
+        "status": 200,
+        "cached": false,
+        "endMs": 317.44599994271994,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/talebook-launch.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.3249998074025,
+        "status": 200,
+        "cached": false,
+        "endMs": 322.4519998766482,
+        "bytes": 6290
+      },
+      {
+        "path": "/api/book/10/reader-bootstrap",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 324.63199994526803,
+        "status": 200,
+        "cached": false,
+        "endMs": 428.38499997742474,
+        "bytes": 1476
+      },
+      {
+        "path": "/readest/reader.html",
+        "type": "Document",
+        "initiator": "script",
+        "startMs": 430.08399987593293,
+        "status": 200,
+        "cached": false,
+        "endMs": 534.2149999924004,
+        "bytes": 1891
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.1189999096096,
+        "status": 200,
+        "cached": false,
+        "endMs": 667.7109999582171,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/_next/static/css/3ac2be450e571eda.css",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 555.5669998284429,
+        "status": 200,
+        "cached": false,
+        "endMs": 914.4679999444634,
+        "bytes": 175744
+      },
+      {
+        "path": "/readest/_next/static/chunks/webpack-7bead95e146958b8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.7179998140782,
+        "status": 200,
+        "cached": false,
+        "endMs": 687.7669999375939,
+        "bytes": 3786
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.8139998465776,
+        "status": 200,
+        "cached": false,
+        "endMs": 816.776999970898,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.9069998562336,
+        "status": 200,
+        "cached": false,
+        "endMs": 783.0289998091757,
+        "bytes": 41062
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/_app-949d21ae6acb708e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.9919998049736,
+        "status": 200,
+        "cached": false,
+        "endMs": 681.5390000119805,
+        "bytes": 642
+      },
+      {
+        "path": "/readest/_next/static/chunks/93c975d7-562eb60b13a129b1.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.0839998070151,
+        "status": 200,
+        "cached": false,
+        "endMs": 772.9379998054355,
+        "bytes": 1045
+      },
+      {
+        "path": "/readest/_next/static/chunks/c884d9bd-3ffd797021daa818.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.1819998547435,
+        "status": 200,
+        "cached": false,
+        "endMs": 786.3749999087304,
+        "bytes": 1294
+      },
+      {
+        "path": "/readest/_next/static/chunks/675145d0-6edac469cf028d29.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.2839999329299,
+        "status": 200,
+        "cached": false,
+        "endMs": 795.2439999207854,
+        "bytes": 1527
+      },
+      {
+        "path": "/readest/_next/static/chunks/432c8c81-00737adf06944c99.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.3669998664409,
+        "status": 200,
+        "cached": false,
+        "endMs": 881.2659999821335,
+        "bytes": 5461
+      },
+      {
+        "path": "/readest/_next/static/chunks/e07b0497-74dc09b64a9bc1c4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.4709999598563,
+        "status": 200,
+        "cached": false,
+        "endMs": 892.0059998054057,
+        "bytes": 3277
+      },
+      {
+        "path": "/readest/_next/static/chunks/18d0c3b8-ac9d0cc89f42c5a4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.5599999390543,
+        "status": 200,
+        "cached": false,
+        "endMs": 901.5849998686463,
+        "bytes": 7261
+      },
+      {
+        "path": "/readest/_next/static/chunks/e9f0445e-b3b8c1b3d6eea83e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.7409999202937,
+        "status": 200,
+        "cached": false,
+        "endMs": 900.5189999006689,
+        "bytes": 1275
+      },
+      {
+        "path": "/readest/_next/static/chunks/3cf8cea4-91a27969355594b5.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.8399999756366,
+        "status": 200,
+        "cached": false,
+        "endMs": 920.7819998264313,
+        "bytes": 1182
+      },
+      {
+        "path": "/readest/_next/static/chunks/edd57365-543d8cf1f03817fa.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 556.9269999396056,
+        "status": 200,
+        "cached": false,
+        "endMs": 989.2759998328984,
+        "bytes": 5240
+      },
+      {
+        "path": "/readest/_next/static/chunks/f260128c-9f0d6592ca6b33f6.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.0179999340326,
+        "status": 200,
+        "cached": false,
+        "endMs": 996.371999848634,
+        "bytes": 1509
+      },
+      {
+        "path": "/readest/_next/static/chunks/d3edc095-478803bdf570adcd.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.1229998022318,
+        "status": 200,
+        "cached": false,
+        "endMs": 1003.8840000052005,
+        "bytes": 1112
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbbacad5-cd9ae0b3a6e11f34.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.2159998118877,
+        "status": 200,
+        "cached": false,
+        "endMs": 1004.2689999099821,
+        "bytes": 970
+      },
+      {
+        "path": "/readest/_next/static/chunks/70c2d073-d1ef65c0e1ae7980.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.3129998520017,
+        "status": 200,
+        "cached": false,
+        "endMs": 1018.7249998562038,
+        "bytes": 2813
+      },
+      {
+        "path": "/readest/_next/static/chunks/6f4b2082-7b5bf3ab60fef9f4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.4019998311996,
+        "status": 200,
+        "cached": false,
+        "endMs": 1025.2270000055432,
+        "bytes": 4051
+      },
+      {
+        "path": "/readest/_next/static/chunks/8f786f43-a33bb4d96ec63083.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.5149999931455,
+        "status": 200,
+        "cached": false,
+        "endMs": 1093.511999817565,
+        "bytes": 1248
+      },
+      {
+        "path": "/readest/_next/static/chunks/f52c12b5-7e873c2478d07d02.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.5999999418855,
+        "status": 200,
+        "cached": false,
+        "endMs": 1232.3519999627024,
+        "bytes": 47787
+      },
+      {
+        "path": "/readest/_next/static/chunks/9332fda6-60742933ff93e2e9.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.681999867782,
+        "status": 200,
+        "cached": false,
+        "endMs": 1362.7619999460876,
+        "bytes": 79689
+      },
+      {
+        "path": "/readest/_next/static/chunks/f70018de-de8278e5fb8148ef.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.77099984698,
+        "status": 200,
+        "cached": false,
+        "endMs": 1355.6209998205304,
+        "bytes": 76907
+      },
+      {
+        "path": "/readest/_next/static/chunks/97e934a9-62876e9f1291f912.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.8689998947084,
+        "status": 200,
+        "cached": false,
+        "endMs": 1221.7170000076294,
+        "bytes": 27114
+      },
+      {
+        "path": "/readest/_next/static/chunks/5-36a4698bba927409.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 557.9589998815209,
+        "status": 200,
+        "cached": false,
+        "endMs": 1155.011999886483,
+        "bytes": 7367
+      },
+      {
+        "path": "/readest/_next/static/chunks/1478-79f7af6b0f13e2e8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 558.0509998835623,
+        "status": 200,
+        "cached": false,
+        "endMs": 1865.2170000132173,
+        "bytes": 367125
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/reader-ea06f1a025fcb505.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 558.1449999008328,
+        "status": 200,
+        "cached": false,
+        "endMs": 1989.748999942094,
+        "bytes": 496753
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_buildManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 558.2329998724163,
+        "status": 200,
+        "cached": false,
+        "endMs": 1328.387999907136,
+        "bytes": 1119
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_ssgManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 558.3120000083,
+        "status": 200,
+        "cached": false,
+        "endMs": 1338.842999888584,
+        "bytes": 480
+      },
+      {
+        "path": "/readest/_next/static/chunks/9908.15e22a8495c96cc6.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2103.1539998948574,
+        "status": 200,
+        "cached": false,
+        "endMs": 2211.236999835819,
+        "bytes": 4507
+      },
+      {
+        "path": "/readest/_next/static/chunks/6361.21fa690b92b73803.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2339.7389999590814,
+        "status": 200,
+        "cached": false,
+        "endMs": 2458.280999911949,
+        "bytes": 10390
+      },
+      {
+        "path": "/readest/_next/static/chunks/373.df54e8d9d7aff18d.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2340.329999802634,
+        "status": 200,
+        "cached": false,
+        "endMs": 2445.482000010088,
+        "bytes": 2912
+      },
+      {
+        "path": "/fonts/InterVariable.woff2",
+        "type": "Font",
+        "initiator": "parser",
+        "startMs": 2346.9069998245686,
+        "status": 200,
+        "cached": false,
+        "endMs": 2453.1519999727607,
+        "bytes": 1571
+      },
+      {
+        "path": "/locales/en/translation.json",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2351.304000010714,
+        "status": 200,
+        "cached": false,
+        "endMs": 2458.0490000080317,
+        "bytes": 1571
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2511.622999794781,
+        "status": 200,
+        "cached": false,
+        "endMs": 2615.1769999414682,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2617.199999978766,
+        "status": 206,
+        "cached": false,
+        "endMs": 2734.470999799669,
+        "bytes": 16913
+      },
+      {
+        "path": "/readest/_next/static/chunks/6896.84556ceba78a2e8e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2735.835999948904,
+        "status": 200,
+        "cached": false,
+        "endMs": 2895.9379999432713,
+        "bytes": 71081
+      },
+      {
+        "path": "/readest/_next/static/chunks/4519.77fdafc007b25a92.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2736.1079999245703,
+        "status": 200,
+        "cached": false,
+        "endMs": 2841.5349998977035,
+        "bytes": 1038
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2905.3179998882115,
+        "status": 206,
+        "cached": false,
+        "endMs": 3016.340999864042,
+        "bytes": 11276
+      },
+      {
+        "path": "/readest/_next/static/chunks/6710.b6a22542ffd3295e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 3018.966999836266,
+        "status": 200,
+        "cached": false,
+        "endMs": 3129.4639999978244,
+        "bytes": 9873
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3153.75699987635,
+        "status": 206,
+        "cached": false,
+        "endMs": 3269.340999890119,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3279.6759998891503,
+        "status": 206,
+        "cached": false,
+        "endMs": 3396.119999932125,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3280.0719998776913,
+        "status": 206,
+        "cached": false,
+        "endMs": 3500.2049999311566,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3280.4509999696165,
+        "status": 206,
+        "cached": false,
+        "endMs": 3602.0019999705255,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3281.0569999273866,
+        "status": 206,
+        "cached": false,
+        "endMs": 3705.642999848351,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3281.4189998898655,
+        "status": 206,
+        "cached": false,
+        "endMs": 3808.4609999787062,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3825.411999830976,
+        "status": 200,
+        "cached": false,
+        "endMs": 3928.4129999578,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3929.477999918163,
+        "status": 206,
+        "cached": false,
+        "endMs": 4047.398999799043,
+        "bytes": 16913
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4048.2599998358637,
+        "status": 206,
+        "cached": false,
+        "endMs": 4160.719999810681,
+        "bytes": 11276
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4164.204999804497,
+        "status": 206,
+        "cached": false,
+        "endMs": 4280.047999927774,
+        "bytes": 16921
+      },
+      {
+        "path": "/readest/_next/static/chunks/4954.94e3000c37bf66df.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 4288.987000007182,
+        "status": 200,
+        "cached": false,
+        "endMs": 4404.147999826819,
+        "bytes": 1625
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4407.358999829739,
+        "status": 206,
+        "cached": false,
+        "endMs": 4523.159999866039,
+        "bytes": 16918
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4407.958999974653,
+        "status": 206,
+        "cached": false,
+        "endMs": 4627.234999788925,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4409.669999964535,
+        "status": 206,
+        "cached": false,
+        "endMs": 4728.677999926731,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4410.630999831483,
+        "status": 206,
+        "cached": false,
+        "endMs": 4831.612000009045,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4411.4959998987615,
+        "status": 206,
+        "cached": false,
+        "endMs": 4935.230999952182,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4412.244000006467,
+        "status": 206,
+        "cached": false,
+        "endMs": 5036.947999848053,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4414.24599988386,
+        "status": 206,
+        "cached": false,
+        "endMs": 5140.421999851242,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4414.975999854505,
+        "status": 206,
+        "cached": false,
+        "endMs": 5243.936999933794,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4415.731999790296,
+        "status": 206,
+        "cached": false,
+        "endMs": 5346.485999878496,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4416.827999986708,
+        "status": 206,
+        "cached": false,
+        "endMs": 5501.606999896467,
+        "bytes": 82453
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4524.111999897286,
+        "status": 206,
+        "cached": false,
+        "endMs": 5617.950999876484,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4628.355999942869,
+        "status": 206,
+        "cached": false,
+        "endMs": 5720.94799997285,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4729.573999997228,
+        "status": 206,
+        "cached": false,
+        "endMs": 5810.95499987714,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4832.519999938086,
+        "status": 206,
+        "cached": false,
+        "endMs": 5914.1889999154955,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4936.166999861598,
+        "status": 206,
+        "cached": false,
+        "endMs": 6030.752999940887,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5037.98699984327,
+        "status": 206,
+        "cached": false,
+        "endMs": 6118.633999954909,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5141.279999865219,
+        "status": 206,
+        "cached": false,
+        "endMs": 6234.599999850616,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5244.814999867231,
+        "status": 206,
+        "cached": false,
+        "endMs": 6324.7219999320805,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5347.423999803141,
+        "status": 206,
+        "cached": false,
+        "endMs": 6466.356999939308,
+        "bytes": 131609
+      },
+      {
+        "path": "/readest/_next/static/chunks/8493.756cdcf930a66a19.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6526.058999821544,
+        "status": 200,
+        "cached": false,
+        "endMs": 6634.919999865815,
+        "bytes": 6024
+      },
+      {
+        "path": "/readest/_next/static/chunks/4197.f5ca6b6b11253e2f.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6540.417999960482,
+        "status": 200,
+        "cached": false,
+        "endMs": 6643.300999887288,
+        "bytes": 1304
+      },
+      {
+        "path": "/readest/_next/static/chunks/2043.6a970d9a099d90b5.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6638.1029998883605,
+        "status": 200,
+        "cached": false,
+        "endMs": 6786.477999994531,
+        "bytes": 20263
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbc8e5a0.18e5d908d87f40a8.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6644.540000008419,
+        "status": 200,
+        "cached": false,
+        "endMs": 6827.24199979566,
+        "bytes": 40250
+      },
+      {
+        "path": "/readest/_next/static/chunks/1da4221a.2f23aec3ed62f9d3.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6644.790999824181,
+        "status": 200,
+        "cached": false,
+        "endMs": 6809.528999961913,
+        "bytes": 21681
+      },
+      {
+        "path": "/readest/_next/static/chunks/2018.cdca4e5385ef61bc.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6645.025999983773,
+        "status": 200,
+        "cached": false,
+        "endMs": 6815.289999824017,
+        "bytes": 24644
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6818.551999982446,
+        "status": 206,
+        "cached": false,
+        "endMs": 7115.517999976873,
+        "bytes": 131610
+      },
+      {
+        "path": "/readest/_next/static/media/turso.wasm32-wasi.a2aafc3f.wasm",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6838.17799994722,
+        "status": 200,
+        "cached": false
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7117.119999835268,
+        "status": 206,
+        "cached": false,
+        "endMs": 7429.45499997586,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7432.493999833241,
+        "status": 206,
+        "cached": false,
+        "endMs": 7745.7249998115,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7748.048999812454,
+        "status": 206,
+        "cached": false,
+        "endMs": 8060.790000017732,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8062.918999930844,
+        "status": 206,
+        "cached": false,
+        "endMs": 8374.376999912784,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8376.479999860749,
+        "status": 206,
+        "cached": false,
+        "endMs": 8687.125999946147,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8688.994999974966,
+        "status": 206,
+        "cached": false,
+        "endMs": 8999.758999794722,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9001.687999814749,
+        "status": 206,
+        "cached": false,
+        "endMs": 9314.503999892622,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9317.191999871284,
+        "status": 206,
+        "cached": false,
+        "endMs": 9628.276999806985,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9630.3239997942,
+        "status": 206,
+        "cached": false,
+        "endMs": 9942.060999805108,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9944.22800000757,
+        "status": 206,
+        "cached": false,
+        "endMs": 10256.364999804646,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10258.423999883235,
+        "status": 206,
+        "cached": false,
+        "endMs": 10574.321999913082,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10576.636999845505,
+        "status": 206,
+        "cached": false,
+        "endMs": 10888.54999979958,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10890.656000003219,
+        "status": 206,
+        "cached": false,
+        "endMs": 11203.188999788836,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11205.679999897256,
+        "status": 206,
+        "cached": false,
+        "endMs": 11517.309000017121,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11519.217999884859,
+        "status": 206,
+        "cached": false,
+        "endMs": 11830.20899980329,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11832.49399997294,
+        "status": 206,
+        "cached": false,
+        "endMs": 12143.677999963984,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12145.788999972865,
+        "status": 206,
+        "cached": false,
+        "endMs": 12457.131000002846,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12459.367999807,
+        "status": 206,
+        "cached": false,
+        "endMs": 12769.943999825045,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12771.734999958426,
+        "status": 206,
+        "cached": false,
+        "endMs": 13083.702999865636,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13086.712999967858,
+        "status": 206,
+        "cached": false,
+        "endMs": 13397.391999838874,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13400.054999860004,
+        "status": 206,
+        "cached": false,
+        "endMs": 13713.664999930188,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13715.655999956653,
+        "status": 206,
+        "cached": false,
+        "endMs": 14026.932999957353,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14028.885999927297,
+        "status": 206,
+        "cached": false,
+        "endMs": 14340.795999858528,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14343.133999966085,
+        "status": 206,
+        "cached": false,
+        "endMs": 14655.285999877378,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14657.341999933124,
+        "status": 206,
+        "cached": false,
+        "endMs": 14969.450999982655,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14971.52699995786,
+        "status": 206,
+        "cached": false,
+        "endMs": 15282.688000006601,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 15284.821999957785,
+        "status": 206,
+        "cached": false,
+        "endMs": 15413.951999973506,
+        "bytes": 16921
+      },
+      {
+        "path": "http://127.0.0.1:39209/79ebf5e3-6933-4844-988a-9fcb75367307",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 15430.600999854505,
+        "status": 200,
+        "cached": false,
+        "endMs": 15431.287999963388,
+        "bytes": 0
+      },
+      {
+        "path": "http://127.0.0.1:39209/295a18f5-33d9-40c3-9b5d-7470bf4ba2d0",
+        "type": "Image",
+        "initiator": "parser",
+        "startMs": 15431.449999799952,
+        "status": 200,
+        "cached": false,
+        "endMs": 15436.15399999544,
+        "bytes": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "variant": "baseline",
+    "trial": 3,
+    "readyMs": 15505,
+    "bootstrapEndMs": 426.97100015357137,
+    "readerStartMs": 428.69800003245473,
+    "earlyAssetCount": 0,
+    "staticBytes": 1641229,
+    "earlyAssets": [],
+    "network": [
+      {
+        "path": "/readest/talebook-launch.html",
+        "type": "Document",
+        "initiator": "other",
+        "startMs": 103.51800010539591,
+        "status": 200,
+        "cached": false,
+        "endMs": 207.41400006227195,
+        "bytes": 1888
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.9380000513047,
+        "status": 200,
+        "cached": false,
+        "endMs": 319.4170000497252,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/talebook-launch.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 212.16700016520917,
+        "status": 200,
+        "cached": false,
+        "endMs": 322.1470001153648,
+        "bytes": 6290
+      },
+      {
+        "path": "/api/book/10/reader-bootstrap",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 324.1200000047684,
+        "status": 200,
+        "cached": false,
+        "endMs": 426.97100015357137,
+        "bytes": 1476
+      },
+      {
+        "path": "/readest/reader.html",
+        "type": "Document",
+        "initiator": "script",
+        "startMs": 428.69800003245473,
+        "status": 200,
+        "cached": false,
+        "endMs": 532.928999979049,
+        "bytes": 1891
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.1440001688898,
+        "status": 200,
+        "cached": false,
+        "endMs": 660.4049999732524,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/_next/static/css/3ac2be450e571eda.css",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 554.3919999618083,
+        "status": 200,
+        "cached": false,
+        "endMs": 909.2910001054406,
+        "bytes": 175744
+      },
+      {
+        "path": "/readest/_next/static/chunks/webpack-7bead95e146958b8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.5370001345873,
+        "status": 200,
+        "cached": false,
+        "endMs": 679.5100001618266,
+        "bytes": 3786
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.6339999418706,
+        "status": 200,
+        "cached": false,
+        "endMs": 823.1029999442399,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.72999997437,
+        "status": 200,
+        "cached": false,
+        "endMs": 789.642000105232,
+        "bytes": 41062
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/_app-949d21ae6acb708e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.7950000036508,
+        "status": 200,
+        "cached": false,
+        "endMs": 691.522000124678,
+        "bytes": 642
+      },
+      {
+        "path": "/readest/_next/static/chunks/93c975d7-562eb60b13a129b1.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.8509999644011,
+        "status": 200,
+        "cached": false,
+        "endMs": 765.7270000781864,
+        "bytes": 1045
+      },
+      {
+        "path": "/readest/_next/static/chunks/c884d9bd-3ffd797021daa818.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 554.9399999435991,
+        "status": 200,
+        "cached": false,
+        "endMs": 784.7880001645535,
+        "bytes": 1294
+      },
+      {
+        "path": "/readest/_next/static/chunks/675145d0-6edac469cf028d29.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.0280001480132,
+        "status": 200,
+        "cached": false,
+        "endMs": 798.2220000121742,
+        "bytes": 1527
+      },
+      {
+        "path": "/readest/_next/static/chunks/432c8c81-00737adf06944c99.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.1060000434518,
+        "status": 200,
+        "cached": false,
+        "endMs": 876.1520001571625,
+        "bytes": 5461
+      },
+      {
+        "path": "/readest/_next/static/chunks/e07b0497-74dc09b64a9bc1c4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 555.2020000759512,
+        "status": 200,
+        "cached": false,
+        "endMs": 891.814999980852,
+        "bytes": 3277
+      },
+      {
+        "path": "/readest/_next/static/chunks/18d0c3b8-ac9d0cc89f42c5a4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.3340000379831,
+        "status": 200,
+        "cached": false,
+        "endMs": 903.6600000690669,
+        "bytes": 7261
+      },
+      {
+        "path": "/readest/_next/static/chunks/e9f0445e-b3b8c1b3d6eea83e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.4910000693053,
+        "status": 200,
+        "cached": false,
+        "endMs": 902.7299999725074,
+        "bytes": 1275
+      },
+      {
+        "path": "/readest/_next/static/chunks/3cf8cea4-91a27969355594b5.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.5840000789613,
+        "status": 200,
+        "cached": false,
+        "endMs": 926.4820001553744,
+        "bytes": 1182
+      },
+      {
+        "path": "/readest/_next/static/chunks/edd57365-543d8cf1f03817fa.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.6639999896288,
+        "status": 200,
+        "cached": false,
+        "endMs": 984.2660001013428,
+        "bytes": 5240
+      },
+      {
+        "path": "/readest/_next/static/chunks/f260128c-9f0d6592ca6b33f6.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.7529999688268,
+        "status": 200,
+        "cached": false,
+        "endMs": 994.8970000259578,
+        "bytes": 1509
+      },
+      {
+        "path": "/readest/_next/static/chunks/d3edc095-478803bdf570adcd.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.8640001155436,
+        "status": 200,
+        "cached": false,
+        "endMs": 1005.2680000662804,
+        "bytes": 1112
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbbacad5-cd9ae0b3a6e11f34.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 560.9470000490546,
+        "status": 200,
+        "cached": false,
+        "endMs": 1008.6430001538247,
+        "bytes": 970
+      },
+      {
+        "path": "/readest/_next/static/chunks/70c2d073-d1ef65c0e1ae7980.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.0319999977946,
+        "status": 200,
+        "cached": false,
+        "endMs": 1014.519999967888,
+        "bytes": 2813
+      },
+      {
+        "path": "/readest/_next/static/chunks/6f4b2082-7b5bf3ab60fef9f4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.1060000956059,
+        "status": 200,
+        "cached": false,
+        "endMs": 1031.9789999630302,
+        "bytes": 4051
+      },
+      {
+        "path": "/readest/_next/static/chunks/8f786f43-a33bb4d96ec63083.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.1960000824183,
+        "status": 200,
+        "cached": false,
+        "endMs": 1087.0670001022518,
+        "bytes": 1248
+      },
+      {
+        "path": "/readest/_next/static/chunks/f52c12b5-7e873c2478d07d02.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.2800000235438,
+        "status": 200,
+        "cached": false,
+        "endMs": 1225.239000050351,
+        "bytes": 47787
+      },
+      {
+        "path": "/readest/_next/static/chunks/9332fda6-60742933ff93e2e9.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.358000151813,
+        "status": 200,
+        "cached": false,
+        "endMs": 1359.8040000069886,
+        "bytes": 79689
+      },
+      {
+        "path": "/readest/_next/static/chunks/f70018de-de8278e5fb8148ef.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.4360000472516,
+        "status": 200,
+        "cached": false,
+        "endMs": 1357.9400000162423,
+        "bytes": 76907
+      },
+      {
+        "path": "/readest/_next/static/chunks/97e934a9-62876e9f1291f912.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.5179999731481,
+        "status": 200,
+        "cached": false,
+        "endMs": 1217.7830000873655,
+        "bytes": 27114
+      },
+      {
+        "path": "/readest/_next/static/chunks/5-36a4698bba927409.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.5920000709593,
+        "status": 200,
+        "cached": false,
+        "endMs": 1162.1910000685602,
+        "bytes": 7367
+      },
+      {
+        "path": "/readest/_next/static/chunks/1478-79f7af6b0f13e2e8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.6709999740124,
+        "status": 200,
+        "cached": false,
+        "endMs": 1861.1479999963194,
+        "bytes": 367125
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/reader-ea06f1a025fcb505.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.752000125125,
+        "status": 200,
+        "cached": false,
+        "endMs": 1986.8970001116395,
+        "bytes": 496753
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_buildManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.8310000281781,
+        "status": 200,
+        "cached": false,
+        "endMs": 1323.8350001629442,
+        "bytes": 1119
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_ssgManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 561.9690001476556,
+        "status": 200,
+        "cached": false,
+        "endMs": 1332.6390001457185,
+        "bytes": 480
+      },
+      {
+        "path": "/readest/_next/static/chunks/9908.15e22a8495c96cc6.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2095.192000037059,
+        "status": 200,
+        "cached": false,
+        "endMs": 2203.5400001332164,
+        "bytes": 4507
+      },
+      {
+        "path": "/readest/_next/static/chunks/6361.21fa690b92b73803.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2301.0629999917,
+        "status": 200,
+        "cached": false,
+        "endMs": 2419.5250000339,
+        "bytes": 10390
+      },
+      {
+        "path": "/readest/_next/static/chunks/373.df54e8d9d7aff18d.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2301.634000148624,
+        "status": 200,
+        "cached": false,
+        "endMs": 2407.8590001445264,
+        "bytes": 2912
+      },
+      {
+        "path": "/fonts/InterVariable.woff2",
+        "type": "Font",
+        "initiator": "parser",
+        "startMs": 2306.438999949023,
+        "status": 200,
+        "cached": false,
+        "endMs": 2413.058000151068,
+        "bytes": 1571
+      },
+      {
+        "path": "/locales/en/translation.json",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2310.5659999419004,
+        "status": 200,
+        "cached": false,
+        "endMs": 2416.909000137821,
+        "bytes": 1571
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2470.314000034705,
+        "status": 200,
+        "cached": false,
+        "endMs": 2573.3130001462996,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2575.476000085473,
+        "status": 206,
+        "cached": false,
+        "endMs": 2691.1800000816584,
+        "bytes": 16913
+      },
+      {
+        "path": "/readest/_next/static/chunks/6896.84556ceba78a2e8e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2692.456000018865,
+        "status": 200,
+        "cached": false,
+        "endMs": 2853.116000071168,
+        "bytes": 71081
+      },
+      {
+        "path": "/readest/_next/static/chunks/4519.77fdafc007b25a92.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2692.7279999945313,
+        "status": 200,
+        "cached": false,
+        "endMs": 2799.2660000454634,
+        "bytes": 1038
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2861.6669999901205,
+        "status": 206,
+        "cached": false,
+        "endMs": 2973.6840000841767,
+        "bytes": 11276
+      },
+      {
+        "path": "/readest/_next/static/chunks/6710.b6a22542ffd3295e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2976.4700001105666,
+        "status": 200,
+        "cached": false,
+        "endMs": 3086.2780001480132,
+        "bytes": 9873
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3118.2170000392944,
+        "status": 206,
+        "cached": false,
+        "endMs": 3243.771000066772,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3256.4640000928193,
+        "status": 206,
+        "cached": false,
+        "endMs": 3374.5949999429286,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3256.9200000725687,
+        "status": 206,
+        "cached": false,
+        "endMs": 3476.4420001301914,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3257.3309999424964,
+        "status": 206,
+        "cached": false,
+        "endMs": 3577.902999939397,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3257.9210000112653,
+        "status": 206,
+        "cached": false,
+        "endMs": 3681.1610001605004,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3258.3469999954104,
+        "status": 206,
+        "cached": false,
+        "endMs": 3783.547000028193,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3797.5890000816435,
+        "status": 200,
+        "cached": false,
+        "endMs": 3900.0059999525547,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3900.9130001068115,
+        "status": 206,
+        "cached": false,
+        "endMs": 4018.7010001391172,
+        "bytes": 16913
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4019.8200000450015,
+        "status": 206,
+        "cached": false,
+        "endMs": 4131.777000147849,
+        "bytes": 11276
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4135.9449999872595,
+        "status": 206,
+        "cached": false,
+        "endMs": 4253.773000091314,
+        "bytes": 16921
+      },
+      {
+        "path": "/readest/_next/static/chunks/4954.94e3000c37bf66df.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 4261.321000056341,
+        "status": 200,
+        "cached": false,
+        "endMs": 4367.432000115514,
+        "bytes": 1625
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4370.440999977291,
+        "status": 206,
+        "cached": false,
+        "endMs": 4488.260000012815,
+        "bytes": 16918
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4371.05800001882,
+        "status": 206,
+        "cached": false,
+        "endMs": 4591.126000043005,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4371.676000067964,
+        "status": 206,
+        "cached": false,
+        "endMs": 4695.6680000294,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4372.3120000213385,
+        "status": 206,
+        "cached": false,
+        "endMs": 4796.175000024959,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4373.219999950379,
+        "status": 206,
+        "cached": false,
+        "endMs": 4899.784000124782,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4373.791000107303,
+        "status": 206,
+        "cached": false,
+        "endMs": 5002.26500001736,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4374.465000117198,
+        "status": 206,
+        "cached": false,
+        "endMs": 5104.237999999896,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4375.196000095457,
+        "status": 206,
+        "cached": false,
+        "endMs": 5209.345000097528,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4376.090000150725,
+        "status": 206,
+        "cached": false,
+        "endMs": 5312.571000074968,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4377.030000090599,
+        "status": 206,
+        "cached": false,
+        "endMs": 5467.152999946848,
+        "bytes": 82453
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4489.036000100896,
+        "status": 206,
+        "cached": false,
+        "endMs": 5583.391000051051,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4592.040000017732,
+        "status": 206,
+        "cached": false,
+        "endMs": 5686.433000024408,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4696.735000004992,
+        "status": 206,
+        "cached": false,
+        "endMs": 5776.757000014186,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4797.353000147268,
+        "status": 206,
+        "cached": false,
+        "endMs": 5880.194999976084,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4900.785000063479,
+        "status": 206,
+        "cached": false,
+        "endMs": 5995.397000107914,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5003.463000059128,
+        "status": 206,
+        "cached": false,
+        "endMs": 6083.845000015572,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5105.110000120476,
+        "status": 206,
+        "cached": false,
+        "endMs": 6200.895000016317,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5210.247999988496,
+        "status": 206,
+        "cached": false,
+        "endMs": 6291.27399995923,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5313.502999953926,
+        "status": 206,
+        "cached": false,
+        "endMs": 6432.541999965906,
+        "bytes": 131609
+      },
+      {
+        "path": "/readest/_next/static/chunks/8493.756cdcf930a66a19.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6491.820000112057,
+        "status": 200,
+        "cached": false,
+        "endMs": 6599.981999956071,
+        "bytes": 6024
+      },
+      {
+        "path": "/readest/_next/static/chunks/4197.f5ca6b6b11253e2f.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6506.150000030175,
+        "status": 200,
+        "cached": false,
+        "endMs": 6608.662000158802,
+        "bytes": 1304
+      },
+      {
+        "path": "/readest/_next/static/chunks/2043.6a970d9a099d90b5.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6603.3390001393855,
+        "status": 200,
+        "cached": false,
+        "endMs": 6759.484000038356,
+        "bytes": 20263
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbc8e5a0.18e5d908d87f40a8.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6609.950999962166,
+        "status": 200,
+        "cached": false,
+        "endMs": 6794.4960000459105,
+        "bytes": 40250
+      },
+      {
+        "path": "/readest/_next/static/chunks/1da4221a.2f23aec3ed62f9d3.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6610.197999980301,
+        "status": 200,
+        "cached": false,
+        "endMs": 6776.272000046447,
+        "bytes": 21681
+      },
+      {
+        "path": "/readest/_next/static/chunks/2018.cdca4e5385ef61bc.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6610.424000071362,
+        "status": 200,
+        "cached": false,
+        "endMs": 6782.770999940112,
+        "bytes": 24644
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6789.5949999801815,
+        "status": 206,
+        "cached": false,
+        "endMs": 7087.34600013122,
+        "bytes": 131610
+      },
+      {
+        "path": "/readest/_next/static/media/turso.wasm32-wasi.a2aafc3f.wasm",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6804.727999959141,
+        "status": 200,
+        "cached": false
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7088.8940000440925,
+        "status": 206,
+        "cached": false,
+        "endMs": 7399.9199999962,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7402.184000005946,
+        "status": 206,
+        "cached": false,
+        "endMs": 7714.802999980748,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7716.755999950692,
+        "status": 206,
+        "cached": false,
+        "endMs": 8029.03400012292,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8031.064999988303,
+        "status": 206,
+        "cached": false,
+        "endMs": 8341.879999963567,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8343.659000005573,
+        "status": 206,
+        "cached": false,
+        "endMs": 8655.030000023544,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8657.06600015983,
+        "status": 206,
+        "cached": false,
+        "endMs": 8968.350999988616,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8970.277999993414,
+        "status": 206,
+        "cached": false,
+        "endMs": 9281.589000020176,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9283.493000082672,
+        "status": 206,
+        "cached": false,
+        "endMs": 9594.732000026852,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9596.758000086993,
+        "status": 206,
+        "cached": false,
+        "endMs": 9908.626000164077,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9910.699000116438,
+        "status": 206,
+        "cached": false,
+        "endMs": 10221.68800001964,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10223.758999956772,
+        "status": 206,
+        "cached": false,
+        "endMs": 10534.714000066742,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10536.559000145644,
+        "status": 206,
+        "cached": false,
+        "endMs": 10847.699000034481,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10849.549000151455,
+        "status": 206,
+        "cached": false,
+        "endMs": 11160.697000101209,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11162.736000027508,
+        "status": 206,
+        "cached": false,
+        "endMs": 11474.42500013858,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11476.40800010413,
+        "status": 206,
+        "cached": false,
+        "endMs": 11787.227000109851,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11789.315999951214,
+        "status": 206,
+        "cached": false,
+        "endMs": 12101.30099998787,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12103.567000012845,
+        "status": 206,
+        "cached": false,
+        "endMs": 12415.467000100762,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12417.697000084445,
+        "status": 206,
+        "cached": false,
+        "endMs": 12729.073000140488,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12730.96300009638,
+        "status": 206,
+        "cached": false,
+        "endMs": 13042.650999967009,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13044.60300016217,
+        "status": 206,
+        "cached": false,
+        "endMs": 13357.076999964193,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13361.597000155598,
+        "status": 206,
+        "cached": false,
+        "endMs": 13674.129000166431,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13676.196000073105,
+        "status": 206,
+        "cached": false,
+        "endMs": 13988.614000147209,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13990.568000124767,
+        "status": 206,
+        "cached": false,
+        "endMs": 14301.240999950096,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14303.210000041872,
+        "status": 206,
+        "cached": false,
+        "endMs": 14615.176999941468,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14617.48700006865,
+        "status": 206,
+        "cached": false,
+        "endMs": 14929.865000071004,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14932.81100015156,
+        "status": 206,
+        "cached": false,
+        "endMs": 15244.967000093311,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 15246.913000009954,
+        "status": 206,
+        "cached": false,
+        "endMs": 15376.907000085339,
+        "bytes": 16921
+      },
+      {
+        "path": "http://127.0.0.1:39209/1991ac89-1569-4f30-8947-13115edac042",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 15394.942000042647,
+        "status": 200,
+        "cached": false,
+        "endMs": 15395.897000096738,
+        "bytes": 0
+      },
+      {
+        "path": "http://127.0.0.1:39209/c0804c51-f29f-4993-962f-a163625876a6",
+        "type": "Image",
+        "initiator": "parser",
+        "startMs": 15395.77200007625,
+        "status": 200,
+        "cached": false,
+        "endMs": 15407.360000070184,
+        "bytes": 0
+      }
+    ],
+    "errors": []
+  },
+  {
+    "variant": "preload",
+    "trial": 3,
+    "readyMs": 15429,
+    "bootstrapEndMs": 436.67800002731383,
+    "readerStartMs": 438.7020000722259,
+    "earlyAssetCount": 2,
+    "staticBytes": 1641229,
+    "earlyAssets": [
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.42500010319054,
+        "status": 200,
+        "cached": false,
+        "endMs": 406.7840001080185,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.5400000475347,
+        "status": 200,
+        "cached": false,
+        "endMs": 389.8710000794381,
+        "bytes": 41062
+      }
+    ],
+    "network": [
+      {
+        "path": "/readest/talebook-launch.html",
+        "type": "Document",
+        "initiator": "other",
+        "startMs": 102.88599994964898,
+        "status": 200,
+        "cached": false,
+        "endMs": 207.3820000514388,
+        "bytes": 2004
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.07800002209842,
+        "status": 200,
+        "cached": false,
+        "endMs": 320.75900002382696,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/talebook-launch.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.31899999454618,
+        "status": 200,
+        "cached": false,
+        "endMs": 331.80800010450184,
+        "bytes": 6290
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.42500010319054,
+        "status": 200,
+        "cached": false,
+        "endMs": 406.7840001080185,
+        "bytes": 60797
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 211.5400000475347,
+        "status": 200,
+        "cached": false,
+        "endMs": 389.8710000794381,
+        "bytes": 41062
+      },
+      {
+        "path": "/api/book/10/reader-bootstrap",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 333.96600000560284,
+        "status": 200,
+        "cached": false,
+        "endMs": 436.67800002731383,
+        "bytes": 1476
+      },
+      {
+        "path": "/readest/reader.html",
+        "type": "Document",
+        "initiator": "script",
+        "startMs": 438.7020000722259,
+        "status": 200,
+        "cached": false,
+        "endMs": 544.1519999876618,
+        "bytes": 1891
+      },
+      {
+        "path": "/readest/legacy-worker-cleanup.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 564.2379999626428,
+        "status": 200,
+        "cached": false,
+        "endMs": 671.3330000638962,
+        "bytes": 2342
+      },
+      {
+        "path": "/readest/_next/static/css/3ac2be450e571eda.css",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 564.6750000305474,
+        "status": 200,
+        "cached": false,
+        "endMs": 838.2540000602603,
+        "bytes": 175744
+      },
+      {
+        "path": "/readest/_next/static/chunks/webpack-7bead95e146958b8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 564.8950000759214,
+        "status": 200,
+        "cached": false,
+        "endMs": 681.0510000213981,
+        "bytes": 3786
+      },
+      {
+        "path": "/readest/_next/static/chunks/framework-803b9476910ff7dc.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.0019999593496,
+        "status": 200,
+        "cached": true,
+        "endMs": 578.6880000960082,
+        "bytes": 0
+      },
+      {
+        "path": "/readest/_next/static/chunks/main-fa3b8f89dca32434.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.1070000603795,
+        "status": 200,
+        "cached": true,
+        "endMs": 578.5650000907481,
+        "bytes": 0
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/_app-949d21ae6acb708e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.2050001081079,
+        "status": 200,
+        "cached": false,
+        "endMs": 678.4659998957068,
+        "bytes": 642
+      },
+      {
+        "path": "/readest/_next/static/chunks/93c975d7-562eb60b13a129b1.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.2900000568479,
+        "status": 200,
+        "cached": false,
+        "endMs": 682.4930000584573,
+        "bytes": 1045
+      },
+      {
+        "path": "/readest/_next/static/chunks/c884d9bd-3ffd797021daa818.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.3890001121908,
+        "status": 200,
+        "cached": false,
+        "endMs": 685.3519999422133,
+        "bytes": 1294
+      },
+      {
+        "path": "/readest/_next/static/chunks/675145d0-6edac469cf028d29.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.5519999563694,
+        "status": 200,
+        "cached": false,
+        "endMs": 776.6050000209361,
+        "bytes": 1527
+      },
+      {
+        "path": "/readest/_next/static/chunks/432c8c81-00737adf06944c99.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.6330001074821,
+        "status": 200,
+        "cached": false,
+        "endMs": 794.9610000941902,
+        "bytes": 5461
+      },
+      {
+        "path": "/readest/_next/static/chunks/e07b0497-74dc09b64a9bc1c4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.7230000942945,
+        "status": 200,
+        "cached": false,
+        "endMs": 793.9929999411106,
+        "bytes": 3277
+      },
+      {
+        "path": "/readest/_next/static/chunks/18d0c3b8-ac9d0cc89f42c5a4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.8899999689311,
+        "status": 200,
+        "cached": false,
+        "endMs": 802.8649999760091,
+        "bytes": 7261
+      },
+      {
+        "path": "/readest/_next/static/chunks/e9f0445e-b3b8c1b3d6eea83e.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 565.9940000623465,
+        "status": 200,
+        "cached": false,
+        "endMs": 791.3679999765009,
+        "bytes": 1275
+      },
+      {
+        "path": "/readest/_next/static/chunks/3cf8cea4-91a27969355594b5.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.0840000491589,
+        "status": 200,
+        "cached": false,
+        "endMs": 879.4790001120418,
+        "bytes": 1182
+      },
+      {
+        "path": "/readest/_next/static/chunks/edd57365-543d8cf1f03817fa.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.1379999946803,
+        "status": 200,
+        "cached": false,
+        "endMs": 900.3900000825524,
+        "bytes": 5240
+      },
+      {
+        "path": "/readest/_next/static/chunks/f260128c-9f0d6592ca6b33f6.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.2040000315756,
+        "status": 200,
+        "cached": false,
+        "endMs": 896.9960000831634,
+        "bytes": 1509
+      },
+      {
+        "path": "/readest/_next/static/chunks/d3edc095-478803bdf570adcd.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.2750001065433,
+        "status": 200,
+        "cached": false,
+        "endMs": 898.7130001187325,
+        "bytes": 1112
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbbacad5-cd9ae0b3a6e11f34.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.3290000520647,
+        "status": 200,
+        "cached": false,
+        "endMs": 905.8149999473244,
+        "bytes": 970
+      },
+      {
+        "path": "/readest/_next/static/chunks/70c2d073-d1ef65c0e1ae7980.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.3940000813454,
+        "status": 200,
+        "cached": false,
+        "endMs": 943.4489998966455,
+        "bytes": 2813
+      },
+      {
+        "path": "/readest/_next/static/chunks/6f4b2082-7b5bf3ab60fef9f4.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.4429999887943,
+        "status": 200,
+        "cached": false,
+        "endMs": 987.7780000679195,
+        "bytes": 4051
+      },
+      {
+        "path": "/readest/_next/static/chunks/8f786f43-a33bb4d96ec63083.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.5110000409186,
+        "status": 200,
+        "cached": false,
+        "endMs": 999.6740000788122,
+        "bytes": 1248
+      },
+      {
+        "path": "/readest/_next/static/chunks/f52c12b5-7e873c2478d07d02.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.5670000016689,
+        "status": 200,
+        "cached": false,
+        "endMs": 1140.631000045687,
+        "bytes": 47787
+      },
+      {
+        "path": "/readest/_next/static/chunks/9332fda6-60742933ff93e2e9.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.6179999243468,
+        "status": 200,
+        "cached": false,
+        "endMs": 1228.8820000831038,
+        "bytes": 79689
+      },
+      {
+        "path": "/readest/_next/static/chunks/f70018de-de8278e5fb8148ef.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.6819999460131,
+        "status": 200,
+        "cached": false,
+        "endMs": 1230.716000078246,
+        "bytes": 76907
+      },
+      {
+        "path": "/readest/_next/static/chunks/97e934a9-62876e9f1291f912.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.7580000590533,
+        "status": 200,
+        "cached": false,
+        "endMs": 1147.6139998994768,
+        "bytes": 27114
+      },
+      {
+        "path": "/readest/_next/static/chunks/5-36a4698bba927409.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.8089999817312,
+        "status": 200,
+        "cached": false,
+        "endMs": 1120.0339999049902,
+        "bytes": 7367
+      },
+      {
+        "path": "/readest/_next/static/chunks/1478-79f7af6b0f13e2e8.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.863999934867,
+        "status": 200,
+        "cached": false,
+        "endMs": 1750.8189999498427,
+        "bytes": 367125
+      },
+      {
+        "path": "/readest/_next/static/chunks/pages/reader-ea06f1a025fcb505.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.9259999413043,
+        "status": 200,
+        "cached": false,
+        "endMs": 1890.1229999028146,
+        "bytes": 496753
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_buildManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 566.9809998944402,
+        "status": 200,
+        "cached": false,
+        "endMs": 1244.8519999161363,
+        "bytes": 1119
+      },
+      {
+        "path": "/readest/_next/static/zvPRcVLdCMeo6yL4OsRS6/_ssgManifest.js",
+        "type": "Script",
+        "initiator": "parser",
+        "startMs": 567.0300000347197,
+        "status": 200,
+        "cached": false,
+        "endMs": 1252.5369999930263,
+        "bytes": 480
+      },
+      {
+        "path": "/readest/_next/static/chunks/9908.15e22a8495c96cc6.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 1991.1199999041855,
+        "status": 200,
+        "cached": false,
+        "endMs": 2100.391000043601,
+        "bytes": 4507
+      },
+      {
+        "path": "/readest/_next/static/chunks/6361.21fa690b92b73803.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2215.051000006497,
+        "status": 200,
+        "cached": false,
+        "endMs": 2333.189999917522,
+        "bytes": 10390
+      },
+      {
+        "path": "/readest/_next/static/chunks/373.df54e8d9d7aff18d.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2215.6179999001324,
+        "status": 200,
+        "cached": false,
+        "endMs": 2322.6970001123846,
+        "bytes": 2912
+      },
+      {
+        "path": "/fonts/InterVariable.woff2",
+        "type": "Font",
+        "initiator": "parser",
+        "startMs": 2220.2640001196414,
+        "status": 200,
+        "cached": false,
+        "endMs": 2329.0409999899566,
+        "bytes": 1571
+      },
+      {
+        "path": "/locales/en/translation.json",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2224.184999940917,
+        "status": 200,
+        "cached": false,
+        "endMs": 2331.6170000471175,
+        "bytes": 1571
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2393.673999933526,
+        "status": 200,
+        "cached": false,
+        "endMs": 2496.8469999730587,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2499.056000029668,
+        "status": 206,
+        "cached": false,
+        "endMs": 2615.684000076726,
+        "bytes": 16913
+      },
+      {
+        "path": "/readest/_next/static/chunks/6896.84556ceba78a2e8e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2616.9660000596195,
+        "status": 200,
+        "cached": false,
+        "endMs": 2777.5230000261217,
+        "bytes": 71081
+      },
+      {
+        "path": "/readest/_next/static/chunks/4519.77fdafc007b25a92.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2617.240000050515,
+        "status": 200,
+        "cached": false,
+        "endMs": 2719.7469999082386,
+        "bytes": 1038
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 2786.472999956459,
+        "status": 206,
+        "cached": false,
+        "endMs": 2900.1539999153465,
+        "bytes": 11276
+      },
+      {
+        "path": "/readest/_next/static/chunks/6710.b6a22542ffd3295e.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 2902.8400001116097,
+        "status": 200,
+        "cached": false,
+        "endMs": 3012.474999995902,
+        "bytes": 9873
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3034.815999912098,
+        "status": 206,
+        "cached": false,
+        "endMs": 3151.759000029415,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3165.1640001218766,
+        "status": 206,
+        "cached": false,
+        "endMs": 3285.122999921441,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3165.6070000026375,
+        "status": 206,
+        "cached": false,
+        "endMs": 3387.2930000070482,
+        "bytes": 16917
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3165.9830000717193,
+        "status": 206,
+        "cached": false,
+        "endMs": 3492.015999974683,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3166.3319999352098,
+        "status": 206,
+        "cached": false,
+        "endMs": 3593.8059999607503,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3166.9910000637174,
+        "status": 206,
+        "cached": false,
+        "endMs": 3697.3290001042187,
+        "bytes": 16921
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3720.1549999881536,
+        "status": 200,
+        "cached": false,
+        "endMs": 3822.7619999088347,
+        "bytes": 480
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3823.744999943301,
+        "status": 206,
+        "cached": false,
+        "endMs": 3939.1439999453723,
+        "bytes": 16913
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 3940.0180000811815,
+        "status": 206,
+        "cached": false,
+        "endMs": 4050.8479999843985,
+        "bytes": 11276
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4054.3569999281317,
+        "status": 206,
+        "cached": false,
+        "endMs": 4171.0840000305325,
+        "bytes": 16921
+      },
+      {
+        "path": "/readest/_next/static/chunks/4954.94e3000c37bf66df.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 4179.715000092983,
+        "status": 200,
+        "cached": false,
+        "endMs": 4283.896999899298,
+        "bytes": 1625
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4287.331999978051,
+        "status": 206,
+        "cached": false,
+        "endMs": 4405.3640000056475,
+        "bytes": 16918
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4288.135000038892,
+        "status": 206,
+        "cached": false,
+        "endMs": 4506.872999947518,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4288.875000085682,
+        "status": 206,
+        "cached": false,
+        "endMs": 4611.8409999180585,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4289.478000020608,
+        "status": 206,
+        "cached": false,
+        "endMs": 4714.666000101715,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4290.022999979556,
+        "status": 206,
+        "cached": false,
+        "endMs": 4816.740999929607,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4290.547000011429,
+        "status": 206,
+        "cached": false,
+        "endMs": 4920.825999928638,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4291.111000115052,
+        "status": 206,
+        "cached": false,
+        "endMs": 5024.095000000671,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4291.6230000555515,
+        "status": 206,
+        "cached": false,
+        "endMs": 5126.829999964684,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4292.21299989149,
+        "status": 206,
+        "cached": false,
+        "endMs": 5230.6260000914335,
+        "bytes": 16919
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4293.14099997282,
+        "status": 206,
+        "cached": false,
+        "endMs": 5384.962999960408,
+        "bytes": 82453
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4406.350000062957,
+        "status": 206,
+        "cached": false,
+        "endMs": 5500.382000114769,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4508.367999922484,
+        "status": 206,
+        "cached": false,
+        "endMs": 5604.173999978229,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4612.914999946952,
+        "status": 206,
+        "cached": false,
+        "endMs": 5693.918999982998,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4715.595999965444,
+        "status": 206,
+        "cached": false,
+        "endMs": 5796.193999936804,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4818.009000038728,
+        "status": 206,
+        "cached": false,
+        "endMs": 5911.123000085354,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 4921.847000019625,
+        "status": 206,
+        "cached": false,
+        "endMs": 6001.424999907613,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5024.9840000178665,
+        "status": 206,
+        "cached": false,
+        "endMs": 6118.5640001203865,
+        "bytes": 98839
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5127.65199993737,
+        "status": 206,
+        "cached": false,
+        "endMs": 6208.221999928355,
+        "bytes": 82455
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 5231.486999895424,
+        "status": 206,
+        "cached": false,
+        "endMs": 6348.6520000733435,
+        "bytes": 131609
+      },
+      {
+        "path": "/readest/_next/static/chunks/8493.756cdcf930a66a19.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6407.272000098601,
+        "status": 200,
+        "cached": false,
+        "endMs": 6516.082999994978,
+        "bytes": 6024
+      },
+      {
+        "path": "/readest/_next/static/chunks/4197.f5ca6b6b11253e2f.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6422.3609999753535,
+        "status": 200,
+        "cached": false,
+        "endMs": 6525.228000013158,
+        "bytes": 1304
+      },
+      {
+        "path": "/readest/_next/static/chunks/2043.6a970d9a099d90b5.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6520.1679999008775,
+        "status": 200,
+        "cached": false,
+        "endMs": 6671.362000051886,
+        "bytes": 20263
+      },
+      {
+        "path": "/readest/_next/static/chunks/cbc8e5a0.18e5d908d87f40a8.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6526.403000112623,
+        "status": 200,
+        "cached": false,
+        "endMs": 6710.414000088349,
+        "bytes": 40250
+      },
+      {
+        "path": "/readest/_next/static/chunks/1da4221a.2f23aec3ed62f9d3.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6526.648000115529,
+        "status": 200,
+        "cached": false,
+        "endMs": 6692.06800009124,
+        "bytes": 21681
+      },
+      {
+        "path": "/readest/_next/static/chunks/2018.cdca4e5385ef61bc.js",
+        "type": "Script",
+        "initiator": "script",
+        "startMs": 6526.8790000118315,
+        "status": 200,
+        "cached": false,
+        "endMs": 6697.855999926105,
+        "bytes": 24644
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6700.8249999489635,
+        "status": 206,
+        "cached": false,
+        "endMs": 6994.084000121802,
+        "bytes": 131610
+      },
+      {
+        "path": "/readest/_next/static/media/turso.wasm32-wasi.a2aafc3f.wasm",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6720.9109999239445,
+        "status": 200,
+        "cached": false
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 6995.595999993384,
+        "status": 206,
+        "cached": false,
+        "endMs": 7306.117000058293,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7308.297999901697,
+        "status": 206,
+        "cached": false,
+        "endMs": 7619.763999944553,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7621.669000014663,
+        "status": 206,
+        "cached": false,
+        "endMs": 7933.877000119537,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 7935.87899999693,
+        "status": 206,
+        "cached": false,
+        "endMs": 8247.475000098348,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8249.395000049844,
+        "status": 206,
+        "cached": false,
+        "endMs": 8560.990999918431,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8563.259999966249,
+        "status": 206,
+        "cached": false,
+        "endMs": 8877.289999974892,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 8879.171000095084,
+        "status": 206,
+        "cached": false,
+        "endMs": 9189.992000116035,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9191.83099991642,
+        "status": 206,
+        "cached": false,
+        "endMs": 9503.682000096887,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9506.034000078216,
+        "status": 206,
+        "cached": false,
+        "endMs": 9818.448999896646,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 9820.421000011265,
+        "status": 206,
+        "cached": false,
+        "endMs": 10133.815000066534,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10142.170999897644,
+        "status": 206,
+        "cached": false,
+        "endMs": 10461.242000106722,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10474.506000056863,
+        "status": 206,
+        "cached": false,
+        "endMs": 10787.510999944061,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 10794.034000020474,
+        "status": 206,
+        "cached": false,
+        "endMs": 11104.743999894708,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11106.777000008151,
+        "status": 206,
+        "cached": false,
+        "endMs": 11417.65800002031,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11421.085000038147,
+        "status": 206,
+        "cached": false,
+        "endMs": 11731.72300006263,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 11733.889000024647,
+        "status": 206,
+        "cached": false,
+        "endMs": 12044.861000031233,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12047.022999962792,
+        "status": 206,
+        "cached": false,
+        "endMs": 12359.226000029594,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12361.416999949142,
+        "status": 206,
+        "cached": false,
+        "endMs": 12674.05300005339,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12676.096000010148,
+        "status": 206,
+        "cached": false,
+        "endMs": 12990.77200004831,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 12993.571999948472,
+        "status": 206,
+        "cached": false,
+        "endMs": 13308.9270000346,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13313.247000100091,
+        "status": 206,
+        "cached": false,
+        "endMs": 13625.628999900073,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13628.064000047743,
+        "status": 206,
+        "cached": false,
+        "endMs": 13939.633999951184,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 13942.440999904647,
+        "status": 206,
+        "cached": false,
+        "endMs": 14256.068000104278,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14258.401999948546,
+        "status": 206,
+        "cached": false,
+        "endMs": 14569.97500010766,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14571.811999892816,
+        "status": 206,
+        "cached": false,
+        "endMs": 14882.98700004816,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 14885.18700003624,
+        "status": 206,
+        "cached": false,
+        "endMs": 15196.019999915734,
+        "bytes": 131610
+      },
+      {
+        "path": "/read/resource/10.epub",
+        "type": "Fetch",
+        "initiator": "script",
+        "startMs": 15198.099999921396,
+        "status": 206,
+        "cached": false,
+        "endMs": 15327.198999933898,
+        "bytes": 16921
+      },
+      {
+        "path": "http://127.0.0.1:39211/56ab3ef3-3f85-467d-81a5-b48d68c686f0",
+        "type": "Stylesheet",
+        "initiator": "parser",
+        "startMs": 15344.561000121757,
+        "status": 200,
+        "cached": false,
+        "endMs": 15347.287999931723,
+        "bytes": 0
+      },
+      {
+        "path": "http://127.0.0.1:39211/c5da3199-b488-4ff2-a2a5-89a4db009842",
+        "type": "Image",
+        "initiator": "parser",
+        "startMs": 15345.435000024736,
+        "status": 200,
+        "cached": false,
+        "endMs": 15350.425000069663,
+        "bytes": 0
+      }
+    ],
+    "errors": []
+  }
+]

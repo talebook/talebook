@@ -1,0 +1,25 @@
+{
+  "repository": "https://github.com/hehetoshang/readest-reader",
+  "commit": "a4fc84077ad4f4c490305961235086f25bd4da12",
+  "monorepoVersion": "0.1.0",
+  "readerAppVersion": "0.12.1",
+  "license": "AGPL-3.0-only",
+  "patches": [
+    "scripts/readest/0001-android-web-head.patch",
+    "scripts/readest/0002-online-range-performance.patch",
+    "scripts/readest/0003-progressive-navigation.patch"
+  ],
+  "build": {
+    "packageManager": "pnpm@11.1.1",
+    "command": "NEXT_PUBLIC_APP_PLATFORM=web pnpm build",
+    "appPlatform": "web",
+    "embeddedBasePath": "/readest",
+    "output": "out/readest"
+  },
+  "hostFiles": [
+    "legacy-worker-cleanup.js",
+    "sw.js",
+    "talebook-launch.html",
+    "talebook-launch.js"
+  ]
+}

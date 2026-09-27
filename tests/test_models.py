@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 
-import hashlib
 import json
 import logging
 import sqlite3
@@ -9,6 +8,13 @@ import unittest
 from pathlib import Path
 
 from webserver import models
+
+
+# Fixed historical records: keep legacy verification independent of the implementation.
+# These are synthetic test credentials, never used for real accounts.
+LEGACY_RECORDS = json.loads((Path(__file__).parent / "cases" / "legacy_passwords.json").read_text(encoding="utf-8"))
+LEGACY_SALT = LEGACY_RECORDS["salt"]
+LEGACY_HASHES = LEGACY_RECORDS["hashes"]
 
 
 class TestUser(unittest.TestCase):
@@ -72,11 +78,10 @@ class TestUser(unittest.TestCase):
     def test_sha256_password_compatibility_exact_match(self):
         """测试SHA256+salt密码精确兼容性验证"""
         a = models.Reader()
-        a.salt = models.mksalt()
+        a.salt = LEGACY_SALT
         raw_password = "LegacyPassword1234"
 
-        p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
-        p2 = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        p2 = LEGACY_HASHES[raw_password]
         a.password = p2
 
         self.assertEqual(a.get_secure_password(raw_password), a.password)
@@ -84,12 +89,11 @@ class TestUser(unittest.TestCase):
     def test_sha256_password_compatibility_wrong_password(self):
         """测试SHA256+salt密码错误验证"""
         a = models.Reader()
-        a.salt = models.mksalt()
+        a.salt = LEGACY_SALT
         correct_password = "LegacyPassword1234"
         wrong_password = "TotallyWrong9876"
 
-        p1 = hashlib.sha256(correct_password.encode("UTF-8")).hexdigest()
-        p2 = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        p2 = LEGACY_HASHES[correct_password]
         a.password = p2
 
         self.assertNotEqual(a.get_secure_password(wrong_password), a.password)
@@ -97,12 +101,11 @@ class TestUser(unittest.TestCase):
     def test_sha256_password_using_original_get_secure(self):
         """使用原来的get_secure_password方法计算SHA256密码并验证"""
         a = models.Reader()
-        a.salt = models.mksalt()
+        a.salt = LEGACY_SALT
         raw_password = "TestLegacyPassword"
 
-        # 使用原算法计算
-        p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
-        expected_hash = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        # 加载固定历史哈希向量
+        expected_hash = LEGACY_HASHES[raw_password]
 
         # 使用我们的get_secure_password验证是否相同
         a.password = expected_hash
@@ -146,10 +149,9 @@ class TestUser(unittest.TestCase):
 
         # SHA256模式
         b = models.Reader()
-        b.salt = models.mksalt()
+        b.salt = LEGACY_SALT
         correct_password = "ValidLegacyPassword"
-        p1 = hashlib.sha256(correct_password.encode("UTF-8")).hexdigest()
-        p2 = hashlib.sha256((b.salt + p1).encode("UTF-8")).hexdigest()
+        p2 = LEGACY_HASHES[correct_password]
         b.password = p2
 
         self.assertNotEqual(b.get_secure_password(""), b.password)
@@ -171,21 +173,19 @@ class TestUser(unittest.TestCase):
 
             # SHA256模式测试
             b = models.Reader()
-            b.salt = models.mksalt()
-            p1 = hashlib.sha256(password.encode("UTF-8")).hexdigest()
-            p2 = hashlib.sha256((b.salt + p1).encode("UTF-8")).hexdigest()
+            b.salt = LEGACY_SALT
+            p2 = LEGACY_HASHES[password]
             b.password = p2
             self.assertEqual(b.get_secure_password(password), b.password)
 
     def test_migrate_password_from_sha256_to_bcrypt(self):
         """测试密码从 SHA256 迁移到 bcrypt"""
         a = models.Reader()
-        a.salt = models.mksalt()
+        a.salt = LEGACY_SALT
         raw_password = "LegacyPassword1234"
 
-        # 设置 SHA256 密码
-        p1 = hashlib.sha256(raw_password.encode("UTF-8")).hexdigest()
-        p2 = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        # 加载旧版 SHA256 密码记录
+        p2 = LEGACY_HASHES[raw_password]
         a.password = p2
 
         # 验证迁移前是 SHA256
@@ -219,13 +219,12 @@ class TestUser(unittest.TestCase):
     def test_migrate_password_wrong_password(self):
         """测试错误密码不会触发迁移"""
         a = models.Reader()
-        a.salt = models.mksalt()
+        a.salt = LEGACY_SALT
         correct_password = "CorrectPassword123"
         wrong_password = "WrongPassword456"
 
-        # 设置 SHA256 密码
-        p1 = hashlib.sha256(correct_password.encode("UTF-8")).hexdigest()
-        p2 = hashlib.sha256((a.salt + p1).encode("UTF-8")).hexdigest()
+        # 加载旧版 SHA256 密码记录
+        p2 = LEGACY_HASHES[correct_password]
         a.password = p2
         original_salt = a.salt
 

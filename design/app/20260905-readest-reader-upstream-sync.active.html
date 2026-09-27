@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 将内嵌 Readest 静态阅读器迁移到 readest-reader 独立上游的实施方案。" />
+    <link rel="icon" href="data:," />
+    <title>将 Talebook Readest 静态阅读器迁移到独立上游 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg:#f5f7fb; --panel:#fff; --ink:#172033; --muted:#5b6474; --line:#d9e0ea; --accent:#315f91; --accent-soft:#eef5ff; --warn:#9a5c09; --warn-soft:#fff8eb; --good:#1f7a53; --good-soft:#e7f5ee; --shadow:0 12px 30px rgba(15,23,42,.08); --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; --mono:"SFMono-Regular",Consolas,monospace; }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:linear-gradient(180deg,#fbfcff,var(--bg)); font-family:var(--sans); line-height:1.68; }
+      a { color:var(--accent); text-underline-offset:3px; } a:focus-visible,[tabindex="0"]:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+      code { padding:.1em .35em; border-radius:4px; background:#eef2f7; font-family:var(--mono); overflow-wrap:anywhere; }
+      .skip { position:fixed; top:8px; left:8px; padding:8px 12px; color:#fff; background:var(--ink); transform:translateY(-160%); } .skip:focus { transform:none; }
+      .page { width:min(1060px,calc(100vw - 32px)); margin:auto; padding:24px 0 56px; } .hero,.card { background:var(--panel); border:1px solid var(--line); border-radius:20px; box-shadow:var(--shadow); }
+      .hero { padding:32px 34px; margin-bottom:18px; } h1 { margin:0 0 10px; font-size:clamp(30px,4vw,46px); line-height:1.15; } .sub { margin:0; color:var(--muted); }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 11px; border-radius:999px; color:#536176; background:#eef2f7; font-size:12px; font-weight:700; } .chip.active { color:var(--good); background:var(--good-soft); }
+      .card { padding:26px 28px; margin-bottom:18px; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:0 0 8px; font-size:17px; } p { margin:0 0 12px; } p,li,td,th { font-size:14px; } ul,ol { margin:8px 0 0 20px; padding:0; } li+li { margin-top:6px; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } .choice,.callout { padding:16px; border:1px solid var(--line); border-radius:14px; } .choice.good,.callout.good { border-color:#bddcc4; background:var(--good-soft); } .callout.warn { border-color:#f0d7a8; background:var(--warn-soft); }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:14px; } table { width:100%; min-width:680px; border-collapse:collapse; } th,td { padding:11px 12px; border-right:1px solid var(--line); border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f8fafc; } th:last-child,td:last-child { border-right:0; } tr:last-child td { border-bottom:0; }
+      .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; } .step { padding:15px; border:1px solid var(--line); border-radius:14px; } .step b { display:block; margin-bottom:5px; } .step p { color:var(--muted); font-size:13px; }
+      .verified { color:var(--good); font-weight:800; } footer { color:var(--muted); font-size:12px; text-align:center; }
+      @media (max-width:720px) { .page { width:calc(100vw - 20px); padding-top:10px; } .hero,.card { border-radius:16px; padding:22px 20px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } } @media print { body { background:#fff; } .page { width:100%; } .hero,.card { box-shadow:none; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>将 Talebook Readest 静态阅读器迁移到独立上游</h1>
+        <p class="sub">以可复现、可追溯的方式，用 <code>hehetoshang/readest-reader</code> 的 Reader-only 静态产物替换 PR #977 中来自旧仓库的完整 Readest 构建，同时保持 Talebook 的权限、Range 资源与回退协议。</p>
+        <div class="chips" aria-label="方案元信息"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-09-05</span><span class="chip">所属模块：app</span><span class="chip">影响范围：静态阅读器、启动器、测试与部署契约</span><span class="chip">需求来源：TB-204 / PR #977</span></div>
+      </header>
+      <main id="main">
+        <section class="card"><h2>1. 原始诉求</h2><div class="callout warn">“更新 Talebook 当前 Readest 相关 PR 中使用的阅读器实现，使其同步到新的上游仓库 <code>https://github.com/hehetoshang/readest-reader/</code>；保留阅读入口、书籍加载、鉴权和资源访问能力，并完成构建、验证与 PR 回传。”</div><p>现有 PR #977 把 <code>hehetoshang/readest@5eaf1013f</code> 的完整静态导出放在 <code>app/public/readest</code>。独立上游已收敛为 Reader-only 边界，且最新提交加入了 Talebook 在线 EPUB source adapter。</p></section>
+        <section class="card"><h2>2. 目标与边界</h2><div class="grid"><article class="choice good"><h3>目标</h3><ul><li>固定并记录独立上游提交与构建参数。</li><li>保留 <code>/readest/talebook-launch.html</code> 到同源授权 EPUB 的启动链。</li><li>保留 HEAD、Range、ETag、MIME、权限失败和 Candle 回退契约。</li><li>删除旧构建不再需要的 library/account/worker 产物。</li></ul></article><article class="choice"><h3>非目标</h3><ul><li>不引入 Readest 账号、云端书库或支付能力。</li><li>不改变 Talebook 登录与书籍可见性规则。</li><li>不实现 PDF/TXT 经 Readest 打开。</li><li>不修改独立上游的 Moke/Tauri 原生契约。</li></ul></article></div></section>
+        <section class="card"><h2>3. 现状与证据</h2><div class="table-wrap" role="region" aria-label="现状证据" tabindex="0"><table><thead><tr><th>观察</th><th>证据</th><th>结论</th></tr></thead><tbody><tr><td>PR #977 的静态产物来自旧仓库</td><td>PR 正文固定 <code>hehetoshang/readest@5eaf1013f</code></td><td>来源需改为独立上游并落盘记录。</td></tr><tr><td>独立上游没有 release/tag</td><td><code>main@a4fc84077ad4f4c490305961235086f25bd4da12</code></td><td>本次固定完整 commit SHA，而不是漂移分支名。</td></tr><tr><td>新上游已有安全在线 source adapter</td><td><code>mokeRemoteSource.ts</code> 校验同源路径、revision、HEAD、Range、ETag 和 MIME</td><td>Talebook 启动器须补充 <code>mokeSourceServerUrl</code>。</td></tr></tbody></table></div></section>
+        <section class="card"><h2>4. 方案</h2><div class="callout good"><strong>方案结论：</strong>在独立上游检出固定 SHA、初始化其 vendor 后，以 <code>NEXT_PUBLIC_APP_PLATFORM=web</code> 构建 Reader-only 静态导出；同步 <code>out/readest</code> 到 Talebook，保留 Talebook 自有 launcher/legacy worker tombstone，新增来源清单与一致性测试。</div><div class="flow"><article class="step"><b>固定来源</b><p>记录仓库、完整 SHA、版本和构建 profile。</p></article><article class="step"><b>构建同步</b><p>安装锁定依赖、生成 vendor 并构建静态 Reader。</p></article><article class="step"><b>协议适配</b><p>launcher 传入同源 server 与授权 EPUB URL。</p></article><article class="step"><b>验证交付</b><p>运行两仓测试、Talebook 构建与浏览器关键流程。</p></article></div></section>
+        <section class="card"><h2>5. 影响、风险与回滚</h2><div class="grid"><article class="choice good"><h3>影响范围</h3><p><code>app/public/readest</code> 构建产物、Talebook launcher 参数、Readest 的 CSP/跨源隔离响应头、静态资源契约测试和 PR 说明。后端 bootstrap/resource API 维持现状。</p></article><article class="choice"><h3>保持不变</h3><p><code>/read/:id</code> 入口、登录/游客/激活权限、EPUB revision、Candle 显式回退、Nginx 私有缓存与 byte-range 转发。</p></article></div><div class="callout warn"><strong>主要风险：</strong>新静态构建是 Moke-oriented Reader profile；浏览器托管必须强制 web platform。上游仍会发出不影响阅读的 Tauri bridge 诊断，且 Talebook 的严格 CSP 会拒绝外部在线字体并回退到本地字体。回滚单位是本次同步提交，无数据迁移或清理。</div></section>
+        <section class="card"><h2>6. 测试计划与结果</h2><div class="table-wrap" role="region" aria-label="测试结果" tabindex="0"><table><thead><tr><th>验证层</th><th>命令或页面</th><th>预期</th><th>结果</th></tr></thead><tbody><tr><td>上游</td><td><code>pnpm typecheck</code>、<code>pnpm test</code>、<code>NEXT_PUBLIC_APP_PLATFORM=web pnpm build</code></td><td>源码、契约与静态导出通过</td><td class="verified">通过：4 个 repository tests、82 个 app tests、类型检查与生产构建</td></tr><tr><td>Talebook 单元/集成</td><td>Docker Pytest 与 3 个相关 Vitest 文件</td><td>权限、启动参数、代理和 worker 清理不回归</td><td class="verified">通过：17 个 Pytest、12 个 Vitest</td></tr><tr><td>构建与质量</td><td><code>npm run build</code>、<code>npm run generate</code>、Python/前端 lint、Nginx 两种配置与设计门禁</td><td>生产构建和门禁通过</td><td class="verified">通过；前端 lint 为 0 error、459 个既有 warning</td></tr><tr><td>真实浏览器</td><td>临时 Docker 生产后端 + Playwright Chromium：EPUB 打开、HEAD/Range、翻页、错误回退</td><td>新 Reader 能加载授权资源并保留恢复动作</td><td class="verified">通过：标题与正文渲染；HEAD 200、Range 206；双页视图 1/34 → 4/34；无效书籍可改用 Candle</td></tr></tbody></table></div><p class="callout warn">仓库流程提到的 <code>interface-review</code> skill 在当前运行环境中不可用。本次以 Playwright headless 实机渲染、页面截图人工检查、响应/控制台断言替代；修复 CSP 后核心 WebAssembly/worker 报错及页面异常均为 0。</p></section>
+        <section class="card"><h2>7. 决策记录</h2><ol><li><strong>2026-09-05：</strong>选择独立上游最新主分支完整 SHA，因为仓库尚未发布 tag/release。</li><li><strong>2026-09-05：</strong>Talebook 浏览器构建显式覆盖为 web platform，避免依赖 Tauri IPC，同时复用上游浏览器 fetch transport。</li><li><strong>2026-09-05：</strong>保留 Talebook 自有 launcher 与 worker tombstone；两者属于宿主协议与历史兼容，不属于上游 Reader 产物。</li><li><strong>2026-09-05：</strong>为上游 Reader 增加最小化 <code>wasm-unsafe-eval</code>、data fetch、blob worker 和 COOP/COEP，仅用于 WebAssembly/worker；跨域字体仍由 CSP 阻断。</li></ol></section>
+      </main>
+      <footer>Talebook internal design · app · ACTIVE · 2026-09-05</footer>
+    </div>
+  </body>
+</html>

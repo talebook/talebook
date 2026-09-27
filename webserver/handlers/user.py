@@ -155,7 +155,7 @@ class UserUpdate(BaseHandler):
 
         ke = data.get("kindle_email", "").strip()
         if len(ke) > 0:
-            if not re.match(Reader.RE_EMAIL, ke):
+            if not Reader.is_valid_email(ke):
                 return {"err": "params.email.invalid", "msg": _("Kindle地址无效")}
             if user.extra is None:
                 user.extra = {"kindle_email": ke}
@@ -211,7 +211,7 @@ class SignUp(BaseHandler):
         if not nickname or not username or not password:
             return {"err": "params.invalid", "msg": _("用户名或密码无效")}
 
-        if not re.match(Reader.RE_EMAIL, email):
+        if not Reader.is_valid_email(email):
             return {"err": "params.email.invalid", "msg": _("Email无效")}
         if len(username) < 2 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _("用户名无效")}

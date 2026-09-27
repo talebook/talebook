@@ -1,0 +1,155 @@
+/* Copyright 2014 Mozilla Foundation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.textLayer {
+  color-scheme: only light;
+
+  position: absolute;
+  text-align: initial;
+  inset: 0;
+  overflow: clip;
+  opacity: 1;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  caret-color: CanvasText;
+  z-index: 0;
+
+  /* Avoids https://github.com/mozilla/pdf.js/issues/13840 in Chrome */
+  /*#endif*/
+}
+
+.textLayer.highlighting {
+    touch-action: none;
+  }
+
+.textLayer :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+
+.textLayer {
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+/* We multiply the font size by --min-font-size, and then scale the text
+   * elements by 1/--min-font-size. This allows us to effectively ignore the
+   * minimum font size enforced by the browser, so that the text layer <span>s
+   * can always match the size of the text in the canvas. */
+
+.textLayer > :not(.markedContent),
+  .textLayer .markedContent span:not(.markedContent) {
+    z-index: 1;
+
+    --font-height: 0; /* set by text_layer.js */
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+
+    --scale-x: 1;
+    --rotate: 0deg;
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x))
+      scale(var(--min-font-size-inv));
+  }
+
+.textLayer .markedContent {
+    display: contents;
+  }
+
+.textLayer span[role="img"] {
+    user-select: none;
+    cursor: default;
+  }
+
+.textLayer .highlight {
+    --highlight-bg-color: rgb(180 0 170 / 0.25);
+    --highlight-selected-bg-color: rgb(0 100 0 / 0.25);
+    --highlight-backdrop-filter: none;
+    --highlight-selected-backdrop-filter: none;
+  }
+
+@media screen and (forced-colors: active) {
+
+.textLayer .highlight {
+      --highlight-bg-color: transparent;
+      --highlight-selected-bg-color: transparent;
+      --highlight-backdrop-filter: var(--hcm-highlight-filter);
+      --highlight-selected-backdrop-filter: var(
+        --hcm-highlight-selected-filter
+      )
+  }
+    }
+
+.textLayer .highlight {
+
+    margin: -1px;
+    padding: 1px;
+    background-color: var(--highlight-bg-color);
+    backdrop-filter: var(--highlight-backdrop-filter);
+    border-radius: 4px;
+}
+
+.textLayer .highlight.appended {
+      position: initial;
+    }
+
+.textLayer .highlight.begin {
+      border-radius: 4px 0 0 4px;
+    }
+
+.textLayer .highlight.end {
+      border-radius: 0 4px 4px 0;
+    }
+
+.textLayer .highlight.middle {
+      border-radius: 0;
+    }
+
+.textLayer .highlight.selected {
+      background-color: var(--highlight-selected-bg-color);
+      backdrop-filter: var(--highlight-selected-backdrop-filter);
+    }
+
+.textLayer ::selection {
+    /* stylelint-disable declaration-block-no-duplicate-properties */
+    /*#if !MOZCENTRAL*/
+    background: rgba(0 0 255 / 0.25);
+    /*#endif*/
+    /* stylelint-enable declaration-block-no-duplicate-properties */
+    background: color-mix(in srgb, AccentColor, transparent 75%);
+  }
+
+/*#if !MOZCENTRAL*/
+
+.textLayer br::selection {
+    background: transparent;
+  }
+
+.textLayer .endOfContent {
+    display: block;
+    position: absolute;
+    inset: 100% 0 0;
+    z-index: 0;
+    cursor: default;
+    user-select: none;
+  }
+
+.textLayer.selecting .endOfContent {
+    top: 0;
+  }

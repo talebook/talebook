@@ -1,0 +1,29 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "J5W48D69VR.com.bilingify.readest"
+        ],
+        "components": [
+          {
+            "/": "/auth/*",
+            "comment": "Matches OAuth callback paths"
+          },
+          {
+            "/": "/o/*",
+            "comment": "Matches annotation deeplinks"
+          },
+          {
+            "/": "/s/*",
+            "comment": "Matches book share links"
+          },
+          {
+            "/": "/clip*",
+            "comment": "Matches Share-Extension URL handoff: /clip?url=..."
+          }
+        ]
+      }
+    ]
+  }
+}

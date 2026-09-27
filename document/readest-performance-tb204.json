@@ -1,0 +1,258 @@
+{
+  "book": {
+    "name": "西游记",
+    "id": 10,
+    "bytes": 4680179
+  },
+  "method": {
+    "browser": "Playwright Chromium Android Edge UA",
+    "viewport": "412x915",
+    "downloadBytesPerSecond": 1250000,
+    "repeats": 3,
+    "ready": "navigation start to visible page counter",
+    "warm": "same context, reopen after 2 seconds on first page; no guarantee of navigation-cache hit",
+    "backend": "real isolated Docker; original image b53da2d4 vs same image plus optimized assets/config"
+  },
+  "results": [
+    {
+      "latencyMs": 0,
+      "cache": "cold",
+      "before": {
+        "trialsMs": [
+          18071,
+          16887,
+          17764
+        ],
+        "medianMs": 17764,
+        "rangeRequests": [
+          165,
+          165,
+          165
+        ],
+        "epubBytes": [
+          8818461,
+          8818461,
+          8818461
+        ],
+        "readerAssetBytes": [
+          6252289,
+          6252289,
+          6252289
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      },
+      "after": {
+        "trialsMs": [
+          9336,
+          9100,
+          9134
+        ],
+        "medianMs": 9134,
+        "rangeRequests": [
+          58,
+          58,
+          58
+        ],
+        "epubBytes": [
+          4805606,
+          4805606,
+          4805606
+        ],
+        "readerAssetBytes": [
+          1637043,
+          1637043,
+          1637043
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "latencyMs": 0,
+      "cache": "warm",
+      "before": {
+        "trialsMs": [
+          12177,
+          11354,
+          11997
+        ],
+        "medianMs": 11997,
+        "rangeRequests": [
+          160,
+          158,
+          160
+        ],
+        "epubBytes": [
+          8580836,
+          8449764,
+          8580836
+        ],
+        "readerAssetBytes": [
+          2247,
+          2247,
+          2247
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      },
+      "after": {
+        "trialsMs": [
+          8034,
+          8267,
+          8377
+        ],
+        "medianMs": 8267,
+        "rangeRequests": [
+          58,
+          58,
+          58
+        ],
+        "epubBytes": [
+          4805606,
+          4805606,
+          4805606
+        ],
+        "readerAssetBytes": [
+          2247,
+          2247,
+          2247
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "latencyMs": 100,
+      "cache": "cold",
+      "before": {
+        "trialsMs": [
+          33685,
+          34505,
+          34633
+        ],
+        "medianMs": 34505,
+        "rangeRequests": [
+          164,
+          164,
+          164
+        ],
+        "epubBytes": [
+          8752925,
+          8752925,
+          8752925
+        ],
+        "readerAssetBytes": [
+          6252289,
+          6252289,
+          6252289
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      },
+      "after": {
+        "trialsMs": [
+          15651,
+          16377,
+          15662
+        ],
+        "medianMs": 15662,
+        "rangeRequests": [
+          58,
+          58,
+          58
+        ],
+        "epubBytes": [
+          4805606,
+          4805606,
+          4805606
+        ],
+        "readerAssetBytes": [
+          1637043,
+          1637043,
+          1637043
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      }
+    },
+    {
+      "latencyMs": 100,
+      "cache": "warm",
+      "before": {
+        "trialsMs": [
+          19661,
+          20546,
+          19294
+        ],
+        "medianMs": 19661,
+        "rangeRequests": [
+          163,
+          163,
+          163
+        ],
+        "epubBytes": [
+          8736541,
+          8736541,
+          8736541
+        ],
+        "readerAssetBytes": [
+          2247,
+          2247,
+          2247
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      },
+      "after": {
+        "trialsMs": [
+          14379,
+          13868,
+          13857
+        ],
+        "medianMs": 13868,
+        "rangeRequests": [
+          58,
+          58,
+          58
+        ],
+        "epubBytes": [
+          4805606,
+          4805606,
+          4805606
+        ],
+        "readerAssetBytes": [
+          2247,
+          2247,
+          2247
+        ],
+        "pageErrors": [
+          [],
+          [],
+          []
+        ]
+      }
+    }
+  ]
+}
