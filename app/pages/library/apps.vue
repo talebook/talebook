@@ -212,6 +212,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { computed } from 'vue';
 import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useMainStore } from '@/stores/main';
@@ -221,8 +222,8 @@ const store = useMainStore();
 const { t } = useI18n();
 const requestUrl = useRequestURL();
 const origin = `${requestUrl.protocol}//${requestUrl.host}`;
-const opdsUrl = `${origin}/opds/`;
-const webdavUrl = `${origin}/books/`;
+const opdsUrl = `${origin}${withBasePath('/opds/')}`;
+const webdavUrl = `${origin}${withBasePath('/books/')}`;
 const opdsEnabled = computed(() => store.sys.opds_enabled !== false);
 const webdavEnabled = computed(() => store.sys.webdav_enabled !== false);
 </script>

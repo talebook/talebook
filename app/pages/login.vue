@@ -80,7 +80,7 @@
                                 <v-btn
                                     small
                                     outlined
-                                    :href="'/auth/login/' + s.value"
+                                    :href="withBasePath('/auth/login/' + s.value)"
                                     class="ma-1"
                                 >
                                     {{ s.text }}
@@ -193,6 +193,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';

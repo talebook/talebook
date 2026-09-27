@@ -25,6 +25,7 @@ import tornado.web
 from sqlalchemy import func, or_
 
 from webserver import loader, utils
+from webserver.base_path import public_url
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
 from webserver.models import (
@@ -109,8 +110,8 @@ def _chapter_dict(chapter):
         "title": chapter.title,
         "duration_ms": chapter.duration_ms,
         "size_bytes": chapter.size_bytes,
-        "audio_url": f"/media/audio/{chapter.edition_id}/chapter/{chapter.number}.mp3",
-        "timeline_url": f"/api/audio/{chapter.edition_id}/chapter/{chapter.number}/timeline",
+        "audio_url": public_url(f"/media/audio/{chapter.edition_id}/chapter/{chapter.number}.mp3"),
+        "timeline_url": public_url(f"/api/audio/{chapter.edition_id}/chapter/{chapter.number}/timeline"),
     }
 
 
@@ -1602,7 +1603,9 @@ class AudiobookVoices(BaseHandler):
         for voice in catalog.get("voices", []):
             preview_path = voice.pop("preview_path", None)
             if preview_path:
-                voice["preview_url"] = f"/media/audio-voice/{quote(str(voice['engine']))}/{quote(str(voice['voice_id']))}.mp3"
+                voice["preview_url"] = public_url(
+                    f"/media/audio-voice/{quote(str(voice['engine']))}/{quote(str(voice['voice_id']))}.mp3"
+                )
         return {"err": "ok", "catalog": catalog}
 
 

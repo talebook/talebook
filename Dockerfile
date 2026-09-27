@@ -16,6 +16,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 
 # spa build mode will clear ssr build data, run it first
 COPY app/ /build/
+ARG TALEBOOK_BASE_PATH=""
+ENV TALEBOOK_BASE_PATH=${TALEBOOK_BASE_PATH}
 RUN mkdir -p /app-ssr/ /app-static/
 RUN npm run build
 RUN ls -al
@@ -140,6 +142,8 @@ CMD ["pytest", "/var/www/talebook/tests"]
 # ----------------------------------------
 # 生产环境
 FROM server AS production
+ARG TALEBOOK_BASE_PATH=""
+ENV TALEBOOK_BASE_PATH=${TALEBOOK_BASE_PATH}
 ARG GIT_VERSION=""
 ARG TARGETARCH
 ARG TARGETVARIANT
@@ -178,6 +182,7 @@ COPY docker/ /var/www/talebook/docker/
 COPY webserver/ /var/www/talebook/webserver/
 COPY conf/nginx/ssl.* /data/books/ssl/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/
+RUN python3 -m docker.configure_base_path /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY docker/status_page.html /var/www/talebook/status/status_page.html
 COPY --from=builder /app-static/ /var/www/talebook/app/
@@ -235,6 +240,7 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
 
 # copy ssr config
 COPY conf/nginx/server-side-render.conf /etc/nginx/conf.d/talebook.conf
+RUN python3 -m docker.configure_base_path /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/server-side-render.conf /etc/supervisor/conf.d/talebook.conf
 COPY --from=builder /app-ssr/ /var/www/talebook/app/
 
@@ -248,6 +254,8 @@ RUN rm -rf /var/www/talebook/app/.output/public/logo && \
 # 构建：docker build --target dev -t talebook/talebook:dev .
 # 使用：docker-compose -f dev.yml up
 FROM test AS dev
+ARG TALEBOOK_BASE_PATH=""
+ENV TALEBOOK_BASE_PATH=${TALEBOOK_BASE_PATH}
 ARG BUILD_COUNTRY=""
 ARG GIT_VERSION=""
 ARG TARGETARCH
@@ -309,6 +317,7 @@ COPY docker/ /var/www/talebook/docker/
 COPY webserver/ /var/www/talebook/webserver/
 COPY conf/nginx/ssl.* /data/books/ssl/
 COPY conf/nginx/dev.conf /etc/nginx/conf.d/talebook.conf
+RUN python3 -m docker.configure_base_path /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/dev.conf /etc/supervisor/conf.d/talebook.conf
 
 # 预先安装 npm 依赖（当 app/ 目录未被外部挂载时作为回退）

@@ -93,6 +93,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, computed, onMounted, nextTick, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
@@ -115,7 +116,7 @@ const showError = ref(true);
 
 const lineOptions = [100, 200, 500, 1000, 2000];
 
-const downloadUrl = '/api/admin/log/download';
+const downloadUrl = withBasePath('/api/admin/log/download');
 
 // tornado 的 LogFormatter 在行首输出单字母级别，如 "[E 260101 12:00:00 module:1] message"
 const levelInfo = (line) => {
