@@ -4,6 +4,7 @@ import logging
 from wsgidav.wsgidav_app import WsgiDAVApp
 
 from webserver import loader
+from webserver.base_path import BASE_PATH
 
 from .dav_provider import MyBooksDavProvider
 
@@ -33,6 +34,7 @@ def create_webdav_app(calibre_cache, sqlite_session):
         "host": "0.0.0.0",
         "port": 8080,
         "app_title": "Talebook/WebDAV",
+        "mount_path": BASE_PATH,
         "provider_mapping": {
             "/books": provider,
         },

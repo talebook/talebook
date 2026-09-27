@@ -627,6 +627,17 @@ class TestBook(TestWithUserLogin):
         self.assertEqual(rsp.code, 206)
         self.assertEqual(rsp.body, book_body[1:])
 
+    def test_pdf_download_and_inline_preview_use_distinct_dispositions(self):
+        rsp = self.fetch(f"/api/book/{BID_PDF}.pdf")
+        self.assertEqual(rsp.code, 200)
+        self.assertEqual(rsp.headers["Content-Type"], "application/pdf")
+        self.assertTrue(rsp.headers["Content-Disposition"].startswith("attachment;"))
+
+        rsp = self.fetch(f"/api/book/{BID_PDF}.pdf?inline=1")
+        self.assertEqual(rsp.code, 200)
+        self.assertEqual(rsp.headers["Content-Type"], "application/pdf")
+        self.assertTrue(rsp.headers["Content-Disposition"].startswith("inline;"))
+
     def test_download_permission(self):
         with mock_permission() as user:
             user.set_permission("S")  # forbid
@@ -891,6 +902,12 @@ class TestBook(TestWithUserLogin):
                 rsp = self.fetch("/read/%s" % bid, follow_redirects=False)
                 self.assertEqual(rsp.code, 302 if bid == BID_PDF or bid == BID_TXT else 200)
 
+    def test_pdf_read_redirect_requests_inline_preview(self):
+        rsp = self.fetch(f"/read/{BID_PDF}", follow_redirects=False)
+
+        self.assertEqual(rsp.code, 302)
+        self.assertIn(urllib.parse.quote_plus(f"/api/book/{BID_PDF}.PDF?inline=1"), rsp.headers["Location"])
+
     def test_read_waits_for_conversion(self):
         with mock.patch("webserver.services.convert.ConvertService.convert_and_save", return_value="Yo"):
             # 非EPUB书籍：转换尚未完成，页面应包含轮询等待逻辑，不能直接初始化阅读器
@@ -947,36 +964,46 @@ class TestBook(TestWithUserLogin):
 
 
 class TestRefer(TestWithUserLogin):
-    @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi._baike")
-    @mock.patch("webserver.plugins.meta.baike.BaiduBaikeApi.get_cover")
-    @mock.patch("webserver.plugins.meta.youshu.YoushuApi._youshu")
-    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_isbn")
-    @mock.patch("webserver.plugins.meta.calibre.CalibreMetadataApi.get_book_by_title")
-    @mock.patch("webserver.plugins.meta.tomato.TomatoNovelApi.get_book")
-    @mock.patch("webserver.plugins.meta.xhsd.XhsdBookApi.get_book")
-    def test_refer(self, m_xhsd, m_tomato, m_calibre_title, m_calibre_isbn, m7, m6, m5):
-        from tests.test_baike import BAIKE_PAGE
-        from tests.test_youshu import YOUSHU_PAGE
+    def test_refer(self):
+        from calibre.ebooks.metadata.book.base import Metadata
 
-        m5.return_value = BAIKE_PAGE
-        m6.return_value = ("jpg", b"image-body")
+        from webserver.plugins.meta.baike.api import BaiduBaikeApi, BaiduBaikeProvider
+        from webserver.services.plugin_runtime import PluginRuntime
 
-        m7.return_value = YOUSHU_PAGE
-        m_calibre_isbn.return_value = []
-        m_calibre_title.return_value = []
-        m_tomato.return_value = None
-        m_xhsd.return_value = None
+        plugin_key = BaiduBaikeProvider.manifest["id"]
+        metadata = Metadata("冰火魔厨", ["唐家三少"])
+        metadata.provider_value = "123"
+        metadata.source = "百度百科"
+        metadata.comments = "冰与火的魔法故事"
+        metadata.tags = ["小说"]
+        connections_for = PluginRuntime.connections_for
 
-        # with mock.patch("plugins.meta.baike.BaiduBaikeApi.get_book", return_value=self.fake_baidu) as m:
-        d = self.json("/api/book/1/refer")
-        self.assertEqual(d["err"], "ok")
+        def baike_connections(runtime, capability, user_id=None):
+            return [
+                connection
+                for connection in connections_for(runtime, capability, user_id)
+                if runtime.plugin_key_of(connection) == plugin_key
+            ]
 
-        global _app
-        with mock.patch.object(_app.settings["legacy"], "set_metadata", return_value="Yo"):
-            for book in d["books"]:
-                body = "provider_key=%(provider_key)s&provider_value=%(provider_value)s" % book
-                r = self.json("/api/book/1/refer", method="POST", raise_error=True, body=body)
-                self.assertEqual(r["err"], "ok")
+        # Exercise the real provider conversion and runtime in both directions.
+        # Isolate external lookups so unrelated enabled sources cannot affect this test.
+        with enabled_builtin_plugin(plugin_key):
+            with mock.patch.object(PluginRuntime, "connections_for", baike_connections):
+                with mock.patch.object(BaiduBaikeApi, "get_book", return_value=metadata):
+                    data = self.json("/api/book/1/refer")
+                    self.assertEqual(data["err"], "ok")
+                    self.assertEqual(len(data["books"]), 1)
+                    book = data["books"][0]
+                    self.assertEqual(book["title"], "冰火魔厨")
+                    self.assertEqual(book["provider_key"], plugin_key)
+                    body = urllib.parse.urlencode(
+                        {"provider_key": book["provider_key"], "provider_value": book["provider_value"]}
+                    )
+                    with mock.patch("webserver.handlers.book.set_metadata_preserving_external_paths") as save:
+                        result = self.json("/api/book/1/refer", method="POST", body=body)
+                    self.assertEqual(result["err"], "ok")
+                    save.assert_called_once()
+                    self.assertEqual(save.call_args.args[3].authors, ["唐家三少"])
 
 
 class TestReferCoverUpdate(TestWithUserLogin):

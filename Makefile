@@ -1,4 +1,4 @@
-.PHONY: all build test check-design
+.PHONY: all build test check-design check-spec
 
 VER = $(shell git branch --show-current | tr '/' '-')
 IMAGE = talebook/talebook:$(VER)
@@ -53,6 +53,9 @@ check-i18n:
 
 check-design:
 	python3 scripts/check_design_docs.py
+
+check-spec:
+	python3 scripts/check_spec.py
 
 pytest:
 	pytest tests -v --cov=webserver --cov-report=term-missing

@@ -16,6 +16,8 @@ import logging
 import re
 from urllib.parse import urljoin
 
+from webserver.plugins.runtime.safe_http import HostQueueTimeout
+
 from .exceptions import JsRuleUnsupported, SourceHttpError
 from .http_client import build_session, decode_response
 from .js_runtime import run_js
@@ -158,6 +160,8 @@ class AnalyzeUrl:
                 resp = self.session.post(self.url, data=data, headers=headers, timeout=self.timeout)
             else:
                 resp = self.session.get(self.url, headers=headers, timeout=self.timeout)
+        except HostQueueTimeout:
+            raise
         except Exception as err:
             logging.info("booksource: http error for %s: %s", self.url, err)
             raise SourceHttpError(str(err))

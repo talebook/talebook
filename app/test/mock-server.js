@@ -4,6 +4,7 @@ import { listen } from 'listhen';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { metadataPage } from './metadata-pagination.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1321,13 +1322,14 @@ const libraryFilterItems = {
     { id: 'PDF', name: 'PDF', count: 18 },
     { id: 'MOBI', name: 'MOBI', count: 6 },
   ],
+  series: [{ id: 1, name: '测试丛书', count: 2 }],
+  rating: [2, 4, 6, 8, 10].map(value => ({ id: value, name: value, count: 1 })),
 };
 
-for (const filter of ['publisher', 'author', 'tag', 'format']) {
-  router.get(`/api/${filter}`, eventHandler(() => ({
-    err: 'ok',
-    items: libraryFilterItems[filter],
-  })));
+for (const filter of Object.keys(libraryFilterItems)) {
+  router.get(`/api/${filter}`, eventHandler(event => (
+    metadataPage(filter, libraryFilterItems[filter], getQuery(event))
+  )));
 }
 
 router.get('/api/hot', eventHandler(() => {

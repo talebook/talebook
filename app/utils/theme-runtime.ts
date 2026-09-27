@@ -1,3 +1,5 @@
+import { withBasePath } from './base-path'
+
 interface ThemeVersionSource {
     version?: string | null
     installed_at?: string | null
@@ -10,7 +12,7 @@ export function withThemeVersion(url: string, theme?: ThemeVersionSource | null)
 }
 
 export function resolveThemeModuleUrl(url: string, theme?: ThemeVersionSource | null) {
-    return withThemeVersion(url, theme)
+    return withThemeVersion(withBasePath(url), theme)
 }
 
 export function clearInjectedThemeStyles(doc: Document = document) {

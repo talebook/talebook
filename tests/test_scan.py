@@ -273,6 +273,72 @@ class TestScanContinue(TestWithUserLogin):
 class TestImport(TestWithUserLogin):
     READY_ROW_ID = 69
 
+    @mock.patch("webserver.services.scan.AutoFillService.auto_fill_all")
+    def test_long_titles_survive_scan_import_and_api(self, auto_fill):
+        from calibre.ebooks.metadata.book.base import Metadata
+        from calibre.ebooks.metadata.meta import set_metadata
+
+        legacy = self.get_app().settings["legacy"]
+        backend = legacy.new_api.backend
+        session = self.get_app().settings["ScopedSession"]
+        title = "命运攸关的抉择：1940-1941年间改变世界的十个决策"
+        with (
+            mock.patch.object(backend, "construct_path_name", main.utf8_construct_path_name),
+            mock.patch.object(backend, "construct_file_name", main.utf8_construct_file_name),
+            tempfile.TemporaryDirectory() as directory,
+        ):
+            for fmt in ("epub", "pdf", "txt"):
+                for mode in ("copy", "move", "index"):
+                    with self.subTest(fmt=fmt, mode=mode):
+                        # Distinct contents avoid scan hash deduplication between cases.
+                        expected = title + " " + fmt + " " + mode
+                        source = os.path.join(directory, expected + "." + fmt)
+                        write_supported_media(source, fmt)
+                        if fmt == "epub":
+                            with open(source, "r+b") as stream:
+                                set_metadata(stream, Metadata(expected, ["回归作者"]), "epub")
+                        else:
+                            with open(source, "ab") as stream:
+                                stream.write(expected.encode("utf-8"))
+                        row = None
+                        book_id = None
+                        try:
+                            ScanService().do_scan(directory)
+                            session.rollback()
+                            row = session.query(ScanFile).filter(ScanFile.path == source).one()
+                            self.assertEqual(row.status, ScanFile.READY)
+                            self.assertEqual(row.title, expected)
+
+                            ScanService().do_import([row.hash], 1, import_mode=mode)
+                            session.rollback()
+                            session.refresh(row)
+                            book_id = row.book_id
+                            self.assertEqual(row.status, ScanFile.INDEXED if mode == "index" else ScanFile.IMPORTED)
+                            self.assertEqual(legacy.new_api.field_for("title", book_id), expected)
+                            self.assertEqual(self.json("/api/book/%s" % book_id)["book"]["title"], expected)
+                            result = self.json("/api/search?name=" + urllib.parse.quote(expected))
+                            self.assertIn(expected, [book["title"] for book in result["books"]])
+
+                            stored = legacy.format_abspath(book_id, fmt.upper(), index_is_id=True)
+                            self.assertTrue(os.path.isfile(stored))
+                            if mode == "index":
+                                self.assertEqual(stored, source)
+                            else:
+                                self.assertTrue(os.path.basename(stored).startswith(main.safe_filename(expected) + " - "))
+                            self.assertEqual(os.path.exists(source), mode != "move")
+                        finally:
+                            if book_id:
+                                if mode == "index":
+                                    self._cleanup_external_books([book_id])
+                                else:
+                                    legacy.delete_book(book_id)
+                                    session.query(Item).filter(Item.book_id == book_id).delete()
+                            if row is not None:
+                                session.delete(row)
+                            session.commit()
+                            if os.path.exists(source):
+                                os.unlink(source)
+
     def _cleanup_external_books(self, book_ids):
         legacy = self.get_app().settings["legacy"]
         session = self.get_app().settings["ScopedSession"]

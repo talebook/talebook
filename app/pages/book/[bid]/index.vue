@@ -909,6 +909,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute, useRouter } from 'vue-router';
@@ -1153,7 +1154,7 @@ const openAnnotationInReader = (annotation) => {
     const query = new URLSearchParams();
     if (annotation.cfi) query.set('cfi', annotation.cfi);
     if (annotation.chapter) query.set('chapter', annotation.chapter);
-    window.open(`/read/${book.value.id}?${query.toString()}`, '_blank', 'noopener');
+    window.open(withBasePath(`/read/${book.value.id}?${query.toString()}`), '_blank', 'noopener');
 };
 
 useHead({
@@ -1298,9 +1299,9 @@ const get_refer = async () => {
             } else {
                 data.href = '';
                 if (!data.cover_url || data.cover_url === '') {
-                    data.img = '/get/cover/0';
+                    data.img = withBasePath('/get/cover/0');
                 } else {
-                    data.img = '/get/pcover?url=' + encodeURIComponent(data.cover_url);
+                    data.img = withBasePath('/get/pcover?url=' + encodeURIComponent(data.cover_url));
                 }
                 refer_books.value.push(data);
             }
