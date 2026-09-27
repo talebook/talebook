@@ -201,14 +201,14 @@
             <v-tabs-window-item>
                 <v-row>
                     <v-col
-                        v-if="sources.length === 0"
+                        v-if="browseSources.length === 0"
                         cols="12"
                     >
                         <v-alert
                             type="info"
                             variant="tonal"
                         >
-                            {{ $t('network.noSource') }}
+                            {{ $t('network.noBrowseSource') }}
                         </v-alert>
                     </v-col>
 
@@ -218,7 +218,7 @@
                     >
                         <v-select
                             v-model="exploreSourceId"
-                            :items="sources.map(s => ({ value: s.source_key || s.id, title: s.name }))"
+                            :items="browseSources.map(s => ({ value: s.source_key || s.id, title: s.name }))"
                             :label="$t('network.explorePickSource')"
                             density="compact"
                             hide-details
@@ -317,6 +317,9 @@ store.setNavbar(true);
 
 const activeTab = ref(0);
 const sources = ref([]);
+const browseSources = computed(() => sources.value.filter(source =>
+    !Array.isArray(source.capabilities) || source.capabilities.includes('sources.browse'),
+));
 const availability = ref({ state: 'no_configured_sources', enabled_plugins: 0, configured_sources: 0 });
 const selected = ref([]);
 const searchMode = ref('top');

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 书籍详情页移动端元数据名称和值同排显示修复方案。" />
+    <link rel="icon" href="data:," />
+    <title>修复移动端书籍元数据同排显示 · ACTIVE</title>
+    <style>
+      :root { color-scheme:light; --bg:#f5f7fb; --panel:#fff; --ink:#202938; --muted:#5d6878; --line:#d8e0ea; --accent:#1769aa; --soft:#edf6ff; --warn:#fff7e7; --good:#e8f6ef; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; }
+      * { box-sizing:border-box; }
+      html { scroll-behavior:smooth; }
+      body { margin:0; color:var(--ink); background:linear-gradient(180deg,#fbfdff,var(--bg)); font-family:var(--sans); line-height:1.65; }
+      .skip { position:absolute; top:-60px; left:12px; padding:8px 12px; color:#fff; background:#111827; }
+      .skip:focus { top:12px; }
+      .page { width:min(920px,calc(100vw - 28px)); margin:auto; padding:24px 0 48px; }
+      header,section { margin-bottom:16px; padding:24px 28px; background:var(--panel); border:1px solid var(--line); border-radius:16px; }
+      header { background:linear-gradient(135deg,#fff,var(--soft)); }
+      h1 { margin:0 0 8px; font-size:clamp(28px,4vw,40px); line-height:1.15; }
+      h2 { margin:0 0 12px; font-size:21px; }
+      h3 { margin:0 0 8px; font-size:16px; }
+      p,li,td,th { font-size:14px; }
+      p { margin:8px 0; }
+      ul,ol { margin:8px 0 0; padding-left:22px; }
+      .muted { color:var(--muted); }
+      .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+      .chip { padding:4px 10px; color:#405168; background:#edf1f6; border-radius:999px; font-size:12px; font-weight:700; }
+      .chip.wip { color:#8a5700; background:#fff0cf; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+      .box,.callout { padding:14px 16px; border:1px solid var(--line); border-radius:12px; }
+      .callout { background:var(--warn); }
+      .good { background:var(--good); }
+      .table { overflow-x:auto; border:1px solid var(--line); border-radius:12px; }
+      table { width:100%; min-width:650px; border-collapse:collapse; }
+      th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+      tr:last-child td { border-bottom:0; }
+      th { color:#526174; background:#f7f9fc; }
+      code { padding:2px 5px; background:#eef2f7; border-radius:4px; overflow-wrap:anywhere; }
+      .pending { color:#946000; font-weight:700; }
+      footer { color:var(--muted); font-size:12px; text-align:center; }
+      @media (max-width:680px) { .page{width:calc(100vw - 18px);padding-top:9px} header,section{padding:20px 18px;border-radius:13px}.grid{grid-template-columns:1fr} }
+      @media (prefers-reduced-motion:reduce) { html{scroll-behavior:auto} }
+      @media print { body{background:#fff}.page{width:100%}header,section{break-inside:avoid} }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header>
+        <h1>修复移动端书籍元数据同排显示</h1>
+        <p class="muted">在窄屏保留稳定的字段名列，让元数据名称和值优先同排展示，长值只在自身区域内换行。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip" style="color:#17623b;background:#dff5e8">状态：ACTIVE</span><span class="chip">创建日期：2026-09-04</span><span class="chip">所属模块：app</span><span class="chip">影响范围：书籍详情页与 E2E</span><span class="chip">需求来源：TB-202</span>
+        </div>
+      </header>
+      <main id="main">
+        <section>
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“书籍详情页在手机模式下，元数据的 name 和 value 换行了。应当尽量保持在同一行。”</div>
+        </section>
+        <section>
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="box"><h3>目标</h3><ul><li>390px 与 320px 手机视口中，元数据字段名和值保持左右同排。</li><li>字段值可在右侧剩余空间内自然换行。</li><li>不产生页面水平滚动，不影响已有标签和阅读状态操作。</li></ul></article>
+            <article class="box"><h3>非目标</h3><ul><li>不调整字段顺序、数据来源、文案或业务交互。</li><li>不修改桌面布局、后端接口、权限或数据模型。</li><li>不重构详情页其他区域。</li></ul></article>
+          </div>
+        </section>
+        <section>
+          <h2>3. 现状与根因</h2>
+          <p><code>app/pages/book/[bid]/index.vue</code> 的元数据默认使用 <code>76px minmax(0, 1fr)</code> 两列 Grid，但在 480px 以下被媒体查询改成单列，导致每个 <code>dt</code> 与 <code>dd</code> 必然上下排列。该断点覆盖与“优先同排”的目标直接冲突。</p>
+        </section>
+        <section>
+          <h2>4. 方案</h2>
+          <div class="callout good"><strong>结论：</strong>删除 480px 以下强制单列的覆盖，移动端沿用已有的固定字段名列与弹性值列。字段值列保留 <code>minmax(0, 1fr)</code> 和现有换行能力，因此短值同排、长值在值列内折行。</div>
+          <ul><li>保持字段名称起始位置和字段值起始位置稳定，延续桌面端信息扫描方式。</li><li>用 E2E 在 390×844 和 320×800 下逐行断言值列位于名称列右侧，并检查文档宽度不超过视口。</li><li>保留现有 chip 换行、评分、阅读状态和格式操作样式，不新增响应式特例。</li></ul>
+        </section>
+        <section>
+          <h2>5. 影响、风险与回滚</h2>
+          <div class="grid"><article class="box"><h3>影响范围</h3><p>书籍详情页局部响应式 CSS、书籍详情 E2E 和本方案文件。</p></article><article class="box"><h3>主要风险</h3><p>超长值或多枚标签会增加值列高度；通过允许值列内部换行和 320px 水平溢出断言控制风险。</p></article></div>
+          <p><strong>回滚：</strong>恢复 480px 以下单列覆盖并删除对应 E2E 断言即可；无数据迁移或兼容性清理。</p>
+        </section>
+        <section>
+          <h2>6. 测试计划与结果</h2>
+          <div class="table"><table><thead><tr><th>验证层</th><th>命令或页面</th><th>验收口径</th><th>结果</th></tr></thead><tbody>
+            <tr><td>E2E</td><td><code>MOCK_API_URL=http://127.0.0.1:8200 PLAYWRIGHT_BASE_URL=http://127.0.0.1:3201 npx playwright test test/e2e/book-detail.spec.ts</code></td><td>390px、320px 下字段值位于字段名右侧，且页面无水平溢出。</td><td>Chromium 29 项通过，耗时 1.7 分钟；新增用例逐行校验两种视口。首次运行因本机缺少 Playwright Chromium 未启动，执行 <code>npx playwright install chromium</code> 后完整重跑通过。</td></tr>
+            <tr><td>实际渲染</td><td>短生命周期 mock + Playwright Chromium，浅色主题，390×844；E2E 同时覆盖 320×800</td><td>短值同排；长值与标签在值列内自然折行；无裁切。</td><td>通过；作者、系列、评分、出版社、出版日期、格式、上传者、阅读状态和标签均保留名称列和值列，上传者与标签在值列内自然折行，两个视口均无水平溢出。截图：<code>app/test/e2e/screenshots/20260904-book-detail-mobile-metadata.png</code>。当前运行环境未提供 Chrome DevTools MCP，无法按项目规范执行该专用工具，改用真实 Chromium 渲染、几何断言与截图复核；剩余风险为未取得 DevTools MCP 快照。</td></tr>
+            <tr><td>质量门禁</td><td><code>npm run build</code>、<code>npm run lint</code>、<code>make check-design</code>、<code>git diff --check</code></td><td>相关构建、静态检查与方案检查通过。</td><td>生产构建通过；lint 为 0 error、459 个仓库既有 warning；补丁检查通过；ACTIVE 单文件方案检查通过。</td></tr>
+            <tr><td>界面审查</td><td><code>interface-review full working</code>，默认分支 <code>origin/master</code>，基线 <code>db868842</code></td><td>全部本地产品界面变更相对默认分支无 HIGH / MEDIUM 问题。</td><td>Approve；审查页面响应式 CSS、E2E 与 390px 实际渲染，320px 由 E2E 实渲染覆盖。无 Introduced / Regression 问题；截图二进制按规则排除，页面无额外消费者。写作、色彩和动效因变更无相关证据标记为未审查。</td></tr>
+          </tbody></table></div>
+        </section>
+        <section>
+          <h2>7. 决策记录</h2>
+          <ol><li><strong>2026-09-04：</strong>需求边界清晰，仅移除造成强制换行的移动端单列覆盖，不引入新的断点或固定值宽度。</li><li><strong>2026-09-04：</strong>测试覆盖 390px 常见手机宽度与项目既有 320px 最窄验收宽度。</li><li><strong>2026-09-04：</strong>完整界面审查认为维持现有 76px 共享字段名宽度优于新增更窄断点；没有引入强制不换行，以免英文长字段名挤压值列。</li></ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · app · ACTIVE · 2026-09-04</footer>
+    </div>
+  </body>
+</html>

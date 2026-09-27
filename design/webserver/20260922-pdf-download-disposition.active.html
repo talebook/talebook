@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="区分 PDF 附件下载与在线阅读的响应语义，修复浏览器下载回归。" />
+    <link rel="icon" href="data:," />
+    <title>区分 PDF 下载与在线阅读响应 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light; --bg: #f4f7fb; --panel: #fff; --ink: #1d2939; --muted: #596579; --line: #d6deea; --accent: #b54708; --good: #176448; }
+      * { box-sizing: border-box; }
+      body { margin: 0; color: var(--ink); background: linear-gradient(145deg, #fff8f0, var(--bg) 35%); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; line-height: 1.65; }
+      main { width: min(980px, calc(100vw - 28px)); margin: 28px auto 56px; }
+      header, section { margin-bottom: 16px; padding: 24px 28px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 10px 28px rgba(15, 23, 42, .06); }
+      h1 { margin: 0 0 8px; font-size: clamp(28px, 5vw, 44px); line-height: 1.15; }
+      h2 { margin: 0 0 12px; font-size: 21px; }
+      p, li { color: #344054; font-size: 14px; }
+      code { padding: .1em .35em; background: #eef2f7; border-radius: 4px; overflow-wrap: anywhere; }
+      .meta { color: var(--muted); }
+      .decision { padding: 14px 16px; color: var(--good); background: #eaf7f1; border-left: 4px solid var(--good); border-radius: 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th, td { padding: 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { background: #f8fafc; }
+      .blocked { color: var(--accent); font-weight: 700; }
+      @media (max-width: 600px) { main { margin-top: 12px; } header, section { padding: 20px; border-radius: 14px; } }
+      @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+      @media print { body { background: #fff; } header, section { box-shadow: none; break-inside: avoid; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>区分 PDF 下载与在线阅读响应</h1>
+        <p>恢复详情页 PDF 下载，并保持 PDF.js 在线阅读能力。</p>
+        <p class="meta">创建日期：2026-09-22 · 所属模块：webserver · 状态：ACTIVE · 需求来源：GitHub #1047 / Multica TB-224 · 影响：<code>spec/书籍.md</code>、<code>spec/阅读器.md</code></p>
+      </header>
+      <section>
+        <h2>1. 原始诉求</h2>
+        <p>GitHub #1047 报告 v26.09.01 在 PC 与移动端的 Chrome、Firefox 中均无法通过浏览器下载 PDF。</p>
+        <p>当前处理器为所有非 OPDS PDF 返回 <code>Content-Disposition: inline</code>。这解决了 #595 的在线阅读媒体类型问题，却同时改变了详情页下载的语义。</p>
+      </section>
+      <section>
+        <h2>2. 目标与边界</h2>
+        <ul>
+          <li>普通 PDF 文件请求默认返回 <code>application/pdf</code> 与 <code>attachment</code>。</li>
+          <li>统一在线阅读入口生成的 PDF URL 显式请求 <code>inline</code>。</li>
+          <li>OPDS 始终保持附件下载；非 PDF 格式、权限、计数与 Range 处理保持不变。</li>
+          <li>不处理 #1026 的 PDF 封面提取，也不改变前端页面组件。</li>
+        </ul>
+      </section>
+      <section>
+        <h2>3. 方案与兼容性</h2>
+        <p class="decision">文件接口默认代表下载；只有服务端统一阅读入口可通过 <code>inline=1</code> 声明在线阅读用途。</p>
+        <p><code>BookDownload.initialize()</code> 解析严格布尔标记，<code>BookDownload.parse_url_path()</code> 根据格式、OPDS 与标记选择响应头。<code>BookRead</code> 在把文件地址编码进 PDF.js URL 前添加标记。旧的直接下载 URL 无需修改即可恢复，既有阅读入口仍能内联加载。</p>
+        <p>参数不授予额外权限，仍经过同一可见性和下载权限检查。主要风险是遗漏其他依赖内联 PDF 的调用方；仓库搜索表明在线阅读只从 <code>BookRead</code> 生成该 URL，测试同时锁定跳转目标与两类响应头。</p>
+      </section>
+      <section>
+        <h2>4. 影响、回滚与界面审查</h2>
+        <p>代码影响限于 <code>webserver/handlers/book.py</code> 与后端测试；同步澄清书籍下载和阅读器规格。无数据库、配置、部署或前端组件变化。</p>
+        <p>这是 HTTP 响应头与服务端跳转契约修复，无页面布局、文案、主题或交互控件变化，豁免 <code>interface-review</code> 和浏览器渲染审查。回滚只需撤销处理器、测试与规格改动，无数据清理。</p>
+      </section>
+      <section>
+        <h2>5. 测试计划与结果</h2>
+        <table>
+          <thead><tr><th>验证</th><th>命令 / 断言</th><th>结果</th></tr></thead>
+          <tbody>
+            <tr><td>定向回归</td><td><code>pytest tests/test_main.py::TestBook::test_pdf_download_and_inline_preview_use_distinct_dispositions tests/test_main.py::TestBook::test_pdf_read_redirect_requests_inline_preview -v</code></td><td>2 passed</td></tr>
+            <tr><td>后端质量</td><td><code>make lint-py-fix</code>、<code>make lint-py</code>、相关测试集与完整 <code>make pytest</code></td><td>格式与静态检查通过；相关测试 32 passed；完整测试 1403 passed、37 skipped</td></tr>
+            <tr><td>规格 / 方案</td><td><code>make check-spec</code>、本文件转为 ACTIVE、<code>make check-design</code></td><td>规格检查 23 passed；方案检查在转 ACTIVE 后复验</td></tr>
+            <tr><td>安全扫描</td><td><code>deepsec shield scan . --layer l1,l2 --include-tests --format json --output -</code></td><td class="blocked">当前主机缺少指定版本 CLI（<code>/opt/deepsec/…/venv/bin/deepsec</code> 不存在），退出码 127、扫描文件数 0，未获得有效报告；交付时明确保留此安全验证风险</td></tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </body>
+</html>

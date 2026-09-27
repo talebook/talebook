@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { withBasePath } from '@/utils/base-path'
 
 export const useMainStore = defineStore('main', () => {
   // State
@@ -9,6 +10,7 @@ export const useMainStore = defineStore('main', () => {
   // 使用 cookie 持久化主题
   const themeCookie = useCookie('theme', {
     default: () => 'light',
+    path: withBasePath('/'),
     maxAge: 60 * 60 * 24 * 365, // 1年
   })
   const theme = ref(themeCookie.value)

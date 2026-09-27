@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 # -*- coding: UTF-8 -*-
+import json
 import logging
 import re
 import urllib.parse
@@ -75,6 +76,8 @@ class BaiduBaikeApi:
 
     def get_book(self, title, author=None, expected_id=None):
         logging.debug(f"BaiduBaikeApi.get_book called with title: {repr(title)}")
+        if author and author.strip().lower() in {"佚名", "未知", "unknown", "unknown author"}:
+            author = None
         # Check if the title is start with *[0-9][_-] then remote the prefix
         if re.match(r"^\d*[_-]", title):
             title = re.sub(r"^\d*[_-]", "", title)
@@ -254,6 +257,7 @@ if __name__ == "__main__":
 
 
 class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
+    REFERENCE_PREFIX = "baike:v1:"
     legacy_sources = ("baidu",)
     proxy_image_hosts = ("bcebos.com", "bdstatic.com")
     manifest = meta_manifest(
@@ -270,10 +274,42 @@ class BaiduBaikeProvider(MetaSourceMixin, BaiduBaikeApi):
 
     def _search(self, query, context):
         mi = self.get_book(query.title, query.authors[0] if query.authors else None)
+        if mi is not None:
+            # The card API searches by title, not by lemma ID. Keep both so a
+            # later lookup can repeat disambiguation and verify the selection.
+            mi.provider_value = self.REFERENCE_PREFIX + json.dumps(
+                {"title": mi.title, "author": mi.authors[0] if mi.authors else "", "id": mi.provider_value},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
         return [mi] if mi else []
 
     def _fetch(self, external_id, context):
-        return self.get_book(external_id, expected_id=external_id)
+        # Legacy bare IDs lack the search title: require a new search rather
+        # than using an ID as a title or silently selecting a different lemma.
+        if not isinstance(external_id, str) or len(external_id) > 4096:
+            return None
+        if not external_id.startswith(self.REFERENCE_PREFIX):
+            return None
+        try:
+            reference = json.loads(external_id[len(self.REFERENCE_PREFIX) :])
+        except (ValueError, RecursionError):
+            return None
+        if not isinstance(reference, dict):
+            return None
+        title, author, lemma_id = (reference.get(key) for key in ("title", "author", "id"))
+        if not isinstance(title, str) or not title.strip() or len(title) > 512:
+            return None
+        if not isinstance(author, str) or len(author) > 512:
+            return None
+        if not isinstance(lemma_id, str) or not re.fullmatch(r"[0-9]{1,20}", lemma_id):
+            return None
+        # Never mutate copy_image on the shared provider: searches stay cheap,
+        # while selections obtain cover bytes through the trusted CDN client.
+        mi = BaiduBaikeApi(copy_image=True).get_book(title, author or None, expected_id=lemma_id)
+        if mi is not None:
+            mi.provider_value = external_id
+        return mi
 
     def get_cover(self, cover_url, context=None):
         return BaiduBaikeApi.get_cover(cover_url)

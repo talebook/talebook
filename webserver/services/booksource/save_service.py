@@ -6,12 +6,14 @@ import concurrent.futures
 import logging
 import os
 import re
+import tempfile
 import time
 import traceback
 
 from webserver import loader
 from webserver.i18n import _
 from webserver.models import Item, OnlineBookMeta
+from webserver.plugins.runtime.safe_http import DEFAULT_HOST_CONCURRENCY, HOST_CONCURRENCY_CONFIG_KEY, SafeHttpClient
 from webserver.plugins.source.legado import DEFAULT_SAVE_CONCURRENCY, SAVE_CONCURRENCY_KEY
 from webserver.plugins.source.legado import PLUGIN_ID as LEGADO_PLUGIN_ID
 from webserver.services import AsyncService
@@ -55,14 +57,12 @@ def _build_metadata(detail):
     return mi
 
 
-def _attach_cover(mi, cover_url):
+def _attach_cover(mi, cover_url, plugin_key="", max_concurrency=DEFAULT_HOST_CONCURRENCY):
     if not cover_url:
         return
     try:
-        from webserver.plugins.runtime.safe_http import SafeHttpClient
-
         img = (
-            SafeHttpClient()
+            SafeHttpClient(plugin_key=plugin_key, max_concurrency=max_concurrency)
             .request(
                 "GET",
                 cover_url,
@@ -122,7 +122,7 @@ class SaveOnlineBookService(AsyncService):
             book_id = self._import_file(detail, book_file)
             if not book_id:
                 raise RuntimeError(_("导入本地书库失败"))
-            self._save_meta(book_id, user_id, detail, [])
+            self._save_meta(book_id, user_id, detail, [], source)
             if task_id:
                 BackgroundService().update_progress(task_id, 100, {"total": 1, "done": 1, "book_id": book_id})
             self.add_msg(user_id, "success", _("《%s》已保存到本地书库") % detail.title)
@@ -158,7 +158,7 @@ class SaveOnlineBookService(AsyncService):
         if not book_id:
             raise RuntimeError(_("导入本地书库失败"))
 
-        self._save_meta(book_id, user_id, detail, chapters)
+        self._save_meta(book_id, user_id, detail, chapters, source)
         if task_id:
             BackgroundService().update_progress(task_id, 100, {"total": total, "done": total, "book_id": book_id})
 
@@ -177,25 +177,26 @@ class SaveOnlineBookService(AsyncService):
         filename = _safe_filename(book_file.filename or detail.title)
         if not filename.lower().endswith(".%s" % format_name.lower()):
             filename = "%s.%s" % (filename, format_name.lower())
-        path = os.path.join(upload_dir, "%s-%s" % (int(time.time()), filename))
-        with open(path, "wb") as stream:
-            stream.write(book_file.content)
+        with tempfile.TemporaryDirectory(prefix="online-save-", dir=upload_dir) as temporary:
+            path = os.path.join(temporary, filename)
+            with open(path, "wb") as stream:
+                stream.write(book_file.content)
 
-        metadata = _build_metadata(detail)
-        same_author_book_id = None
-        try:
-            books = self.db.books_with_same_title(metadata)
-            for book in self.db.get_data_as_dict(ids=books) if books else []:
-                if set(book.get("authors", [])) == set(metadata.authors):
-                    same_author_book_id = book.get("id")
-                    if format_name in (book.get("available_formats", "") or ""):
-                        return same_author_book_id
-        except Exception as exc:
-            logging.info("save online: dedupe check failed: %s", exc)
-        if same_author_book_id:
-            self.db.add_format(same_author_book_id, format_name, path, True)
-            return same_author_book_id
-        return self.db.import_book(metadata, [path])
+            metadata = _build_metadata(detail)
+            same_author_book_id = None
+            try:
+                books = self.db.books_with_same_title(metadata)
+                for book in self.db.get_data_as_dict(ids=books) if books else []:
+                    if set(book.get("authors", [])) == set(metadata.authors):
+                        same_author_book_id = book.get("id")
+                        if format_name in (book.get("available_formats", "") or ""):
+                            return same_author_book_id
+            except Exception as exc:
+                logging.info("save online: dedupe check failed: %s", exc)
+            if same_author_book_id:
+                self.db.add_format(same_author_book_id, format_name, path, True)
+                return same_author_book_id
+            return self.db.import_book(metadata, [path])
 
     def _import_txt(self, detail, txt_path):
         mi = _build_metadata(detail)
@@ -216,10 +217,14 @@ class SaveOnlineBookService(AsyncService):
             return same_author_book_id
         return self.db.import_book(mi, [txt_path])
 
-    def _save_meta(self, book_id, user_id, detail, chapters):
+    def _save_meta(self, book_id, user_id, detail, chapters, source):
         # cover
         mi = self.db.get_metadata(book_id, index_is_id=True)
-        _attach_cover(mi, detail.cover_url)
+        max_concurrency = (source.connection.config or {}).get(
+            HOST_CONCURRENCY_CONFIG_KEY,
+            DEFAULT_HOST_CONCURRENCY,
+        )
+        _attach_cover(mi, detail.cover_url, source.plugin_key, max_concurrency)
         if getattr(mi, "cover_data", None) and mi.cover_data[1]:
             try:
                 self.db.set_cover(book_id, mi.cover_data[1])

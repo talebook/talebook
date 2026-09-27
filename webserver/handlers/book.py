@@ -12,6 +12,7 @@ import re
 import shutil
 import time
 import urllib
+from collections.abc import Mapping
 
 import tornado.escape
 from tornado import web
@@ -531,6 +532,8 @@ class BookRefer(BaseHandler):
         )
         if isinstance(outcome, Exception):
             raise outcome
+        if outcome is None:
+            raise PluginRuntimeError("metadata.not_found", "Selected metadata is no longer available")
         return to_calibre_metadata(outcome) or outcome
 
     def plugin_get_book_meta(self, provider_key, provider_value, mi):
@@ -588,6 +591,8 @@ class BookRefer(BaseHandler):
             try:
                 refer_mi = self._plugin_metadata_detail(provider_key, provider_value)
             except Exception as e:
+                if isinstance(e, PluginRuntimeError) and e.code == "metadata.not_found":
+                    raise RuntimeError({"err": "metadata.not_found", "msg": _("未获取到所选记录，请重新搜索")})
                 logging.error("插件 %s 元数据查询失败：%s", provider_key, e)
                 raise RuntimeError({"err": "httprequest.plugin.failed", "msg": _("插件查询失败")})
             if refer_mi is None:
@@ -758,7 +763,7 @@ class BookRefer(BaseHandler):
                 "provider_value": b.provider_value if hasattr(b, "provider_value") else "",
                 "pubdate": b.pubdate if hasattr(b, "pubdate") else None,
             }
-        elif not isinstance(b, dict):
+        elif not isinstance(b, Mapping):
             return None
 
         if "title" not in b or not b["title"]:
@@ -1062,6 +1067,7 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         self.root = "/"
         self.default_filename = None
         self.is_opds = self.get_argument("from", "") == "opds"
+        self.is_inline = self.get_argument("inline", "") == "1"
         BaseHandler.initialize(self)
 
     def prepare(self):
@@ -1105,12 +1111,11 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         if self.is_opds:
             att = 'attachment; filename="%(id)d.%(fmt)s"' % book
 
-        # PDF 文件使用 application/pdf，允许浏览器内联预览（供 pdfjs 等在线阅读器使用）
-        # 其他格式使用 application/octet-stream 强制下载
+        # PDF 保留正确的媒体类型；只有在线阅读入口显式要求时才内联展示。
+        # 普通下载和 OPDS 都必须返回 attachment，避免下载按钮退化为浏览器预览。
         if fmt == "pdf":
             self.set_header("Content-Type", "application/pdf")
-            # 在线阅读时不附加 Content-Disposition attachment，避免触发下载
-            if not self.is_opds:
+            if self.is_inline and not self.is_opds:
                 self.set_header("Content-Disposition", f'inline; filename="{fname}"'.encode("UTF-8"))
             else:
                 self.set_header("Content-Disposition", att.encode("UTF-8"))
@@ -1759,7 +1764,7 @@ class BookRead(BaseHandler):
             elif not self.current_user.can_save():
                 raise web.HTTPError(403, reason=_("无权在线阅读PDF类书籍"))
 
-            pdf_url = urllib.parse.quote_plus(self.api_url + "/api/book/%(id)d.PDF" % book)
+            pdf_url = urllib.parse.quote_plus(self.api_url + "/api/book/%(id)d.PDF?inline=1" % book)
             pdf_reader_url = CONF["PDF_VIEWER"] % {"pdf_url": pdf_url}
             return self.redirect(pdf_reader_url)
 

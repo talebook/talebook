@@ -26,6 +26,16 @@ def test_production_compose_defaults_to_persistent_local_data_directory():
     assert all(not volume.startswith("/tmp/") for volume in volumes)
 
 
+def test_default_persistent_data_directory_is_gitignored():
+    patterns = {
+        line.strip()
+        for line in read(".gitignore").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    assert "data/" in patterns
+
+
 def test_deployment_docs_explain_persistence_and_do_not_recommend_tmp_data():
     for relative_path in ("README.md", "README_EN.md", "CODE_WIKI.md"):
         content = read(relative_path)

@@ -7,6 +7,7 @@
 </template>
 
 <script setup>
+import { withBasePath } from '@/utils/base-path';
 import { computed, onBeforeUnmount, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useRoute } from 'vue-router';
@@ -24,7 +25,7 @@ const locateAnnotation = (annotation) => {
         const query = new URLSearchParams();
         if (annotation.cfi) query.set('cfi', annotation.cfi);
         if (annotation.chapter) query.set('chapter', annotation.chapter);
-        window.location.href = `/read/${bookId.value}?${query.toString()}`;
+        window.location.href = withBasePath(`/read/${bookId.value}?${query.toString()}`);
         return;
     }
     window.parent.postMessage({

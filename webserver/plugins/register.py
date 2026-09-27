@@ -31,6 +31,7 @@ from webserver.plugins.source.komga import PROVIDER as KOMGA_PROVIDER
 from webserver.plugins.source.legado import PROVIDER as LEGADO_PROVIDER
 from webserver.plugins.source.opds import PROVIDER as OPDS_PROVIDER
 from webserver.plugins.source.standard_ebooks import PROVIDER as STANDARD_EBOOKS_PROVIDER
+from webserver.plugins.source.tomato_downloader import PROVIDER as TOMATO_DOWNLOADER_PROVIDER
 from webserver.plugins.source.watch_folder import PROVIDER as WATCH_FOLDER_PROVIDER
 from webserver.plugins.source.webdav import PROVIDER as WEBDAV_PROVIDER
 from webserver.plugins.tool.text_replace.provider import PROVIDER as TEXT_REPLACE_PROVIDER
@@ -49,6 +50,7 @@ SOURCE_PROVIDERS = (
     INTERNET_ARCHIVE_PROVIDER,
     WEBDAV_PROVIDER,
     WATCH_FOLDER_PROVIDER,
+    TOMATO_DOWNLOADER_PROVIDER,
 )
 META_PROVIDERS = (
     DOUBAN_V2_PROVIDER,

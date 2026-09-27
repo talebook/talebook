@@ -169,7 +169,7 @@ class TestNetworkLibrary(TestWithUserLogin):
         m_session.return_value = self._fake()
         # 创建任务：立即返回 task_id，不阻塞
         # 默认搜索还会覆盖启用的公共书源插件；这里显式选中 Legado，
-        # 让本用例只验证其任务进度与 runtime lease/run 收口。
+        # 让本用例只验证其任务进度与 runtime audit run 收口。
         d = self.json("/api/network/search?key=%s&sources=%s" % (Q("剑来"), Q("legado:%s" % self.sid)))
         self.assertEqual(d["err"], "ok")
         self.assertTrue(d["task_id"])
@@ -198,7 +198,7 @@ class TestNetworkLibrary(TestWithUserLogin):
 
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_search_groups_multiple_bindings_into_one_runtime_run(self, m_session):
-        """Legado 多个事实书源共用一条 connection，也只占用一个 lease/run。"""
+        """Legado 多个事实书源共用一条 connection，也只建立一个 audit run。"""
         m_session.side_effect = lambda *_args, **_kwargs: self._fake()
         session = get_db()
         second = models.BookSourceModel(CSS_SOURCE)
@@ -302,7 +302,7 @@ class TestNetworkLibrary(TestWithUserLogin):
 
     @mock.patch("webserver.services.booksource.engine.build_session")
     def test_browse_succeeds_while_connection_lease_is_held(self, m_session):
-        """TB-198 回归：搜索批量/超时宽限占用连接租约时，点击结果进入浏览页不得报 concurrent_run。"""
+        """TB-198 回归：有副作用调用持有连接租约时，只读浏览不得报 concurrent_run。"""
         m_session.return_value = self._fake()
         session = get_db()
         connection = (
@@ -333,7 +333,7 @@ class TestNetworkLibrary(TestWithUserLogin):
 
         session = get_db()
         item = session.get(models.PluginConnection, connection.id)
-        # 宽容读不带租约，收口后不得干扰租约持有者
+        # read 不参与租约，收口后不得干扰有副作用调用的租约。
         self.assertEqual(item.lease_token, "simulated-search-batch")
 
     @mock.patch("webserver.services.booksource.engine.build_session")

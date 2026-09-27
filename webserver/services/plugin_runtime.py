@@ -34,6 +34,11 @@ from webserver.plugins.runtime import (
     contract_violations,
 )
 from webserver.plugins.runtime.protocol import ManifestError, validate_against_schema
+from webserver.plugins.runtime.safe_http import (
+    DEFAULT_HOST_CONCURRENCY,
+    HOST_CONCURRENCY_CONFIG_KEY,
+    plugin_http_policy,
+)
 from webserver.services.plugin_secrets import SENSITIVE_KEY_RE, SecretCipher, SecretCipherError, redact, secret_mask_hint
 from webserver.services.plugin_writers import writer_for
 
@@ -46,6 +51,12 @@ PLATFORM_CONFIG_SCHEMA = {
         "timeout_seconds": {"type": "number", "minimum": 0.01, "maximum": 3600},
         "max_retries": {"type": "integer", "minimum": 0, "maximum": 5},
         "backoff_seconds": {"type": "number", "minimum": 0, "maximum": 60},
+        HOST_CONCURRENCY_CONFIG_KEY: {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": DEFAULT_HOST_CONCURRENCY,
+        },
     },
 }
 ENTITY_TYPES = frozenset({"metadata", "annotation", "review", "book_source"})
@@ -59,6 +70,16 @@ DEFAULT_COUNTS = {"fetched": 0, "written": 0, "updated": 0, "skipped": 0, "faile
 # pool; timed-out work may finish later, but the process has a hard concurrency
 # ceiling instead of leaking an unbounded number of workers.
 _PLUGIN_IO_EXECUTOR = ThreadPoolExecutor(max_workers=16, thread_name_prefix="plugin-io")
+
+
+def _host_concurrency(context):
+    value = (context.get("config") or {}).get(HOST_CONCURRENCY_CONFIG_KEY, DEFAULT_HOST_CONCURRENCY)
+    return max(1, min(100, int(value)))
+
+
+def _invoke_provider_method(provider, context, plugin_key, deadline, method, args):
+    with plugin_http_policy(plugin_key, _host_concurrency(context), deadline):
+        return getattr(provider, method)(*args, context)
 
 
 class PluginRuntimeError(RuntimeError):
@@ -740,7 +761,16 @@ class PluginRuntime:
             deadline=(datetime.datetime.now() + datetime.timedelta(seconds=effective_timeout)).isoformat(),
             platform=dict(override.get("platform") or {}),
         ).as_dict()
-        future = _PLUGIN_IO_EXECUTOR.submit(getattr(provider, method), *args, context)
+        deadline = time.monotonic() + effective_timeout
+        future = _PLUGIN_IO_EXECUTOR.submit(
+            _invoke_provider_method,
+            provider,
+            context,
+            plugin_key,
+            deadline,
+            method,
+            args,
+        )
         try:
             return future.result(timeout=effective_timeout)
         except FutureTimeoutError:
@@ -775,7 +805,7 @@ class PluginRuntime:
 
         SQLAlchemy session 不是线程安全的，因此所有涉及 session 的工作都在这里
         完成；返回的 ``call`` 只做网络 I/O，可放进任意线程池。接入既有外部
-        线程池时传 ``audit=True``，由 ``finish_read`` 在调用线程结束租约与 run。
+        线程池时传 ``audit=True``，由 ``finish_read`` 在调用线程结束 audit run。
         """
         prepared, failures = [], {}
         overrides_by_connection = context_overrides or {}
@@ -831,13 +861,22 @@ class PluginRuntime:
             attempt_state = {"value": 0, "deadline": time.monotonic() + effective_timeout}
             if audit or retry:
 
-                def call(method, *args, _p=provider, _c=context, _conn=connection, _state=attempt_state):
-                    return self._invoke_prepared_with_retry(_p, _c, _conn, _state, method, args)
+                def call(
+                    method,
+                    *args,
+                    _p=provider,
+                    _c=context,
+                    _conn=connection,
+                    _state=attempt_state,
+                    _plugin_key=plugin_key,
+                ):
+                    return self._invoke_prepared_with_retry(_p, _c, _conn, _state, _plugin_key, method, args)
 
             else:
 
-                def call(method, *args, _p=provider, _c=context):
-                    return getattr(_p, method)(*args, _c)
+                def call(method, *args, _p=provider, _c=context, _timeout=effective_timeout, _plugin_key=plugin_key):
+                    deadline = time.monotonic() + _timeout
+                    return _invoke_provider_method(_p, _c, _plugin_key, deadline, method, args)
 
             prepared.append(
                 {
@@ -856,7 +895,7 @@ class PluginRuntime:
             )
         return prepared, failures
 
-    def _invoke_prepared_with_retry(self, provider, context, connection, attempt_state, method, args):
+    def _invoke_prepared_with_retry(self, provider, context, connection, attempt_state, plugin_key, method, args):
         """外部线程池内的纯 I/O 重试器；不得访问 SQLAlchemy session。
 
         调用本身交给运行时的有界池，因此书源自己卡住时不会永久占用
@@ -871,7 +910,15 @@ class PluginRuntime:
                 raise PluginRuntimeError("plugin.timeout", "Plugin %s timed out" % method, retryable=True)
             attempt_state["value"] = attempt
             context["attempt"] = attempt
-            future = _PLUGIN_IO_EXECUTOR.submit(getattr(provider, method), *args, context)
+            future = _PLUGIN_IO_EXECUTOR.submit(
+                _invoke_provider_method,
+                provider,
+                context,
+                plugin_key,
+                attempt_state["deadline"],
+                method,
+                args,
+            )
             try:
                 return future.result(timeout=remaining)
             except FutureTimeoutError:
@@ -907,33 +954,30 @@ class PluginRuntime:
 
     def _begin_capability_run(self, connection, mode, timeout, requested_by=None, audit_data=None):
         requested_by = self._audit_subject(connection, requested_by)
-        token = uuid.uuid4().hex
         now = datetime.datetime.now()
-        acquired = (
-            self.session.query(PluginConnection)
-            .filter(
-                PluginConnection.id == connection.id,
-                or_(PluginConnection.lease_until.is_(None), PluginConnection.lease_until < now),
+        token = ""
+        acquired = True
+        # read 只做外部读取，由 SafeHttpClient 按 plugin+host 公平排队；它不再
+        # 参与持久化 connection lease。这样搜索、浏览和保存既不会互相快速
+        # 拒绝，也不会让一次慢读阻塞后续 write。write/sync/execute 等有状态或
+        # 有副作用的模式仍使用数据库租约，保持跨进程互斥与超时宽限保护。
+        if mode != "read":
+            token = uuid.uuid4().hex
+            acquired = (
+                self.session.query(PluginConnection)
+                .filter(
+                    PluginConnection.id == connection.id,
+                    or_(PluginConnection.lease_until.is_(None), PluginConnection.lease_until < now),
+                )
+                .update(
+                    {
+                        PluginConnection.lease_token: token,
+                        PluginConnection.lease_until: now + datetime.timedelta(seconds=timeout + 30),
+                    },
+                    synchronize_session=False,
+                )
             )
-            .update(
-                {
-                    PluginConnection.lease_token: token,
-                    PluginConnection.lease_until: now + datetime.timedelta(seconds=timeout + 30),
-                },
-                synchronize_session=False,
-            )
-        )
-        # read 型能力调用（网络书库搜索批量、详情/目录/正文抓取等）只是远端只读
-        # 请求，运行时内部本就允许同一连接上的并发读（一次搜索批量会并发执行多个
-        # 书源）。若把连接租约当作互斥锁强加给读，搜索批量占用的租约——或读超时
-        # 后保留的宽限租约——会让「点击搜索结果进入详情页」等后续读直接报
-        # concurrent_run。读遇忙时改为不带租约并发执行：不阻塞任何其他调用，也
-        # 不会在收口时误清持有者的租约（token 为空时清理语句匹配不到任何 token）。
-        # write/sync/execute 等有副作用的模式保持互斥，仍然快速失败。
-        tolerate = not acquired and mode == "read"
-        refused = not acquired and not tolerate
-        if tolerate:
-            token = ""
+        refused = not acquired
         run = PluginRun(
             connection_id=connection.id,
             action=mode,
@@ -1266,7 +1310,7 @@ class PluginRuntime:
         return results
 
     def begin_read_batch(self, connection, *, timeout=30, requested_by=None, audit_data=None):
-        """为共用一条 connection 的多个 read binding 只建立一个 lease/run。"""
+        """为共用一条 connection 的多个 read binding 只建立一个 audit run。"""
         effective_timeout = self._effective_timeout(connection, timeout)
         run, token = self._begin_capability_run(
             connection,
@@ -1549,7 +1593,16 @@ class PluginRuntime:
 
     @staticmethod
     def _call_method_with_timeout(provider, method, context, timeout):
-        future = _PLUGIN_IO_EXECUTOR.submit(getattr(provider, method), context)
+        plugin_key = (getattr(provider, "manifest", None) or {}).get("id", "")
+        future = _PLUGIN_IO_EXECUTOR.submit(
+            _invoke_provider_method,
+            provider,
+            context,
+            plugin_key,
+            time.monotonic() + timeout,
+            method,
+            (),
+        )
         try:
             return future.result(timeout=timeout)
         except FutureTimeoutError as exc:

@@ -3,12 +3,35 @@
         <v-row>
             <v-col cols="12">
                 <div class="library-filter-panel">
+                    <v-progress-linear
+                        v-if="filterOptionsLoading"
+                        indeterminate
+                        color="primary"
+                        :aria-label="t('book.loading')"
+                    />
+                    <v-alert
+                        v-if="filterOptionsFailed"
+                        type="error"
+                        variant="tonal"
+                        role="alert"
+                    >
+                        {{ t('errors.networkError') }}
+                        <v-btn
+                            :disabled="filterOptionsLoading"
+                            variant="text"
+                            @click="loadFilterOptions"
+                        >
+                            {{ t('common.retry') }}
+                        </v-btn>
+                    </v-alert>
                     <div class="library-metadata-filters">
                         <LibraryChipFilter
                             v-for="filter in metadataFilters"
                             :key="filter.key"
                             :model-value="filters[filter.key]"
                             :items="filterOptions[filter.key]"
+                            :total="filterTotals[filter.key]"
+                            :load-page="(p, q, size) => loadMetadataPage(filter.key, p, q, size)"
                             :label="filter.label"
                             :filter-key="filter.key"
                             @update:model-value="updateFilter(filter.key, $event)"
@@ -16,38 +39,6 @@
                     </div>
 
                     <div class="library-quick-filters">
-                        <div class="quick-filter-row">
-                            <span class="filter-label">{{ $t('book.format') }}{{ $t('messages.colon') }}</span>
-                            <div
-                                class="filter-chip-group"
-                                role="group"
-                                :aria-label="$t('book.format')"
-                            >
-                                <v-chip
-                                    :class="filters.format === null ? 'filter-chip-active' : 'filter-chip-inactive'"
-                                    :aria-pressed="filters.format === null"
-                                    class="quick-filter-chip"
-                                    label
-                                    role="button"
-                                    @click="updateFilter('format', null)"
-                                >
-                                    {{ t('messages.all') }}
-                                </v-chip>
-                                <v-chip
-                                    v-for="item in filterOptions.format"
-                                    :key="item.id"
-                                    :class="filters.format === item.name ? 'filter-chip-active' : 'filter-chip-inactive'"
-                                    :aria-pressed="filters.format === item.name"
-                                    class="quick-filter-chip"
-                                    label
-                                    role="button"
-                                    @click="updateFilter('format', item.name)"
-                                >
-                                    {{ item.name }}
-                                </v-chip>
-                            </div>
-                        </div>
-
                         <div
                             v-if="store.sys.show_network_library !== false"
                             class="quick-filter-row"
@@ -117,6 +108,8 @@ import LibraryChipFilter from '~/components/LibraryChipFilter.vue';
 import SerializeStatusBadge from '~/components/SerializeStatusBadge.vue';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
+import { useNuxtApp, useRoute, useHead } from 'nuxt/app';
+import { metadataPageUrl } from '@/composables/useMetadataPage';
 
 const store = useMainStore();
 const { t } = useI18n();
@@ -147,10 +140,15 @@ const filterOptions = ref({
     format: []
 });
 
+const filterTotals = ref({ publisher: 0, author: 0, tag: 0, format: 0 });
+const filterOptionsLoading = ref(false);
+const filterOptionsFailed = ref(false);
+
 const metadataFilters = computed(() => [
     { key: 'publisher', label: t('messages.publisher') },
     { key: 'author', label: t('messages.author') },
-    { key: 'tag', label: t('messages.tags') }
+    { key: 'tag', label: t('messages.tags') },
+    { key: 'format', label: t('book.format') }
 ]);
 
 const statusFilter = ref('all');
@@ -245,19 +243,27 @@ const fetchBooks = async (p = 1) => {
     }
 };
 
-// 加载筛选选项
+const loadMetadataPage = (type, p, q, size) => $backend(metadataPageUrl(type, p, q, size));
+
+// 只加载首屏摘要，完整列表由弹窗按页请求。
 const loadFilterOptions = async () => {
+    filterOptionsLoading.value = true;
+    filterOptionsFailed.value = false;
     const filterTypes = ['publisher', 'author', 'tag', 'format'];
     await Promise.all(filterTypes.map(async (type) => {
         try {
-            const rsp = await $backend(`/${type}?show=all`);
+            const rsp = await loadMetadataPage(type, 1, '', 10);
+            if (rsp.err && rsp.err !== 'ok') throw new Error('Metadata request failed');
+            filterTotals.value[type] = rsp.total || 0;
             if (rsp.items) {
                 filterOptions.value[type] = rsp.items;
             }
         } catch (error) {
             console.error(`Failed to load ${type} options:`, error);
+            filterOptionsFailed.value = true;
         }
     }));
+    filterOptionsLoading.value = false;
 };
 
 // 初始化函数
@@ -277,7 +283,7 @@ const init = async () => {
         p = 1 + parseInt(query.start / page_size);
     }
 
-    await Promise.all([fetchBooks(p), loadFilterOptions()]);
+    await fetchBooks(p);
 };
 
 // 翻页
@@ -302,7 +308,7 @@ watch(() => route.query, () => {
 
 // 初始加载
 onMounted(() => {
-    init();
+    Promise.all([init(), loadFilterOptions()]);
 });
 
 useHead(() => ({
