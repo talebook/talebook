@@ -1,8 +1,7 @@
 """Regression coverage for the security findings reported on PR #977."""
 
 import re
-import subprocess
-import sys
+import time
 from unittest import mock
 from urllib.parse import quote, unquote, urlencode, urlsplit
 
@@ -20,7 +19,7 @@ def setUpModule():
 
 @pytest.mark.parametrize("email", ["reader@example.com", "a+b@books.example.org", "读者@书库.中国"])
 def test_email_accepts_supported_addresses(email):
-    assert re.match(models.Reader.RE_EMAIL, email)
+    assert models.Reader.is_valid_email(email)
 
 
 @pytest.mark.parametrize(
@@ -37,13 +36,14 @@ def test_email_accepts_supported_addresses(email):
     ],
 )
 def test_email_rejects_malformed_addresses(email):
-    assert not re.match(models.Reader.RE_EMAIL, email)
+    assert not models.Reader.is_valid_email(email)
 
 
 def test_email_long_invalid_input_has_bounded_runtime():
-    # Isolate the regex so a regression cannot hang the test runner itself.
-    code = "import re, sys; assert re.match(sys.argv[1], '?' * 100000 + '@' + '?' * 100000) is None"
-    subprocess.run([sys.executable, "-c", code, models.Reader.RE_EMAIL], check=True, timeout=5)
+    email = "?" * 100000 + "@" + "?" * 100000
+    started = time.monotonic()
+    assert not models.Reader.is_valid_email(email)
+    assert time.monotonic() - started < 5
 
 
 def test_reset_password_without_account_timestamps():

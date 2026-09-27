@@ -110,8 +110,6 @@ class Reader(Base, SQLAlchemyMixin):
     OVERSIZE_SHRINK_RATE = 0.8
     SQLITE_MAX_LENGTH = 32 * 1024.0
 
-    # Dot-separated domain labels cannot overlap, keeping validation linear.
-    RE_EMAIL = r"[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\Z"
     RE_USERNAME = r"[a-z][a-z0-9_]*"
     RE_PASSWORD = r'[-a-zA-Z0-9!@#$%^&*()_+=[\]{};\':",./<>?\|]*'
 
@@ -130,6 +128,14 @@ class Reader(Base, SQLAlchemyMixin):
     update_time = Column(DateTime)
     access_time = Column(DateTime)
     extra = Column(MutableDict.as_mutable(JSONType), default={})
+
+    @staticmethod
+    def is_valid_email(email):
+        local, separator, domain = email.partition("@")
+        if not local or not separator or not domain or "@" in domain or any(char.isspace() for char in email):
+            return False
+        labels = domain.split(".")
+        return len(labels) >= 2 and all(labels)
 
     def __str__(self):
         return "<id=%d, username=%s, email=%s>" % (self.id, self.username, self.email)

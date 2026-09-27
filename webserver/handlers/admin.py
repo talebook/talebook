@@ -739,7 +739,7 @@ class AdminInstall(BaseHandler):
         password = self.get_argument("password", "").strip()
         if not username or not password or not email or not title:
             return {"err": "params.invalid", "msg": _("填写的内容有误")}
-        if not re.match(Reader.RE_EMAIL, email):
+        if not Reader.is_valid_email(email):
             return {"err": "params.email.invalid", "msg": _("Email无效")}
         if len(username) < 2 or len(username) > 20 or not re.match(Reader.RE_USERNAME, username):
             return {"err": "params.username.invalid", "msg": _("用户名无效")}
