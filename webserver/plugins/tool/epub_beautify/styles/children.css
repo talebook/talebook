@@ -1,0 +1,184 @@
+/* mb-beauty.css — 童趣解读·问句标题：圆角卡片 + 青绿琥珀双色 */
+@page {
+    margin: 5% 7%;
+}
+
+body {
+    {{FONT_BODY}}
+    line-height: {{LINE_HEIGHT}} !important;
+    text-align: justify;
+    orphans: 2;
+    widows: 2;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+/* 正文：缩进制统一（段距归零，间距由用户段距设置驱动，亲子共读可调大） */
+p {
+    text-indent: 2em !important;
+    duokan-text-indent: 2em;
+    text-align: justify !important;
+    text-justify: inter-ideograph;
+    line-height: {{LINE_HEIGHT}} !important;
+    margin: 0 !important;
+    orphans: 2;
+    widows: 2;
+}
+
+p[data-mb-first] {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+}
+
+/* 章节标题：问句式标题（水浒 title 115% #01B9B7）——居中 + 青绿 + 下划装饰线 */
+/* 童趣：圆角卡片 + 双线 + 淡底 */
+.mb-ch {
+    page-break-before: always;
+    break-before: page;
+    text-align: center !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    {{FONT_HEAD}}
+    font-weight: 800;
+    font-size: {{TITLE_SIZE}} !important;
+    line-height: 1.55;
+    color: {{ACCENT}};
+    margin: 3.6em 0 0.9em 0 !important;
+    padding: 1em 0.8em 0.9em 0.8em !important;
+    background: {{ACCENT_LIGHT}} !important;
+    border: 1px solid {{BORDER}} !important;
+    border-left: 4px solid {{ACCENT}} !important;
+    border-radius: 10px;
+    letter-spacing: 0.08em;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 标题后缀（章节内数字/问号） — MUTED */
+.mb-ch span {
+    font-size: 0.82em;
+    color: {{MUTED}};
+    font-weight: normal;
+    margin-left: 0.3em;
+}
+
+/* h 兜底 */
+h1, h2, h3 {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 引文：童趣卡片——QUOTE_BG + BORDER + ACCENT */
+blockquote {
+    {{FONT_KAI}}
+    font-size: 0.93em;
+    line-height: 1.8;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    text-align: center;
+    margin: 1.2em 1em !important;
+    padding: 0.9em 1.1em;
+    color: #2e3a3a;
+    background: {{QUOTE_BG}};
+    border: 1px solid {{BORDER}};
+    border-left: 4px solid {{ACCENT}};
+    border-radius: 8px;
+    orphans: 2;
+    widows: 2;
+}
+blockquote p {
+    text-indent: 0 !important;
+    text-align: center;
+    margin: 0.45em 0 !important;
+}
+
+/* 强调：童趣双色系 — 青绿粗体 + 琥珀高亮块 */
+strong {
+    font-weight: bold;
+    color: {{ACCENT}};
+}
+em {
+    font-style: normal;
+    background: {{QUOTE_BG}};
+    padding: 0.1em 0.3em;
+    border-radius: 3px;
+}
+
+/* 插图：童趣大图 + 圆角 + 阴影 */
+img {
+    max-width: 92% !important;
+    height: auto;
+    margin: 1.4em auto !important;
+    display: block;
+    border-radius: 6px;
+}
+p img {
+    display: inline;
+    margin: 0 0.2em !important;
+    vertical-align: middle;
+    border-radius: 3px;
+}
+
+/* 分割线：BORDER */
+hr {
+    border: none !important;
+    border-top: 2px dotted {{BORDER}} !important;
+    width: 42% !important;
+    margin: 1.8em auto !important;
+}
+
+/* 注释 */
+sup {
+    font-size: 0.7em !important;
+    line-height: 1;
+}
+.footnote,
+.duokan-footnote-content {
+    {{FONT_KAI}}
+    font-size: 0.86em;
+    line-height: 1.65;
+    text-align: left !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    color: {{MUTED}};
+}
+
+/* 表格：BORDER */
+table {
+    border-collapse: collapse;
+    margin: 1.2em auto !important;
+    font-size: 0.88em;
+    border: 1px solid {{BORDER}};
+    border-radius: 6px;
+    overflow: hidden;
+}
+td, th {
+    border: 1px solid {{BORDER}};
+    padding: 0.5em 0.7em;
+    text-indent: 0;
+}
+
+/* 代码 */
+pre, code {
+    {{FONT_CODE}}
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* 长线 — 童趣：55% 虚线 + 星点感 */
+.mb-ch-sep {
+    width: 55% !important;
+    height: 0 !important;
+    background: transparent !important;
+    border-top: 2px dotted {{BORDER}} !important;
+    opacity: 0.9;
+    margin-top: 0.6em !important;
+}
+
+{{RESPONSIVE}}
+{{TOC_STYLE}}

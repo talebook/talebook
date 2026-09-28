@@ -188,14 +188,15 @@ def test_tool_providers_declare_initial_enabled_state():
     assert "talebook.tool.text-replace" in keys
     assert "talebook.tool.zh-converter" in keys
     assert "talebook.tool.txt-fixer" in keys
-    # all three must be in integrations category
+    assert "talebook.tool.epub-beautify" in keys
+    # all tools must be in integrations category
     for p in TOOL_PROVIDERS:
         assert callable(p.initial_enabled)
         assert "integrations" in p.manifest["categories"]
 
 
 # ---------------------------------------------------------------------------
-# HTTP 层测试：/api/plugins/tools/* 6 个端点
+# HTTP 层测试：/api/plugins/tools/* 各工具端点
 #
 # 覆盖此前 review 发现的两个高危问题：
 # - zh-converter run 因缺少 DIRECTION_LABELS 导入而 NameError；
@@ -260,7 +261,11 @@ class TestBookToolActions(TestApp):
         self.assertEqual(epub["err"], "ok")
         self.assertEqual(
             {action["plugin_key"] for action in epub["actions"]},
-            {"talebook.tool.text-replace", "talebook.tool.zh-converter"},
+            {
+                "talebook.tool.text-replace",
+                "talebook.tool.zh-converter",
+                "talebook.tool.epub-beautify",
+            },
         )
         self.assertEqual(
             {action["plugin_key"] for action in txt["actions"]},
@@ -455,3 +460,80 @@ class TestBookToolAuditTrail(TestApp):
         self.assertEqual(len(runs), before + 1)
         self.assertEqual(runs[-1].status, "succeeded")
         self.assertEqual(runs[-1].cursor_after["encoding"], "gbk")
+
+
+class TestEpubBeautifyPresets(TestApp):
+    def test_presets_ok(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/tools/epub-beautify/presets")
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(len(d["presets"]), 12)
+        self.assertEqual(len(d["toc_styles"]), 4)
+
+
+class TestEpubBeautifyPreview(TestApp):
+    def test_preview_ok(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json(
+                "/api/plugins/tools/epub-beautify/preview",
+                method="POST",
+                body=json.dumps({"book_id": BID_EPUB}),
+            )
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["book_id"], BID_EPUB)
+        self.assertIn("analysis", d)
+
+    def test_preview_rejects_other_users_private_book(self):
+        with temporary_book_scope(BID_EPUB, "private", collector_id=1):
+            with mock.patch.object(BaseHandler, "user_id", return_value=2):
+                d = self.json(
+                    "/api/plugins/tools/epub-beautify/preview",
+                    method="POST",
+                    body=json.dumps({"book_id": BID_EPUB}),
+                )
+                self.assertEqual(d["err"], "booktools.failed")
+
+
+class TestEpubBeautifyRun(TestApp):
+    def test_run_requires_admin(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=2):
+            d = self.json(
+                "/api/plugins/tools/epub-beautify/run",
+                method="POST",
+                body=json.dumps({"book_id": BID_EPUB, "preset": "classic", "toc_style": "elegant"}),
+            )
+            self.assertEqual(d["err"], "permission.not_admin")
+
+    @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
+    @mock.patch("webserver.plugins.tool.epub_beautify.provider.beautify")
+    def test_run_creates_new_book(self, m_beautify, m_import):
+        def fake_beautify(src, out, css, **kwargs):
+            with open(out, "wb") as handle:
+                handle.write(b"EPUB")
+            return {"marked_headers": 3, "toc_generated": True}
+
+        m_beautify.side_effect = fake_beautify
+        m_import.return_value = 9201
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json(
+                "/api/plugins/tools/epub-beautify/run",
+                method="POST",
+                body=json.dumps({"book_id": BID_EPUB, "preset": "classic", "toc_style": "elegant"}),
+            )
+        self.assertEqual(d["err"], "ok")
+        self.assertEqual(d["book_id"], 9201)
+        self.assertEqual(d["output_mode"], "new")
+        self.assertEqual(d["preset"], "classic")
+        self.assertTrue(m_beautify.called)
+        self.assertTrue(m_import.called)
+
+    @mock.patch("webserver.plugins.tool.epub_beautify.provider.beautify")
+    def test_run_rejects_invalid_preset(self, m_beautify):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json(
+                "/api/plugins/tools/epub-beautify/run",
+                method="POST",
+                body=json.dumps({"book_id": BID_EPUB, "preset": "does-not-exist", "toc_style": "elegant"}),
+            )
+        self.assertEqual(d["err"], "booktools.failed")
+        self.assertFalse(m_beautify.called)

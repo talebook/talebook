@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="把 mybooks 的 EPUB 美化工具改造成 Talebook 内置 tool 插件（integrations.tool），并顺带核对内置文本工具图标。" />
+    <link rel="icon" href="data:," />
+    <title>EPUB 美化工具迁移为 Talebook tool 插件 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <h1>把 EPUB 美化工具迁移为 Talebook 内置 tool 插件</h1>
+        <p class="sub">把 mybooks 的 <code>epub_beautify</code>（12 套预设 × 4 种目录形式、纯无损生成新书）改造成 Talebook 的 <code>integrations.tool</code> 插件，沿用现有三个正文工具的 provider/handler/前端范式；同时核对内置文本工具图标并补齐新工具图标注册。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-09-15</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：webserver/plugins/tool、handlers、app/pages/plugins、i18n、local-mdi-icons</span>
+          <span class="chip">需求来源：用户原话（2026-09-15）</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“查看 https://github.com/talebook/talebook/blob/master/document/PluginGuide.md ，我想把本地的 epubbeautify 工具改造成 talebook 的一个插件，做个计划（附加一个，之前黏菌还提交过三个工具，但是图标似乎有问题，你把图标修复也放进计划里）”</div>
+            <p>触发背景：mybooks 侧 <code>epub_beautify</code> 已上线并经过多轮 review（revision 0.2.2），核心逻辑无 calibre 依赖；Talebook 侧已建立 <code>PROTOCOL_VERSION = "talebook.plugin/v1"</code> 的插件领域模型与 <code>TransformProvider</code> 契约，且已有三个工具（正文查找替换 / 繁简转换 / TXT 编码修复）作为可复制的范式。图标部分为独立附加项：用户不确定三工具图标是否正常。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul>
+                <li>EPUB 美化以 <code>talebook.tool.epub-beautify</code> 内置插件交付，具备 preview / run、书籍详情页入口、运行审计。</li>
+                <li>核心美化逻辑逐行复用 mybooks 实现，禁止重写导致输出不一致。</li>
+                <li>坚持「只生成新书、原书零改动」的无损红线。</li>
+                <li>图标修复可追溯：确认 master 已含 TB-201，并为新工具补齐图标注册与测试覆盖。</li>
+              </ul></article>
+              <article class="choice"><h3>非目标</h3><ul>
+                <li>不迁移 mybooks 的背景图上传（无对应 Talebook 持久层）。</li>
+                <li>不迁移批量队列与后台长任务模型（v1 单本，平台已有 host queue）。</li>
+                <li>不提供覆盖写回（overwrite）模式。</li>
+                <li>不改动现有三个工具的行为与接口。</li>
+                <li>不把所有非 tool 插件的 mdi 名纳入本次修复范围。</li>
+              </ul></article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-conditional">条件支持</span>
+              <span class="matrix-no">不支持 / 不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>管理员</th><th>Web</th><th>移动端</th><th>API</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">EPUB 美化</th>
+                    <td><strong>预览书籍并选择美化预设</strong><br /><span class="matrix-note">只读分析，不改文件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td>preview 返回目录形态/标题统计/字体与 12 预设元数据；私有书越权返回与不存在一致。</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">EPUB 美化</th>
+                    <td><strong>执行美化并生成新书</strong><br /><span class="matrix-note">原书零改动</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td>run 为管理员写操作；失败落 PluginRun；新书含注入 CSS 与目录页。</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">插件中心</th>
+                    <td><strong>启停与图标展示</strong><br /><span class="matrix-note">三个历史工具 + 新工具</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td>未注册 mdi 名由 LocalMdiIcons 测试拦截；图标不再是问号 fallback。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>mybooks 核心纯 Python，可移植</td><td><code>webserver/toolbox/utils/epub_beautify_lib.py</code>（仅 stdlib + chapter_patterns）、<code>utils/styles/</code>（json/os/re）</td><td>lib 与样式零 calibre 依赖，直接搬运；仅外壳 epub_beautify.py 需重写。</td></tr>
+                  <tr><td>Talebook 已有工具范式</td><td><code>webserver/plugins/tool/text_replace/provider.py</code>、<code>tool/base.py:34</code>、<code>handlers/plugin_booktools.py:508</code>、<code>services/booktools.py:95</code></td><td>provider/handler/前端/i18n 均有可复制模板。</td></tr>
+                  <tr><td>契约边界明确</td><td><code>webserver/plugins/runtime/interfaces.py:110</code> TransformProvider（preview/apply）</td><td>长任务/批量模型不属于契约，v1 用 preview+apply。</td></tr>
+                  <tr><td>三工具图标在 master 已修</td><td>commit <code>2f523a5c</code>（TB-201，补 <code>mdi-find-replace</code> / <code>mdi-file-restore-outline</code>）+ <code>a4d93751</code> 测试</td><td>master 正常；用户 fork 分支 <code>feat/book-tools</code> 落后 157 提交且不含 TB-201，故仍坏。</td></tr>
+                  <tr><td>图标守卫测试范围</td><td><code>app/test/components/LocalMdiIcons.spec.ts:36</code> 仅扫 <code>app/*</code> + <code>webserver/plugins/tool</code></td><td>新工具用到的 mdi 名必须补进 <code>local-mdi-icons.ts</code>，否则测试红。</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与推断：</strong>推断「图标坏了」来自陈旧分支；已在 master 用 <code>git cat-file</code>/文件内容核实三工具图标名均已注册。若评审要求仍从旧分支继续，则需 cherry-pick TB-201。</div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>新插件目录 <code>webserver/plugins/tool/epub_beautify/</code> 拥有全部内核与 provider，Talebook 只提供平台能力（书籍定位、权限、入库、审计）；数据流为 <code>book → preview(分析) → apply(生成 beautified.epub) → import_as_new_book</code>，失败不落库。</div>
+
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Input</span><b>选书 + 参数</b><p>管理员选 EPUB 与预设/目录形式/开关。</p></article>
+              <article class="step"><span class="label">Guard</span><b>权限与格式校验</b><p><code>can_view_book</code> + 仅 EPUB；写操作用 <code>@is_admin</code>。</p></article>
+              <article class="step"><span class="label">Core</span><b>provider.apply</b><p>组装预设 CSS，无损重写并输出到临时目录。</p></article>
+              <article class="step"><span class="label">Output</span><b>入库 + 审计</b><p><code>import_as_new_book</code> 生成新书；PluginRun 留痕。</p></article>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>契约映射</td><td>provider 只实现 preview/apply，不做后台任务</td><td>与现有三工具一致，平台负责 run 记录与队列</td><td>mybooks 的 BackgroundTask/全局锁</td></tr>
+                  <tr><td>写回策略</td><td>只生成新书</td><td>保留「原书零改动」红线，降低误伤风险</td><td>overwrite 模式</td></tr>
+                  <tr><td>背景图</td><td>v1 只用内置纹理</td><td>无 Talebook 持久层，避免新增业务表</td><td>自定义上传（后续单独立项）</td></tr>
+                  <tr><td>批量</td><td>v1 单本</td><td>平台 host queue 已可横向扩展</td><td>mybooks 批量队列 UI</td></tr>
+                  <tr><td>图标</td><td>基线取 master 继承 TB-201，新工具补注册</td><td>避免重复修同一问题</td><td>在旧分支重复修补</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <pre aria-label="目录结构"><code>webserver/plugins/tool/epub_beautify/
+  __init__.py
+  provider.py          # EpubBeautifyTransformPlugin + PROVIDER
+  beautify_lib.py      # ← mybooks epub_beautify_lib.py
+  chapter_patterns.py  # ← mybooks chapter_patterns.py（MIT 出处保留）
+  styles/              # ← mybooks styles/（CSS + presets.json + textures）
+webserver/handlers/plugin_booktools.py   # + presets/preview/run 路由
+webserver/plugins/register.py            # TOOL_PROVIDERS 追加
+app/pages/plugins/epub-beautify.vue
+app/i18n/locales/{zh-CN,en-US}.json      # bookTools.epubBeautify.*</code></pre>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p>新增插件目录（约 1.1MB 样式与纹理）、新增 handler 路由、注册表追加一项、新前端页面与三语文案、图标注册多一项；现有三工具不变。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>TransformProvider 契约、现有工具/插件行为、Connection/启停规则、书籍详情页动作由 Capability 派生。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>① 移植文件原为 240 列格式，Talebook 的 <code>ruff format</code> 门禁要求 127 列并统一引号，故 vendored 文件存在一次机械重排 diff（后续同步上游需以逻辑 diff 为准）。② 原生 lib 为 GPL-3.0，与 talebook 一致；章节正则出处（txt2epub-next, MIT）已在 <code>chapter_patterns.py</code> 头部保留署名。③ 前端 i18n 违反 <code>@</code>/<code>&lt;</code> 禁用会导致整个 locale 编译失败 → 已对新增文案做静态扫描（无命中），仍需本地 dev server 实测。</div>
+            <div class="callout"><strong>回滚：</strong>单分支提交；回滚即还原注册表一项与删除插件目录/页面，无数据迁移、无库表变更。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>核心单元</td><td><code>pytest tests/test_epub_beautify.py tests/test_epub_beautify_plugin.py</code></td><td>移植核心单测全绿；manifest/契约/端到端预览、生成与内置纹理通过</td><td><span class="verified">通过（209 passed）</span></td></tr>
+                  <tr><td>契约守卫</td><td><code>pytest tests/test_plugin_contract.py</code>（已同步 expected_modules）</td><td>注册表含 <code>talebook.tool.epub-beautify</code> 且只入 tool 分组</td><td><span class="verified">远端全量通过（注册表/分组断言无失败）</span></td></tr>
+                  <tr><td>集成 / HTTP</td><td><code>pytest tests</code>（远端 <code>talebook/talebook:latest</code> + calibre 一次性容器）</td><td>presets/preview/run 权限、私有书、格式过滤、新书创建与非法预设</td><td><span class="verified">通过（<code>test_texttools</code>/<code>test_epub_beautify*</code>/<code>test_plugin_runtime</code> 全绿）</span></td></tr>
+                  <tr><td>前端图标</td><td><code>npx vitest run test/components/LocalMdiIcons.spec.ts</code></td><td>新增页与 provider 用到的 mdi 名全部注册</td><td><span class="verified">通过（3 passed）</span></td></tr>
+                  <tr><td>前端 lint</td><td><code>npm run lint</code></td><td>0 error</td><td><span class="verified">通过（0 errors）</span></td></tr>
+                  <tr><td>前端构建</td><td><code>npm run build</code>（CI test-ui 同款 nuxt build）</td><td>构建成功</td><td><span class="verified">通过</span></td></tr>
+                  <tr><td>前端组件</td><td><code>npx vitest run test/components/</code></td><td>全绿</td><td><span class="pending">3 个既有文件因 Nuxt <code>$fetch</code> teardown 报错失败，非本次改动文件</span></td></tr>
+                  <tr><td>后端 lint</td><td><code>ruff check ./webserver</code>、<code>ruff format --diff ./webserver</code></td><td>均通过</td><td><span class="verified">通过（含移植文件已 ruff format）</span></td></tr>
+                  <tr><td>方案门禁</td><td><code>make check-design</code></td><td>通过</td><td><span class="verified">通过</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout warn"><strong>说明：</strong>远端 pytest 全量中另有失败项，均系测试环境只上传了仓库子集（缺 <code>.github/</code>、<code>docker/</code>、<code>Dockerfile</code>、<code>app/public</code> 图标、preset 书库等）导致，与本插件无关；本方案的 <code>interface-review</code> 与浏览器渲染验收未执行。</div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-09-15：</strong>确认在 master 新建分支 <code>feat/epub-beautify-plugin-20260915</code>，图标修复继承 TB-201。</li>
+              <li><strong>2026-09-15：</strong>v1 只生成新书、单本执行；背景仅内置纹理（<code>bg_texture</code>，6 种），不迁移自定义上传。</li>
+              <li><strong>2026-09-15：</strong>移植文件按 Talebook 门禁 <code>ruff format</code> 重排到 127 列，并修 2 处 lint（<code>zip(..., strict=False)</code> 与未使用局部变量）；此为实现偏离，逻辑不变。</li>
+              <li><strong>2026-09-15：</strong>删除仅依赖 mybooks 外壳（BaseTool/BackgroundTask）的锁测试；前端 <code>noteMarkItems()</code> 与 provider 校验两处漂移守卫测试改为 Talebook 路径。</li>
+              <li><strong>2026-09-15：</strong>大书美化显式设置运行超时（preview 120s / apply 600s），规避平台默认 30s 超时。</li>
+            </ol>
+          </section>
+        </main>
+      </div>
+
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-09-15</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

@@ -505,6 +505,142 @@ class UserZhConverterRun(BaseHandler):
                 shutil.rmtree(work_dir, ignore_errors=True)
 
 
+EPUB_BEAUTIFY_ROUTE = "/plugins/epub-beautify"
+EPUB_BEAUTIFY_SUFFIX = "（美化版）"
+
+
+class UserEpubBeautifyPresets(BaseHandler):
+    """无书籍依赖的预设/目录形式元数据，供工具页初始化渲染。"""
+
+    @js
+    @auth
+    def get(self):
+        from webserver.plugins.tool.epub_beautify.provider import PROVIDER
+
+        return {"err": "ok", **PROVIDER.describe()}
+
+
+def _epub_beautify_input(req, src):
+    """把请求体归一化为 provider 输入（只做形状转换，参数合法性由 provider 校验）。"""
+    return {
+        "path": src,
+        "format": "EPUB",
+        "preset": str(req.get("preset") or ""),
+        "toc_style": str(req.get("toc_style") or "elegant"),
+        "use_system_fonts": req.get("use_system_fonts", True),
+        "font_overrides": req.get("font_overrides"),
+        "toc_depth": req.get("toc_depth"),
+        "cleanup": req.get("cleanup"),
+        "palette_overrides": req.get("palette_overrides"),
+        "page_tint": req.get("page_tint"),
+        "bg_texture": str(req.get("bg_texture") or ""),
+        "dialogue": bool(req.get("dialogue")),
+        "title_split": bool(req.get("title_split")),
+        "toc_columns": bool(req.get("toc_columns")),
+        "para_mode": req.get("para_mode"),
+        "para_indent": req.get("para_indent"),
+        "para_gap": req.get("para_gap"),
+        "notes": bool(req.get("notes")),
+        "note_mark": str(req.get("note_mark") or "orig"),
+    }
+
+
+def _epub_beautify_source(handler, book_id):
+    book = _tool_resolve_book(handler, book_id)
+    fmts = [fmt.upper() for fmt in (book.get("available_formats") or [])]
+    if "EPUB" not in fmts:
+        raise BookToolsError("该书籍没有 EPUB 格式，无法美化")
+    return book, get_format_path(handler.db, book_id, "EPUB")
+
+
+class UserEpubBeautifyPreview(BaseHandler):
+    @js
+    @auth
+    def post(self):
+        req = _body(self)
+        try:
+            book_id = _tool_book_id(req)
+            _book, src = _epub_beautify_source(self, book_id)
+            runtime, connection = _tool_runtime(self, EPUB_BEAUTIFY_ROUTE)
+            result = runtime.read(
+                connection,
+                "preview",
+                ToolInput.from_dict({"path": src, "format": "EPUB"}),
+                required_scopes=("books.read",),
+                requested_by=self.user_id(),
+                timeout=120,
+            ).to_dict()
+            result["err"] = "ok"
+            result["book_id"] = book_id
+            return result
+        except (BookToolsError, RuntimeError) as exc:
+            return _tool_error(exc)
+
+
+class UserEpubBeautifyRun(BaseHandler):
+    """美化并生成新书；原书零改动，故无覆盖写回与回滚。"""
+
+    @js
+    @is_admin
+    def post(self):
+        req = _body(self)
+        work_dir = None
+        try:
+            book_id = _tool_book_id(req)
+            book, src = _epub_beautify_source(self, book_id)
+            title = book.get("title") or "Unknown"
+            work_dir = _tool_workdir()
+            runtime, connection = _tool_runtime(self, EPUB_BEAUTIFY_ROUTE)
+
+            def finalize(output):
+                value = output.to_dict()
+                suffix = str(req.get("suffix") or "").strip() or EPUB_BEAUTIFY_SUFFIX
+                return {
+                    "err": "ok",
+                    "path": value["path"],
+                    "format": "EPUB",
+                    "preset": value.get("preset"),
+                    "stats": value.get("stats"),
+                    "output_mode": "new",
+                    "book_id": import_as_new_book(
+                        self.db,
+                        self.session,
+                        book_id,
+                        value["path"],
+                        title_suffix=suffix,
+                        collector_id=self.user_id(),
+                    ),
+                }
+
+            rsp = runtime.write(
+                connection,
+                "apply",
+                ToolInput.from_dict(_epub_beautify_input(req, src)),
+                work_dir,
+                required_scopes=("books.write",),
+                requested_by=self.user_id(),
+                timeout=600,
+                finalize=finalize,
+                audit_data={"book_id": book_id, "format": "EPUB", "preset": req.get("preset"), "output_mode": "new"},
+            )
+            stats = rsp.get("stats") or {}
+            logging.info(
+                "[booktools] epub-beautify done: book=%s preset=%s headers=%s toc=%s new_book=%s [uid:%s]",
+                title,
+                rsp.get("preset"),
+                stats.get("marked_headers"),
+                stats.get("toc_generated"),
+                rsp.get("book_id"),
+                self.user_id(),
+            )
+            return rsp
+        except (BookToolsError, RuntimeError) as exc:
+            return _tool_error(exc)
+        finally:
+            if work_dir:
+                shutil.rmtree(work_dir, ignore_errors=True)
+
+
 def routes():
     return [
         (r"/api/plugins/tools/book-actions", AdminBookToolActions),
@@ -514,4 +650,7 @@ def routes():
         (r"/api/plugins/tools/txt-fixer/analyze", UserTxtFixerAnalyze),
         (r"/api/plugins/tools/txt-fixer/run", UserTxtFixerRun),
         (r"/api/plugins/tools/zh-converter/run", UserZhConverterRun),
+        (r"/api/plugins/tools/epub-beautify/presets", UserEpubBeautifyPresets),
+        (r"/api/plugins/tools/epub-beautify/preview", UserEpubBeautifyPreview),
+        (r"/api/plugins/tools/epub-beautify/run", UserEpubBeautifyRun),
     ]

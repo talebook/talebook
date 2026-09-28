@@ -34,6 +34,7 @@ from webserver.plugins.source.standard_ebooks import PROVIDER as STANDARD_EBOOKS
 from webserver.plugins.source.tomato_downloader import PROVIDER as TOMATO_DOWNLOADER_PROVIDER
 from webserver.plugins.source.watch_folder import PROVIDER as WATCH_FOLDER_PROVIDER
 from webserver.plugins.source.webdav import PROVIDER as WEBDAV_PROVIDER
+from webserver.plugins.tool.epub_beautify.provider import PROVIDER as EPUB_BEAUTIFY_PROVIDER
 from webserver.plugins.tool.text_replace.provider import PROVIDER as TEXT_REPLACE_PROVIDER
 from webserver.plugins.tool.txt_fixer.provider import PROVIDER as TXT_FIXER_PROVIDER
 from webserver.plugins.tool.zh_converter.provider import PROVIDER as ZH_CONVERTER_PROVIDER
@@ -70,7 +71,7 @@ REVIEW_PROVIDERS = (
     FILE_IMPORT_PROVIDER,
 )
 ANNOTATION_PROVIDERS = (BRS_PROVIDER,)
-TOOL_PROVIDERS = (TEXT_REPLACE_PROVIDER, ZH_CONVERTER_PROVIDER, TXT_FIXER_PROVIDER)
+TOOL_PROVIDERS = (TEXT_REPLACE_PROVIDER, ZH_CONVERTER_PROVIDER, TXT_FIXER_PROVIDER, EPUB_BEAUTIFY_PROVIDER)
 PUSH_PROVIDERS = (
     KINDLE_PROVIDER,
     DUOKAN_PROVIDER,

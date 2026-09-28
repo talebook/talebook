@@ -1,0 +1,154 @@
+/* ── 目录页朱印版（seal）──
+   精装书目录版式：标题靠左 + 全角空格拉开字距 + 朱红"印章"装饰 +
+   小号浅色 CONTENT 副题；双栏无边框表格：左列「编号+章节名」链接，
+   右列「\\　✦」装饰标记；表格 85% 宽、靠左缩进、黑体小字。
+   装饰全部为真实元素与常规属性（兼容手机阅读器）。 */
+body.mb-toc-page {
+    margin: 0 !important;
+    {{FONT_BODY}}
+}
+/* 实色卡片：淡纸色底，保留无边框表格的通透 */
+body.mb-toc-page .mb-toc {
+    background: {{ACCENT_LIGHT}} !important;
+    border: 1px solid {{BORDER}} !important;
+    border-radius: 8px;
+    padding: 1.8em 1.2em 1.5em 1.2em !important;
+    margin: 2.5em 1em !important;
+}
+body.mb-toc-page div.mulu,
+body.mb-toc-page table.mulu {
+    margin: 2.5em 1em;
+}
+/* 标题：靠左 + margin-left 缩进、标题字体 + 主题色 + 字距
+   （.mb-toc-title = 书内平铺目录页的 p/div 标题兜底类） */
+body.mb-toc-page h1,
+body.mb-toc-page h2,
+body.mb-toc-page .mb-toc-title {
+    {{FONT_HEAD}}
+    text-align: left !important;
+    font-weight: bold;
+    font-size: 1.3em !important;
+    line-height: 1.5;
+    letter-spacing: 0.2em;
+    text-indent: 0 !important;
+    color: {{ACCENT}};
+    margin: 2em 0 0.8em 1em !important;
+    orphans: 2;
+    widows: 2;
+}
+/* 印章：朱红底 + 浅色字小块（真实 span 元素） */
+body.mb-toc-page .mb-toc-seal {
+    display: inline-block;
+    background-color: #B54942;
+    color: #F5E6D0;
+    font-size: 0.42em;
+    font-weight: normal;
+    letter-spacing: 0.1em;
+    padding: 0.28em 0.4em;
+    margin-left: 0.9em;
+    vertical-align: middle;
+    border-radius: 0.15em;
+}
+/* 英文副题（小号浅色） */
+body.mb-toc-page .mb-toc-sub {
+    display: block;
+    font-size: 0.5em;
+    font-weight: normal;
+    letter-spacing: 0.45em;
+    color: #D8B7A7;
+    margin-top: 0.4em;
+    margin-bottom: 1.4em;
+}
+/* 双栏表格（无边框、靠左、85% 宽） */
+body.mb-toc-page table.mulu {
+    width: 85%;
+    margin: 0.875em auto 0.875em 1.5em !important;
+    border: none !important;
+    border-collapse: collapse;
+    {{FONT_HEAD}}
+    font-size: 0.88em;
+}
+body.mb-toc-page table.mulu td {
+    padding: 0.35em 0.2em;
+    text-align: left;
+    vertical-align: middle;
+    border: none !important;
+    line-height: 1.7;
+    color: #111;
+}
+body.mb-toc-page table.mulu a,
+body.mb-toc-page p a,
+body.mb-toc-page div a {
+    text-decoration: none !important;
+    color: inherit;
+}
+/* 编号（嵌在链接内，主题色加粗两位编号） */
+body.mb-toc-page .mb-toc-num {
+    color: {{ACCENT}};
+    font-weight: bold;
+    margin-right: 0.5em;
+}
+/* 右列装饰标记（\\　✦） */
+body.mb-toc-page td.mb-toc-mark {
+    text-align: right;
+    width: 18%;
+    color: #A2906A;
+    font-size: 0.8em;
+    letter-spacing: 0.2em;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+/* 二级条目：缩进、小号、MUTED */
+body.mb-toc-page td.mb-toc-l2 a {
+    padding-left: 1.5em;
+    color: {{MUTED}};
+    font-size: 0.92em;
+}
+/* 平铺式目录（p/div 条目）兜底；标题块走 .mb-toc-title 的标题样式不在此列 */
+body.mb-toc-page p,
+body.mb-toc-page div {
+    text-indent: 0 !important;
+}
+body.mb-toc-page p:not(.mb-toc-title) {
+    margin: 0.7em 0 !important;
+    line-height: 1.9 !important;
+}
+/* 收尾装饰符 */
+body.mb-toc-page .mb-toc-end {
+    text-align: center;
+    color: #A2906A;
+    font-size: 0.75em;
+    letter-spacing: 1.5em;
+    margin: 2em 0 0 0 !important;
+}
+/* 目录截断提示 — MUTED */
+body.mb-toc-page .mb-toc-truncated {
+    text-align: center;
+    color: {{MUTED}};
+    margin-top: 1.5em !important;
+}
+
+/* ── 目录移动端优化（双栏表格 → 单栏紧凑） ── */
+@media (max-width: 600px) {
+  body.mb-toc-page .mb-toc,
+  body.mb-toc-page div.mulu,
+  body.mb-toc-page table.mulu {
+    margin: 1.2em 0.6em !important;
+    width: 95% !important;
+  }
+  body.mb-toc-page h1,
+  body.mb-toc-page h2,
+  body.mb-toc-page .mb-toc-title {
+    font-size: 1.15em !important;
+    margin: 1.2em 0 0.6em 0.5em !important;
+  }
+  body.mb-toc-page table.mulu td {
+    padding: 0.32em 0.15em !important;
+    font-size: 0.92em;
+    line-height: 1.75;
+  }
+  body.mb-toc-page td.mb-toc-mark {
+    width: 14% !important;
+    font-size: 0.72em !important;
+  }
+}
