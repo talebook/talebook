@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="阅读器笔记入口开关：把浮动入口的显隐做成阅读器设置里的一项偏好，宿主模板只消费阅读器透出的状态。" />
+    <link rel="icon" href="data:," />
+    <title>阅读器笔记入口开关 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 860px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <h1>阅读器笔记入口开关：浮动入口的显隐归阅读器设置</h1>
+        <p class="sub">登录读者在线阅读时，右上角的「阅读笔记」浮动入口无法关闭。本方案把它的显隐做成阅读器设置里的一项偏好，宿主模板只消费阅读器透出的状态：不加后端接口，不动笔记数据，两个仓库可以独立发布。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-09-28</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：图文书阅读器模板与 <code>spec/阅读器.md</code>；配套 candle-reader 阅读器设置</span>
+          <span class="chip">需求来源：用户诉求「把页面上我圈出来的图标开发一个可以自由打开关闭的功能性开关」</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“帮我写一个完整的拉取请求，把页面上我圈出来的图标开发一个可以自由打开关闭的功能性开关。”</div>
+            <p>圈出的对象是登录读者阅读页右上角的浮动入口「阅读笔记」（<code>#annotation-toggle</code>，带笔记条数角标）。它当前固定显示：读者觉得它压住正文时没有别的选择，而它又是进笔记面板的唯一入口，所以「关掉」必须可逆。</p>
+            <p>已核实的事实：这个入口不在 candle-reader 里，而是 Talebook 自己的 <code>creader.html</code> 渲染的；阅读页的正文、底部导航和设置面板都由 candle-reader 渲染。因此本方案要先回答「开关归谁」，再谈怎么隐藏。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul><li>登录读者用一个开关让浮动入口显示或隐藏，重新打开即恢复。</li><li>开关归阅读器设置，按浏览器保存，不需要新接口与后端改动。</li><li>关掉入口只改变入口的可见性，不改变任何一条笔记数据。</li><li>宿主模板不引入第二份偏好来源，两侧可以独立发布。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不改笔记数据模型与 <code>/api/book/&lt;book_id&gt;/annotations</code> 接口。</li><li>不做按书、按设备或服务端同步的偏好。</li><li>不改游客行为——游客本来就看不到该入口。</li><li>不代替 candle-reader 正在推进的「笔记 UI 收口」；本方案的开关语义是「入口是否出现」，收口完成后仍然成立。</li></ul></article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <p>本次只改动图文书阅读器的入口显隐，其余阅读器与角色不在范围内。</p>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-conditional">条件支持</span>
+              <span class="matrix-no">不支持 / 不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>Web</th><th>移动端</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">阅读器</th>
+                    <td><strong>显示或隐藏阅读笔记浮动入口</strong><br /><span class="matrix-note">读者按自己的阅读习惯决定入口是否挡正文</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>关掉后入口不可见且不可聚焦，刷新与重开页面保持；重新打开即恢复</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">划线笔记</th>
+                    <td><strong>查看、创建笔记</strong><br /><span class="matrix-note">入口关闭期间的笔记读写能力，本次不变</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>接口与权限规则不变；关闭入口不产生任何写请求或数据变更</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>浮动入口固定显示，没有开关</td><td><code>webserver/resources/book/creader.html</code> 的 <code>#annotation-toggle</code>（仅登录读者渲染）</td><td>入口的所有权在宿主模板，不在阅读器</td></tr>
+                  <tr><td>阅读页其余部分由阅读器渲染</td><td><code>creader.html</code> 里 <code>new Reader('#app', …)</code> 加载 <code>candle-reader.es.js</code></td><td>阅读器已经有设置面板，是开关的现成落点</td></tr>
+                  <tr><td>阅读器设置与宿主同源</td><td><code>EpubReader.vue</code> 的 <code>save_settings()</code> 写 <code>localStorage.readerSettings</code></td><td>宿主可以在首屏同步读到这份偏好，无需新接口</td></tr>
+                  <tr><td>入口隐藏后不应还能被键盘选中</td><td>入口是原生 <code>&lt;button&gt;</code>，当前始终在 Tab 序中</td><td>隐藏方式必须真正移出可达序列，而不是只做视觉遮挡</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与推断：</strong>推断「阅读器设置面板在移动端始终可达」已由底部导航「设置」入口证实；未验证的是读者在真实书库中对默认值的接受度，这属于产品观察，不影响本次实现。</div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>开关的所有权放阅读器设置（它本来就管「阅读界面里有什么」），宿主只让出自己那份入口的显隐。阅读器把偏好透出成 <code>&lt;html&gt;</code> 上的一个属性，宿主用一条 CSS 消费它——跨仓契约只有一个属性名加一条选择器，没有新接口。</div>
+
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Input</span><b>读者切换「笔记入口」</b><p>阅读器设置面板里的显示 / 隐藏，默认显示</p></article>
+              <article class="step"><span class="label">Guard</span><b>读写偏好</b><p>写入 <code>localStorage.readerSettings.notes_entry</code>，并同步 <code>&lt;html data-candle-reader-notes-entry&gt;</code></p></article>
+              <article class="step"><span class="label">Core</span><b>宿主消费属性</b><p>一条 CSS 让浮动入口 <code>display:none</code>；首屏脚本先读一次 localStorage，避免入口闪现</p></article>
+              <article class="step"><span class="label">Output</span><b>入口显隐</b><p>隐藏时同时移出 Tab 序与无障碍树；笔记数据与接口零变化</p></article>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>开关的所有权</td><td>放阅读器设置，宿主只消费状态</td><td>入口属于阅读界面，阅读器已经在管界面构成；宿主再存一份会出现两套偏好</td><td>在 Talebook 模板里自建开关与存储（读者换个阅读器就丢掉偏好，且与阅读器设置面板重复）</td></tr>
+                  <tr><td>跨仓契约</td><td><code>&lt;html&gt;</code> 上的 <code>data</code> 属性 + 宿主 CSS</td><td>宿主不需要接回调或事件；运行中切换也能立刻生效；属性是纯 DOM 状态，易断言</td><td>自定义事件或 <code>postMessage</code> 回调（宿主需额外接线，首屏仍要单独处理）</td></tr>
+                  <tr><td>首屏表现</td><td>宿主在 <code>&lt;head&gt;</code> 同步读一次 <code>readerSettings</code></td><td>阅读器挂载前入口就会渲染，只靠阅读器设置会出现「先出现再消失」</td><td>只依赖阅读器挂载后设置属性（入口闪现）</td></tr>
+                  <tr><td>关闭的语义</td><td>只隐藏入口，不碰笔记数据</td><td>诉求是「图标可以打开关闭」，不是关闭笔记能力</td><td>关闭时同时停掉笔记加载（会改变数据语义，超出诉求，也和主开关重复）</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <pre aria-label="跨仓契约与宿主改动"><code>阅读器（candle-reader）
+  设置项 notes_entry（默认 true）
+    → localStorage.readerSettings.notes_entry = false
+    → document.documentElement.dataset.candleReaderNotesEntry = 'off' | 'on'
+
+宿主（talebook creader.html）
+  &lt;head&gt; 首屏脚本（避免闪现）：
+    var saved = JSON.parse(localStorage.getItem('readerSettings') || '{}')
+    if (saved.notes_entry === false) {
+      document.documentElement.setAttribute('data-candle-reader-notes-entry', 'off')
+    }
+
+  样式（两侧共用的唯一一条规则）：
+    html[data-candle-reader-notes-entry="off"] #annotation-toggle { display: none !important; }</code></pre>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p>本仓库：<code>webserver/resources/book/creader.html</code> 新增一条 CSS 与一段首屏脚本，<code>tests/test_annotations.py</code> 新增渲染断言，<code>spec/阅读器.md</code> 新增「5.7 笔记入口」并补第 4、7 节。配套仓库 candle-reader：设置面板新增「笔记入口」，设置默认值新增 <code>notes_entry</code>，并透出到 <code>&lt;html&gt;</code>。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>笔记表与接口、隐私与可见性规则、游客行为、浮动入口的位置样式与无障碍名称、笔记面板本身、阅读器与宿主的既有初始化参数。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>阅读器与宿主版本错配（宿主先更新而阅读器还是旧包）→ 触发条件是读者没有新的设置项，因此根本看不到开关，不会出现「关了没反应」；反向（阅读器先更新）→ 旧宿主不认识该属性，入口照常显示，属于功能未生效而非故障。缓解方式是两个仓库都可独立发布，且契约只依赖一个属性名。另一风险是 <code>localStorage</code> 不可用（隐私模式、禁用 Cookie）→ 首屏脚本整体 <code>try/catch</code>，保持入口默认显示。</div>
+            <div class="callout"><strong>回滚：</strong>两个仓库各自以提交为单位回滚，无需数据迁移；偏好键是阅读器设置里的一个新字段，老版本会忽略它，不产生残留状态。</div>
+            <div class="callout warn"><strong>交付顺序：</strong>宿主侧改动只有在新的 candle-reader 静态包上线后才会真正生效，<code>candle-reader-version.txt</code> 需要随发行包一起升级。反过来先升宿主、后升阅读器是安全的：旧阅读器没有该设置项，读者看不到开关，入口行为与现在完全一致。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>宿主模板渲染断言</td><td><code>tests/test_annotations.py</code> 新增 <code>test_reader_hosts_the_notes_entry_toggle_contract</code></td><td>渲染出的 <code>/read/&lt;id&gt;</code> 含 CSS 规则与首屏脚本</td><td class="pending">未执行（本机无 Python / Docker）</td></tr>
+                  <tr><td>阅读器开关（candle-reader e2e）</td><td><code>npx playwright test reader-ui</code></td><td>切换后写入设置并透出 <code>off/on</code>；关闭后刷新保持</td><td class="verified">通过（含新增两条用例）</td></tr>
+                  <tr><td>阅读器全量 e2e</td><td><code>npm run test:e2e</code></td><td>除既有有声书时序用例外全部通过</td><td class="verified">36 passed / 4 failed，失败全部集中在既有 <code>audiobook.spec.js</code> 高亮时序</td></tr>
+                  <tr><td>阅读器 e2e 基线对照</td><td>同一份 <code>audiobook.spec.js</code> 在无本方案改动的 <code>origin/main</code> 上串行重跑</td><td>确认失败与本方案无关</td><td class="verified">同样是 2 passed / 2 failed，失败用例与失败断言完全一致</td></tr>
+                  <tr><td>阅读器质量门禁</td><td><code>npm run lint</code>、<code>npm run build</code></td><td>无 lint 错误，发行包可构建</td><td class="verified">通过</td></tr>
+                  <tr><td>宿主模板实际渲染</td><td>本地 Node + Playwright Chromium 渲染 <code>creader.html</code>（402×874、DPR3）</td><td>默认显示；透出 <code>off</code> 隐藏；重新打开恢复；隐藏后不可聚焦</td><td class="verified">8/8 断言通过，0 pageerror</td></tr>
+                  <tr><td>仓库门禁</td><td><code>make check-design</code>、<code>make check-spec</code>、<code>make pytest</code></td><td>方案、规格与后端测试通过</td><td class="pending">未执行（本机无 Python / make / Docker）</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout warn"><strong>未执行说明：</strong>本机没有 Python、Docker 与 make，无法运行 <code>make pytest</code>、<code>make check-design</code>、<code>make check-spec</code>，也不具备运行 <code>interface-review</code> skill 与 Chrome DevTools MCP 的条件。替代验证是用真实 Chromium 渲染渲染后的宿主模板并断言显隐、首屏属性与焦点行为，再叠加一次真实阅读器发行包的端到端取证。本次改动是一条 CSS、一段 12 行首屏脚本与一个设置项，未触及后端、数据与权限。新增的 Python 渲染断言需在 CI 或 Docker 环境执行。</div>
+            <div class="callout"><strong>截图证据：</strong><code>document/screenshots/20260928-notes-entry/01-entry-visible.png</code>（入口显示、设置行在「显示」）、<code>02-entry-hidden.png</code>（点隐藏后入口消失、设置行在「隐藏」）、<code>03-hidden-after-reload.png</code>（刷新后入口仍不出现，正文正常渲染）。取证为 402×874、DPR3；为让正文渲染，取证环境按 <code>index.html</code> 的既有顺序额外引入 JSZip，生产由 talebook 静态包提供。</div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-09-28：</strong>确认浮动入口由宿主模板渲染、阅读器设置面板存在且同源可读，因此开关放阅读器设置，宿主只消费 <code>&lt;html data-candle-reader-notes-entry&gt;</code>。</li>
+              <li><strong>2026-09-28：</strong>放弃在 Talebook 模板内自建开关与存储：会产生两套偏好，且与阅读器设置面板重复。</li>
+              <li><strong>2026-09-28：</strong>关闭语义定为「隐藏入口」，不牵连笔记加载与数据，避免与阅读器主开关的语义重叠。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-09-28</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>
