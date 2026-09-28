@@ -43,6 +43,46 @@ def normalize_import_mode(import_mode=None, delete_after=False):
     return saved_mode if saved_mode in IMPORT_MODES else IMPORT_MODE_COPY
 
 
+def collect_scan_tasks(path_dir, limit, done_paths):
+    """遍历 path_dir 收集待扫描的书文件候选。
+
+    done_paths 里已登记且处理完毕的路径直接跳过、不占批次名额，扫描窗口始终只被
+    真正需要处理的文件填满——即使每轮都从树根重走，窗口也会随登记积累不断向树深处推进，
+    不会卡死在目录头部（每轮收集到同一批旧文件，其后的新文件永远扫不到）。
+    """
+    has_books = False
+    tasks = []
+    skipped = 0
+    for dirpath, dirnames, filenames in os.walk(path_dir):
+        # 排除隐藏文件夹（以.开头或@__thumb等）
+        dirnames[:] = [
+            d for d in dirnames if not (d.startswith(".") or d.startswith("@__") or os.path.islink(os.path.join(dirpath, d)))
+        ]
+
+        for fname in filenames:
+            # 排除隐藏文件
+            if fname.startswith("."):
+                continue
+
+            fpath = os.path.join(dirpath, fname)
+            if os.path.islink(fpath) or not os.path.isfile(fpath):
+                continue
+
+            fmt = fpath.split(".")[-1].lower()
+            if fmt not in SCAN_EXT:
+                continue
+            has_books = True
+            if fpath in done_paths:
+                skipped += 1
+                continue
+            tasks.append((fname, fpath, fmt))
+            if limit and len(tasks) >= limit:
+                break
+        if limit and len(tasks) >= limit:
+            break
+    return has_books, tasks, skipped
+
+
 class ScanService(AsyncService):
     _watch_lock = threading.Lock()
     _watch_generation = 0
@@ -172,40 +212,37 @@ class ScanService(AsyncService):
     def do_scan(self, path_dir, limit=None):
         return self._do_scan(path_dir, limit=limit)
 
+    def _load_done_paths(self, path_dir):
+        """加载当前扫描根下已登记且处理完毕（非 NEW 状态、真实哈希）的文件路径。
+
+        判定条件与 _do_scan 第二阶段对已知路径的跳过条件严格一致：NEW 状态行、
+        中断残留的 fstat: 临时哈希行都不算 done，仍会占批次名额并被重新处理。
+        """
+        prefix = os.path.join(path_dir, "")
+        query = self.session.query(ScanFile.path).filter(
+            ScanFile.path.startswith(prefix, autoescape=True),
+            ScanFile.status != ScanFile.NEW,
+            ~ScanFile.hash.like("fstat:%"),
+        )
+        return {row[0] for row in query}
+
     def _do_scan(self, path_dir, limit=None):
         from calibre.ebooks.metadata.meta import get_metadata
 
         logging.info("<%s> we are: db=%s, session=%s", self, self.db, self.session)
         logging.info("start to scan %s", path_dir)
 
-        # 先检查目录中是否有待扫描的书籍
-        has_books = False
-        tasks = []
-        for dirpath, dirnames, filenames in os.walk(path_dir):
-            # 排除隐藏文件夹（以.开头或@__thumb等）
-            dirnames[:] = [
-                d
-                for d in dirnames
-                if not (d.startswith(".") or d.startswith("@__") or os.path.islink(os.path.join(dirpath, d)))
-            ]
-
-            for fname in filenames:
-                # 排除隐藏文件
-                if fname.startswith("."):
-                    continue
-
-                fpath = os.path.join(dirpath, fname)
-                if os.path.islink(fpath) or not os.path.isfile(fpath):
-                    continue
-
-                fmt = fpath.split(".")[-1].lower()
-                if fmt in SCAN_EXT:
-                    has_books = True
-                    tasks.append((fname, fpath, fmt))
-                    if limit and len(tasks) >= limit:
-                        break
-            if limit and len(tasks) >= limit:
-                break
+        # 先收集目录中待扫描的书籍；已处理完毕的文件不占批次名额
+        done_paths = self._load_done_paths(path_dir)
+        has_books, tasks, skipped = collect_scan_tasks(path_dir, limit, done_paths)
+        logging.info(
+            "scan %s: done=%d, skipped=%d, candidates=%d, limit=%s",
+            path_dir,
+            len(done_paths),
+            skipped,
+            len(tasks),
+            limit,
+        )
 
         # 检查是否有符合条件的书籍文件
         if not has_books:
