@@ -25,6 +25,37 @@ test.describe('Book Detail Page', () => {
         });
     });
 
+    for (const format of ['djvu', 'uvz']) {
+        test(`downloads ${format} with online reading disabled`, async ({ page }) => {
+            test.setTimeout(90_000);
+            await page.goto('/');
+            await expect(page.locator(`a[href="/book/${bookId}"]`).first()).toBeVisible({ timeout: 45_000 });
+            await page.route(`**/api/book/${bookId}`, async route => {
+                await route.fulfill({ json: {
+                    ...apiBook,
+                    book: {
+                        ...apiBook.book,
+                        media_type: 'unknown',
+                        online_readable: false,
+                        files: [{ format, size: 1024, href: `/api/book/${bookId}.${format}`, online_readable: false }],
+                    },
+                } });
+            });
+            await page.locator(`a[href="/book/${bookId}"]`).first().click();
+            await expect(page.getByTestId('online-reading-unsupported')).toBeDisabled({ timeout: 15_000 });
+            await expect(page.getByTestId('open-online-reader')).toHaveCount(0);
+            await page.getByTestId('book-action-download').click();
+            await expect(page.getByTestId('book-download-dialog').locator(`a[href="/api/book/${bookId}.${format}"]`)).toContainText(format);
+            await page.getByTestId('book-download-dialog').getByRole('button', { name: '关闭' }).click();
+            await expect(page.getByTestId('book-download-dialog')).toBeHidden();
+            await page.getByTestId('book-action-section').screenshot({ path: `test-results/scanned-${format}-desktop.png`, animations: 'disabled' });
+            await page.setViewportSize({ width: 375, height: 812 });
+            await expect(page.getByTestId('book-action-download')).toBeVisible();
+            await expect(page.getByTestId('online-reading-unsupported')).toBeDisabled();
+            await page.getByTestId('book-action-section').screenshot({ path: `test-results/scanned-${format}-mobile.png`, animations: 'disabled' });
+        });
+    }
+
     test('displays book details', async ({ page }) => {
         await page.goto(`/book/${bookId}`);
 

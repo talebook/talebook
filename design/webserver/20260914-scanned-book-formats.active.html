@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>DJVU / UVZ 扫描资源管理 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page" id="main"><header class="hero"><h1>DJVU / UVZ 扫描资源管理</h1><p>创建：2026-09-14 · 模块：webserver / app · 状态：ACTIVE</p><p>来源：<a href="https://github.com/talebook/talebook/issues/1031">GitHub #1031</a> · TB-218</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>接受 DJVU、UVZ 扫描版资源，按文件名编目，将同名不同格式合并，接入网络元数据和封面补全；仅提供下载，不提供在线阅读。2026-09-14 核实原问题 OPEN、无评论和附件。</p></section>
+<section class="card"><h2>设计决策与边界核对</h2><p>当前环境没有 grill 技能；按现有代码和原问题逐项核对边界，无额外审批要求。</p><ul><li>仅新增 djvu、uvz（大小写不敏感），不开放任意扩展名。DJVU 核对 IFF 文件头及 DJVU/DJVM 类型；UVZ 核对 ZIP 容器结构和既有资源预算，不解压、不解析私有页面内容。</li><li>两种格式从文件名去除最后一个扩展名作为标题，作者默认佚名，不调用 Calibre 文件元数据解析器。</li><li>仅对新格式允许唯一同名候选自动合并；多个同名候选时建立新记录。重复格式不覆盖。网页上传仅考虑当前登录者有编辑权限且拥有或管理员可管理的候选。普通格式保持既有匹配行为。</li><li>复用 AutoFillService，是否启用、网络匹配成功率由原有插件配置决定。网络失败不能阻止文件入库。</li><li>复用 online_readable=false 的禁读和下载按钮。不添加阅读器或转换路径。前端两个文件选择入口及格式说明同步更新。</li><li>原问题的自定义正则属于建议项，本次不新增配置和正则执行面；文件名解析规则在使用说明中明确。</li></ul></section>
+<section class="card"><h2>方案与影响范围</h2><p>media_analysis 增加独立的仅管理格式集合；上传、扫描预览及执行阶段共用文件名元数据及候选选择逻辑。前端 Upload 和书籍格式上传入口开放扩展名。既有下载权限、媒体分类和网络补全流程保持适用。</p><p>扫描资源只做容器识别，不保证私有阅读器可读性；缺少开发者真实样本，使用最小 DJVU 和 UVZ ZIP 测试样本验证管理链路。</p></section>
+<section class="card" id="validation"><h2>测试结果</h2><p>make check-design：交付前校验通过。</p>
+<ul><li>Docker 镜像 talebook:tb214-revision-tests 挂载当前仓库运行 make pytest：1336 passed、37 skipped、78 warnings。最后只修正重复格式提示文案，随后运行 pytest -q tests/test_managed_documents.py tests/test_media_analysis.py tests/test_scan.py tests/test_upload.py tests/test_book_write_permissions.py tests/test_autofill.py：137 passed。</li>
+<li>make lint-py-fix、make lint-py：通过。npm run lint：0 errors、459 个已有 warnings；现有配置不覆盖测试 TS 文件，测试文件由 Vitest / Playwright 实际编译运行。</li>
+<li>npx vitest run test/components/Upload.spec.ts test/components/BookDetailActions.spec.ts：14 passed。包含新扩展名文件选择与上传。</li>
+<li>MOCK_API_URL=http://127.0.0.1:18318 npx playwright test --config playwright.documents.config.ts book-detail.spec.ts --grep 'downloads (djvu|uvz)'：2 passed。隔离 mock 自动由 Playwright 启停，不提供体验地址。覆盖桌面及 375px 手机的禁读和下载菜单；测试首次编译超时已通过首页进入、延长用例等待修正。</li>
+<li>新增后端测试覆盖文件头伪装、截断 DJVU、UVZ 不安全路径、中文多点文件名、大写扩展名、原始字节下载、唯一同名合并、歧义候选不合并、所有权限制、重复格式、API online_readable 和 /read 返回 415、自动补全触发；原索引格式矩阵扩展 DJVU / UVZ。</li>
+<li>Chrome DevTools MCP 在本环境不可用，以 Playwright Chromium 完成实际渲染和截图。未验证真实古籍样本、真实外部元数据源、暗色主题和 200% 缩放；不声称真实数据端到端验收。</li></ul></section>
+<section class="card"><h2>interface-review full</h2>
+<p>范围：branch + 全部未提交变更；基线 origin/master / HEAD 均为 8b21fbb9480f14b498327d3cef36088c4ba47821，0 个已有提交。读取 git diff（含删除侧）、git status --short、git ls-files --others --exclude-standard；无 fetch、checkout 或其他审查写操作。参照根目录 AGENTS.md、webserver/CLAUDE.md、app/CLAUDE.md，使用 Nuxt 4 / Vuetify 3 既有组件体系。</p>
+<p>直接消费者扩展：全局 Upload、书籍详情格式上传、BookDetailActions、详情下载对话框、管理导入说明。二进制截图、扫描报告与生成测试产物不作代码界面审查；未扩大到无关页面。</p>
+<div class="table-wrap"><table><thead><tr><th>领域</th><th>检查证据</th><th>结果</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>原生文件输入保留标签；禁读按钮 disabled；下载按钮及链接；Vitest / Chromium 两个新格式状态。</td><td>Clear（限定已检查的状态；未做屏幕阅读器测试）</td></tr>
+<tr><td>Layout</td><td>未改 CSS、布局与组件顺序；桌面及 375px 动作区可见。</td><td>Clear；其余断点未渲染验证</td></tr>
+<tr><td>Writing</td><td>两个 locale 同步格式清单；重复格式提示去除不再成立的“同作者”字样，回归通过。</td><td>复查无遗留问题</td></tr>
+<tr><td>Typography</td><td>格式缩写沿用原有字号和自动换行容器，无样式改动。</td><td>Clear（源码检查）</td></tr>
+<tr><td>Colors / UI motion</td><td>变更无颜色、动效、图标、阴影或字体 token。</td><td>Not reviewed: no evidence in the change scope</td></tr>
+</tbody></table></div>
+<p>Findings：No actionable interface findings in this change。已修复的 introduced 文案问题：上传新格式唯一同名匹配时可能作者不同，旧重复提示“同名同作者”会误导；改为“书籍”。</p>
+<p>Considered but Rejected：① 不新增在线阅读器，需求只要求管理与下载，现有禁读状态足够；② 不调整禁用按钮配色，该样式是既有 Vuetify 状态，本改动不涉及颜色；③ 不添加自定义正则设置，原需求为建议项，规则与当前限制已明确记录。既有顶栏与全页截图几何不作为本变更问题，交付截图聚焦实际变化状态的动作区。</p>
+<p>Verification：make lint-py、npm run lint、Vitest 与 Playwright 命令及限制见上文。最终 Verdict：Approve（上述范围内的源码及功能状态审查，不代表未验证的视觉、设备或真实数据环境）。</p></section>
+<section class="card"><h2>DeepSec Shield</h2>
+<p>版本：0.2.0，来源 fff031fc01fb36b95348214c8ee359f6ede8aa8b。命令：<code>/opt/deepsec/fff031fc01fb36b95348214c8ee359f6ede8aa8b/venv/bin/deepsec shield scan . --layer l1,l2 --include-tests --format json --output -</code>。范围：全仓支持的源码及测试，扫描前检查源码范围符号链接，无越界链接；依赖和生成目录由扫描器排除。</p>
+<p>最终全仓扫描 539 文件，L1/L2，退出码 2，有效报告共 122 项（32 critical、69 high、21 medium）。所有告警文件与基线逐字节相同：57 项第三方静态资源、28 项测试、37 项应用/脚本。未对这些既有项扩大修复，不将其一概认定为误报；本次修改文件无告警，不能称全仓安全通过。</p>
+<p>两个 Vue 文件不受此 CLI 语言覆盖；其 accept 改动已人工与组件测试检查。最后的 E2E 截图等待调整另用相同命令扫描 app/test/e2e/book-detail.spec.ts：1 文件，L1/L2，退出码 0、零发现。报告和 stderr / 退出码保留于 .deepsec；交付脱敏 JSON 隐去源码证据、可疑凭据值及绝对路径。仅本地 Shield，不启用 Spear 或远程 LLM。</p></section>
+</main></body></html>

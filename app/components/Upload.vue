@@ -42,7 +42,7 @@
                         <v-file-input
                             v-model="ebooks"
                             :label="$t('messages.selectEbook')"
-                            accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.cbz,.zip,.cbr,.rar"
+                            accept=".epub,.mobi,.azw,.azw3,.pdf,.txt,.djvu,.uvz,.cbz,.zip,.cbr,.rar"
                         />
                     </v-form>
                     <v-progress-linear

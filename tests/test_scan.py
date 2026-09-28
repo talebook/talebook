@@ -28,6 +28,12 @@ def write_supported_media(path, extension):
     if extension == "epub":
         with open(testdir + "/cases/new.epub", "rb") as source, open(path, "wb") as target:
             target.write(source.read())
+    elif extension == "djvu":
+        with open(path, "wb") as stream:
+            stream.write(b"AT&TFORM\x00\x00\x00\x04DJVU")
+    elif extension == "uvz":
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("0001.pdg", b"scanned page")
     elif extension == "pdf":
         with open(path, "wb") as stream:
             stream.write(b"%PDF-1.4 indexed test")

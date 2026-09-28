@@ -107,6 +107,21 @@ describe('Upload.vue', () => {
         wrapper.unmount();
     });
 
+    it.each(['djvu', 'uvz'])('accepts and uploads %s documents', async (format) => {
+        const wrapper = mountUpload();
+        (wrapper.vm as unknown as UploadVm).dialog = true;
+        await flushPromises();
+        const input = document.querySelector('input[type="file"]') || wrapper.find('input[type="file"]').element;
+        expect(input?.getAttribute('accept')?.split(',')).toContain(`.${format}`);
+        backendMock.mockResolvedValue({ err: 'ok', book_id: 42 });
+        (wrapper.vm as unknown as UploadVm).ebooks = makeFakeFile(`古籍.${format}`, 1024);
+        (wrapper.vm as unknown as UploadVm).do_upload();
+        await flushPromises();
+        expect(backendMock).toHaveBeenCalledWith('/book/upload', expect.objectContaining({ method: 'POST' }));
+        expect(pushMock).toHaveBeenCalledWith('/book/42');
+        wrapper.unmount();
+    });
+
     it('uploads small files directly without chunking', async () => {
         const wrapper = mountUpload();
         backendMock.mockResolvedValue({ err: 'ok', book_id: 42 });

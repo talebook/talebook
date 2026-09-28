@@ -21,7 +21,8 @@ COMIC_ZIP_FORMATS = frozenset(("cbz", "zip"))
 COMIC_RAR_FORMATS = frozenset(("cbr", "rar"))
 COMIC_CONTAINER_FORMATS = COMIC_ZIP_FORMATS | COMIC_RAR_FORMATS
 EBOOK_MEDIA_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt"))
-SUPPORTED_MEDIA_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS
+MANAGED_DOCUMENT_FORMATS = frozenset(("djvu", "uvz"))
+SUPPORTED_MEDIA_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS | MANAGED_DOCUMENT_FORMATS
 ONLINE_READ_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS
 
 MAX_ARCHIVE_ENTRIES = 10000
@@ -489,6 +490,35 @@ def _analyze_epub(path, declared_format):
     return MediaAnalysis(declared_format, "epub", "application/epub+zip", MEDIA_TYPE_EBOOK, "text_spine")
 
 
+def _analyze_managed_document(path, declared_format):
+    """Recognize download-only documents without decoding their pages."""
+    if declared_format == "djvu":
+        header = _read_signature(path, 16)
+        if len(header) != 16 or header[:8] != b"AT&TFORM" or header[12:16] not in (b"DJVU", b"DJVM"):
+            _invalid("format.mismatch", "文件内容不是有效的 DjVu 容器")
+        form_size = struct.unpack(">I", header[8:12])[0]
+        if form_size < 4 or form_size + 12 != os.path.getsize(path):
+            _invalid("format.mismatch", "DjVu 容器长度不匹配")
+        mime_type = "image/vnd.djvu"
+    else:
+        # UVZ stores scanned pages in a ZIP container. Do not apply comic image
+        # restrictions: its pages may use private formats such as PDG.
+        if not _read_signature(path, 4).startswith(b"PK"):
+            _invalid("format.mismatch", "文件内容不是有效的 UVZ ZIP 容器")
+        _preflight_zip_directory(path)
+        try:
+            with zipfile.ZipFile(path) as archive:
+                _infos, files = _zip_file_entries(archive)
+                if not files:
+                    _invalid("archive.empty", "UVZ 容器为空")
+        except InvalidMediaError:
+            raise
+        except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as err:
+            _invalid("archive.corrupt", "UVZ 容器已损坏：%s" % err)
+        mime_type = "application/octet-stream"
+    return MediaAnalysis(declared_format, declared_format, mime_type, MEDIA_TYPE_UNKNOWN, "download_only_document")
+
+
 def analyze_media_file(path, declared_format):
     """Validate a file against its declared format and classify its content."""
     declared_format = (declared_format or "").lower().lstrip(".")
@@ -497,6 +527,8 @@ def analyze_media_file(path, declared_format):
     if not os.path.isfile(path):
         _invalid("media.unreadable", "媒体文件不存在")
 
+    if declared_format in MANAGED_DOCUMENT_FORMATS:
+        return _analyze_managed_document(path, declared_format)
     if declared_format in COMIC_ZIP_FORMATS:
         if not _read_signature(path, 4).startswith(b"PK"):
             _invalid("format.mismatch", "文件内容不是有效的 ZIP 容器")
