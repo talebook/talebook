@@ -4419,7 +4419,7 @@ function Qd(e) {
 }
 function Re(e, t, n, o, i, l) {
   return Qd(
-    ue(
+    ce(
       e,
       t,
       n,
@@ -4460,7 +4460,7 @@ const jg = (...e) => tf(
   ref_key: t,
   ref_for: n
 }) => (typeof e == "number" && (e = "" + e), e != null ? Qe(e) || Je(e) || Te(e) ? { i: wt, r: e, k: t, f: !!n } : e : null);
-function ue(e, t = null, n = null, o = 0, i = null, l = e === Ee ? 0 : 1, a = !1, s = !1) {
+function ce(e, t = null, n = null, o = 0, i = null, l = e === Ee ? 0 : 1, a = !1, s = !1) {
   const r = {
     __v_isVNode: !0,
     __v_skip: !0,
@@ -4522,7 +4522,7 @@ function tf(e, t = null, n = null, o = 0, i = null, l = !1) {
     `
 Component that was made reactive: `,
     e
-  )), ue(
+  )), ce(
     e,
     t,
     n,
@@ -9887,7 +9887,7 @@ const ci = {
   ...Pn({
     variant: "elevated"
   })
-}, "VBtn"), ce = de()({
+}, "VBtn"), ue = de()({
   name: "VBtn",
   props: dm(),
   emits: {
@@ -10184,7 +10184,7 @@ const ci = {
                 props: P.value
               })];
             }
-          }) : u(ce, be({
+          }) : u(ue, be({
             key: "close-btn",
             icon: e.closeIcon,
             size: "x-small",
@@ -12503,10 +12503,10 @@ function t0(e, t, n, o, i, l) {
             ])),
             _: 1
           }),
-          ue("div", X_, Oe(n.selectionCfi ? "此处还没有笔记" : "还没有划线或笔记"), 1),
+          ce("div", X_, Oe(n.selectionCfi ? "此处还没有笔记" : "还没有划线或笔记"), 1),
           n.toolbarEnabled && !n.selectionCfi ? (Q(), Re("div", J_, "在正文中选择文字即可开始。")) : !n.toolbarEnabled && !n.selectionCfi ? (Q(), Re(Ee, { key: 1 }, [
-            t[3] || (t[3] = ue("div", { class: "text-medium-emphasis mt-1" }, "选区工具栏已关闭，开启后即可添加划线或笔记。", -1)),
-            u(ce, {
+            t[3] || (t[3] = ce("div", { class: "text-medium-emphasis mt-1" }, "选区工具栏已关闭，开启后即可添加划线或笔记。", -1)),
+            u(ue, {
               class: "mt-3",
               variant: "tonal",
               onClick: t[0] || (t[0] = (a) => e.$emit("open-settings"))
@@ -12559,7 +12559,7 @@ function t0(e, t, n, o, i, l) {
                 ]),
                 _: 2
               }, 1024),
-              ue("div", Z_, Oe(a.annotation_type === "highlight" ? "划线笔记" : "文字笔记") + " · " + Oe(a.is_private === !1 ? "公开" : "私密"), 1),
+              ce("div", Z_, Oe(a.annotation_type === "highlight" ? "划线笔记" : "文字笔记") + " · " + Oe(a.is_private === !1 ? "公开" : "私密"), 1),
               a.quote_text ? (Q(), me(_a, {
                 key: 0,
                 class: "annotation-quote"
@@ -13778,13 +13778,13 @@ function S0(e, t, n, o, i, l) {
             class: "text-center"
           }, {
             default: _(() => t[4] || (t[4] = [
-              ue("h4", { class: "mt-3" }, "评论列表", -1)
+              ce("h4", { class: "mt-3" }, "评论列表", -1)
             ])),
             _: 1
           }),
           u(Be, { cols: "2" }, {
             default: _(() => [
-              u(ce, {
+              u(ue, {
                 variant: "plain",
                 icon: "mdi-close",
                 onClick: t[0] || (t[0] = (a) => e.$emit("close")),
@@ -13837,7 +13837,7 @@ function S0(e, t, n, o, i, l) {
               }, null, 8, ["icon"])
             ]),
             append: _(() => [
-              u(ce, {
+              u(ue, {
                 class: "px-0",
                 size: "small",
                 variant: "plain",
@@ -13884,7 +13884,7 @@ function S0(e, t, n, o, i, l) {
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     onClick: t[3] || (t[3] = (a) => e.$emit("add_review", this.content))
                   }, {
                     default: _(() => t[7] || (t[7] = [
@@ -13897,7 +13897,7 @@ function S0(e, t, n, o, i, l) {
               })
             ]),
             _: 1
-          })) : (Q(), me(ce, {
+          })) : (Q(), me(ue, {
             key: 0,
             onClick: t[1] || (t[1] = (a) => e.$emit("login")),
             variant: "text",
@@ -15059,7 +15059,7 @@ function Z0(e, t, n, o, i, l) {
         ])),
         _: 1
       }),
-      ue("div", Y0, [
+      ce("div", Y0, [
         u(bt, {
           class: "mb-3 elevation-4 rounded-lg",
           subtitle: "用户信息"
@@ -15072,7 +15072,7 @@ function Z0(e, t, n, o, i, l) {
                   onClick: l.alert_avatar
                 }, {
                   prepend: _(() => t[15] || (t[15] = [
-                    ue("span", null, "头像", -1)
+                    ce("span", null, "头像", -1)
                   ])),
                   append: _(() => [
                     u(Ht, {
@@ -15086,7 +15086,7 @@ function Z0(e, t, n, o, i, l) {
                   title: n.user.email
                 }, {
                   prepend: _(() => t[16] || (t[16] = [
-                    ue("span", null, "邮箱", -1)
+                    ce("span", null, "邮箱", -1)
                   ])),
                   _: 1
                 }, 8, ["title"]),
@@ -15096,7 +15096,7 @@ function Z0(e, t, n, o, i, l) {
                   title: n.user.nickname
                 }, {
                   prepend: _(() => t[17] || (t[17] = [
-                    ue("span", null, "昵称", -1)
+                    ce("span", null, "昵称", -1)
                   ])),
                   append: _(() => [
                     u(De, null, {
@@ -15115,7 +15115,7 @@ function Z0(e, t, n, o, i, l) {
                   "append-icon": "mdi-chevron-right"
                 }, {
                   prepend: _(() => t[19] || (t[19] = [
-                    ue("span", null, "密码", -1)
+                    ce("span", null, "密码", -1)
                   ])),
                   _: 1
                 }),
@@ -15125,7 +15125,7 @@ function Z0(e, t, n, o, i, l) {
                   "append-icon": "mdi-chevron-right"
                 }, {
                   prepend: _(() => t[20] || (t[20] = [
-                    ue("span", null, "退出登录", -1)
+                    ce("span", null, "退出登录", -1)
                   ])),
                   _: 1
                 })
@@ -15136,7 +15136,7 @@ function Z0(e, t, n, o, i, l) {
           _: 1
         })
       ]),
-      ue("div", X0, [
+      ce("div", X0, [
         u(bt, {
           class: "mb-3 elevation-4 rounded-lg",
           subtitle: "章评互动信息"
@@ -15175,7 +15175,7 @@ function Z0(e, t, n, o, i, l) {
                   subtitle: a.nickName + " @《宿命之环》"
                 }, {
                   default: _(() => [
-                    ue("div", J0, Oe(l.thumb_or_content(a)), 1),
+                    ce("div", J0, Oe(l.thumb_or_content(a)), 1),
                     u(bt, {
                       variant: "tonal",
                       color: "surface-variant",
@@ -15237,7 +15237,7 @@ function Z0(e, t, n, o, i, l) {
               }),
               u(Po, null, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     text: "",
                     onClick: t[5] || (t[5] = (a) => e.editNickname = !1)
                   }, {
@@ -15246,7 +15246,7 @@ function Z0(e, t, n, o, i, l) {
                     ])),
                     _: 1
                   }),
-                  u(ce, {
+                  u(ue, {
                     text: "",
                     onClick: l.saveNickname
                   }, {
@@ -15313,7 +15313,7 @@ function Z0(e, t, n, o, i, l) {
               }),
               u(Po, null, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     text: "",
                     onClick: t[10] || (t[10] = (a) => e.editPassword = !1)
                   }, {
@@ -15322,7 +15322,7 @@ function Z0(e, t, n, o, i, l) {
                     ])),
                     _: 1
                   }),
-                  u(ce, {
+                  u(ue, {
                     text: "",
                     onClick: l.savePassword
                   }, {
@@ -15372,7 +15372,7 @@ function Z0(e, t, n, o, i, l) {
               }),
               u(Po, null, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     text: "",
                     onClick: t[12] || (t[12] = (a) => e.checkLogout = !1)
                   }, {
@@ -15381,7 +15381,7 @@ function Z0(e, t, n, o, i, l) {
                     ])),
                     _: 1
                   }),
-                  u(ce, {
+                  u(ue, {
                     text: "",
                     onClick: l.do_logout
                   }, {
@@ -15527,7 +15527,7 @@ function tw(e, t, n, o, i, l) {
                 label: "密码",
                 type: "password"
               }, null, 8, ["modelValue"]),
-              u(ce, {
+              u(ue, {
                 type: "submit",
                 color: "primary"
               }, {
@@ -15551,7 +15551,7 @@ function tw(e, t, n, o, i, l) {
                 type: "text",
                 autocomplete: "old-email"
               }, null, 8, ["modelValue"]),
-              u(ce, {
+              u(ue, {
                 type: "submit",
                 color: "red"
               }, {
@@ -15588,7 +15588,7 @@ function tw(e, t, n, o, i, l) {
                 autocomplete: "new-nickname",
                 rules: [e.rules.nick]
               }, null, 8, ["modelValue", "rules"]),
-              u(ce, {
+              u(ue, {
                 type: "submit",
                 color: "green"
               }, {
@@ -15597,7 +15597,7 @@ function tw(e, t, n, o, i, l) {
                 ])),
                 _: 1
               }),
-              t[11] || (t[11] = ue("p", { class: "text-small" }, " * 账号密码将随机生成，并发往邮箱", -1))
+              t[11] || (t[11] = ce("p", { class: "text-small" }, " * 账号密码将随机生成，并发往邮箱", -1))
             ]),
             _: 1
           }, 8, ["onSubmit"])) : We("", !0)
@@ -15616,18 +15616,18 @@ function tw(e, t, n, o, i, l) {
       u(Zt),
       u(Po, null, {
         default: _(() => [
-          e.mode == "login" ? (Q(), me(ce, {
+          e.mode == "login" ? (Q(), me(ue, {
             key: 0,
             onClick: t[5] || (t[5] = (a) => e.mode = "forget"),
             text: "忘记密码?"
           })) : We("", !0),
-          e.mode != "login" ? (Q(), me(ce, {
+          e.mode != "login" ? (Q(), me(ue, {
             key: 1,
             onClick: t[6] || (t[6] = (a) => e.mode = "login"),
             text: "登录账号"
           })) : We("", !0),
           u(Sl),
-          u(ce, {
+          u(ue, {
             onClick: t[7] || (t[7] = (a) => e.mode = "signup"),
             text: "快速注册"
           })
@@ -15685,8 +15685,8 @@ const iv = /* @__PURE__ */ On(ew, [["render", tw]]), Dr = Symbol.for("vuetify:v-
       }
     }
     return Se(() => {
-      const f = ce.filterProps(e);
-      return u(ce, be({
+      const f = ue.filterProps(e);
+      return u(ue, be({
         symbol: Dr,
         ref: a,
         class: ["v-tab", e.class],
@@ -15879,7 +15879,7 @@ const lv = {
       };
       P.push(v.value ? n.prev ? n.prev({
         props: C
-      }) : u(ce, C, null) : u("div", null, null));
+      }) : u(ue, C, null) : u("div", null, null));
       const x = {
         icon: i.value ? e.prevIcon : e.nextIcon,
         class: `v-window__${r.value ? "left" : "right"}`,
@@ -15888,7 +15888,7 @@ const lv = {
       };
       return P.push(g.value ? n.next ? n.next({
         props: x
-      }) : u(ce, x, null) : u("div", null, null)), P;
+      }) : u(ue, x, null) : u("div", null, null)), P;
     }), A = p(() => e.touch === !1 ? e.touch : {
       ...{
         left: () => {
@@ -16509,7 +16509,7 @@ function xw(e, t, n, o, i, l) {
             class: "text-center"
           }, {
             default: _(() => t[5] || (t[5] = [
-              ue("h4", { class: "mt-3" }, "本书评论", -1)
+              ce("h4", { class: "mt-3" }, "本书评论", -1)
             ])),
             _: 1
           }),
@@ -16518,7 +16518,7 @@ function xw(e, t, n, o, i, l) {
             class: "text-right"
           }, {
             default: _(() => [
-              u(ce, {
+              u(ue, {
                 variant: "plain",
                 icon: "mdi-close",
                 onClick: t[0] || (t[0] = (a) => e.$emit("close")),
@@ -16546,7 +16546,7 @@ function xw(e, t, n, o, i, l) {
               color: l.avatar_color(n.user.id)
             }, {
               default: _(() => [
-                ue("span", kw, Oe(l.avatar_text(n.user.nickName || n.user.nickname)), 1)
+                ce("span", kw, Oe(l.avatar_text(n.user.nickName || n.user.nickname)), 1)
               ]),
               _: 1
             }, 8, ["color"]))
@@ -16587,7 +16587,7 @@ function xw(e, t, n, o, i, l) {
         _: 1
       }, 8, ["model-value"]),
       u(Zt, { class: "br-fixed" }),
-      ue("div", Sw, [
+      ce("div", Sw, [
         n.comments.length === 0 ? (Q(), me(dn, {
           key: 0,
           density: "compact"
@@ -16628,13 +16628,13 @@ function xw(e, t, n, o, i, l) {
                   color: l.avatar_color(a.userId)
                 }, {
                   default: _(() => [
-                    ue("span", Ew, Oe(l.avatar_text(a.nickName)), 1)
+                    ce("span", Ew, Oe(l.avatar_text(a.nickName)), 1)
                   ]),
                   _: 2
                 }, 1032, ["color"]))
               ]),
               append: _(() => [
-                u(ce, {
+                u(ue, {
                   class: "px-0",
                   size: "small",
                   variant: "plain",
@@ -16694,7 +16694,7 @@ function xw(e, t, n, o, i, l) {
                 class: "text-right"
               }, {
                 default: _(() => [
-                  u(ce, { onClick: l.submit }, {
+                  u(ue, { onClick: l.submit }, {
                     default: _(() => t[11] || (t[11] = [
                       q("发表")
                     ])),
@@ -16705,7 +16705,7 @@ function xw(e, t, n, o, i, l) {
               })
             ]),
             _: 1
-          })) : (Q(), me(ce, {
+          })) : (Q(), me(ue, {
             key: 0,
             onClick: t[3] || (t[3] = (a) => e.$emit("login")),
             variant: "text",
@@ -17491,13 +17491,13 @@ const Aw = W({
     },
     note_options: [
       { key: "notes_enabled", label: "笔记" },
-      { key: "show_comments", label: "加载章节段落评论", child: !0 },
-      { key: "show_selection_toolbar", label: "选中后出现工具栏", child: !0 }
+      { key: "show_comments", label: "段落评论", description: "加载章节段落评论", child: !0 },
+      { key: "show_selection_toolbar", label: "选区工具栏", description: "选中后出现工具栏", child: !0 }
     ],
     themes: ro
   })
-}, Hw = { class: "d-inline-blockx text-center" }, jw = { class: "d-inline-blockx text-center" }, zw = { class: "d-inline-blockx text-center" }, Uw = { class: "note-settings" }, Ww = ["id"];
-function qw(e, t, n, o, i, l) {
+}, Hw = { class: "d-inline-blockx text-center" }, jw = { class: "d-inline-blockx text-center" }, zw = { class: "d-inline-blockx text-center" }, Uw = ["id", "aria-label", "title"];
+function Ww(e, t, n, o, i, l) {
   return Q(), me(dn, { density: "compact" }, {
     default: _(() => [
       u(He, { class: "my-2" }, {
@@ -17506,7 +17506,7 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[18] || (t[18] = [
-                  ue("span", null, "亮度", -1)
+                  ce("span", null, "亮度", -1)
                 ])),
                 _: 1
               }),
@@ -17538,13 +17538,13 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[19] || (t[19] = [
-                  ue("span", { class: "text-justify" }, "字体", -1)
+                  ce("span", { class: "text-justify" }, "字体", -1)
                 ])),
                 _: 1
               }),
               u(Be, { cols: "2" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     class: "text-justify",
                     variant: "outlined",
                     density: "comfortable",
@@ -17563,13 +17563,13 @@ function qw(e, t, n, o, i, l) {
                 class: "d-flex align-center justify-center"
               }, {
                 default: _(() => [
-                  ue("span", Hw, Oe(e.opt.font_size), 1)
+                  ce("span", Hw, Oe(e.opt.font_size), 1)
                 ]),
                 _: 1
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "outlined",
                     density: "comfortable",
                     onClick: t[3] || (t[3] = (a) => l.set_and_emit("font_size", e.opt.font_size + 2))
@@ -17584,7 +17584,7 @@ function qw(e, t, n, o, i, l) {
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "outlined",
                     density: "comfortable",
                     onClick: t[4] || (t[4] = (a) => l.set_and_emit("font_size", 18))
@@ -17609,13 +17609,13 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[23] || (t[23] = [
-                  ue("span", null, "行距", -1)
+                  ce("span", null, "行距", -1)
                 ])),
                 _: 1
               }),
               u(Be, { cols: "2" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     class: "text-justify",
                     variant: "outlined",
                     density: "comfortable",
@@ -17634,13 +17634,13 @@ function qw(e, t, n, o, i, l) {
                 class: "d-flex align-center justify-center"
               }, {
                 default: _(() => [
-                  ue("span", jw, Oe(e.opt.line_height.toFixed(1)), 1)
+                  ce("span", jw, Oe(e.opt.line_height.toFixed(1)), 1)
                 ]),
                 _: 1
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "outlined",
                     density: "comfortable",
                     onClick: t[6] || (t[6] = (a) => l.set_and_emit("line_height", e.opt.line_height + 0.1))
@@ -17655,7 +17655,7 @@ function qw(e, t, n, o, i, l) {
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "outlined",
                     density: "comfortable",
                     onClick: t[7] || (t[7] = (a) => l.set_and_emit("line_height", 1.5))
@@ -17680,13 +17680,13 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[27] || (t[27] = [
-                  ue("span", null, "间距", -1)
+                  ce("span", null, "间距", -1)
                 ])),
                 _: 1
               }),
               u(Be, { cols: "2" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     class: "text-justify",
                     variant: "outlined",
                     density: "comfortable",
@@ -17705,13 +17705,13 @@ function qw(e, t, n, o, i, l) {
                 class: "d-flex align-center justify-center"
               }, {
                 default: _(() => [
-                  ue("span", zw, Oe(e.opt.letter_spacing) + "px", 1)
+                  ce("span", zw, Oe(e.opt.letter_spacing) + "px", 1)
                 ]),
                 _: 1
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "outlined",
                     density: "comfortable",
                     onClick: t[9] || (t[9] = (a) => l.set_and_emit("letter_spacing", e.opt.letter_spacing + 1))
@@ -17726,7 +17726,7 @@ function qw(e, t, n, o, i, l) {
               }),
               u(Be, { cols: "3" }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "outlined",
                     density: "comfortable",
                     onClick: t[10] || (t[10] = (a) => l.set_and_emit("letter_spacing", 0))
@@ -17751,7 +17751,7 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[31] || (t[31] = [
-                  ue("span", null, "翻页", -1)
+                  ce("span", null, "翻页", -1)
                 ])),
                 _: 1
               }),
@@ -17763,7 +17763,7 @@ function qw(e, t, n, o, i, l) {
                     density: "compact"
                   }, {
                     default: _(() => [
-                      u(ce, {
+                      u(ue, {
                         active: e.opt.flow == "paginated",
                         onClick: t[11] || (t[11] = (a) => l.set_and_emit("flow", "paginated"))
                       }, {
@@ -17772,7 +17772,7 @@ function qw(e, t, n, o, i, l) {
                         ])),
                         _: 1
                       }, 8, ["active"]),
-                      u(ce, {
+                      u(ue, {
                         active: e.opt.flow == "scrolled",
                         onClick: t[12] || (t[12] = (a) => l.set_and_emit("flow", "scrolled"))
                       }, {
@@ -17799,7 +17799,7 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[34] || (t[34] = [
-                  ue("span", null, "控制", -1)
+                  ce("span", null, "控制", -1)
                 ])),
                 _: 1
               }),
@@ -17811,7 +17811,7 @@ function qw(e, t, n, o, i, l) {
                     density: "compact"
                   }, {
                     default: _(() => [
-                      u(ce, {
+                      u(ue, {
                         active: e.opt.paging_control == "mouse_and_keyboard",
                         onClick: t[13] || (t[13] = (a) => l.set_and_emit("paging_control", "mouse_and_keyboard"))
                       }, {
@@ -17820,7 +17820,7 @@ function qw(e, t, n, o, i, l) {
                         ])),
                         _: 1
                       }, 8, ["active"]),
-                      u(ce, {
+                      u(ue, {
                         active: e.opt.paging_control == "keyboard_only",
                         onClick: t[14] || (t[14] = (a) => l.set_and_emit("paging_control", "keyboard_only"))
                       }, {
@@ -17847,7 +17847,7 @@ function qw(e, t, n, o, i, l) {
             default: _(() => [
               u(Be, { cols: "2" }, {
                 default: _(() => t[37] || (t[37] = [
-                  ue("span", { density: "compact" }, "滚轮翻页", -1)
+                  ce("span", { density: "compact" }, "滚轮翻页", -1)
                 ])),
                 _: 1
               }),
@@ -17859,7 +17859,7 @@ function qw(e, t, n, o, i, l) {
                     density: "compact"
                   }, {
                     default: _(() => [
-                      u(ce, {
+                      u(ue, {
                         active: e.opt.wheel_paging == !0,
                         onClick: t[15] || (t[15] = (a) => l.set_and_emit("wheel_paging", !0))
                       }, {
@@ -17868,7 +17868,7 @@ function qw(e, t, n, o, i, l) {
                         ])),
                         _: 1
                       }, 8, ["active"]),
-                      u(ce, {
+                      u(ue, {
                         active: e.opt.wheel_paging == !1,
                         onClick: t[16] || (t[16] = (a) => l.set_and_emit("wheel_paging", !1))
                       }, {
@@ -17889,72 +17889,71 @@ function qw(e, t, n, o, i, l) {
         ]),
         _: 1
       }),
-      ue("fieldset", Uw, [
-        t[42] || (t[42] = ue("legend", { class: "sr-only" }, "笔记设置", -1)),
-        (Q(!0), Re(Ee, null, jt(e.note_options, (a) => (Q(), me(He, {
-          key: a.key,
-          class: "my-2",
-          "data-setting": a.key
-        }, {
-          default: _(() => [
-            u(Bt, {
-              class: rn(["align-center", { "note-suboption": a.child, "note-suboption-disabled": a.child && !e.opt.notes_enabled }])
-            }, {
-              default: _(() => [
-                u(Be, { cols: "5" }, {
-                  default: _(() => [
-                    ue("span", {
-                      id: `setting-${a.key}`
-                    }, Oe(a.label), 9, Ww)
-                  ]),
-                  _: 2
-                }, 1024),
-                u(Be, { cols: "7" }, {
-                  default: _(() => [
-                    u(Go, {
-                      variant: "outlined",
-                      divided: "",
-                      density: "compact",
-                      class: "note-setting-buttons",
-                      role: "group",
-                      "aria-labelledby": `setting-${a.key}`
-                    }, {
-                      default: _(() => [
-                        u(ce, {
-                          disabled: a.child && !e.opt.notes_enabled,
-                          active: e.opt[a.key] === !0,
-                          "aria-pressed": e.opt[a.key] === !0,
-                          onClick: (s) => l.set_and_emit(a.key, !0)
-                        }, {
-                          default: _(() => t[40] || (t[40] = [
-                            q("开启")
-                          ])),
-                          _: 2
-                        }, 1032, ["disabled", "active", "aria-pressed", "onClick"]),
-                        u(ce, {
-                          disabled: a.child && !e.opt.notes_enabled,
-                          active: e.opt[a.key] === !1,
-                          "aria-pressed": e.opt[a.key] === !1,
-                          onClick: (s) => l.set_and_emit(a.key, !1)
-                        }, {
-                          default: _(() => t[41] || (t[41] = [
-                            q("关闭")
-                          ])),
-                          _: 2
-                        }, 1032, ["disabled", "active", "aria-pressed", "onClick"])
-                      ]),
-                      _: 2
-                    }, 1032, ["aria-labelledby"])
-                  ]),
-                  _: 2
-                }, 1024)
-              ]),
-              _: 2
-            }, 1032, ["class"])
-          ]),
-          _: 2
-        }, 1032, ["data-setting"]))), 128))
-      ]),
+      (Q(!0), Re(Ee, null, jt(e.note_options, (a) => (Q(), me(He, {
+        key: a.key,
+        class: "my-2",
+        "data-setting": a.key
+      }, {
+        default: _(() => [
+          u(Bt, {
+            class: rn(["align-center", { "note-suboption-disabled": a.child && !e.opt.notes_enabled }])
+          }, {
+            default: _(() => [
+              u(Be, { cols: "2" }, {
+                default: _(() => [
+                  ce("span", {
+                    class: "note-setting-label",
+                    id: `setting-${a.key}`,
+                    "aria-label": a.description || a.label,
+                    title: a.description || a.label
+                  }, Oe(a.label), 9, Uw)
+                ]),
+                _: 2
+              }, 1024),
+              u(Be, { cols: "10" }, {
+                default: _(() => [
+                  u(Go, {
+                    variant: "outlined",
+                    divided: "",
+                    density: "compact",
+                    role: "group",
+                    "aria-labelledby": `setting-${a.key}`
+                  }, {
+                    default: _(() => [
+                      u(ue, {
+                        disabled: a.child && !e.opt.notes_enabled,
+                        active: e.opt[a.key] === !0,
+                        "aria-pressed": e.opt[a.key] === !0,
+                        onClick: (s) => l.set_and_emit(a.key, !0)
+                      }, {
+                        default: _(() => t[40] || (t[40] = [
+                          q("开启")
+                        ])),
+                        _: 2
+                      }, 1032, ["disabled", "active", "aria-pressed", "onClick"]),
+                      u(ue, {
+                        disabled: a.child && !e.opt.notes_enabled,
+                        active: e.opt[a.key] === !1,
+                        "aria-pressed": e.opt[a.key] === !1,
+                        onClick: (s) => l.set_and_emit(a.key, !1)
+                      }, {
+                        default: _(() => t[41] || (t[41] = [
+                          q("关闭")
+                        ])),
+                        _: 2
+                      }, 1032, ["disabled", "active", "aria-pressed", "onClick"])
+                    ]),
+                    _: 2
+                  }, 1032, ["aria-labelledby"])
+                ]),
+                _: 2
+              }, 1024)
+            ]),
+            _: 2
+          }, 1032, ["class"])
+        ]),
+        _: 2
+      }, 1032, ["data-setting"]))), 128)),
       u(He, { class: "my-2" }, {
         default: _(() => [
           u(Bt, {
@@ -17963,8 +17962,8 @@ function qw(e, t, n, o, i, l) {
           }, {
             default: _(() => [
               u(Be, { cols: "2" }, {
-                default: _(() => t[43] || (t[43] = [
-                  ue("span", { density: "compact" }, "皮肤", -1)
+                default: _(() => t[42] || (t[42] = [
+                  ce("span", { density: "compact" }, "皮肤", -1)
                 ])),
                 _: 1
               }),
@@ -17973,7 +17972,7 @@ function qw(e, t, n, o, i, l) {
                 class: "text-center"
               }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     active: e.opt.theme == a.id,
                     density: "compact",
                     icon: a.icon,
@@ -17988,14 +17987,14 @@ function qw(e, t, n, o, i, l) {
                 class: "text-right"
               }, {
                 default: _(() => [
-                  u(ce, {
+                  u(ue, {
                     variant: "text",
                     density: "compact",
                     size: "small",
                     "append-icon": "mdi-chevron-right",
                     onClick: t[17] || (t[17] = (a) => e.$emit("open-themes"))
                   }, {
-                    default: _(() => t[44] || (t[44] = [
+                    default: _(() => t[43] || (t[43] = [
                       q("更多")
                     ])),
                     _: 1
@@ -18013,11 +18012,11 @@ function qw(e, t, n, o, i, l) {
     _: 1
   });
 }
-const vv = /* @__PURE__ */ On(Rw, [["render", qw], ["__scopeId", "data-v-d0dde8bb"]]), Os = "data-candle-audiobook-active", Br = "candle-audiobook", Fr = "candle-audiobook-active";
+const vv = /* @__PURE__ */ On(Rw, [["render", Ww], ["__scopeId", "data-v-b0498306"]]), Os = "data-candle-audiobook-active", Br = "candle-audiobook", Fr = "candle-audiobook-active";
 function ii(e) {
   return String(e || "").replace(/\s+/g, "").trim();
 }
-function Kw(e, t) {
+function qw(e, t) {
   let n = 0, o = e.length - 1, i = -1;
   for (; n <= o; ) {
     const a = Math.floor((n + o) / 2);
@@ -18049,13 +18048,13 @@ function Ga(e, t) {
   const i = ((s = e == null ? void 0 : e.getContents) == null ? void 0 : s.call(e)) || [];
   return t ? i.find((r) => As(hv(r), t)) || null : i[0] || null;
 }
-function Gw(e, t) {
+function Kw(e, t) {
   return Array.from((e == null ? void 0 : e.children) || []).filter((n) => {
     var o;
     return ((o = n.localName) == null ? void 0 : o.toLowerCase()) === t;
   });
 }
-function Yw(e, t) {
+function Gw(e, t) {
   const n = String(t || "").replace(/^\/+/, "").split("/").filter(Boolean);
   if (!n.length) return null;
   let o = e.documentElement;
@@ -18071,11 +18070,11 @@ function Yw(e, t) {
       o = e.body;
       continue;
     }
-    if (o = Gw(o, a)[s], !o) return null;
+    if (o = Kw(o, a)[s], !o) return null;
   }
   return o;
 }
-function Xw(e, t) {
+function Yw(e, t) {
   const n = ii(t);
   if (!n) return null;
   const o = e.querySelectorAll("p, h1, h2, h3, h4, h5, h6, li, blockquote, div");
@@ -18084,13 +18083,13 @@ function Xw(e, t) {
     return l === n || l.includes(n) || n.includes(l);
   }) || null;
 }
-function Jw(e, t) {
+function Xw(e, t) {
   const n = e == null ? void 0 : e.document, o = (t == null ? void 0 : t.locator) || {};
   if (!n) return null;
   let i = o.element_id ? n.getElementById(o.element_id) : null;
-  return !i && o.dom_path && (i = Yw(n, o.dom_path)), i || (i = Xw(n, t.text)), i ? { document: n, element: i, locator: o } : null;
+  return !i && o.dom_path && (i = Gw(n, o.dom_path)), i || (i = Yw(n, t.text)), i ? { document: n, element: i, locator: o } : null;
 }
-function Zw(e) {
+function Jw(e) {
   const t = [], n = e.ownerDocument.createTreeWalker(e, NodeFilter.SHOW_TEXT);
   let o = n.nextNode();
   for (; o; )
@@ -18106,15 +18105,15 @@ function Dc(e, t) {
   const o = e[e.length - 1];
   return o ? { node: o, offset: o.data.length } : null;
 }
-function Qw(e, t, n) {
-  const o = Zw(e);
+function Zw(e, t, n) {
+  const o = Jw(e);
   if (!o.length) return null;
   const i = o.reduce((f, m) => f + m.data.length, 0), l = Math.min(i, Math.max(0, Number(t) || 0)), a = Number(n), s = Math.min(i, Number.isFinite(a) && a > l ? a : i), r = Dc(o, l), d = Dc(o, s);
   if (!r || !d) return null;
   const c = e.ownerDocument.createRange();
   return c.setStart(r.node, r.offset), c.setEnd(d.node, d.offset), c;
 }
-function e1(e) {
+function Qw(e) {
   if (e.getElementById("candle-audiobook-highlight-style")) return;
   const t = e.createElement("style");
   t.id = "candle-audiobook-highlight-style", t.textContent = `
@@ -18139,36 +18138,36 @@ function gv(e) {
     }));
   });
 }
-function t1(e, t, n) {
+function e1(e, t, n) {
   var d, c;
   gv(e);
-  const o = Jw(t, n);
+  const o = Xw(t, n);
   if (!o) return null;
   const { document: i, element: l, locator: a } = o;
-  e1(i), l.setAttribute(Os, n.id || ""), l.classList.add(Fr);
-  const s = Qw(l, a.start_char, a.end_char), r = i.defaultView;
+  Qw(i), l.setAttribute(Os, n.id || ""), l.classList.add(Fr);
+  const s = Zw(l, a.start_char, a.end_char), r = i.defaultView;
   return s && ((d = r == null ? void 0 : r.CSS) != null && d.highlights) && r.Highlight && r.CSS.highlights.set(Br, new r.Highlight(s)), (c = l.scrollIntoView) == null || c.call(l, { block: "center", behavior: "smooth" }), { contents: t, document: i, element: l, range: s };
 }
-function n1(e, t) {
+function t1(e, t) {
   return As(e == null ? void 0 : e.source_key, t);
 }
-function o1(e, t) {
+function n1(e, t) {
   var i;
   if (!e || !t) return !1;
   if ((i = e.locator) != null && i.element_id && e.locator.element_id === t.id) return !0;
   const n = ii(e.text), o = ii(t.textContent);
   return !!(n && o && (o.includes(n) || n.includes(o)));
 }
-const i1 = {
+const o1 = {
   key: 0,
   class: "audiobook-player",
   "data-testid": "candle-audiobook-player",
   "aria-label": "边听边读播放器"
-}, l1 = { class: "player-heading" }, a1 = {
+}, i1 = { class: "player-heading" }, l1 = {
   key: 0,
   class: "player-error",
   role: "alert"
-}, s1 = { class: "player-controls" }, r1 = ["disabled"], u1 = ["aria-label", "disabled"], c1 = ["disabled"], d1 = { class: "time" }, f1 = ["max", "value"], m1 = { class: "time" }, v1 = { class: "rate-control" }, h1 = ["value"], g1 = 50, y1 = 100, p1 = 40, b1 = {
+}, a1 = { class: "player-controls" }, s1 = ["disabled"], r1 = ["aria-label", "disabled"], u1 = ["disabled"], c1 = { class: "time" }, d1 = ["max", "value"], f1 = { class: "time" }, m1 = { class: "rate-control" }, v1 = ["value"], h1 = 50, g1 = 100, y1 = 40, p1 = {
   __name: "AudiobookPlayer",
   props: {
     visible: { type: Boolean, default: !1 },
@@ -18318,7 +18317,7 @@ const i1 = {
       F && (h.value = Math.round(F.currentTime * 1e3), Et(), Ve());
     }
     function Et(F = !1) {
-      const U = Kw(r.value, h.value), xe = (U == null ? void 0 : U.id) || "";
+      const U = qw(r.value, h.value), xe = (U == null ? void 0 : U.id) || "";
       if (!(!F && xe === I)) {
         if (I = xe, d.value = U, i("segment-change", U), !U || !y.value || !c.value) {
           b();
@@ -18332,14 +18331,14 @@ const i1 = {
       const U = ++N, Ce = (F.locator || {}).href || (($e = s.value) == null ? void 0 : $e.source_key);
       let fe = Ga(o.rendition, Ce);
       !fe && o.rendition && y.value && await o.rendition.display(Ce);
-      for (let st = 0; st < p1; st += 1) {
+      for (let st = 0; st < y1; st += 1) {
         if (U !== N || !y.value) return;
-        if (fe = Ga(o.rendition, Ce), fe && t1(o.rendition, fe, F)) {
-          if (await new Promise((ut) => window.setTimeout(ut, y1)), U !== N || !y.value) return;
+        if (fe = Ga(o.rendition, Ce), fe && e1(o.rendition, fe, F)) {
+          if (await new Promise((ut) => window.setTimeout(ut, g1)), U !== N || !y.value) return;
           const vt = Ga(o.rendition, Ce), Yt = (it = vt == null ? void 0 : vt.document) == null ? void 0 : it.querySelector("[data-candle-audiobook-active]");
           if ((Yt == null ? void 0 : Yt.getAttribute("data-candle-audiobook-active")) === F.id) return;
         }
-        await new Promise((vt) => window.setTimeout(vt, g1));
+        await new Promise((vt) => window.setTimeout(vt, h1));
       }
       U === N && y.value && console.warn("[candle-audiobook] 无法定位时间轴片段", F.id);
     }
@@ -18372,9 +18371,9 @@ const i1 = {
       var Yt, ut, Mt, mo, Lr, ol, Rr, Hr, jr;
       if (a.value || await R(), !a.value || !F) return !1;
       y.value = !0;
-      const U = ((Yt = F.toc) == null ? void 0 : Yt.href) || ((ut = F.toc) == null ? void 0 : ut.id) || hv(F.contents), xe = $.value.find((vo) => n1(vo, U)) || s.value || $.value[0];
+      const U = ((Yt = F.toc) == null ? void 0 : Yt.href) || ((ut = F.toc) == null ? void 0 : ut.id) || hv(F.contents), xe = $.value.find((vo) => t1(vo, U)) || s.value || $.value[0];
       (xe == null ? void 0 : xe.id) !== ((Mt = s.value) == null ? void 0 : Mt.id) && await oe(xe, { navigate: !1 });
-      const Ce = ((Lr = (mo = F.cfi) == null ? void 0 : mo.toString) == null ? void 0 : Lr.call(mo)) || F.cfi, fe = Ce && ((Rr = (ol = o.rendition) == null ? void 0 : ol.getRange) == null ? void 0 : Rr.call(ol, Ce)), $e = ((Hr = fe == null ? void 0 : fe.startContainer) == null ? void 0 : Hr.nodeType) === Node.TEXT_NODE ? fe.startContainer.parentElement : fe == null ? void 0 : fe.startContainer, it = ((jr = $e == null ? void 0 : $e.closest) == null ? void 0 : jr.call($e, "p, h1, h2, h3, h4, h5, h6, li, blockquote")) || null, st = ii(it == null ? void 0 : it.textContent), vt = st && r.value.find((vo) => ii(vo.text) === st) || it && r.value.find((vo) => o1(vo, it)) || r.value.find((vo) => Number(vo.index) === Number(F.segment_id));
+      const Ce = ((Lr = (mo = F.cfi) == null ? void 0 : mo.toString) == null ? void 0 : Lr.call(mo)) || F.cfi, fe = Ce && ((Rr = (ol = o.rendition) == null ? void 0 : ol.getRange) == null ? void 0 : Rr.call(ol, Ce)), $e = ((Hr = fe == null ? void 0 : fe.startContainer) == null ? void 0 : Hr.nodeType) === Node.TEXT_NODE ? fe.startContainer.parentElement : fe == null ? void 0 : fe.startContainer, it = ((jr = $e == null ? void 0 : $e.closest) == null ? void 0 : jr.call($e, "p, h1, h2, h3, h4, h5, h6, li, blockquote")) || null, st = ii(it == null ? void 0 : it.textContent), vt = st && r.value.find((vo) => ii(vo.text) === st) || it && r.value.find((vo) => n1(vo, it)) || r.value.find((vo) => Number(vo.index) === Number(F.segment_id));
       return vt ? (await oe(xe, { startMs: vt.start_ms, autoplay: !0, navigate: !0 }), !0) : !1;
     }
     async function te(F = !1, U = !1) {
@@ -18426,13 +18425,13 @@ const i1 = {
       Xe(), (U = (F = o.rendition) == null ? void 0 : F.off) == null || U.call(F, "rendered", yn), b(), w.value && o.request(`/api/audiobook-sessions/${w.value}`, { method: "POST" });
     }), t({ loadManifest: R, playFromSelection: ne, returnToNarration: L, suspendFollow: S }), (F, U) => {
       var xe, Ce;
-      return e.visible ? (Q(), Re("section", i1, [
-        ue("header", l1, [
-          ue("div", null, [
-            U[3] || (U[3] = ue("span", { class: "player-kicker" }, "边听边读", -1)),
-            ue("strong", null, Oe(((xe = s.value) == null ? void 0 : xe.title) || "正在载入有声书"), 1)
+      return e.visible ? (Q(), Re("section", o1, [
+        ce("header", i1, [
+          ce("div", null, [
+            U[3] || (U[3] = ce("span", { class: "player-kicker" }, "边听边读", -1)),
+            ce("strong", null, Oe(((xe = s.value) == null ? void 0 : xe.title) || "正在载入有声书"), 1)
           ]),
-          ue("button", {
+          ce("button", {
             type: "button",
             class: "icon-button",
             "aria-label": "关闭听书播放器",
@@ -18446,12 +18445,12 @@ const i1 = {
             })
           ])
         ]),
-        ue("p", {
+        ce("p", {
           class: rn(["active-dialogue", { muted: !d.value }])
         }, Oe(((Ce = d.value) == null ? void 0 : Ce.text) || (f.value ? "正在加载章节时间轴…" : "片段间留白")), 3),
-        m.value ? (Q(), Re("div", a1, Oe(m.value), 1)) : We("", !0),
-        ue("div", s1, [
-          ue("button", {
+        m.value ? (Q(), Re("div", l1, Oe(m.value), 1)) : We("", !0),
+        ce("div", a1, [
+          ce("button", {
             type: "button",
             class: "icon-button",
             "aria-label": "上一章",
@@ -18464,8 +18463,8 @@ const i1 = {
               ])),
               _: 1
             })
-          ], 8, r1),
-          ue("button", {
+          ], 8, s1),
+          ce("button", {
             type: "button",
             class: "play-button",
             "aria-label": c.value ? "暂停听书" : "播放听书",
@@ -18478,8 +18477,8 @@ const i1 = {
               ]),
               _: 1
             })
-          ], 8, u1),
-          ue("button", {
+          ], 8, r1),
+          ce("button", {
             type: "button",
             class: "icon-button",
             "aria-label": "下一章",
@@ -18492,9 +18491,9 @@ const i1 = {
               ])),
               _: 1
             })
-          ], 8, c1),
-          ue("span", d1, Oe(ye(h.value)), 1),
-          ue("input", {
+          ], 8, u1),
+          ce("span", c1, Oe(ye(h.value)), 1),
+          ce("input", {
             class: "timeline-slider",
             type: "range",
             min: "0",
@@ -18503,19 +18502,19 @@ const i1 = {
             value: h.value,
             "aria-label": "听书进度",
             onInput: U[1] || (U[1] = (fe) => Y(Number(fe.target.value)))
-          }, null, 40, f1),
-          ue("span", m1, Oe(ye(v.value)), 1),
-          ue("label", v1, [
-            U[7] || (U[7] = ue("span", { class: "sr-only" }, "播放速度", -1)),
-            lt(ue("select", {
+          }, null, 40, d1),
+          ce("span", f1, Oe(ye(v.value)), 1),
+          ce("label", m1, [
+            U[7] || (U[7] = ce("span", { class: "sr-only" }, "播放速度", -1)),
+            lt(ce("select", {
               "onUpdate:modelValue": U[2] || (U[2] = (fe) => g.value = fe),
               "aria-label": "播放速度",
               onChange: j
             }, [
-              (Q(), Re(Ee, null, jt(A, (fe) => ue("option", {
+              (Q(), Re(Ee, null, jt(A, (fe) => ce("option", {
                 key: fe,
                 value: fe
-              }, "x" + Oe(fe), 9, h1)), 64))
+              }, "x" + Oe(fe), 9, v1)), 64))
             ], 544), [
               [
                 Ay,
@@ -18541,7 +18540,7 @@ const i1 = {
           }),
           U[9] || (U[9] = q(" 回到朗读位置 "))
         ])),
-        ue("audio", {
+        ce("audio", {
           ref_key: "audioElement",
           ref: l,
           preload: "metadata",
@@ -18554,8 +18553,8 @@ const i1 = {
       ])) : We("", !0);
     };
   }
-}, yv = /* @__PURE__ */ On(b1, [["__scopeId", "data-v-f2028a04"]]);
-function _1(e = {}) {
+}, yv = /* @__PURE__ */ On(p1, [["__scopeId", "data-v-f2028a04"]]);
+function b1(e = {}) {
   const t = e.show_comments ?? !0, n = e.show_annotations ?? !0;
   return {
     notes_settings_version: 2,
@@ -18564,7 +18563,7 @@ function _1(e = {}) {
     show_selection_toolbar: e.show_selection_toolbar ?? n
   };
 }
-const w1 = "candle-reader:annotations:v1:";
+const _1 = "candle-reader:annotations:v1:";
 function $c(e) {
   return e.client_id || e.id;
 }
@@ -18572,22 +18571,22 @@ function Is() {
   var e;
   return (e = window.crypto) != null && e.randomUUID ? window.crypto.randomUUID() : `candle-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
-function k1(e) {
+function w1(e) {
   const t = Array.isArray(e) ? e : e == null ? void 0 : e.annotations;
   if (!Array.isArray(t)) throw new Error("读取笔记的回调必须返回数组或 { annotations }");
   return t;
 }
-function S1(e) {
+function k1(e) {
   const t = (e == null ? void 0 : e.annotation) || e;
   if (!t || typeof t != "object" || Array.isArray(t))
     throw new Error("写入笔记的回调必须返回笔记对象或 { annotation }");
   return t;
 }
-function C1(e, t) {
-  return `${w1}${encodeURIComponent(String(e || t || "unknown-book"))}`;
+function S1(e, t) {
+  return `${_1}${encodeURIComponent(String(e || t || "unknown-book"))}`;
 }
-function E1({ bookId: e, bookUrl: t, storage: n } = {}) {
-  const o = C1(e, t);
+function C1({ bookId: e, bookUrl: t, storage: n } = {}) {
+  const o = S1(e, t);
   let i = n;
   if (i === void 0)
     try {
@@ -18622,30 +18621,30 @@ function E1({ bookId: e, bookUrl: t, storage: n } = {}) {
     }
   };
 }
-function x1({ callbacks: e, bookId: t, bookUrl: n, storage: o } = {}) {
+function E1({ callbacks: e, bookId: t, bookUrl: n, storage: o } = {}) {
   const i = e != null;
   if (i && (typeof e.load != "function" || typeof e.save != "function"))
     throw new Error("annotation_callbacks 必须同时提供 load 和 save 函数");
-  const l = i ? e : E1({ bookId: t, bookUrl: n, storage: o }), a = { book_id: t || null, book_url: n || "" };
+  const l = i ? e : C1({ bookId: t, bookUrl: n, storage: o }), a = { book_id: t || null, book_url: n || "" };
   return {
     source: i ? "callback" : "localStorage",
     async load(s = {}) {
-      return k1(await l.load({ ...a, ...s }));
+      return w1(await l.load({ ...a, ...s }));
     },
     async save(s) {
-      return S1(await l.save({ ...s }, a));
+      return k1(await l.save({ ...s }, a));
     }
   };
 }
-const V1 = W({
+const x1 = W({
   ...Ae(),
   ...Bb({
     fullHeight: !0
   }),
   ...nt()
-}, "VApp"), N1 = de()({
+}, "VApp"), V1 = de()({
   name: "VApp",
-  props: V1(),
+  props: x1(),
   setup(e, t) {
     let {
       slots: n
@@ -18673,13 +18672,13 @@ const V1 = W({
       theme: o
     };
   }
-}), T1 = W({
+}), N1 = W({
   text: String,
   ...Ae(),
   ...Ze()
 }, "VToolbarTitle"), pv = de()({
   name: "VToolbarTitle",
-  props: T1(),
+  props: N1(),
   setup(e, t) {
     let {
       slots: n
@@ -18699,14 +18698,14 @@ const V1 = W({
       });
     }), {};
   }
-}), O1 = [null, "prominent", "default", "comfortable", "compact"], bv = W({
+}), T1 = [null, "prominent", "default", "comfortable", "compact"], bv = W({
   absolute: Boolean,
   collapse: Boolean,
   color: String,
   density: {
     type: String,
     default: "default",
-    validator: (e) => O1.includes(e)
+    validator: (e) => T1.includes(e)
   },
   extended: Boolean,
   extensionHeight: {
@@ -18831,7 +18830,7 @@ const V1 = W({
       extensionHeight: m
     };
   }
-}), A1 = W({
+}), O1 = W({
   scrollTarget: {
     type: String
   },
@@ -18840,7 +18839,7 @@ const V1 = W({
     default: 300
   }
 }, "scroll");
-function I1(e) {
+function A1(e) {
   let t = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : {};
   const {
     canScroll: n
@@ -18893,7 +18892,7 @@ function I1(e) {
     savedScroll: s
   };
 }
-const P1 = W({
+const I1 = W({
   scrollBehavior: String,
   modelValue: {
     type: Boolean,
@@ -18906,14 +18905,14 @@ const P1 = W({
   },
   ...bv(),
   ...Gf(),
-  ...A1(),
+  ...O1(),
   height: {
     type: [Number, String],
     default: 64
   }
-}, "VAppBar"), D1 = de()({
+}, "VAppBar"), P1 = de()({
   name: "VAppBar",
-  props: P1(),
+  props: I1(),
   emits: {
     "update:modelValue": (e) => !0
   },
@@ -18942,7 +18941,7 @@ const P1 = W({
       scrollThreshold: r,
       isScrollingUp: d,
       scrollRatio: c
-    } = I1(e, {
+    } = A1(e, {
       canScroll: a
     }), f = p(() => l.value.hide || l.value.fullyHide), m = p(() => e.collapse || l.value.collapse && (l.value.inverted ? c.value > 0 : c.value === 0)), h = p(() => e.flat || l.value.fullyHide && !i.value || l.value.elevate && (l.value.inverted ? s.value > 0 : s.value === 0)), v = p(() => l.value.fadeImage ? l.value.inverted ? 1 - c.value : c.value : void 0), g = p(() => {
       var P, C;
@@ -18987,7 +18986,7 @@ const P1 = W({
       }), n);
     }), {};
   }
-}), $1 = W({
+}), D1 = W({
   bordered: Boolean,
   color: String,
   content: [Number, String],
@@ -19020,7 +19019,7 @@ const P1 = W({
 }, "VBadge"), Mc = de()({
   name: "VBadge",
   inheritAttrs: !1,
-  props: $1(),
+  props: D1(),
   setup(e, t) {
     const {
       backgroundColorClasses: n,
@@ -19074,7 +19073,7 @@ const P1 = W({
       });
     }), {};
   }
-}), M1 = W({
+}), $1 = W({
   baseColor: String,
   bgColor: String,
   color: String,
@@ -19106,9 +19105,9 @@ const P1 = W({
     selectedClass: "v-btn--selected"
   }),
   ...nt()
-}, "VBottomNavigation"), B1 = de()({
+}, "VBottomNavigation"), M1 = de()({
   name: "VBottomNavigation",
-  props: M1(),
+  props: $1(),
   emits: {
     "update:active": (e) => !0,
     "update:modelValue": (e) => !0
@@ -19168,14 +19167,14 @@ const P1 = W({
       }, [n.default()])]
     })), {};
   }
-}), F1 = W({
+}), B1 = W({
   inset: Boolean,
   ...nv({
     transition: "bottom-sheet-transition"
   })
 }, "VBottomSheet"), bo = de()({
   name: "VBottomSheet",
-  props: F1(),
+  props: B1(),
   emits: {
     "update:modelValue": (e) => !0
   },
@@ -19197,16 +19196,16 @@ const P1 = W({
       }), n);
     }), {};
   }
-}), L1 = W({
+}), F1 = W({
   scrollable: Boolean,
   ...Ae(),
   ...Dn(),
   ...Ze({
     tag: "main"
   })
-}, "VMain"), R1 = de()({
+}, "VMain"), L1 = de()({
   name: "VMain",
-  props: L1(),
+  props: F1(),
   setup(e, t) {
     let {
       slots: n
@@ -19266,14 +19265,14 @@ const P1 = W({
   ...Ae(),
   ...Kt(),
   ...nt()
-}, "SelectionControlGroup"), H1 = W({
+}, "SelectionControlGroup"), R1 = W({
   ...wv({
     defaultsTarget: "VSelectionControl"
   })
 }, "VSelectionControlGroup");
 de()({
   name: "VSelectionControlGroup",
-  props: H1(),
+  props: R1(),
   emits: {
     "update:modelValue": (e) => !0
   },
@@ -19330,7 +19329,7 @@ const kv = W({
   ...Ae(),
   ...wv()
 }, "VSelectionControl");
-function j1(e) {
+function H1(e) {
   const t = Ge(_v, void 0), {
     densityClasses: n
   } = tn(e), o = Ye(e, "modelValue"), i = p(() => e.trueValue !== void 0 ? e.trueValue : e.value !== void 0 ? e.value : !0), l = p(() => e.falseValue !== void 0 ? e.falseValue : !1), a = p(() => !!e.multiple || e.multiple == null && Array.isArray(o.value)), s = p({
@@ -19392,7 +19391,7 @@ const Bc = de()({
       backgroundColorClasses: c,
       backgroundColorStyles: f,
       trueValue: m
-    } = j1(e), h = gn(), v = he(!1), g = he(!1), y = ie(), w = p(() => e.id || `input-${h}`), E = p(() => !e.disabled && !e.readonly);
+    } = H1(e), h = gn(), v = he(!1), g = he(!1), y = ie(), w = p(() => e.id || `input-${h}`), E = p(() => !e.disabled && !e.readonly);
     i == null || i.onForceUpdate(() => {
       y.value && (y.value.checked = s.value);
     });
@@ -19480,7 +19479,7 @@ const Bc = de()({
       input: y
     };
   }
-}), z1 = W({
+}), j1 = W({
   indeterminate: Boolean,
   indeterminateIcon: {
     type: ze,
@@ -19490,9 +19489,9 @@ const Bc = de()({
     falseIcon: "$checkboxOff",
     trueIcon: "$checkboxOn"
   })
-}, "VCheckboxBtn"), U1 = de()({
+}, "VCheckboxBtn"), z1 = de()({
   name: "VCheckboxBtn",
-  props: z1(),
+  props: j1(),
   emits: {
     "update:modelValue": (e) => !0,
     "update:indeterminate": (e) => !0
@@ -19520,7 +19519,7 @@ const Bc = de()({
       }), n);
     }), {};
   }
-}), Sv = Symbol.for("vuetify:v-chip-group"), W1 = W({
+}), Sv = Symbol.for("vuetify:v-chip-group"), U1 = W({
   column: Boolean,
   filter: Boolean,
   valueComparator: {
@@ -19540,7 +19539,7 @@ const Bc = de()({
 }, "VChipGroup");
 de()({
   name: "VChipGroup",
-  props: W1(),
+  props: U1(),
   emits: {
     "update:modelValue": (e) => !0
   },
@@ -19586,7 +19585,7 @@ de()({
     }), {};
   }
 });
-const q1 = W({
+const W1 = W({
   activeClass: String,
   appendAvatar: String,
   appendIcon: ze,
@@ -19639,12 +19638,12 @@ const q1 = W({
   ...Pn({
     variant: "tonal"
   })
-}, "VChip"), K1 = de()({
+}, "VChip"), q1 = de()({
   name: "VChip",
   directives: {
     Ripple: ci
   },
-  props: q1(),
+  props: W1(),
   emits: {
     "click:close": (e) => !0,
     "update:modelValue": (e) => !0,
@@ -19804,7 +19803,7 @@ const q1 = W({
       }), [[Nn("ripple"), A.value && e.ripple, null]]);
     };
   }
-}), G1 = W({
+}), K1 = W({
   // TODO
   // disableKeys: Boolean,
   id: String,
@@ -19821,9 +19820,9 @@ const q1 = W({
       component: Er
     }
   }), ["absolute"])
-}, "VMenu"), Y1 = de()({
+}, "VMenu"), G1 = de()({
   name: "VMenu",
-  props: G1(),
+  props: K1(),
   emits: {
     "update:modelValue": (e) => !0
   },
@@ -19925,13 +19924,13 @@ const q1 = W({
       ΨopenChildren: c
     }, r);
   }
-}), X1 = W({
+}), Y1 = W({
   renderless: Boolean,
   ...Ae()
-}, "VVirtualScrollItem"), J1 = de()({
+}, "VVirtualScrollItem"), X1 = de()({
   name: "VVirtualScrollItem",
   inheritAttrs: !1,
-  props: X1(),
+  props: Y1(),
   emits: {
     "update:height": (e) => !0
   },
@@ -19961,14 +19960,14 @@ const q1 = W({
       }, n), [(r = i.default) == null ? void 0 : r.call(i)]);
     });
   }
-}), Z1 = -1, Q1 = 1, Ya = 100, ek = W({
+}), J1 = -1, Z1 = 1, Ya = 100, Q1 = W({
   itemHeight: {
     type: [Number, String],
     default: null
   },
   height: [Number, String]
 }, "virtual");
-function tk(e, t) {
+function ek(e, t) {
   const n = vr(), o = he(0);
   Ut(() => {
     o.value = parseFloat(e.itemHeight || 0);
@@ -20027,7 +20026,7 @@ function tk(e, t) {
     return B = zt(B, 0, t.value.length - 1), y[B] || 0;
   }
   function N(B) {
-    return nk(y, B);
+    return tk(y, B);
   }
   let T = 0, $ = 0, O = 0;
   ge(h, (B, M) => {
@@ -20053,7 +20052,7 @@ function tk(e, t) {
     if (
       // Only update the side we're scrolling towards,
       // the other side will be updated incidentally
-      (M !== Z1 || K < i.value) && (M !== Q1 || we > l.value)
+      (M !== J1 || K < i.value) && (M !== Z1 || we > l.value)
     ) {
       const Ie = I(i.value) - I(K), J = I(we) - I(l.value);
       Math.max(Ie, J) > Ya ? (i.value = K, l.value = we) : (K <= 0 && (i.value = K), we >= t.value.length && (l.value = we));
@@ -20089,7 +20088,7 @@ function tk(e, t) {
     handleItemResize: x
   };
 }
-function nk(e, t) {
+function tk(e, t) {
   let n = e.length - 1, o = 0, i = 0, l = null, a = -1;
   if (e[n] < t)
     return n;
@@ -20101,18 +20100,18 @@ function nk(e, t) {
     else return l === t ? i : o;
   return a;
 }
-const ok = W({
+const nk = W({
   items: {
     type: Array,
     default: () => []
   },
   renderless: Boolean,
-  ...ek(),
+  ...Q1(),
   ...Ae(),
   ...Dn()
-}, "VVirtualScroll"), ik = de()({
+}, "VVirtualScroll"), ok = de()({
   name: "VVirtualScroll",
-  props: ok(),
+  props: nk(),
   setup(e, t) {
     let {
       slots: n
@@ -20130,7 +20129,7 @@ const ok = W({
       paddingTop: m,
       paddingBottom: h,
       computedItems: v
-    } = tk(e, se(e, "items"));
+    } = ek(e, se(e, "items"));
     return Wn(() => e.renderless, () => {
       function g() {
         var E, A;
@@ -20145,7 +20144,7 @@ const ok = W({
         a.value = $f(o.vnode.el, !0), g(!0);
       }), At(g);
     }), Se(() => {
-      const g = v.value.map((y) => u(J1, {
+      const g = v.value.map((y) => u(X1, {
         key: y.index,
         renderless: e.renderless,
         "onUpdate:height": (w) => c(y.index, w)
@@ -20190,7 +20189,7 @@ const ok = W({
     };
   }
 });
-function lk(e, t) {
+function ik(e, t) {
   const n = he(!1);
   let o;
   function i(s) {
@@ -20240,7 +20239,7 @@ function lk(e, t) {
     onKeydown: a
   };
 }
-const ak = W({
+const lk = W({
   chips: Boolean,
   closableChips: Boolean,
   closeText: {
@@ -20275,8 +20274,8 @@ const ak = W({
   ...Nm({
     itemChildren: !1
   })
-}, "Select"), sk = W({
-  ...ak(),
+}, "Select"), ak = W({
+  ...lk(),
   ...Xn(Km({
     modelValue: null,
     role: "combobox"
@@ -20286,9 +20285,9 @@ const ak = W({
       component: Er
     }
   })
-}, "VSelect"), rk = de()({
+}, "VSelect"), sk = de()({
   name: "VSelect",
-  props: sk(),
+  props: ak(),
   emits: {
     "update:focused": (e) => !0,
     "update:modelValue": (e) => !0,
@@ -20325,7 +20324,7 @@ const ak = W({
           // Set aria-haspopup to 'listbox'
         }
       };
-    }), I = ie(), N = lk(I, i);
+    }), I = ie(), N = ik(I, i);
     function T(B) {
       e.openOnClear && (r.value = !0);
     }
@@ -20431,7 +20430,7 @@ const ak = W({
         title: o(w.value)
       }), {
         ...n,
-        default: () => u(Ee, null, [u(Y1, be({
+        default: () => u(Ee, null, [u(G1, be({
           ref: l,
           modelValue: r.value,
           "onUpdate:modelValue": (we) => r.value = we,
@@ -20461,7 +20460,7 @@ const ak = W({
               var we, Ie, J;
               return [(we = n["prepend-item"]) == null ? void 0 : we.call(n), !P.value.length && !e.hideNoData && (((Ie = n["no-data"]) == null ? void 0 : Ie.call(n)) ?? u(He, {
                 title: o(e.noDataText)
-              }, null)), u(ik, {
+              }, null)), u(ok, {
                 ref: a,
                 renderless: !0,
                 items: P.value
@@ -20489,7 +20488,7 @@ const ak = W({
                       let {
                         isSelected: b
                       } = yn;
-                      return u(Ee, null, [e.multiple && !e.hideSelected ? u(U1, {
+                      return u(Ee, null, [e.multiple && !e.hideSelected ? u(z1, {
                         key: Pe.value,
                         modelValue: b,
                         ripple: !1,
@@ -20542,7 +20541,7 @@ const ak = W({
               }
             }, {
               default: () => [Xe]
-            }) : u(K1, be({
+            }) : u(q1, be({
               key: "chip",
               closable: e.closableChips,
               size: "small",
@@ -20571,7 +20570,7 @@ const ak = W({
     }, i);
   }
 });
-function uk(e) {
+function rk(e) {
   const t = he(e());
   let n = -1;
   function o() {
@@ -20598,7 +20597,7 @@ function uk(e) {
     reset: i
   };
 }
-const ck = W({
+const uk = W({
   multiLine: Boolean,
   text: String,
   timer: [Boolean, String],
@@ -20617,9 +20616,9 @@ const ck = W({
   ...Xn(Sa({
     transition: "v-snackbar-transition"
   }), ["persistent", "noClickAnimation", "scrim", "scrollStrategy"])
-}, "VSnackbar"), dk = de()({
+}, "VSnackbar"), ck = de()({
   name: "VSnackbar",
-  props: ck(),
+  props: uk(),
   emits: {
     "update:modelValue": (e) => !0
   },
@@ -20639,7 +20638,7 @@ const ck = W({
       variantClasses: d
     } = Ho(e), {
       roundedClasses: c
-    } = Ct(e), f = uk(() => Number(e.timeout)), m = ie(), h = ie(), v = he(!1), g = he(0), y = ie(), w = Ge(Bi, void 0);
+    } = Ct(e), f = rk(() => Number(e.timeout)), m = ie(), h = ie(), v = he(!1), g = he(0), y = ie(), w = Ge(Bi, void 0);
     Wn(() => !!w, () => {
       const O = Yf();
       Ut(() => {
@@ -20741,7 +20740,7 @@ const ck = W({
       });
     }), fo({}, m);
   }
-}), fk = W({
+}), dk = W({
   autoGrow: Boolean,
   autofocus: Boolean,
   counter: [Boolean, Number, String],
@@ -20764,13 +20763,13 @@ const ck = W({
   modelModifiers: Object,
   ...ka(),
   ...Ir()
-}, "VTextarea"), mk = de()({
+}, "VTextarea"), fk = de()({
   name: "VTextarea",
   directives: {
     Intersect: Sr
   },
   inheritAttrs: !1,
-  props: fk(),
+  props: dk(),
   emits: {
     "click:control": (e) => !0,
     "mousedown:control": (e) => !0,
@@ -20942,7 +20941,7 @@ const ck = W({
       });
     }), fo({}, m, h, g);
   }
-}), vk = {
+}), mk = {
   name: "EpubReader",
   components: {
     Settings: vv,
@@ -21051,7 +21050,7 @@ const ck = W({
     },
     initialize_annotations: function() {
       try {
-        this.annotation_repository = x1({
+        this.annotation_repository = E1({
           callbacks: this.annotation_callbacks,
           bookId: this.initial_book_id,
           bookUrl: this.book_url
@@ -21786,7 +21785,7 @@ const ck = W({
       this.settings = Object.assign({}, o);
       for (const l in i)
         i[l] !== void 0 && (this.settings[l] = i[l]);
-      Object.assign(this.settings, _1(i));
+      Object.assign(this.settings, b1(i));
     }
     this.initialize_annotations(), this.is_debug_signal = this.debug, this.is_debug_click = this.debug, this.loadingTimeout = setTimeout(() => {
       this.loading && (console.warn("电子书加载超时，显示提示框"), this.loading = !1, this.showTimeoutDialog = !0);
@@ -21932,42 +21931,42 @@ const ck = W({
     show_theme_dialog: !1,
     audiobook_open: !1
   })
-}, hk = {
+}, vk = {
   key: 0,
   class: "d-flex align-center flex-wrap ga-2 px-4 py-3",
   role: "group",
   "aria-label": "笔记分类"
-}, gk = { class: "text-body-1 font-weight-medium me-auto" }, yk = { key: 1 }, pk = { class: "annotation-editor-quote" }, bk = {
+}, hk = { class: "text-body-1 font-weight-medium me-auto" }, gk = { key: 1 }, yk = { class: "annotation-editor-quote" }, pk = {
   key: 0,
   class: "text-caption mt-2 mb-0"
-}, _k = {
+}, bk = {
   id: "status-bar-left",
   class: "align-start"
-}, wk = {
+}, _k = {
   id: "status-bar-right",
   class: "align-end"
-}, kk = { class: "progress-bar-container" }, Sk = { class: "theme-group-label" }, Ck = { class: "theme-grid" }, Ek = ["onClick"], xk = {
+}, wk = { class: "progress-bar-container" }, kk = { class: "theme-group-label" }, Sk = { class: "theme-grid" }, Ck = ["onClick"], Ek = {
   key: 1,
   class: "theme-badge"
-}, Vk = { class: "theme-name" };
-function Nk(e, t, n, o, i, l) {
+}, xk = { class: "theme-name" };
+function Vk(e, t, n, o, i, l) {
   const a = yv, s = vv, r = mv, d = fv, c = iv, f = ov, m = Gm, h = Am;
-  return Q(), me(N1, {
+  return Q(), me(V1, {
     theme: e.settings.theme,
     "full-height": "",
     density: "compact"
   }, {
     default: _(() => [
-      ue("div", {
+      ce("div", {
         id: "safe-bottom",
         style: on({ backgroundColor: l.foot_color })
       }, null, 4),
-      e.menu.show_navbar ? (Q(), me(D1, {
+      e.menu.show_navbar ? (Q(), me(P1, {
         key: 0,
         density: "compact"
       }, {
         prepend: _(() => [
-          u(ce, {
+          u(ue, {
             icon: "",
             title: e.is_debug_signal ? "返回首页" : "章评"
           }, {
@@ -21985,7 +21984,7 @@ function Nk(e, t, n, o, i, l) {
         default: _(() => [
           q(" " + Oe(e.is_debug_signal ? e.alert_msg : e.book_title) + " ", 1),
           u(Sl),
-          l.has_audiobook ? (Q(), me(ce, {
+          l.has_audiobook ? (Q(), me(ue, {
             key: 0,
             "min-height": "44",
             onClick: l.open_audiobook,
@@ -21998,11 +21997,11 @@ function Nk(e, t, n, o, i, l) {
                 ])),
                 _: 1
               }),
-              t[46] || (t[46] = ue("span", null, "听书", -1))
+              t[46] || (t[46] = ce("span", null, "听书", -1))
             ]),
             _: 1
           }, 8, ["onClick"])) : We("", !0),
-          u(ce, {
+          u(ue, {
             ref: "panelEntryAi",
             icon: "",
             title: "更多选项",
@@ -22021,14 +22020,14 @@ function Nk(e, t, n, o, i, l) {
         ]),
         _: 1
       })) : We("", !0),
-      u(B1, {
+      u(M1, {
         modelValue: e.menu.value,
         "onUpdate:modelValue": t[3] || (t[3] = (v) => e.menu.value = v),
         active: e.menu.show_navbar,
         "z-index": "2599"
       }, {
         default: _(() => [
-          u(ce, {
+          u(ue, {
             ref: "panelEntryToc",
             value: "toc",
             onClick: t[1] || (t[1] = (v) => l.set_menu("toc"))
@@ -22040,11 +22039,11 @@ function Nk(e, t, n, o, i, l) {
                 ])),
                 _: 1
               }),
-              t[49] || (t[49] = ue("span", null, "目录", -1))
+              t[49] || (t[49] = ce("span", null, "目录", -1))
             ]),
             _: 1
           }, 512),
-          u(ce, { onClick: l.switch_theme }, {
+          u(ue, { onClick: l.switch_theme }, {
             default: _(() => [
               u(De, null, {
                 default: _(() => [
@@ -22052,11 +22051,11 @@ function Nk(e, t, n, o, i, l) {
                 ]),
                 _: 1
               }),
-              ue("span", null, Oe(l.switch_theme_text), 1)
+              ce("span", null, Oe(l.switch_theme_text), 1)
             ]),
             _: 1
           }, 8, ["onClick"]),
-          u(ce, {
+          u(ue, {
             ref: "panelEntryAnnotations",
             value: "annotations",
             "aria-label": e.chapter_annotation_count ? `笔记，本章 ${e.chapter_annotation_count} 条` : "笔记",
@@ -22083,11 +22082,11 @@ function Nk(e, t, n, o, i, l) {
                 ])),
                 _: 1
               })),
-              t[52] || (t[52] = ue("span", null, "笔记", -1))
+              t[52] || (t[52] = ce("span", null, "笔记", -1))
             ]),
             _: 1
           }, 8, ["aria-label", "onClick"]),
-          u(ce, {
+          u(ue, {
             ref: "panelEntrySettings",
             value: "settings",
             onClick: t[2] || (t[2] = (v) => l.set_menu("settings"))
@@ -22099,7 +22098,7 @@ function Nk(e, t, n, o, i, l) {
                 ])),
                 _: 1
               }),
-              t[54] || (t[54] = ue("span", null, "设置", -1))
+              t[54] || (t[54] = ce("span", null, "设置", -1))
             ]),
             _: 1
           }, 512)
@@ -22174,7 +22173,7 @@ function Nk(e, t, n, o, i, l) {
         "z-index": "234"
       }, {
         default: _(() => [
-          u(ce, {
+          u(ue, {
             variant: "tonal",
             onClick: l.on_open_annotations
           }, {
@@ -22240,7 +22239,7 @@ function Nk(e, t, n, o, i, l) {
         "z-index": "234"
       }, {
         default: _(() => [
-          u(ce, {
+          u(ue, {
             variant: "tonal",
             onClick: l.on_open_annotations
           }, {
@@ -22277,7 +22276,7 @@ function Nk(e, t, n, o, i, l) {
             default: _(() => [
               u(Zl, { density: "compact" }, {
                 append: _(() => [
-                  e.settings.notes_enabled ? (Q(), me(ce, {
+                  e.settings.notes_enabled ? (Q(), me(ue, {
                     key: 0,
                     icon: "mdi-refresh",
                     title: "刷新笔记",
@@ -22285,7 +22284,7 @@ function Nk(e, t, n, o, i, l) {
                     loading: e.annotations_loading,
                     onClick: l.load_annotations
                   }, null, 8, ["loading", "onClick"])) : We("", !0),
-                  u(ce, {
+                  u(ue, {
                     icon: "mdi-close",
                     title: "关闭笔记",
                     "aria-label": "关闭笔记",
@@ -22302,9 +22301,9 @@ function Nk(e, t, n, o, i, l) {
                 ]),
                 _: 1
               }),
-              e.settings.notes_enabled ? (Q(), Re("div", hk, [
-                ue("span", gk, Oe(e.selection_annotation_cfi ? "此处笔记" : "笔记"), 1),
-                e.selection_annotation_cfi ? (Q(), me(ce, {
+              e.settings.notes_enabled ? (Q(), Re("div", vk, [
+                ce("span", hk, Oe(e.selection_annotation_cfi ? "此处笔记" : "笔记"), 1),
+                e.selection_annotation_cfi ? (Q(), me(ue, {
                   key: 0,
                   variant: "tonal",
                   onClick: l.on_open_annotations
@@ -22314,7 +22313,7 @@ function Nk(e, t, n, o, i, l) {
                   ])),
                   _: 1
                 }, 8, ["onClick"])) : We("", !0),
-                u(ce, {
+                u(ue, {
                   variant: "tonal",
                   disabled: !e.settings.show_comments || !e.current_toc,
                   onClick: l.open_chapter_comments
@@ -22324,7 +22323,7 @@ function Nk(e, t, n, o, i, l) {
                   ])),
                   _: 1
                 }, 8, ["disabled", "onClick"]),
-                u(ce, {
+                u(ue, {
                   variant: "tonal",
                   "aria-label": "本书评论",
                   onClick: l.on_open_comments
@@ -22339,7 +22338,7 @@ function Nk(e, t, n, o, i, l) {
                         q("本书评论")
                       ])),
                       _: 1
-                    }, 8, ["content"])) : (Q(), Re("span", yk, "本书评论"))
+                    }, 8, ["content"])) : (Q(), Re("span", gk, "本书评论"))
                   ]),
                   _: 1
                 }, 8, ["onClick"])
@@ -22355,7 +22354,7 @@ function Nk(e, t, n, o, i, l) {
               })) : (Q(), me(Jt, { key: 1 }, {
                 default: _(() => [
                   t[62] || (t[62] = q("笔记已关闭，已有数据会保留。 ")),
-                  u(ce, {
+                  u(ue, {
                     variant: "text",
                     onClick: t[25] || (t[25] = (v) => l.set_menu("settings"))
                   }, {
@@ -22421,8 +22420,8 @@ function Nk(e, t, n, o, i, l) {
                 default: _(() => {
                   var v;
                   return [
-                    ue("blockquote", pk, Oe(e.selected_location.quote_text), 1),
-                    u(mk, {
+                    ce("blockquote", yk, Oe(e.selected_location.quote_text), 1),
+                    u(fk, {
                       ref: "annotationEditorContent",
                       modelValue: e.annotation_editor_content,
                       "onUpdate:modelValue": [
@@ -22435,7 +22434,7 @@ function Nk(e, t, n, o, i, l) {
                       autofocus: "",
                       "error-messages": e.annotation_editor_error
                     }, null, 8, ["modelValue", "error-messages"]),
-                    u(rk, {
+                    u(sk, {
                       modelValue: e.annotation_editor_private,
                       "onUpdate:modelValue": t[35] || (t[35] = (g) => e.annotation_editor_private = g),
                       class: "annotation-visibility",
@@ -22444,7 +22443,7 @@ function Nk(e, t, n, o, i, l) {
                       items: [{ title: "公开", value: !1 }, { title: "私密", value: !0 }],
                       "hide-details": ""
                     }, null, 8, ["modelValue"]),
-                    ((v = e.annotation_repository) == null ? void 0 : v.source) === "localStorage" ? (Q(), Re("p", bk, "本地模式的笔记仅保存在当前浏览器。")) : We("", !0)
+                    ((v = e.annotation_repository) == null ? void 0 : v.source) === "localStorage" ? (Q(), Re("p", pk, "本地模式的笔记仅保存在当前浏览器。")) : We("", !0)
                   ];
                 }),
                 _: 1
@@ -22452,7 +22451,7 @@ function Nk(e, t, n, o, i, l) {
               u(Po, null, {
                 default: _(() => [
                   u(Sl),
-                  u(ce, {
+                  u(ue, {
                     onClick: t[36] || (t[36] = (v) => e.annotation_editor_open = !1)
                   }, {
                     default: _(() => t[65] || (t[65] = [
@@ -22460,7 +22459,7 @@ function Nk(e, t, n, o, i, l) {
                     ])),
                     _: 1
                   }),
-                  u(ce, {
+                  u(ue, {
                     color: "primary",
                     loading: e.annotation_saving,
                     onClick: l.save_note
@@ -22479,7 +22478,7 @@ function Nk(e, t, n, o, i, l) {
         ]),
         _: 1
       }, 8, ["modelValue", "onAfterLeave"]),
-      u(dk, {
+      u(ck, {
         modelValue: e.annotation_feedback_visible,
         "onUpdate:modelValue": t[39] || (t[39] = (v) => e.annotation_feedback_visible = v),
         class: "annotation-feedback",
@@ -22487,7 +22486,7 @@ function Nk(e, t, n, o, i, l) {
         timeout: e.annotation_feedback_error ? -1 : 5e3
       }, {
         actions: _(() => [
-          u(ce, {
+          u(ue, {
             variant: "text",
             onClick: t[38] || (t[38] = (v) => e.annotation_feedback_visible = !1)
           }, {
@@ -22508,7 +22507,7 @@ function Nk(e, t, n, o, i, l) {
         style: on(v),
         "aria-hidden": "true"
       }, null, 4))), 128)),
-      lt(ue("div", {
+      lt(ce("div", {
         id: "comments-toolbar",
         ref: "selectionToolbar",
         role: "group",
@@ -22524,7 +22523,7 @@ function Nk(e, t, n, o, i, l) {
           rounded: ""
         }, {
           default: _(() => [
-            u(ce, { onClick: l.copy_selection }, {
+            u(ue, { onClick: l.copy_selection }, {
               default: _(() => t[68] || (t[68] = [
                 q("复制")
               ])),
@@ -22532,7 +22531,7 @@ function Nk(e, t, n, o, i, l) {
             }, 8, ["onClick"]),
             u(Zt, { vertical: "" }),
             e.settings.notes_enabled ? (Q(), Re(Ee, { key: 0 }, [
-              u(ce, {
+              u(ue, {
                 loading: e.annotation_saving,
                 onClick: l.save_highlight
               }, {
@@ -22542,7 +22541,7 @@ function Nk(e, t, n, o, i, l) {
                 _: 1
               }, 8, ["loading", "onClick"]),
               u(Zt, { vertical: "" }),
-              u(ce, {
+              u(ue, {
                 disabled: e.annotation_saving,
                 onClick: l.open_note_editor
               }, {
@@ -22552,7 +22551,7 @@ function Nk(e, t, n, o, i, l) {
                 _: 1
               }, 8, ["disabled", "onClick"]),
               u(Zt, { vertical: "" }),
-              u(ce, {
+              u(ue, {
                 disabled: e.annotation_saving,
                 onClick: l.on_view_selection_notes
               }, {
@@ -22563,7 +22562,7 @@ function Nk(e, t, n, o, i, l) {
               }, 8, ["disabled", "onClick"]),
               u(Zt, { vertical: "" })
             ], 64)) : We("", !0),
-            l.has_audiobook ? (Q(), me(ce, {
+            l.has_audiobook ? (Q(), me(ue, {
               key: 1,
               onClick: l.on_click_toolbar_listen
             }, {
@@ -22582,7 +22581,7 @@ function Nk(e, t, n, o, i, l) {
       ], 4), [
         [hn, l.is_toolbar_visible()]
       ]),
-      u(R1, {
+      u(L1, {
         id: "main",
         class: "pa-0"
       }, {
@@ -22625,7 +22624,7 @@ function Nk(e, t, n, o, i, l) {
                   }),
                   u(Po, { class: "justify-center" }, {
                     default: _(() => [
-                      u(ce, {
+                      u(ue, {
                         color: "primary",
                         variant: "text",
                         onClick: t[41] || (t[41] = (v) => e.showTimeoutDialog = !1)
@@ -22635,7 +22634,7 @@ function Nk(e, t, n, o, i, l) {
                         ])),
                         _: 1
                       }),
-                      u(ce, {
+                      u(ue, {
                         color: "primary",
                         variant: "flat",
                         onClick: l.retryLoad
@@ -22654,22 +22653,22 @@ function Nk(e, t, n, o, i, l) {
             ]),
             _: 1
           }, 8, ["modelValue"]),
-          ue("div", {
+          ce("div", {
             id: "status-bar-top",
             class: rn(e.settings.theme),
             style: on(l.status_bar_style)
           }, [
-            ue("div", _k, Oe(e.current_toc_title), 1),
-            ue("div", wk, " (" + Oe(l.readingProgress) + ") ", 1)
+            ce("div", bk, Oe(e.current_toc_title), 1),
+            ce("div", _k, " (" + Oe(l.readingProgress) + ") ", 1)
           ], 6),
-          t[77] || (t[77] = ue("div", { id: "reader" }, null, -1)),
-          ue("div", {
+          t[77] || (t[77] = ce("div", { id: "reader" }, null, -1)),
+          ce("div", {
             id: "status-bar-bottom",
             class: rn(e.settings.theme),
             style: on(l.status_bar_style)
           }, [
-            ue("div", kk, [
-              ue("div", {
+            ce("div", wk, [
+              ce("div", {
                 class: "progress-bar",
                 style: on({ width: l.readingProgress })
               }, null, 4)
@@ -22690,9 +22689,9 @@ function Nk(e, t, n, o, i, l) {
             default: _(() => [
               u(ao, { class: "d-flex align-center" }, {
                 default: _(() => [
-                  t[78] || (t[78] = ue("span", null, "阅读皮肤", -1)),
+                  t[78] || (t[78] = ce("span", null, "阅读皮肤", -1)),
                   u(Sl),
-                  u(ce, {
+                  u(ue, {
                     icon: "mdi-close",
                     variant: "text",
                     density: "compact",
@@ -22706,18 +22705,18 @@ function Nk(e, t, n, o, i, l) {
                   (Q(!0), Re(Ee, null, jt(l.theme_groups, (v) => (Q(), Re(Ee, {
                     key: v.mode
                   }, [
-                    ue("div", Sk, Oe(v.label), 1),
-                    ue("div", Ck, [
+                    ce("div", kk, Oe(v.label), 1),
+                    ce("div", Sk, [
                       (Q(!0), Re(Ee, null, jt(v.items, (g) => (Q(), Re("div", {
                         class: "theme-cell",
                         key: g.id
                       }, [
-                        ue("div", {
+                        ce("div", {
                           class: rn(["theme-card", { active: e.settings.theme === g.id }]),
                           style: on(l.theme_card_style(g)),
                           onClick: (y) => l.pick_theme(g)
                         }, [
-                          ue("span", {
+                          ce("span", {
                             class: "theme-sample",
                             style: on({ color: g.text })
                           }, Oe(g.sample), 5),
@@ -22732,9 +22731,9 @@ function Nk(e, t, n, o, i, l) {
                             ])),
                             _: 2
                           }, 1032, ["title"])) : We("", !0),
-                          e.settings.theme === g.id ? (Q(), Re("span", xk, "使用中")) : We("", !0)
-                        ], 14, Ek),
-                        ue("div", Vk, Oe(g.name), 1)
+                          e.settings.theme === g.id ? (Q(), Re("span", Ek, "使用中")) : We("", !0)
+                        ], 14, Ck),
+                        ce("div", xk, Oe(g.name), 1)
                       ]))), 128))
                     ])
                   ], 64))), 128))
@@ -22751,7 +22750,7 @@ function Nk(e, t, n, o, i, l) {
     _: 1
   }, 8, ["theme"]);
 }
-const Tk = /* @__PURE__ */ On(vk, [["render", Nk], ["__scopeId", "data-v-b6ee7ee9"]]), Ok = {
+const Nk = /* @__PURE__ */ On(mk, [["render", Vk], ["__scopeId", "data-v-b6ee7ee9"]]), Tk = {
   name: "CandleReader",
   computed: {},
   mounted: function() {
@@ -22792,8 +22791,8 @@ const Tk = /* @__PURE__ */ On(vk, [["render", Nk], ["__scopeId", "data-v-b6ee7ee
   },
   data: () => ({})
 };
-function Ak(e, t, n, o, i, l) {
-  const a = Tk;
+function Ok(e, t, n, o, i, l) {
+  const a = Nk;
   return Q(), me(a, {
     book_url: n.book_url,
     display_url: n.display_url,
@@ -22805,16 +22804,16 @@ function Ak(e, t, n, o, i, l) {
     audiobook_manifest_url: n.audiobook_manifest_url
   }, null, 8, ["book_url", "display_url", "debug", "themes_css", "initial_book_id", "annotation_callbacks", "audiobook_edition_id", "audiobook_manifest_url"]);
 }
-const Ik = /* @__PURE__ */ On(Ok, [["render", Ak]]);
-class Pk {
+const Ak = /* @__PURE__ */ On(Tk, [["render", Ok]]);
+class Ik {
   constructor(t, n) {
     var o = "https://api.talebook.org";
-    const i = My(Ik, n);
+    const i = My(Ak, n);
     Ub(i, {
       server: n.server || o
     }), i.mount(t);
   }
 }
 export {
-  Pk as Reader
+  Ik as Reader
 };
