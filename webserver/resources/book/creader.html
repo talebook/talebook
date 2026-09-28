@@ -7,6 +7,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>{{ book.title }}</title>
 
+  <script>
+    // 「笔记入口」开关归阅读器设置（candle-reader 的 readerSettings.notes_entry），
+    // 这里在首屏解析正文前同步读一次，避免浮动入口先显示再被隐藏。
+    // 运行中切换由阅读器更新 <html> 上的同一个属性，两侧共用下面那条 CSS。
+    (function () {
+      try {
+        var saved = JSON.parse(localStorage.getItem('readerSettings') || '{}');
+        if (saved.notes_entry === false) {
+          document.documentElement.setAttribute('data-candle-reader-notes-entry', 'off');
+        }
+      } catch (e) { /* localStorage 不可用时保持入口显示 */ }
+    })();
+  </script>
+
   <base href="{{RES}}/static/candle-reader/" />
 
   <link rel="icon" href="{{RES}}/logo/favicon.ico" />
@@ -137,6 +151,8 @@
       cursor: pointer;
       font: 600 14px/1 Roboto, sans-serif;
     }
+    /* 阅读器设置里关掉「笔记入口」时，浮动入口整体隐藏：display:none 同时移出 Tab 序与无障碍树 */
+    html[data-candle-reader-notes-entry="off"] #annotation-toggle { display: none !important; }
     #annotation-count {
       display: inline-grid;
       min-width: 20px;

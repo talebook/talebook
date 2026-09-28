@@ -164,6 +164,15 @@ class TestAnnotations(TestWithUserLogin):
         self.assertIn('aria-hidden="true"', body)
         self.assertIn("shell.inert = !open", body)
 
+    def test_reader_hosts_the_notes_entry_toggle_contract(self):
+        rsp = self.fetch("/read/%d" % BID_EPUB)
+        body = rsp.body.decode("utf-8")
+        # 「笔记入口」开关归阅读器设置：宿主只消费 <html data-candle-reader-notes-entry="off">
+        self.assertIn('html[data-candle-reader-notes-entry="off"] #annotation-toggle', body)
+        self.assertIn("localStorage.getItem('readerSettings')", body)
+        self.assertIn("saved.notes_entry === false", body)
+        self.assertIn("document.documentElement.setAttribute('data-candle-reader-notes-entry', 'off')", body)
+
     def test_reader_hosts_local_selection_actions_and_chapter_annotation_rendering(self):
         rsp = self.fetch("/read/%d" % BID_EPUB)
         body = rsp.body.decode("utf-8")
