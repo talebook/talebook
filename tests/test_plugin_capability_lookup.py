@@ -16,6 +16,7 @@ from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.plugins.runtime.domains import CheckReport, Page, Review
 from webserver.plugins.runtime.protocol import PROTOCOL_VERSION, UpstreamAuthError, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import HostQueueTimeout, SafeHttpClient
+from webserver.services import plugin_runtime as plugin_runtime_module
 from webserver.services.plugin_runtime import (
     PluginRegistry,
     PluginRuntime,
@@ -226,7 +227,7 @@ def test_read_many_retry_backoff_does_not_false_timeout_another_completed_connec
     def retry_after_backoff(title, context):
         retry_calls["count"] += 1
         if retry_calls["count"] == 1:
-            raise UpstreamRateLimitError("retry later", retry_after=0.08)
+            raise UpstreamRateLimitError("retry later", retry_after=0.25)
         return [{"title": title, "from": rate_limited.manifest["id"]}]
 
     def delayed_success(title, context):
@@ -239,15 +240,25 @@ def test_read_many_retry_backoff_does_not_false_timeout_another_completed_connec
         registry.register(plugin)
     slow_connection = _install(db_session, registry, rate_limited)
     fast_connection = _install(db_session, registry, healthy)
-    slow_connection.config = {"timeout_seconds": 0.2, "max_retries": 1, "backoff_seconds": 0.08}
-    fast_connection.config = {"timeout_seconds": 0.05}
+    slow_connection.config = {"timeout_seconds": 0.8, "max_retries": 1, "backoff_seconds": 0.25}
+    fast_connection.config = {"timeout_seconds": 0.15}
     db_session.commit()
 
     def coordinator_must_not_sleep(_delay):
         raise AssertionError("read_many retry scheduling must not block the coordinator")
 
     runtime = PluginRuntime(db_session, SETTINGS, registry=registry, sleeper=coordinator_must_not_sleep)
-    results = runtime.read_many([slow_connection, fast_connection], "search_books", "三体", timeout=0.3)
+    submit = plugin_runtime_module._PLUGIN_IO_EXECUTOR.submit
+    submitted = {"count": 0}
+
+    def slow_first_submission(*args, **kwargs):
+        submitted["count"] += 1
+        if submitted["count"] == 1:
+            time.sleep(0.2)
+        return submit(*args, **kwargs)
+
+    with mock.patch.object(plugin_runtime_module._PLUGIN_IO_EXECUTOR, "submit", side_effect=slow_first_submission):
+        results = runtime.read_many([slow_connection, fast_connection], "search_books", "三体", timeout=0.9)
 
     assert not isinstance(results[fast_connection.id], Exception)
     assert results[fast_connection.id][0]["from"] == healthy.manifest["id"]

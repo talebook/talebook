@@ -25,6 +25,9 @@ class AsyncService(metaclass=SingletonType):
     # 类属性使所有服务单例共享同一份线程本地存储（每个 OS 线程一个 session）
     _local = threading.local()
 
+    def upgrade_busy(self):
+        return any(queue.unfinished_tasks for _, queue in self.running.values())
+
     def setup(self, calibre_db=None, session_maker=None):
         self.db = calibre_db
         self.session_maker = session_maker
@@ -74,6 +77,7 @@ class AsyncService(metaclass=SingletonType):
             finally:
                 # 每个任务结束后关闭本线程的 session，下个任务拿全新的
                 self.close_session()
+                q.task_done()
             logging.info("end : func=%s, args=%s, kwargs=%s", name, args, kwargs)
 
     # 一些常用的工具库
@@ -115,6 +119,10 @@ class AsyncService(metaclass=SingletonType):
                 return service_func(ins, *args, **kwargs)
 
             logging.error("[ASYNC] service call %s(%s, %s)", name, args, kwargs)
+            from webserver.services.application_upgrade import MAINTENANCE
+
+            if MAINTENANCE.exists():
+                raise RuntimeError("Application upgrade is draining background tasks")
             q = ins.start_service(service_func)
             q.put((args, kwargs))
             return None

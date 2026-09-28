@@ -1,0 +1,194 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="data:,"><title>容器内应用升级 · WIP</title><style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style></head><body><main class="page"><header class="hero"><h1>容器内应用升级</h1><p>2026-09-09 · docker / webserver / app / scripts · ACTIVE · TB-213</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>管理后台检查、下载校验并安装 Python 与预编译 SPA，不更换容器；发布同字节签名资源至 GitHub 与可配置国内源。首次安装加载器仍需更新一次镜像，升级短暂中断服务。目标分支 feat/upgrade，中文 PR，不合并、不正式发布。</p></section>
+<section class="card"><h2>设计决策与边界（grill 自审）</h2><p>开发者已授权实施细节自行决定。仓库没有 grill 技能，逐项自审而不重复询问。仅支持生产 SPA、非 root 应用账号、默认本地 SQLite 与默认书库；SSR、开发、外部数据库、目录自定义及数据库结构变化拒绝安装并要求更新镜像。独立 root 执行器属于可信镜像，不从升级包加载；通过权限受限 Unix socket 接收管理员 API 的固定操作，普通请求不能传 URL、命令或路径。无需 Docker socket。</p><p>运行时指纹记录实际 Python、Calibre、系统包、Python distributions 和基础启动协议文件；数据库指纹包含 models.py、migrate_db.py。发布包绑定架构、SPA、提交、序号、大小、哈希、签名。私钥仅发布端持有；可信公钥和源由只读服务器配置注入，默认没有密钥则禁用安装。</p></section>
+<section class="card"><h2>方案与状态转换</h2><p>最终一致性审查补充：预编译 index.html 标记应用版本；统一 backend() 携带该版本，后端在任何业务处理前拒绝旧版本请求（409），客户端刷新。维护闸门覆盖切换窗口，版本校验覆盖恢复服务后的旧标签页，避免旧前端继续向新后端提交操作。</p><p>真实容器暴露 Calibre notes/FTS 的专用 tokenizer，需要可信镜像中的 Calibre 扩展校验备份。同步收紧启动边界：bootstrap 自检脚本复制到镜像只读加载器目录，生产启动不再把 Calibre 运行时目录 chown 给应用账号；服务器信任配置拒绝非 root 或组/其他可写的文件。</p><p>检查所有配置源的已签名 stable 清单 → 选择最高序号并持久化防回放水位 → 固定提交下载（源间回退同一 SHA）→ 限额/哈希校验 → 拒绝链接与特殊文件的安全解包 → 维护闸门阻止所有外部流量 → 等待后台任务排空 → 停止应用进程及子进程 → 一致性 SQLite backup → 原子切换统一前后端目录 → 启动与健康检查 → 成功持久化并开放流量；失败切回旧代码。日志和事务状态持久化；中断恢复使用已记录的上个应用，不自动恢复数据库。恢复阶段失败保持维护状态供运维修复。</p><p>/data/updates 与 /data/books 分离，root 独占写权限；/run/talebook-release/current 为整套前后端链接。镜像带序号与指纹；默认仅加载比内置版本更新且兼容的已验证持久化版本；本轮增加绑定基础镜像的手动固定选择，规则见下文。镜像升级可越过旧持久化版本。首次部署与变更 runtime 后走镜像升级。升级不运行 pip、apt、git pull；不会修改插件和书库文件。</p></section>
+<section class="card"><h2>分发与部署取舍</h2><table><thead><tr><th>源</th><th>覆盖与运维</th><th>条件与费用</th></tr></thead><tbody><tr><td>GitHub Releases</td><td>官方默认源，签名固定版本；大陆可能超时</td><td>GitHub 配额与政策；不承诺国内可达</td></tr><tr><td>阿里云 OSS / 腾讯云 COS + 大陆 CDN</td><td>推荐国内源，同字节镜像与最后发布渠道清单</td><td>云账号、域名、备案、HTTPS、存储和出流量账单；不编造报价</td></tr><tr><td>香港节点</td><td>无大陆备案时备选，跨境链路质量需实测</td><td>存储和流量费用；不等同大陆 CDN 可用性</td></tr></tbody></table><p>不使用公共 GitHub 代理，不将 Cloudflare/R2 当大陆稳定性保证。未提供云资源，本次仅实现配置、同步脚本和发布工作流。固定资源一年 immutable，stable TTL 60 秒；历史至少保留最近 3 个兼容版本及 90 天，删除前核对客户安装情况。所有资源逐个校验并同步后最后替换 stable 清单；镜像落后显示诊断，不降级。</p></section>
+<section class="card"><h2>测试结果</h2><p>浏览器复核：异步获取版本后才出现安装按钮，固定 selector 激活器会错过该按钮；改为响应式按钮引用，并为延迟返回的版本检查增加组件回归测试。确认前不发送安装，Escape 关闭后恢复按钮焦点。</p><p>验证迭代：隔离环境实际启用 SQLite 备份与默认书库；health 排空还覆盖持久化的有声书和插件任务。首次构建发现 slim 镜像没有 calibre GUI 命令，指纹改用 calibredb --version。无可用 grill 技能，自审记录在本页。全量测试发现旧网络书库用例调用未 mock 的公共书源，限定到用例内的 Legado 源以消除外网依赖，保留原断言。</p><p>interface-review full 的渲染复核发现新安装按钮沿用 warning 橙底白字，对比不足；改用现有 primary 主操作色，检查版本改为中性文字描边次操作（深色主题也满足对比），发布说明链接继承主题正文色并保留下划线，重新构建并做真实浏览器复验。</p><p id="validation">已验证：容器内 make pytest：1322 passed、20 skipped、覆盖率 73%；最后后端小改动后相关集 87 passed。协议独立集 49 passed，覆盖签名/哈希、归档穿越/链接/大小限制、架构与运行时、权限、并发/幂等、源回退/滞后、防回放、超时、磁盘不足、WAL 备份及手动恢复、schema 拒绝、中断和启动失败。真实 Calibre tokenizer 备份验证通过。make lint-py-fix、make lint-py 已执行通过；升级脚本/测试 Ruff 通过。</p>
+<p>前端最终执行 npm run generate 成功；node node_modules/vitest/vitest.mjs run --config test/upgrade.vitest.config.ts：4 passed（含异步候选按钮）；npm run lint：0 errors、429 条既有 warnings。TALEBOOK_UPGRADE_URL / TALEBOOK_UPGRADE_EXPECTED_VERSION=v10 / TALEBOOK_UPGRADE_CREDENTIALS 配置下执行 node app/node_modules/@playwright/test/cli.js test --config app/test/upgrade.browser.config.ts：1 passed。验证真实登录、书库、阅读、管理设置、旧标签页 409 自动刷新、320px 无水平溢出、明暗主题、Enter 开确认、Escape 关闭并恢复焦点。截图随 PR 与事项附件提供。</p>
+<p>真实 amd64 Docker：同一容器 88ea69c56c71a230f7e870ebfeab505fd46c04c8a5f122d1d014ca54b5a7b096 完成 v1→v2→v4→v6→v8；3 个数据库备份。故意启动失败的已签名 v7 包安装后 phase=rolled_back，恢复 v6，书库保留。docker restart 后 v8 保留；以增加 LABEL 的兼容镜像重建（不同镜像 ID、同一运行时指纹和数据）后 v8、登录、书库与阅读保留。重建容器再次成功安装最终界面包 v10。包下载、TLS、签名、校验、Supervisor 切换、数据库均真实执行。</p>
+<p>限制：测试镜像基于已有本地运行时，未完成生产 Dockerfile 从零构建；仅测试 fixture 将公共 IP 连接适配到 loopback TLS，生产下载器无绕过开关，不能当作公网/CDN/大陆测速。未实测 arm64/armv7、实际 OSS/COS 服务、原生屏幕阅读器与浏览器菜单 200% 缩放。Chrome DevTools MCP 共享 profile 已占用，未终止共享浏览器，改用独立 Playwright Chromium 验证。全量测试以 8GiB tmpfs 工作目录运行以避免主机低磁盘触发既有有声书空间保护；测试 mock 仅覆盖隔离单元集，真实容器验收无 mock 后端。</p></section><section class="card"><h2>interface-review full · Scope and Coverage</h2>
+<p>依据项目 .agents/skills/interface-review/SKILL.md 与 better-interface 及六个领域技能执行。Nuxt 4 / Vue 3 / Vuetify，遵循 AGENTS.md、app/CLAUDE.md 与现有主题和 backend() 调用约定。对变更增删两侧与直接消费者进行审查，后端正确性和安全结论另列。</p>
+<table><tr><th>字段</th><th>范围</th></tr><tr><td>Target</td><td>feat/upgrade 相对默认分支 master 的整个分支及全部未提交内容</td></tr><tr><td>Base / Head</td><td>origin/master merge-base 与审查时 HEAD 均为 26d8dd74c1b33109668fed4cbf1611cfc459688a；0 个已提交变更，37 个未提交文本文件</td></tr><tr><td>排除</td><td>app/test-results 生成结果、.deepsec 机器报告、构建输出、依赖与截图二进制；截图单独做渲染证据</td></tr><tr><td>直接消费者</td><td>GeneralSettingsContent、MetadataAutomationSettings、ImageCaptchaWidget、BookSourceImportDialog、GlobalDeviceSettings；共享 backend 的其余 55 个 Vue 消费者未扩展（最多 5 个消费者），新 ApplicationUpgrade 自身完整审查</td></tr></table>
+<table><tr><th>领域</th><th>证据</th><th>结果</th></tr><tr><td>Accessibility</td><td>有名按钮、状态 live region、错误 alert、确认/取消、焦点与键盘、减弱动画规则；实际 Enter/Escape 和恢复焦点</td><td>Clear（限定已验证范围）</td></tr><tr><td>Layout</td><td>管理设置、确认弹窗、320px 包裹换行与可达操作</td><td>Clear</td></tr><tr><td>Writing</td><td>中英文、首次换镜像、禁用原因、版本/说明、维护重连、失败恢复文案</td><td>Clear</td></tr><tr><td>Typography</td><td>现有字号、长说明换行、确认正文、不截断关键内容</td><td>Clear</td></tr><tr><td>Colors</td><td>明暗截图和 computed style：主按钮白字/蓝底 #1976d2 为 4.60:1；检查按钮明 16.07:1（alpha 合成）/暗 18.73:1；焦点黑/白 2px</td><td>Clear</td></tr><tr><td>UI</td><td>Vuetify 状态/禁用、进度、无过场确认弹窗、重连</td><td>Clear</td></tr></table>
+<h3>Findings</h3><p>No actionable interface findings in this change. 复审前问题已修复：Introduced / HIGH：异步按钮无法激活弹窗，改响应式 activator 并实测；Introduced / HIGH：安装橙底白字与深色次按钮对比不足，改现有 primary 主操作和中性描边；Regression / MEDIUM：无加载器时原镜像检查入口消失，补回检查镜像与发布说明；旧客户端跨版本操作通过 409 刷新保护（正确性审查）。最终无未解决 HIGH / MEDIUM。</p>
+<h3>Considered but Rejected</h3><table><tr><th>位置</th><th>候选</th><th>不采纳原因</th></tr><tr><td>ApplicationUpgrade 说明</td><td>恢复 rich Markdown 展示</td><td>纯文本完整保留说明、可换行，当前流程无需富文本</td></tr><tr><td>进度</td><td>显示百分比</td><td>下载后还需停机/备份/启动，无可靠总进度；阶段文案与不定进度更准确</td></tr><tr><td>确认弹窗</td><td>增加过场动画</td><td>操作低频且重要，无动画清晰、兼容减弱动态偏好</td></tr></table>
+<h3>Pre-existing</h3><p>既有通用设置的回收站按钮及宣传条配色不属于本次新界面，未扩大修改；不据此声明整个管理页面符合 WCAG。</p>
+<h3>Verification</h3><p>gh repo view --json defaultBranchRef -q .defaultBranchRef.name → master；git symbolic-ref refs/remotes/origin/HEAD 缺失；git fetch origin master feat/upgrade --no-tags 是本轮审查唯一写 .git 的范围刷新操作。git merge-base origin/master HEAD → 上述基线；git rev-list --count 基线..HEAD → 0；git diff 基线、git diff --name-status HEAD 和 git ls-files --others --exclude-standard 合并范围。没有 checkout/stash。此前按钮与配色问题修复后重新读取整份差异并复验。真实浏览器命令、截图及计算对比见测试结果；屏幕阅读器/原生 200% 缩放标记 Not verified，未当作通过。</p>
+<h3>Verdict</h3><p>Approve：变更范围内无剩余可操作界面问题，结论限定上述证据和消费者边界。</p></section><section class="card"><h2>DeepSec 最终结果与限制</h2><p>DeepSec 0.2.0；命令 <code>deepsec shield scan . --layer l1,l2 --include-tests --format json --output -</code>；最后代码修改后扫描 talebook 仓库，含脚本与测试，共 774 文件，L1/L2，退出码 2。有效报告 123 项：32 critical、70 high、21 medium；不是参数失败，也不能声明安全全通过。</p><p>改动文件 4 项：fingerprint.py:34 固定 argv 的 dpkg-query 命令执行误报；self_check.py:64 既有固定参数运行器误报；update_checker.py:110 固定 GitHub URL 的 SSRF 误报（已启用 TLS 验证）；test_network_library.py:325 既有测试假 token。其余 119 项位于既有未修改模块或 vendor，未全部判定或修复。</p><p>只运行本地 Shield，无 Spear、无远程源码上传。Vue/Shell/Dockerfile 不受扫描器语言支持，已用人工/构建/lint/浏览器补充。默认不扫描依赖与生成文件，目录软链接不递归。原始 JSON、stderr、退出码本地保留；交付附件去掉源码证据与绝对路径。</p></section><section class="card"><h2>2026-09-11 · 删除容器后重建补充验证</h2>
+<p>开发者补充关注“升级后删除并重建容器是否丢失版本与数据”。核对现有实现：Compose 已挂载完整 /data，prepare() 每次从 /data/updates/active.json 选择兼容且比内置镜像更新的版本。本轮不改变产品行为与加载器，仅补充部署操作说明及可重复 Docker 回归，属于原方案的非实质说明和验证证据，无需另建方案；无界面影响，不重跑 interface-review。</p>
+<p>新增 tests/test_upgrade_recreation.py，使用已升级至 v12 的隔离真实数据副本，分别停止、删除、用同一镜像/兼容镜像新建容器。容器 ID 两次均改变，v12 前后端、重新登录、书目、阅读入口、应用文件与书库/配置文件哈希保持：2 passed（32.81 秒）。两镜像内 executor.py 与当前分支 SHA-256 一致。原始 fixture 未修改，测试容器全部清理；fixture 没有已安装插件，未验证插件运行行为。</p>
+<p>命令：TMPDIR=/dev/shm TALEBOOK_RECREATE_FIXTURE=/dev/shm/tb213-verified TALEBOOK_RECREATE_COPY_APP=1 python3 -m pytest tests/test_upgrade_recreation.py -x -v -s --tb=short --basetemp=/dev/shm/tb213-recreation-final。首次默认磁盘运行因磁盘耗尽失败，最终将数据副本和每次从镜像新复制的内置应用放在 tmpfs；不把这次结果表述为默认 overlay、宿主重启持久性或生产镜像从零构建验证。前置复制权限问题在测试副本中通过重置权限初始化标记修正，生产启动器未变。</p>
+<p>独立协议及数据库备份测试：TMPDIR=/dev/shm python3 -m pytest tests/test_application_upgrade.py -q --basetemp=/dev/shm/tb213-unit-final，49 passed。普通临时目录的首次备份测试因不足 256 MiB 空间被正确拒绝。make lint-py-fix、make lint-py、新增测试 Ruff 检查均通过。新增回归无 fixture 默认跳过（2 skipped），不能把跳过当作容器验收通过。仅文档和测试变化，未重复全量应用测试与浏览器布局审查。</p>
+<p>本轮最终代码 DeepSec 0.2.0：deepsec shield scan . --layer l1,l2 --include-tests --format json --output -，全仓含测试/脚本 775 文件，L1/L2，退出码 2，stderr 为空；185 项发现（34 critical / 129 high / 22 medium）。新增测试 1 项 medium 为误报：test_upgrade_recreation.py:46 读取登录响应 err 字段判断就绪，不向客户端输出异常。其余 184 项位于分支既有代码，未逐项复核或修复，不能称完整安全通过。Vue/Shell/Dockerfile 不受扫描语言覆盖；本轮新增 Python 测试已覆盖。仅本地扫描，脱敏报告随事项交付。</p></section><section class="card"><h2>Release 自动分发补充（2026-09-11）</h2><p>开发者要求发布 Release 时上传应用升级资源，让客户端能实际获取包。沿用本 PR 唯一方案，尚未合并生效，恢复 WIP 后迭代。决策：正式 v* Release published 事件自动触发；草稿、预发布和 app-* 资源 Release 不触发。手动构建保留 publish=false 默认，可指定已有正式 Release 重试。</p><p>先在无 secret 的 prepare job 解析 tag 为完整 commit 并验证属于 master；构建和签名 job 使用固定 commit、受保护 environment。三架构完整且签名/commit/version/文件名一致后，先给版本 Release 上传并读回校验，再发布不可变 app-COMMIT 资源，最后推进 app-stable。版本 Release 不重建、不覆盖已有不同字节资产；发布 job 仅持有公钥与 GitHub token。没有签名配置应明确失败，不能生成无签名可安装包。</p><p>补充首次生成 Ed25519 密钥、GitHub environments/变量配置、容器只读公钥配置及实际 URL 布局，说明 PR 尚未合并、未执行正式发布、GITHUB_TOKEN 创建 Release 不递归触发工作流，需要手动入口。无产品界面影响，不重复界面审查。验证：TMPDIR=/dev/shm python3 -m pytest tests/test_upgrade_release.py tests/test_application_upgrade.py tests/test_ci_workflow.py -q --tb=short --basetemp=/dev/shm/tb213-release-unit，70 passed。覆盖三架构签名发布、正式 Release 与客户端 URL 同字节、完整矩阵验证、错误签名/提交/版本/架构/哈希、tag 移动、草稿/预发布、上传读回失败、资产冲突、重复发布幂等、annotated tag 解析及未进入 master 的提交拒绝。actionlint 1.7.7 -shellcheck= 检查本工作流通过；ShellCheck 未安装，未运行其检查。Python Ruff、make lint-py-fix、make lint-py 通过。部署文档的 OpenSSL/公钥 JSON 步骤已用一次性密钥执行验证，未生成或上传正式密钥。未运行 GitHub 正式 release 事件、三架构线上构建/上传及实际公开下载，不把单元内存存储测试当作线上发布通过。</p><p>最终 DeepSec 0.2.0：deepsec shield scan . --layer l1,l2 --include-tests --format json --output -，本轮最后代码修改后全仓 776 文件，L1/L2，退出码 2，stderr 空。185 项发现（34 critical / 129 high / 22 medium），本轮修改 workflow、发布脚本及新增测试均无发现；185 项在既有文件，未全部复核/修复，不是完整安全通过。Vue/Shell/Dockerfile 无语言覆盖；workflow 已用 actionlint 补充。仅本地 L1/L2，脱敏报告附事项。</p></section><section class="card"><h2>2026-09-12 版本管理与数据库快照（已验证）</h2><p>诉求：后台列出本地版本、删除、手动切换/回滚，设置保留 N 个版本，解释数据库副本与容器重建。沿用未合并 PR 的唯一方案。</p><p>决策：默认 N=3，允许 2–20。持久化版本元数据、管理偏好及手动选择；当前、上一和未完成事务引用不可删除。每次健康切换后清理多余版本与带关联元数据的新快照；旧的无关联快照不猜测归属、不自动删除，后台允许单独确认删除。受保护项可能使数量暂时超过 N。清理失败报告错误但不撤销健康应用。</p><p>快照采用停服后的 SQLite backup API，记录来源/目标完整 manifest、database 指纹、时间及 inventory。回滚先验证目标与基础镜像及当前应用的 runtime/database 相同，再停服、备份当前数据、原子切换、健康探测；禁止自动恢复 DB。元数据缺失的历史版本显示但禁止回滚，现有 active/previous 的可信记录可补齐。管理员 API 延续既有 same-origin 校验和全局互斥，严格限定 commit/备份 ID，不接收路径。</p><p>手动 pin 绑定基础镜像 commit/runtime/database，回滚至比镜像低序号的兼容版本也可在同镜像重建后保持；镜像变更使 pin 失效，按运行时兼容和版本序号选择。中断或启动失败同时恢复 previous 应用和 previous pin。</p><p>界面增加版本/快照列表、受保护与不兼容说明、删除和切换确认、N 设置确认及重建规则；中英文与窄屏/键盘验证。实际结果见下列最终验证与界面复审。</p></section><section class="card"><h2>2026-09-12 最终验证</h2>
+<p>python3 -m pytest tests/test_application_upgrade.py tests/test_upgrade_release.py tests/test_ci_workflow.py -q：93 passed。覆盖本地列表/删除/兼容性/保留 N、手动 pin、跨镜像失效、中断/健康失败恢复应用与 pin、清理失败不回退应用。隔离 Docker 中 PYTHONPATH=/usr/lib/calibre:/src python3 -m pytest tests/test_upgrade_api.py tests/test_upgrade_calibre_backup.py -q：9 passed，管理员转发、普通账号拒绝、同源保护与真实 Calibre 数据库备份通过。此次未重复首轮已通过的全量 1322 项。</p>
+<p>npx vitest run --config test/upgrade.vitest.config.ts：9 passed，覆盖受保护/不兼容状态、逐项选择/删除确认、重复打开设置弹窗、N 校验和成功反馈。npm run build-spa 成功；npm run lint：0 errors、429 条既有 warnings，最后改动组件单独 eslint 通过。make lint-py-fix、make lint-py、scripts/upgrade 与改动测试的 Ruff check/format 通过。</p>
+<p>TALEBOOK_VERSION_FIXTURE=隔离fixture TALEBOOK_VERSION_BROWSER=1 python3 -m pytest tests/test_upgrade_version_management.py -q -s --tb=short：1 passed（63.13 秒），内含真实 Playwright 2 passed（14.7 秒）。真实签名包 v2→v3→v4；新增独立 SQLite 测试数据后手动 v4→v2，当前数据及快照均含新记录，snapshot.json/inventory 对应 v4→v2。删除 v3 与可删除快照，设置 N=2；停止、删除、新建容器 ID 变化后仍自动运行 v2，pin 和保留数持久化、前端版本和书库文件哈希保持。此次使用默认 Docker overlay 和磁盘数据副本，没有 tmpfs 应用挂载；仅 amd64、现有本地基础镜像、fixture loopback TLS，不代表生产全量构建、多架构或公网/CDN验证。专用容器已清理。</p>
+<p>浏览器验证真实登录、书库/阅读、旧标签页 409 自动刷新，列表/快照、保留设置校验、取消/重复打开、Enter/Escape及焦点恢复、320px 明暗主题与减弱动画。初轮发现显式打开与 Vuetify activator 自动切换发生冲突，最终只保留显式打开并在关闭后恢复焦点。E2E 等待弹窗取得焦点后再发送 Escape，避免在 Vuetify 弹层注册前发键；按有名弹窗/输入框定位，避开背景数据库端口输入。截图位于 document/images/application-upgrade/versions-*.png 与 retention-mobile.png。</p>
+</section>
+<section class="card"><h2>2026-09-12 interface-review full · Scope and Coverage</h2>
+<table><tr><th>字段</th><th>范围</th></tr><tr><td>Target</td><td>feat/upgrade 整个分支及未提交修改</td></tr><tr><td>Base / Head</td><td>origin/master merge-base 26d8dd74c1b33109668fed4cbf1611cfc459688a；HEAD 720e22cb66b028e76c79893cba26b5192a417f82</td></tr><tr><td>Commits / Files</td><td>3 个已提交功能提交 + 13 个未提交文本文件（含新增测试与方案重命名）；共 40 个文本文件</td></tr><tr><td>排除</td><td>截图二进制、test-results、.deepsec、依赖、锁文件和构建输出；新截图单独目视复核</td></tr><tr><td>扩展消费者</td><td>GeneralSettingsContent、MetadataAutomationSettings、ImageCaptchaWidget、BookSourceImportDialog、GlobalDeviceSettings；共享 backend 其余 55 个 Vue 消费者未扩展；新 ApplicationUpgrade 完整审查</td></tr></table>
+<p>Nuxt/Vue/Vuetify，遵循 AGENTS.md、app/CLAUDE.md。完整比较新增/删除两侧：GeneralSettingsContent 的旧更新入口由新组件及无加载器时的镜像检查入口替代；共享 backend 的维护/版本响应影响已审查消费者。根源正确性和安全由测试/安全报告另行记录。</p>
+<table><tr><th>领域</th><th>证据及结果</th></tr><tr><td>Accessibility</td><td>Clear：按钮可访问名包含可见文字、受保护状态说明、live status、错误提示、确认、真实键盘/焦点恢复。</td></tr><tr><td>Layout</td><td>Clear：320px 列表和弹窗无水平溢出，ID/数据库指纹换行、操作正常可达。</td></tr><tr><td>Writing</td><td>Clear：两种语言完整；区分应用大小与下载大小，来源快照与目标版本，不承诺自动恢复数据库。</td></tr><tr><td>Typography</td><td>Clear：现有字号与层次，长元数据不截断，表单文字与帮助可读。</td></tr><tr><td>Colors</td><td>Clear：沿用主题正文/primary/error；截图明暗复核，深色删除文字为 #CF6679 / #121212，约 5.20:1；主操作 #FFFFFF / #1976D2 约 4.60:1。</td></tr><tr><td>UI</td><td>Clear：列表与操作分组、状态/禁用/确认沿用 Vuetify，未添加无意义过场。</td></tr></table>
+<h3>Findings</h3><p>No actionable interface findings in this change。复审前已修复 Introduced/HIGH：弹窗重复激活冲突；Introduced/MEDIUM：删除/设置结果缺少反馈、输入错误后焦点、安装大小误称下载大小。最终范围内无剩余 HIGH/MEDIUM/LOW。</p>
+<h3>Considered but Rejected</h3><table><tr><th>候选</th><th>不采纳依据</th></tr><tr><td>改成宽表格</td><td>长 ID 与手机操作更适合当前可换行列表，信息没有被截断。</td></tr><tr><td>点击回滚即恢复旧数据库</td><td>会覆盖新增数据，必须是单独恢复流程；属于数据正确性边界。</td></tr><tr><td>强制删除受保护项达到 N</td><td>会丢失当前/回退保障，页面已明确保护项可超 N。</td></tr></table>
+<h3>Pre-existing</h3><p>通用设置固定工具条、宣传条与 viewport 的 maximum-scale/user-scalable 限制早于本分支；不在本轮扩大重构，也不声明整个页面符合 WCAG。</p>
+<h3>Verification</h3><p>git merge-base origin/master HEAD、git log --oneline origin/master..HEAD、git diff --name-status origin/master...HEAD、git diff origin/master -- app/components/admin/GeneralSettingsContent.vue app/plugins/talebook.js conf/nginx/talebook.conf、git diff --check，以及新增组件/两语言完整源码、五个直接消费者已读。gh pr view 1044 --json state,headRefName,url,title 确认 OPEN / feat/upgrade。本轮复审没有 fetch/checkout/stash 或其他写 .git 操作；随后实现提交不属于只读审查。上列真实浏览器、组件测试、截图已核验；原生屏幕阅读器、浏览器菜单 200% 缩放和其他语言实际渲染 Not verified。</p>
+<h3>Verdict</h3><p>Approve，限上述变更范围与已验证覆盖。</p></section>
+<section class="card"><h2>2026-09-12 最终 DeepSec</h2><p>DeepSec 0.2.0；deepsec shield scan . --layer l1,l2 --include-tests --format json --output -。最后代码/测试修改后全仓扫描 777 文件，L1/L2；退出码 2，stderr 为空，有效报告 185 项（34 critical / 129 high / 22 medium），不是参数失败。本轮版本管理改动文件无命中；分支既有五处命中经复核：fingerprint.py:34 固定 dpkg-query argv、self_check.py:64 固定自检命令、update_checker.py:110 固定 GitHub HTTPS 地址、test_network_library.py:325 测试假 token、test_upgrade_recreation.py:46 仅检查响应 err 的就绪判断。其余既有发现未全部评估或修复，不声明完整安全通过。</p><p>Vue/Shell/Dockerfile 不受扫描语言覆盖，以人工、lint、生产构建和真实浏览器补充。默认排除依赖/生成产物，源目录未发现跨边界软链接。仅本地 Shield L1/L2；原始报告、stderr 和退出码保留，交付版本移除源码证据和绝对路径。</p></section><section class="card"><h2>历史版本管理浮窗（本轮已验证）</h2><p>开发者要求恢复之前简洁的升级主界面。保留当前版本、检查/安装、进度与结果，仅增加“管理历史版本”按钮；点击后打开可滚动浮窗，内部保留版本/快照列表、保留数量及原有二次确认。关闭子确认回到管理浮窗，关闭管理浮窗回到入口焦点。业务 API、回滚和保留策略不变。验证组件、真实 Docker/浏览器的层级关闭与焦点、320px 明暗主题，完成 full 界面复审及 DeepSec。</p></section><section class="card"><h2>历史版本浮窗 · 验证与 interface-review full</h2>
+<h3>Scope and Coverage</h3><table><tr><th>字段</th><th>范围</th></tr><tr><td>Target / Base / Head</td><td>feat/upgrade 全分支及未提交修改；origin/master merge-base 26d8dd74c1b33109668fed4cbf1611cfc459688a；HEAD cc3175029eb7b10061180182c3283877b8e3d03c</td></tr><tr><td>Commits / Files</td><td>4 个已有提交 + 本轮 7 个文本文件；全分支 40 个文本文件。排除依赖、构建/测试结果、.deepsec、锁文件及截图二进制；截图作为渲染证据单独复核。</td></tr><tr><td>消费者</td><td>延续前次全分支审查：GeneralSettingsContent、MetadataAutomationSettings、ImageCaptchaWidget、BookSourceImportDialog、GlobalDeviceSettings 五处；共享 backend 其余 55 个消费者未扩展。此前代码与结论保留，本轮复读移动前后全部控件、状态与反馈。</td></tr></table>
+<p>Nuxt/Vue/Vuetify，使用已有主题、按钮与对话框。依据 AGENTS.md、app/CLAUDE.md 和 interface-review/better-interface 及六领域技能；原主界面保留，管理按钮打开滚动浮窗。删除/回滚/设置二次确认仍保留，反馈显示在当前浮窗内。</p>
+<table><tr><th>领域</th><th>证据与结果</th></tr><tr><td>Accessibility</td><td>Clear：具名浮窗/按钮；Enter 打开、Escape 逐层关闭、父子焦点恢复与重复打开实测；错误 alert 和进度 live region 保留。</td></tr><tr><td>Layout</td><td>Clear：内容单独滚动、关闭按钮固定在卡片底部；320px 页面与浮窗内容均无横向溢出，长按钮可换行。</td></tr><tr><td>Writing</td><td>Clear：管理历史版本/关闭含中英文；保留原有风险说明和二次确认文案。</td></tr><tr><td>Typography</td><td>Clear：沿用字号与层级，版本/快照长标识完整换行。</td></tr><tr><td>Colors</td><td>Clear：沿用中性正文与已验证主题色；明暗实际截图复核，无新增调色。</td></tr><tr><td>UI</td><td>Clear：主界面恢复简洁、历史内容按需展示，无新增过场动画；入口、关闭和确认可达。</td></tr></table>
+<h3>Findings</h3><p>No actionable interface findings in this change；无剩余 Introduced/Regression HIGH/MEDIUM/LOW。移动时同时迁入进度、成功/失败反馈，避免操作结果落到遮罩后的主页面。</p>
+<h3>Considered but Rejected</h3><table><tr><th>候选</th><th>未采用原因</th></tr><tr><td>主页面继续展示列表摘要</td><td>与本轮保持前一版主界面的明确要求不符，按钮足以提供入口。</td></tr><tr><td>取消二次确认以减少浮窗层级</td><td>删除和版本切换仍需确认，已实测关闭子弹窗不会关闭父浮窗。</td></tr><tr><td>自定义浮窗系统</td><td>现有 Vuetify 已支持堆叠、滚动与焦点机制，无需另造组件体系。</td></tr></table>
+<h3>Verification</h3><p>git merge-base origin/master HEAD、git rev-list --count origin/master..HEAD、git diff --name-only origin/master...HEAD、git diff -w -- app/components/admin/ApplicationUpgrade.vue app/i18n/locales/zh-CN.json app/i18n/locales/en-US.json、git diff --check；gh pr view 1044 --json state,headRefName,headRefOid 确认 OPEN/feat/upgrade。未通过 fetch、checkout 或 stash 改写审查范围。</p>
+<p>npx vitest run --config test/upgrade.vitest.config.ts：9 passed，列表仅在浮窗打开后存在，管理操作转发/确认与反馈通过。npm run build-spa 成功；npm run lint：0 errors、429 条既有 warnings，最终组件单独 eslint 通过。后端代码未改，未重复后端全量测试。</p>
+<p>最终产物：TALEBOOK_VERSION_FIXTURE=隔离fixture TALEBOOK_VERSION_BROWSER=1 python3 -m pytest tests/test_upgrade_version_management.py -q -s --tb=short：1 passed（75.17 秒），内含 Playwright 2 passed（16.6 秒）。真实 Docker/登录/书库/阅读/升级、回滚与重建验证继续通过；浏览器验证主页面隐藏历史列表、打开/关闭与重复打开、父子弹窗键盘/焦点、N 输入与成功提示、320px 明暗主题。截图已更新并增加 upgrade-compact.png。测试容器已清理。仅本地 amd64 既有运行时与 loopback HTTPS fixture，不代表正式分发验证。</p>
+<p>Chrome DevTools MCP list_pages 返回共享 profile 已占用，未终止共享浏览器，改用独立 Playwright Chromium。原生屏幕阅读器、浏览器菜单 200% 缩放及英文实际渲染 Not verified；既有 viewport 缩放限制不在本轮扩大修改，不声明整个应用符合 WCAG。</p>
+<h3>Verdict</h3><p>Approve，限已审查变更与实测覆盖。</p></section><section class="card"><h2>浮窗改动 · 最终安全扫描</h2><p>DeepSec 0.2.0；deepsec shield scan . --layer l1,l2 --include-tests --format json --output -。最终全仓 777 文件、L1/L2、退出码 2、stderr 空；185 项既有发现（34 critical / 129 high / 22 medium），本轮变更文件无命中。既有报告未全部评估/修复，不能视为完整安全通过。首次并行尝试进程退出 143 且无有效报告，已在构建后重新完成扫描。Vue/Shell/Dockerfile 不受语言覆盖，以源码审查、lint、构建、真实浏览器补充；仅本地 L1/L2，无源码远程上传。交付报告移除源码证据及绝对路径。</p></section></main></body></html>

@@ -97,7 +97,13 @@ jobs:
             VERSION=$(git describe --tags --always --match 'v[0-9]*')
           fi
           SAFE_REF_NAME=${GITHUB_REF_NAME//\//-}
-          echo "build_args=GIT_VERSION=$VERSION" >> $GITHUB_OUTPUT
+          {
+            echo 'build_args<<UPGRADE_ARGS'
+            echo "GIT_VERSION=$VERSION"
+            echo "GIT_COMMIT=$GITHUB_SHA"
+            echo "UPGRADE_SEQUENCE=$(git show -s --format=%ct HEAD)"
+            echo 'UPGRADE_ARGS'
+          } >> "$GITHUB_OUTPUT"
           echo "safe_ref_name=$SAFE_REF_NAME" >> $GITHUB_OUTPUT
 
       - name: Set build matrix

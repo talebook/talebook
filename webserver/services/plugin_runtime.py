@@ -885,6 +885,7 @@ class PluginRuntime:
                     "key": connection.id,
                     "plugin_key": plugin_key,
                     "connection": connection,
+                    "context": context,
                     "secrets": secrets,
                     "call": call,
                     "run": run,
@@ -1397,7 +1398,8 @@ class PluginRuntime:
                 "token": token,
                 "attempt": 0,
                 "max_retries": max(0, min(5, int((connection.config or {}).get("max_retries", 2)))),
-                "deadline": time.monotonic() + effective_timeout,
+                "timeout": effective_timeout,
+                "deadline": None,
             }
             states[connection.id] = state
             return state
@@ -1418,6 +1420,13 @@ class PluginRuntime:
             state["attempt"] += 1
             state["run"].attempt = state["attempt"]
             self.session.commit()
+            if state["deadline"] is None:
+                # Preparing the other connections and persisting runs must not
+                # consume this connection's I/O timeout before it is dispatched.
+                state["deadline"] = time.monotonic() + state["timeout"]
+                state["unit"]["context"]["deadline"] = (
+                    datetime.datetime.now() + datetime.timedelta(seconds=state["timeout"])
+                ).isoformat()
             future = _PLUGIN_IO_EXECUTOR.submit(state["unit"]["call"], method, *args)
             futures[future] = state
 

@@ -58,9 +58,7 @@ chown -R talebook:talebook \
   /var/www/talebook/app/dist \
   /var/www/talebook/webserver \
   /var/www/talebook/server.py \
-  /var/www/talebook/status \
-  /usr/lib/calibre \
-  /usr/share/calibre
+  /var/www/talebook/status
 
 if [ -f /data/books/ssl/ssl.crt ]; then
   chmod 0644 /data/books/ssl/ssl.crt
@@ -76,5 +74,11 @@ fi
 export PYTHONDONTWRITEBYTECODE=1
 
 echo
+# Loader and attestation are image-owned; SSR deliberately keeps its original layout.
+if [ "${TALEBOOK_UPGRADE_MODE}" = "spa" ]; then
+  export TALEBOOK_NUXT_ENV_PATH=/var/www/talebook/app/.env
+  python3 /opt/talebook-upgrade/executor.py prepare || exit 1
+fi
+
 echo "====== Start Server ===="
 exec /usr/bin/supervisord --nodaemon -u root -c /etc/supervisor/supervisord.conf
