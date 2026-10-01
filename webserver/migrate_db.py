@@ -161,6 +161,33 @@ def get_database_columns(engine):
     return db_columns
 
 
+def ensure_scanfile_indexes(engine):
+    """Add scan query indexes independently of column migrations, including on old databases."""
+    try:
+        inspector = inspect(engine)
+        existing = inspector.get_indexes("scanfiles") + inspector.get_unique_constraints("scanfiles")
+    except Exception:
+        logger.warning("Cannot inspect scanfiles indexes; retry on next startup", exc_info=True)
+        return
+
+    for index in sorted(models.ScanFile.__table__.indexes, key=lambda item: item.name):
+        columns = [column.name for column in index.columns]
+        # A wider index with the same prefix already supports these queries.
+        if any(
+            item.get("column_names", [])[: len(columns)] == columns
+            and all(item.get("dialect_options", {}).get(option) is None for option in ("sqlite_where", "postgresql_where"))
+            for item in existing
+        ):
+            continue
+        try:
+            logger.info("Creating scan query index %s (large libraries may take time)", index.name)
+            with engine.begin() as connection:
+                index.create(connection, checkfirst=True)
+        except Exception:
+            # Optional indexes must not roll back unrelated schema migrations.
+            logger.warning("Cannot create %s; retry on next startup", index.name, exc_info=True)
+
+
 def compare_and_migrate(engine):
     """Compare model definitions with database schema and perform migration"""
     logger.info("=" * 60)
@@ -205,6 +232,7 @@ def compare_and_migrate(engine):
         logger.info("Database columns are up to date; checking data and constraints")
         backfill_plugin_connection_roles(engine)
         migrate_plugin_connection_unique_constraint(engine)
+        ensure_scanfile_indexes(engine)
         return True
 
     logger.info(f"Found {len(migrations_needed)} columns to migrate:")
@@ -236,6 +264,7 @@ def compare_and_migrate(engine):
         )
         backfill_plugin_connection_roles(engine, include_default=role_added)
         migrate_plugin_connection_unique_constraint(engine)
+        ensure_scanfile_indexes(engine)
 
     return error_count == 0
 

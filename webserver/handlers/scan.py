@@ -227,10 +227,10 @@ class Scanner:
 
     def summary(self):
         done_status = [ScanFile.EXIST, ScanFile.IMPORTED, ScanFile.INDEXED]
-        query = self.session.query(ScanFile)
-        total = query.count()
-        done = query.filter(ScanFile.status.in_(done_status)).count()
-        failed = query.filter(ScanFile.status.in_([ScanFile.FAILED, ScanFile.DELETE_FAILED])).count()
+        counts = dict(self.session.query(ScanFile.status, sqlalchemy.func.count(ScanFile.id)).group_by(ScanFile.status).all())
+        total = sum(counts.values())
+        done = sum(counts.get(status, 0) for status in done_status)
+        failed = sum(counts.get(status, 0) for status in [ScanFile.FAILED, ScanFile.DELETE_FAILED])
         todo = total - done - failed
         return {"total": total, "done": done, "todo": todo, "failed": failed}
 
@@ -285,9 +285,13 @@ class Scanner:
         return (scan_id, self.count(query))
 
     def count(self, query):
-        rows = query.all() if query else []
+        rows = (
+            query.with_entities(ScanFile.status, sqlalchemy.func.count(ScanFile.id)).group_by(ScanFile.status).all()
+            if query is not None
+            else []
+        )
         count = {
-            "total": len(rows),
+            "total": 0,
             ScanFile.NEW: 0,
             ScanFile.DROP: 0,
             ScanFile.EXIST: 0,
@@ -299,10 +303,9 @@ class Scanner:
             ScanFile.DELETE_FAILED: 0,
             ScanFile.FAILED: 0,
         }
-        for row in rows:
-            if row.status not in count:
-                count[row.status] = 0
-            count[row.status] += 1
+        for status, total in rows:
+            count[status] = total
+            count["total"] += total
         return count
 
 

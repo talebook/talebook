@@ -7,6 +7,9 @@ import logging
 import os
 import threading
 import time
+from itertools import islice
+
+from sqlalchemy import func, or_
 
 from webserver import loader, utils
 from webserver.i18n import _
@@ -45,44 +48,65 @@ def normalize_import_mode(import_mode=None, delete_after=False):
     return saved_mode if saved_mode in IMPORT_MODES else IMPORT_MODE_COPY
 
 
-def collect_scan_tasks(path_dir, limit, done_paths):
-    """遍历 path_dir 收集待扫描的书文件候选。
+SCAN_QUERY_BATCH_SIZE = 500
+IMPORT_QUERY_BATCH_SIZE = 100
 
-    done_paths 里已登记且处理完毕的路径直接跳过、不占批次名额，扫描窗口始终只被
-    真正需要处理的文件填满——即使每轮都从树根重走，窗口也会随登记积累不断向树深处推进，
-    不会卡死在目录头部（每轮收集到同一批旧文件，其后的新文件永远扫不到）。
-    """
-    has_books = False
-    tasks = []
-    skipped = 0
+
+def iter_scan_files(path_dir):
+    """Yield candidates without retaining the whole directory tree."""
     for dirpath, dirnames, filenames in os.walk(path_dir):
-        # 排除隐藏文件夹（以.开头或@__thumb等）
         dirnames[:] = [
             d for d in dirnames if not (d.startswith(".") or d.startswith("@__") or os.path.islink(os.path.join(dirpath, d)))
         ]
-
         for fname in filenames:
-            # 排除隐藏文件
-            if fname.startswith("."):
+            if fname.startswith(".") or "." not in fname:
                 continue
-
+            fmt = fname.rsplit(".", 1)[-1].lower()
+            if fmt not in SCAN_EXT:
+                continue
             fpath = os.path.join(dirpath, fname)
             if os.path.islink(fpath) or not os.path.isfile(fpath):
                 continue
+            yield fname, fpath, fmt
 
-            fmt = fpath.split(".")[-1].lower()
-            if fmt not in SCAN_EXT:
-                continue
-            has_books = True
-            if fpath in done_paths:
-                skipped += 1
-                continue
-            tasks.append((fname, fpath, fmt))
-            if limit and len(tasks) >= limit:
-                break
-        if limit and len(tasks) >= limit:
-            break
-    return has_books, tasks, skipped
+
+def iter_scan_task_batches(path_dir, limit, lookup_done, batch_size=SCAN_QUERY_BATCH_SIZE):
+    """Look up only one batch of paths; completed files never consume the scan limit."""
+    candidates = iter_scan_files(path_dir)
+    remaining = limit if limit and limit > 0 else None
+    while True:
+        batch = list(islice(candidates, batch_size))
+        if not batch:
+            return
+        done = lookup_done([path for _, path, _ in batch])
+        tasks = [task for task in batch if task[1] not in done]
+        if remaining is not None:
+            tasks = tasks[:remaining]
+            remaining -= len(tasks)
+        if tasks:
+            yield tasks
+        if remaining == 0:
+            return
+
+
+def iter_scan_rows(query, batch_size=IMPORT_QUERY_BATCH_SIZE):
+    """Keyset pagination survives status changes/commits and excludes newly inserted rows."""
+    upper_id = query.order_by(None).with_entities(func.max(ScanFile.id)).scalar()
+    if upper_id is None:
+        return
+    last_id = 0
+    while True:
+        rows = (
+            query.filter(ScanFile.id > last_id, ScanFile.id <= upper_id)
+            .order_by(None)
+            .order_by(ScanFile.id)
+            .limit(batch_size)
+            .all()
+        )
+        if not rows:
+            return
+        last_id = rows[-1].id
+        yield from rows
 
 
 class ScanService(AsyncService):
@@ -214,83 +238,59 @@ class ScanService(AsyncService):
     def do_scan(self, path_dir, limit=None):
         return self._do_scan(path_dir, limit=limit)
 
-    def _load_done_paths(self, path_dir):
-        """加载当前扫描根下已登记且处理完毕（非 NEW 状态、真实哈希）的文件路径。
-
-        判定条件与 _do_scan 第二阶段对已知路径的跳过条件严格一致：NEW 状态行、
-        中断残留的 fstat: 临时哈希行都不算 done，仍会占批次名额并被重新处理。
-        """
-        prefix = os.path.join(path_dir, "")
+    def _load_done_paths(self, paths):
+        """Fetch completed paths only for the current candidate batch, not the whole library."""
         query = self.session.query(ScanFile.path).filter(
-            ScanFile.path.startswith(prefix, autoescape=True),
+            ScanFile.path.in_(paths),
             ScanFile.status != ScanFile.NEW,
             ~ScanFile.hash.like("fstat:%"),
         )
         return {row[0] for row in query}
 
     def _do_scan(self, path_dir, limit=None):
-        from calibre.ebooks.metadata.meta import get_metadata
-
-        logging.info("<%s> we are: db=%s, session=%s", self, self.db, self.session)
         logging.info("start to scan %s", path_dir)
-
-        # 先收集目录中待扫描的书籍；已处理完毕的文件不占批次名额
-        done_paths = self._load_done_paths(path_dir)
-        has_books, tasks, skipped = collect_scan_tasks(path_dir, limit, done_paths)
-        logging.info(
-            "scan %s: done=%d, skipped=%d, candidates=%d, limit=%s",
-            path_dir,
-            len(done_paths),
-            skipped,
-            len(tasks),
-            limit,
-        )
-
-        # 检查是否有符合条件的书籍文件
-        if not has_books:
-            logging.info("在目录 %s 中没有找到符合条件的书籍文件", path_dir)
-            return
-
-        # 生成任务ID
         scan_id = int(time.time())
-        logging.info("========== start to check files size & name ============")
+        processed = 0
+        for tasks in iter_scan_task_batches(path_dir, limit, self._load_done_paths):
+            self._register_scan_batch(tasks, scan_id)
+            processed += len(tasks)
+        logging.info("scan %s: candidates=%d, limit=%s", path_dir, processed, limit)
+        if processed:
+            query = self.session.query(ScanFile).filter(
+                ScanFile.scan_id == scan_id,
+                or_(ScanFile.status == ScanFile.NEW, ScanFile.hash.like("fstat:%")),
+            )
+            self._scan_metadata(iter_scan_rows(query))
 
-        rows = []
-        inserted_hash = set()
+    def _register_scan_batch(self, tasks, scan_id):
         for fname, fpath, fmt in tasks:
             # logging.info("Scan: %s", fpath)
             # 检查是否已存在相同路径的记录
-            samefiles = self.session.query(ScanFile).filter(ScanFile.path == fpath)
-            if samefiles.count() > 0:
+            row = self.session.query(ScanFile).filter(ScanFile.path == fpath).first()
+            if row is not None:
                 # 如果已经有相同的文件记录，则处理现有记录
-                row = samefiles.first()
                 # 更新扫描ID为当前扫描ID
                 row.scan_id = scan_id
                 # 更新时间
                 row.update_time = datetime.datetime.now()
                 # 只处理NEW状态的记录，其他状态跳过
-                if row.status == ScanFile.NEW:
-                    rows.append(row)
-                else:
-                    # 检查现有记录的哈希是否为真实哈希（非临时哈希），如果是则跳过
-                    if not row.hash.startswith("fstat:"):
-                        continue
-                    # 如果是临时哈希，尝试重新处理
-                    rows.append(row)
+                if row.status == ScanFile.NEW or row.hash.startswith("fstat:"):
+                    row.status = ScanFile.NEW
+                    self.save_or_rollback(row)
                 continue
 
             # 检查是否已存在相同真实哈希的记录
             stat = os.stat(fpath)
-            md5 = hashlib.md5(fname.encode("UTF-8")).hexdigest()
+            md5 = hashlib.md5(fpath.encode("UTF-8")).hexdigest()
             temp_hash = "fstat:%s/%s" % (stat.st_size, md5)
 
             # 创建文件对象
             row = ScanFile(fpath, temp_hash, scan_id)
             if not self.save_or_rollback(row):
                 continue
-            rows.append(row)
-            inserted_hash.add(temp_hash)
-        # self.session.bulk_save_objects(rows)
+
+    def _scan_metadata(self, rows):
+        from calibre.ebooks.metadata.meta import get_metadata
 
         logging.info("========== start to check files hash & meta ============")
         # 检查文件哈希值，检查DB重复情况
@@ -302,8 +302,8 @@ class ScanService(AsyncService):
             sha256 = hashlib.sha256()
             try:
                 with open(fpath, "rb") as f:
-                    # Read and update hash string value in blocks of 4K
-                    for byte_block in iter(lambda: f.read(4096), b""):
+                    # Keep full-content SHA-256; larger blocks reduce Python/read call overhead.
+                    for byte_block in iter(lambda: f.read(1024 * 1024), b""):
                         sha256.update(byte_block)
             except FileNotFoundError:
                 logging.warning("扫描时文件已不存在，跳过: %s", fpath)
@@ -542,7 +542,7 @@ class ScanService(AsyncService):
         imported = []
 
         # 逐个处理
-        for row in query.all():
+        for row in iter_scan_rows(query.filter(ScanFile.import_id == import_id)):
             fpath = row.path
             fname = os.path.basename(row.path)
             fmt = fpath.split(".")[-1].lower()

@@ -10,7 +10,20 @@ import secrets
 
 import bcrypt
 from social_sqlalchemy.storage import JSONType, SQLAlchemyMixin
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.ext.mutable import Mutable
 from sqlalchemy.orm import declarative_base, object_session, relationship
 
@@ -379,6 +392,12 @@ class AuthorAlias(Base, SQLAlchemyMixin):
 
 class ScanFile(Base, SQLAlchemyMixin):
     __tablename__ = "scanfiles"
+    __table_args__ = (
+        Index("ix_scanfiles_path", "path", mysql_length=191),
+        Index("ix_scanfiles_scan_id_status", "scan_id", "status"),
+        Index("ix_scanfiles_import_id_status", "import_id", "status"),
+        Index("ix_scanfiles_status_id", "status", "id"),
+    )
     id = Column(Integer, primary_key=True)
     scan_id = Column(Integer, default=0)
     import_id = Column(Integer, default=0)

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 扫描索引、聚合统计与有界批处理方案。" />
+    <link rel="icon" href="data:," />
+    <title>海量扫描查询与批处理优化 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><div class="page"><header class="hero"><h1>海量扫描查询与批处理优化</h1><p class="sub">减少重复扫描的数据库开销，控制历史记录与导入队列的内存占用。</p><div class="chips"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-10-01</span><span class="chip">所属模块：webserver</span><span class="chip">需求来源：开发者直接会话</span></div></header><main id="main-content">
+<section class="card"><h2>1. 原始诉求</h2><p>“那现在对talebook应用一下这个方案”。将已研究的扫描优化按当前架构落地，方案文档不出现指定的外部项目名称。</p></section>
+<section class="card"><h2>2. 目标与边界</h2><p>优化路径查重、批次统计、扫描历史查询与全量导入；保持现有扫描后确认再导入、完整 SHA-256、目录权限及复制/移动/索引模式。已有 hashlist=all 服务端全选能力直接复用，现有记录删除是单条 SQL，不读取全表 ORM 对象。</p><p>本次不新增批量删除后台任务、取消按钮或抽样哈希；不合并扫描与导入阶段。它们需要新增产品交互或改变现有确认边界，不能机械套用。历史路径跳过语义保持不变，不宣称实现内容变化监控。</p></section>
+<section class="card"><h2>3. 现状与决策核对</h2><p>已逐项核对：hash 有唯一约束；path 缺索引；扫描和导入批次轮询逐行取状态；summary 使用三次 COUNT；扫描加载整个目录历史路径；导入 query.all() 加载全部 ORM 对象。当前没有 import_type 列，不添加无用途的索引字段。</p><p>grill 技能在仓库与可用技能目录中未找到，因此按现有需求逐项完成决策核对：保留完整摘要、复用现有全选、仅优化查询与处理分块、迁移保持幂等与失败隔离。无新增产品选择需要开发者确认。</p></section>
+<section class="card"><h2>4. 方案</h2><div class="table-wrap"><table><thead><tr><th>位置</th><th>实现</th><th>约束</th></tr></thead><tbody>
+<tr><td>模型与迁移</td><td>path、(scan_id,status)、(import_id,status)、(status,id) 索引</td><td>MySQL 的长路径使用 191 字符前缀索引，查询仍按完整路径比对；新库模型自动创建；旧库迁移独立建索引；已有等效索引复用；hash 保留唯一约束</td></tr>
+<tr><td>扫描</td><td>目录候选按 500 个分组，按路径 IN 查询本组已处理记录；分组登记后按 ID 分页解析元数据</td><td>已登记文件不占扫描名额；NEW 与临时指纹仍重试；继续遍历旧目录寻找新文件</td></tr>
+<tr><td>查重与指纹</td><td>同路径一次 first 替代 count+first；临时指纹包含完整路径；完整哈希使用较大读取块</td><td>保持内容查重语义，避免同名同大小的不同路径发生临时指纹冲突</td></tr>
+<tr><td>导入</td><td>记录 ID 游标分页，任务开始捕获最大 ID，逐文件继续使用原有入库流程</td><td>分页不使用 OFFSET，状态变化不跳行，新插入记录不混入当前任务；逐文件提交保障恢复</td></tr>
+<tr><td>进度</td><td>数据库 GROUP BY 聚合返回计数</td><td>响应字段与状态口径保持兼容</td></tr></tbody></table></div></section>
+<section class="card"><h2>5. 影响范围与兼容性</h2><p>涉及 webserver/models.py、webserver/migrate_db.py、webserver/services/scan.py、webserver/handlers/scan.py 及测试。spec/书库.md 的行为规则保持不变，仅在实现对照中记录落点。无界面影响：不改前端、按钮、文案、接口字段或操作契约，豁免 interface-review；仍用接口回归核对旧响应。</p><p>索引首次构建读取历史表并可能持有数据库写锁；每个索引独立事务，失败仅告警并下次重试，不影响已提交的表结构迁移。回滚代码时索引可保留，不删数据。</p><p>为避免扫描分块之间 NEW 数量归零导致前端提前停止轮询，保留先登记候选、再分页解析的两阶段顺序。扫描仍需要遍历目录，os.walk 单目录文件名列表仍与目录大小相关；Calibre 入库、媒体解析及完整文件读取仍有成本，不承诺线性加速倍数。导入后的元数据填充 ID 列表尚随成功数量增长。</p></section>
+<section class="card" id="tests"><h2>6. 测试计划与结果</h2><p>已覆盖索引迁移幂等、旧库唯一约束、等效与部分索引、失败隔离及重试、SQLite 查询计划、MySQL 索引 DDL；分块查询与扫描名额推进；登记完成后再处理元数据；同名同大小文件；完整摘要区别正文变化；分页期间状态变化、删除与新增记录隔离；统计字段兼容。</p><ul><li>Docker 环境执行 <code>python3 -m pytest tests/test_scan_performance.py tests/test_scan.py -q -k &quot;not long_titles_survive_scan_import_and_api&quot;</code>：50 passed，1 deselected。</li><li>Docker 环境执行 <code>make pytest</code>：1806 passed，46 skipped，10 failed。10 个失败全部在未修改的基线 db5744b1 上复现：2 个规格覆盖检查（已有 EPUB 精修插件缺少规格归属），1 个阅读器 bootstrap 503，1 个长书名 EPUB 元数据测试（精简镜像缺少 Qt），6 个发布流程测试（镜像缺少 git）。未修改这些相邻功能。全量执行后新增隐藏文件/符号链接候选回归，已由上述 50 项定向测试覆盖。</li><li>执行 <code>make lint-py-fix</code>、<code>make lint-py</code> 及新增测试/基准脚本的 Ruff 检查：通过。</li><li>执行 <code>make check-spec</code>：基线已有插件规格缺失，同一问题已用 <code>python3 scripts/check_spec.py --root ../talebook-scan-baseline</code> 复现。</li><li>最终索引测试 <code>python3 -m pytest tests/test_scan_performance.py -q</code>：16 passed。本机完整 Calibre/Qt 环境补跑 <code>tests/test_scan.py::TestImport::test_long_titles_survive_scan_import_and_api</code>：1 passed，覆盖 EPUB/PDF/TXT 的 copy/move/index 九种组合。扫描相关用例合计 51 项通过（Docker 50 项、本机补跑 1 项）。</li><li>本机补跑命令：<code>QT_QPA_PLATFORM=offscreen QTWEBENGINE_DISABLE_SANDBOX=1 ../scan-test-venv/bin/python ../scan-test-tools/run_scan_tests.py tests/test_scan.py::TestImport::test_long_titles_survive_scan_import_and_api -q</code>。Python 3.12.3、系统完整 Calibre 与 Qt、SQLAlchemy 2.0.52；辅助 runner 仅把 themes_path 指向临时目录后调用 pytest.main，避免非 root 测试尝试创建 /data/books。最初直接运行时 16 项单测通过、35 项因该目录权限在 setup 阶段报错，调整测试目录后单独补跑受 Qt 限制的用例成功；未改业务逻辑或 mock 元数据功能。</li><li>最终 <code>make check-design</code>：166 份方案通过；<code>git diff --check</code>：通过。</li></ul><p>Docker 使用已安装的 ghcr.io/talebook/talebook:master 镜像，挂载当前代码并在独立目录安装 requirements-test.txt；为诊断 EPUB 测试添加了仅测试环境使用的 Calibre worker 入口，但精简镜像仍缺 Qt。该辅助入口和依赖目录不进入提交。没有前端改动，因此未启动体验服务或执行页面截图验收。</p></section>
+<section class="card"><h2>7. 合成 SQLite 专项基准</h2><p>Python 3.12.3，在内存 SQLite 中构造扫描记录。每组执行 100 次路径查询；进度统计比较逐行取状态与 GROUP BY 聚合。只反映 SQL 和 Python 结果分配，不代表磁盘扫描或 Calibre 入库总耗时。</p><div class="table-wrap"><table><thead><tr><th>记录数</th><th>路径查询：优化前 / 后（秒）</th><th>统计：优化前 / 后（秒）</th><th>统计 Python 峰值：优化前 / 后</th><th>首次建索引（秒）</th></tr></thead><tbody><tr><td>1 万</td><td>0.046870 / 0.000311</td><td>0.029401 / 0.001196</td><td>1,052,311 / 720 字节</td><td>0.017623</td></tr><tr><td>10 万</td><td>0.522680 / 0.000393</td><td>0.249722 / 0.011527</td><td>10,375,359 / 624 字节</td><td>0.206935</td></tr><tr><td>100 万</td><td>6.100352 / 0.000491</td><td>2.539630 / 0.114745</td><td>105,053,103 / 624 字节</td><td>2.468253</td></tr></tbody></table></div><p>实际命令：<code>python3 scripts/benchmark_scan_queries.py</code>。性能数值仅为本机单次样本，不作为跨机器固定阈值。MySQL 仅验证索引 DDL 编译，未连接真实 MySQL 压测。</p></section></main><footer>Talebook internal design · webserver · ACTIVE · 2026-10-01</footer></div></body></html>
