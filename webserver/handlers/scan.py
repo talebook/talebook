@@ -562,7 +562,7 @@ class ScanStatus(BaseHandler):
     def get(self):
         m = Scanner(self.db, self.session)
         status = m.scan_status()[1]
-        return {"err": "ok", "msg": _("成功"), "status": status, "summary": m.summary()}
+        return {"err": "ok", "msg": _("成功"), "status": status, "summary": m.summary(), "task": ScanService().task_status()}
 
 
 class ImportRun(BaseHandler):
@@ -591,7 +591,21 @@ class ImportStatus(BaseHandler):
     def get(self):
         m = Scanner(self.db, self.session)
         status = m.import_status()[1]
-        return {"err": "ok", "msg": _("成功"), "status": status, "summary": m.summary()}
+        return {"err": "ok", "msg": _("成功"), "status": status, "summary": m.summary(), "task": ScanService().task_status()}
+
+
+class ImportTask(BaseHandler):
+    @js
+    @auth
+    @is_admin
+    def get(self):
+        return {"err": "ok", "task": ScanService().task_status()}
+
+    @js
+    @auth
+    @is_admin
+    def delete(self):
+        return {"err": "ok", "task": ScanService().cancel_task()}
 
 
 def routes():
@@ -606,5 +620,6 @@ def routes():
         (r"/api/admin/import/directory/list", ImportDirectoryList),
         (r"/api/admin/import/watch/status", ImportWatchStatus),
         (r"/api/admin/import/run", ImportRun),
+        (r"/api/admin/import/task", ImportTask),
         (r"/api/admin/import/status", ImportStatus),
     ]

@@ -823,6 +823,10 @@ class TestScanBatchWindow(TestWithUserLogin):
     """
 
     def setUp(self):
+        # Production workers close their session after each queued operation.
+        # Direct synchronous tests must do the same when fixtures delete rows.
+        ScanService().close_session()
+        self.addCleanup(ScanService().close_session)
         self.session = self.get_app().settings["ScopedSession"]
         self.session.rollback()
         return super().setUp()

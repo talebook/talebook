@@ -911,6 +911,16 @@
         "queued": "排队中 {0}",
         "importing": "导入中 {0}",
         "failed": "失败 {0}"
+      },
+      "task": {
+        "stop": "停止当前任务",
+        "stopping": "正在停止，当前书籍处理完成后结束。",
+        "stopped": "任务已停止，已完成结果保留；剩余文件可重新扫描或导入。自动监控任务停止后需重新开启。",
+        "progress": "已处理 {count} 项，失败 {failed} 项",
+        "completed": "任务已完成，已处理 {count} 项，失败 {failed} 项；请查看下方扫描记录。",
+        "stopFailed": "停止请求失败，请重试。",
+        "startFailed": "无法启动任务，请重试。",
+        "failed": "任务异常结束，请检查失败记录后重试。"
       }
     },
     "settings": {
