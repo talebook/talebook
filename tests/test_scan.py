@@ -823,6 +823,10 @@ class TestScanBatchWindow(TestWithUserLogin):
     """
 
     def setUp(self):
+        # Production workers close their session after each queued operation.
+        # Direct synchronous tests must do the same when fixtures delete rows.
+        ScanService().close_session()
+        self.addCleanup(ScanService().close_session)
         self.session = self.get_app().settings["ScopedSession"]
         self.session.rollback()
         return super().setUp()
@@ -856,6 +860,43 @@ class TestScanBatchWindow(TestWithUserLogin):
         mi.tags = []
         mi.publisher = None
         return mi
+
+    @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
+    def test_same_name_and_size_in_different_directories_are_both_scanned(self, mock_get_metadata):
+        mock_get_metadata.return_value = self._mock_metadata()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            for folder, content in [("a", b"%PDF-1.4 AAA"), ("b", b"%PDF-1.4 BBB")]:
+                os.mkdir(os.path.join(tmpdir, folder))
+                with open(os.path.join(tmpdir, folder, "book.pdf"), "wb") as stream:
+                    stream.write(content)
+            try:
+                ScanService()._do_scan(tmpdir)
+                self.session.rollback()
+                rows = self._tmpdir_rows(tmpdir)
+                self.assertEqual(len(rows), 2)
+                self.assertEqual({row.status for row in rows}, {ScanFile.READY})
+                self.assertEqual(len({row.hash for row in rows}), 2)
+            finally:
+                self._remove_tmpdir_rows(tmpdir)
+
+    @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
+    def test_full_hash_distinguishes_unsampled_content(self, mock_get_metadata):
+        import hashlib
+
+        mock_get_metadata.return_value = self._mock_metadata()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            expected = set()
+            for name, middle in [("a", b"A"), ("b", b"B")]:
+                content = b"%PDF-1.4" + b"x" * (2 * 1024 * 1024) + middle + b"z" * (2 * 1024 * 1024)
+                with open(os.path.join(tmpdir, name + ".pdf"), "wb") as stream:
+                    stream.write(content)
+                expected.add("sha256:" + hashlib.sha256(content).hexdigest())
+            try:
+                ScanService()._do_scan(tmpdir)
+                self.session.rollback()
+                self.assertEqual({row.hash for row in self._tmpdir_rows(tmpdir)}, expected)
+            finally:
+                self._remove_tmpdir_rows(tmpdir)
 
     @mock.patch("calibre.ebooks.metadata.meta.get_metadata")
     def test_done_files_do_not_block_batch_window(self, mock_get_metadata):

@@ -73,7 +73,40 @@
                 {{ t('admin.imports.message.importAsyncInfo') }}
             </div>
         </v-card-text>
-        <v-card-actions>
+        <div
+            role="status"
+            aria-live="polite"
+            class="import-task-status"
+        >
+            <v-alert
+                v-if="task.active || task.cancelled || task.kind"
+                role="none"
+                type="info"
+                variant="tonal"
+                class="ma-4"
+            >
+                <template v-if="task.cancelled">
+                    {{ task.active ? t('admin.imports.task.stopping') : t('admin.imports.task.stopped') }}
+                </template>
+                <template v-else-if="task.error">
+                    {{ t('admin.imports.task.failed') }}
+                </template>
+                <template v-else>
+                    {{ t(task.active ? 'admin.imports.task.progress' : 'admin.imports.task.completed', { count: task.processed, failed: task.failed }) }}
+                </template>
+            </v-alert>
+        </div>
+        <v-card-actions class="flex-wrap">
+            <v-btn
+                v-if="task.active"
+                :disabled="task.cancelled"
+                :loading="cancelling"
+                variant="outlined"
+                color="primary"
+                @click="cancelTask"
+            >
+                {{ t('admin.imports.task.stop') }}
+            </v-btn>
             <v-btn
                 :disabled="loading"
                 variant="outlined"
@@ -85,7 +118,7 @@
                 </v-icon>{{ t('admin.imports.button.refresh') }}
             </v-btn>
             <v-btn
-                :disabled="loading || importActionsDisabled"
+                :disabled="loading || task.active || importActionsDisabled"
                 variant="elevated"
                 color="primary"
                 @click="scan_books"
@@ -106,7 +139,7 @@
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
-                    :disabled="loading || importActionsDisabled"
+                    :disabled="loading || task.active || importActionsDisabled"
                     variant="elevated"
                     color="#424242"
                     @click="import_books"
@@ -128,7 +161,7 @@
             </template>
             <template v-else>
                 <v-btn
-                    :disabled="loading || importActionsDisabled"
+                    :disabled="loading || task.active || importActionsDisabled"
                     variant="elevated"
                     color="warning"
                     @click="import_books"
@@ -551,7 +584,7 @@
 
 <script setup>
 import { withBasePath } from '@/utils/base-path';
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import OpdsImportDialog from '@/components/OpdsImportDialog.vue';
@@ -597,8 +630,39 @@ const directoryPickerPath = ref('');
 const directoryPickerParent = ref('');
 const directoryItems = ref([]);
 
-const scan_status = ref({});
-const import_status = ref({});
+const task = ref({ active: false, cancelled: false, processed: 0, failed: 0 });
+const cancelling = ref(false);
+let taskTimer;
+let taskDisposed = false;
+const refreshTask = async () => {
+    try {
+        const rsp = await $backend('/admin/import/task');
+        if (rsp.err === 'ok') {
+            const wasActive = task.value.active;
+            task.value = rsp.task;
+            if (wasActive && !rsp.task.active) {
+                getDataFromApi();
+                if (rsp.task.error && $alert) $alert('error', t('admin.imports.task.failed'));
+            }
+        }
+    } catch {
+        // Keep the last state; retry after a transient network failure.
+    } finally {
+        if (!taskDisposed) taskTimer = setTimeout(refreshTask, 2000);
+    }
+};
+const cancelTask = async () => {
+    cancelling.value = true;
+    try {
+        const rsp = await $backend('/admin/import/task', { method: 'DELETE' });
+        if (rsp.err === 'ok') task.value = rsp.task;
+        else if ($alert) $alert('error', rsp.msg);
+    } catch {
+        if ($alert) $alert('error', t('admin.imports.task.stopFailed'));
+    } finally {
+        cancelling.value = false;
+    }
+};
 
 const headers = computed(() => [
     { title: 'ID', key: 'id', sortable: true },
@@ -732,26 +796,6 @@ const getDataFromApi = () => {
         });
 };
 
-const loop_check_status = (url, callback) => {
-    setTimeout(() => {
-        $backend(url)
-            .then((rsp) => {
-                if (rsp.err != 'ok') {
-                    if ($alert) $alert('error', rsp.msg);
-                    return;
-                }
-                if (callback(rsp)) {
-                    getDataFromApi();
-                    setTimeout(() => {
-                        loop_check_status(url, callback);
-                    }, 2000);
-                } else {
-                    getDataFromApi();
-                    if ($alert) $alert('info', '处理完毕！');
-                }
-            });
-    }, 2000);
-};
 
 const applyImportSettings = (settings) => {
     if (!settings) return;
@@ -918,21 +962,11 @@ const scan_books = () => {
             return;
         }
 
-        loop_check_status('/admin/scan/status', (rsp) => {
-            scan_status.value = rsp.status;
-            count_done.value = rsp.summary.done;
-            count_todo.value = rsp.summary.todo;
-            count_failed.value = rsp.summary.failed || 0;
-            if (scan_status.value.new === 0) {
-                loading.value = false;
-                if (scan_status.value.new === 0 && scan_status.value.total > 0) {
-                    $alert('success', '扫描完成！请查看"待处理"列表中的书籍。');
-                }
-                return false;
-            }
-            loading.value = true;
-            return true;
-        });
+        task.value = { ...task.value, active: true, cancelled: false };
+    }).catch(() => {
+        if ($alert) $alert('error', t('admin.imports.task.startFailed'));
+    }).finally(() => {
+        loading.value = false;
     });
 };
 
@@ -952,20 +986,15 @@ const import_books = () => {
     }).then((rsp) => {
         if (rsp.err !== 'ok') {
             if ($alert) $alert('error', rsp.msg);
+            loading.value = false;
+            return;
         }
 
-        loop_check_status('/admin/import/status', (rsp) => {
-            import_status.value = rsp.status;
-            count_done.value = rsp.summary.done;
-            count_todo.value = rsp.summary.todo;
-            count_failed.value = rsp.summary.failed || 0;
-            if ((import_status.value.ready || 0) === 0 && (import_status.value.importing || 0) === 0) {
-                loading.value = false;
-                return false;
-            }
-            loading.value = true;
-            return true;
-        });
+        task.value = { ...task.value, active: true, cancelled: false };
+    }).catch(() => {
+        if ($alert) $alert('error', t('admin.imports.task.startFailed'));
+    }).finally(() => {
+        loading.value = false;
     });
 };
 
@@ -994,6 +1023,12 @@ const openOpdsImportDialog = () => {
 onMounted(() => {
     getDataFromApi();
     getImportSettings();
+    refreshTask();
+});
+
+onUnmounted(() => {
+    taskDisposed = true;
+    clearTimeout(taskTimer);
 });
 
 useHead(() => ({
@@ -1002,6 +1037,8 @@ useHead(() => ({
 </script>
 
 <style scoped>
+.import-task-status { font-variant-numeric: tabular-nums; }
+.import-task-status :deep(.v-alert__content) { color: rgb(var(--v-theme-on-surface)); }
 .imports-titlebar {
     display: flex;
     flex-wrap: wrap;

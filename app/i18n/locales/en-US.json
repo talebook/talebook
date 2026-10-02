@@ -891,6 +891,16 @@
         "queued": "Queued {0}",
         "importing": "Importing {0}",
         "failed": "Failed {0}"
+      },
+      "task": {
+        "stop": "Stop current task",
+        "stopping": "Stopping after the current book finishes.",
+        "stopped": "Task stopped. Completed work is saved; remaining files can be scanned or imported again. Restart automatic monitoring if needed.",
+        "progress": "{count} processed, {failed} failed",
+        "completed": "Task completed: {count} processed, {failed} failed. Review the scan records below.",
+        "stopFailed": "Unable to stop the task. Please retry.",
+        "startFailed": "Unable to start the task. Please retry.",
+        "failed": "The task failed. Check the failed records before retrying."
       }
     },
     "settings": {
