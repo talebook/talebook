@@ -24,6 +24,7 @@ from webserver.constants import (
     MEDIA_TYPE_EBOOK,
 )
 from webserver.handlers.base import BaseHandler, ListHandler, auth, js
+from webserver.handlers.captcha import book_captcha_enabled, require_book_captcha
 from webserver.i18n import _
 from webserver.models import (
     AudiobookEdition,
@@ -1060,6 +1061,11 @@ class BookDelete(BaseHandler):
 
 
 class BookDownload(BaseHandler, web.StaticFileHandler):
+    def set_extra_headers(self, path):
+        scene = "read" if self.is_inline and not self.is_opds else "download"
+        if book_captcha_enabled(scene):
+            self.set_header("Cache-Control", "private, no-store")
+
     def send_error_of_not_invited(self):
         self.set_header("WWW-Authenticate", "Basic")
         self.set_status(401)
@@ -1074,6 +1080,8 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
 
     def prepare(self):
         BaseHandler.prepare(self)
+        if self.is_inline and not self.is_opds and not require_online_read_permission(self):
+            return
         # 演示模式下，未登录访客与演示账号的下载权限统一遵循“访客权限”配置，
         # 忽略演示账号自身的权限位（该账号默认拥有完整权限，用于伪装管理员体验）。
         guest_like = not self.current_user or demo_mode.is_demo_restricted(CONF, self.current_user)
@@ -1097,6 +1105,9 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         fmt = fmt.lower()
         logging.error("download %s bid=%s, fmt=%s" % (filename, bid, fmt))
         book = self.get_book_or_404(bid)
+        scene = "read" if self.is_inline and not self.is_opds else "download"
+        if not require_book_captcha(self, bid, scene, redirect=not self.is_inline and not self.is_opds):
+            raise web.Finish()
         book_id = book["id"]
         self.user_history("download_history", book)
         self.count_increase(book_id, count_download=1)
@@ -1742,6 +1753,8 @@ class BookRead(BaseHandler):
             return
 
         book = self.get_book_or_404(id)
+        if not require_book_captcha(self, id, "read", redirect=True):
+            return
         book_id = book["id"]
         readable_formats = [fmt for fmt in ("epub", "pdf", "txt", "mobi", "azw", "azw3") if book.get("fmt_%s" % fmt)]
         if not readable_formats:
@@ -1832,6 +1845,8 @@ class BookReaderBootstrap(BaseHandler):
         if not book:
             self.set_status(404)
             return {"err": "book.not_found"}
+        if not require_book_captcha(self, id, "read"):
+            return
         fpath = book.get("fmt_epub")
         if not fpath:
             if ConvertService().is_book_converting(book):
@@ -1917,6 +1932,8 @@ class BookReaderResource(BaseHandler, web.StaticFileHandler):
         if not match:
             raise web.HTTPError(404)
         book = self.get_book_or_404(match.group(1))
+        if not require_book_captcha(self, book["id"], "read"):
+            raise web.Finish()
         fpath = book.get("fmt_epub")
         if not fpath:
             raise web.HTTPError(404, reason=_("EPUB 格式不存在"))
@@ -1938,6 +1955,10 @@ class TxtRead(BaseHandler):
     def get(self):
         bid = self.get_argument("id", "")
         book = self.get_book(bid)
+        if not require_online_read_permission(self, structured=True):
+            return
+        if not require_book_captcha(self, bid, "read"):
+            return
         start = int(self.get_argument("start", "0"))
         end = int(self.get_argument("end", "-1"))
         logging.info(book)
@@ -1965,6 +1986,10 @@ class BookTxtInit(BaseHandler):
         bid = self.get_argument("id", "")
         test_ready = self.get_argument("test", "")
         book = self.get_book(bid)
+        if not require_online_read_permission(self, structured=True):
+            return
+        if not require_book_captcha(self, bid, "read"):
+            return
         fpath = book.get("fmt_txt", None)
         if not fpath:
             return {"err": "format error", "msg": "非txt书籍"}

@@ -11,6 +11,7 @@ from tornado import web
 
 from webserver import constants, demo_mode, loader
 from webserver.handlers.base import BaseHandler
+from webserver.handlers.captcha import require_book_captcha
 from webserver.i18n import _
 from webserver.services.convert import ConvertService
 
@@ -168,6 +169,8 @@ class EpubReader(BaseHandler):
             raise web.HTTPError(403, reason=_("无权在线阅读"))
 
         book = self.get_book_or_404(bid)
+        if not require_book_captcha(self, bid, "read"):
+            return
         fpath = book.get("fmt_epub", None)
         if not fpath:
             raise web.HTTPError(404)
