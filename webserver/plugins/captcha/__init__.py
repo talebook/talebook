@@ -11,11 +11,13 @@ from typing import Dict, Any, Optional
 from .base import BaseCaptchaProvider
 from .geetest import GeetestProvider
 from .image_captcha import ImageCaptchaProvider
+from .turnstile import TurnstileProvider
 
 # 注册所有可用的验证提供商
 _CAPTCHA_PROVIDERS = {
     "image": ImageCaptchaProvider,
     "geetest": GeetestProvider,
+    "turnstile": TurnstileProvider,
 }
 
 # 全局缓存
@@ -31,6 +33,7 @@ def get_available_providers() -> Dict[str, str]:
     return {
         "image": "图形验证码 (无需配置)",
         "geetest": "GeeTest (极验)",
+        "turnstile": "Cloudflare Turnstile",
     }
 
 
@@ -51,7 +54,7 @@ def get_captcha_provider(settings: Dict[str, Any]) -> Optional[BaseCaptchaProvid
         return None
 
     # 如果提供商未改变，返回缓存的实例
-    if _current_provider_name == provider_name and _current_provider is not None:
+    if _current_provider_name == provider_name and _current_provider is not None and _current_provider.settings is settings:
         return _current_provider
 
     # 获取提供商类
@@ -120,5 +123,7 @@ def get_captcha_config(settings: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "login": is_captcha_enabled(settings, "login"),
         "welcome": is_captcha_enabled(settings, "welcome"),
         "reset": is_captcha_enabled(settings, "reset"),
+        "download": is_captcha_enabled(settings, "download"),
+        "read": is_captcha_enabled(settings, "read"),
     }
     return config

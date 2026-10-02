@@ -578,6 +578,7 @@ const captchaProviders = [
     { text: t('admin.settings.option.none'), value: '' },
     { text: t('admin.settings.option.image'), value: 'image' },
     { text: t('admin.settings.option.geetest'), value: 'geetest' },
+    { text: 'Cloudflare Turnstile', value: 'turnstile' },
 ];
 
 const cards = computed(() => [
@@ -718,25 +719,37 @@ const cards = computed(() => [
             {
                 key: 'CAPTCHA_ENABLE_FOR_REGISTER',
                 label: t('admin.settings.label.captchaEnableForRegister'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+                show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
             },
             {
                 key: 'CAPTCHA_ENABLE_FOR_LOGIN',
                 label: t('admin.settings.label.captchaEnableForLogin'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+                show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
             },
             {
                 key: 'CAPTCHA_ENABLE_FOR_WELCOME',
                 label: t('admin.settings.label.captchaEnableForWelcome'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+                show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
             },
             {
                 key: 'CAPTCHA_ENABLE_FOR_RESET',
                 label: t('admin.settings.label.captchaEnableForReset'),
-                show_when: () => ['image', 'geetest'].includes(settings.value.CAPTCHA_PROVIDER),
+                show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_DOWNLOAD',
+                label: t('admin.settings.label.captchaEnableForDownload'),
+                show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
+            },
+            {
+                key: 'CAPTCHA_ENABLE_FOR_READ',
+                label: t('admin.settings.label.captchaEnableForRead'),
+                show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
             },
         ],
         captcha_fields: [
+            { icon: 'mdi-key', key: 'TURNSTILE_SITE_KEY', label: t('admin.settings.label.turnstileSiteKey'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'turnstile' },
+            { icon: 'mdi-lock', key: 'TURNSTILE_SECRET_KEY', label: t('admin.settings.label.turnstileSecretKey'), type: 'password', show_when: () => settings.value.CAPTCHA_PROVIDER === 'turnstile' },
             { icon: 'mdi-key', key: 'GEETEST_CAPTCHA_ID', label: t('admin.settings.label.geetestCaptchaId'), show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
             { icon: 'mdi-lock', key: 'GEETEST_CAPTCHA_KEY', label: t('admin.settings.label.geetestCaptchaKey'), type: 'password', show_when: () => settings.value.CAPTCHA_PROVIDER === 'geetest' },
         ],

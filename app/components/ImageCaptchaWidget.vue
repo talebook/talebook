@@ -1,13 +1,19 @@
 <template>
     <div class="image-captcha-widget">
         <div class="captcha-image-container">
-            <img
+            <button
                 v-if="imageUrl"
-                :src="imageUrl"
-                alt="验证码"
-                class="captcha-image"
+                type="button"
+                class="captcha-image-button"
+                :aria-label="t('captcha.refresh')"
                 @click="refreshCaptcha"
             >
+                <img
+                    :src="imageUrl"
+                    alt=""
+                    class="captcha-image"
+                >
+            </button>
             <v-skeleton-loader
                 v-else
                 type="image"
@@ -37,7 +43,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { useNuxtApp } from 'nuxt/app';
+import { ref, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -49,6 +56,7 @@ const emit = defineEmits(['verify', 'error']);
 const imageUrl = ref('');
 const captchaId = ref('');
 const inputCode = ref('');
+watch(inputCode, () => emit('error', ''));
 
 // 获取验证码图片
 const fetchCaptcha = async () => {
@@ -68,6 +76,7 @@ const fetchCaptcha = async () => {
 
 // 刷新验证码
 const refreshCaptcha = () => {
+    emit('error', '');
     imageUrl.value = '';
     fetchCaptcha();
 };
@@ -135,10 +144,23 @@ onMounted(() => {
     overflow: hidden;
 }
 
+.captcha-image-container:focus-within {
+    outline: 2px solid rgb(var(--v-theme-on-surface));
+    outline-offset: 2px;
+}
+
 .captcha-image {
     display: block;
     width: 120px;
     height: 40px;
+}
+
+.captcha-image-button {
+    display: block;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
 }
 
 .captcha-input {

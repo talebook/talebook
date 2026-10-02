@@ -193,6 +193,7 @@
 </template>
 
 <script setup>
+import { appendCaptchaData } from '~/utils/captcha';
 import { withBasePath } from '@/utils/base-path';
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
@@ -329,16 +330,7 @@ const do_login = async () => {
 
     // 添加验证码参数
     if (captchaEnabled.value && captchaData.value) {
-        if (captchaData.value.provider === 'image') {
-            // 图形验证码
-            data.append('captcha_code', captchaData.value.captcha_code);
-        } else {
-            // 极验验证码
-            data.append('lot_number', captchaData.value.lot_number);
-            data.append('captcha_output', captchaData.value.captcha_output);
-            data.append('pass_token', captchaData.value.pass_token);
-            data.append('gen_time', captchaData.value.gen_time);
-        }
+        appendCaptchaData(data, captchaData.value);
     }
     
     try {
@@ -406,16 +398,7 @@ const do_reset = async () => {
 
     // 添加验证码参数
     if (captchaEnabled.value && captchaData.value) {
-        if (captchaData.value.provider === 'image') {
-            // 图形验证码
-            data.append('captcha_code', captchaData.value.captcha_code);
-        } else {
-            // 极验验证码
-            data.append('lot_number', captchaData.value.lot_number);
-            data.append('captcha_output', captchaData.value.captcha_output);
-            data.append('pass_token', captchaData.value.pass_token);
-            data.append('gen_time', captchaData.value.gen_time);
-        }
+        appendCaptchaData(data, captchaData.value);
     }
     
     try {
