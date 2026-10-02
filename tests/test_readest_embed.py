@@ -1,6 +1,8 @@
 import json
+import os
 import urllib.parse
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 from tests.test_main import (
@@ -159,11 +161,27 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(revoked.code, 403)
 
     def test_resource_change_updates_bootstrap_revision(self):
-        initial = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
-        changed_stat = mock.Mock(st_mtime_ns=9999999999000000000, st_size=initial["book"]["id"] + 123)
-        with mock.patch("webserver.handlers.book.os.stat", return_value=changed_stat):
-            changed = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
+        db = self.get_app().settings["legacy"]
+        source = Path(db.format_abspath(BID_EPUB, "EPUB", index_is_id=True))
+        get_book = BaseHandler.get_book
+        with TemporaryDirectory() as directory:
+            resource = Path(directory) / "book.epub"
+            resource.write_bytes(source.read_bytes())
+
+            def isolated_book(handler, *args, **kwargs):
+                book = get_book(handler, *args, **kwargs)
+                if book and book["id"] == BID_EPUB:
+                    return {**book, "fmt_epub": str(resource)}
+                return book
+
+            with mock.patch.object(BaseHandler, "get_book", autospec=True, side_effect=isolated_book):
+                url = "/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB
+                initial = self.json(url)
+                stat = resource.stat()
+                os.utime(resource, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
+                changed = self.json(url)
         self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
+        self.assertNotEqual(initial["resource"]["url"], changed["resource"]["url"])
 
     def test_stale_resource_revision_is_rejected(self):
         bootstrap = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
