@@ -1,5 +1,7 @@
 # TB-234 接入预审修复验证
 
+以下保留 e0e2220 阶段的前后证据与验证结果；当前 9cb3633 / 3316bae6 的独立验收、54 项事务用例、失败限制及交付收尾见 [独立 QA 验收与交付收尾](qa-acceptance/README.md)。
+
 修复前 Talebook：`b02a2e15f8bc278a7f0f5f305053253b65787630` / Voicebook `f3109d00d191066d887b3a76c19d60460bc5b253`。修复版为包含本记录的 PR #1071 提交；交付评论记录完整 SHA。最终固定并实际验证 Voicebook `3316bae6a7372e82d7037d31b9ffb32633ef2aa4`（0.8.0）：生成侧独立复审通过后，Mika 在 `21cbc5a9-cb52-45fb-b57c-2566c2b29bda` 要求并入本轮。v2 契约、CLI 参数和默认值未变化。实际安装模块的 21 个 Python 源文件与该提交逐字节一致。
 
 依据 QA 评论 `af15aa15-2a9c-4674-86a3-d3966a519e63` 附件 `evidence-b02a2e1.zip`。原 ZIP SHA256：`bc5f6996312a4ecaaebbc28043783589577ca23444e1f663c8b564703f0a4d5a`。`qa-original-probes.py` 保留原脚本。没有真实供应商调用。
@@ -25,7 +27,7 @@ QA 原租约探针在 `Session.before_flush` 注入接管。修复改用条件 U
 - 真实 Nuxt SSR / Chromium 页面 / 隔离模拟 API：**4 passed**，新增 SSR 首次断连与恢复；原有三场景全部回归。浅色/深色进度文字对比度 ≥4.5:1，320px 无水平溢出。
 - 真实 API 到页面离线流程：**1 passed，包含快捷、高级和页面取消三个流程**。两种模式各生成两章、6/6 个标题/正文单元，峰值活动请求 2；浏览器收到真实 206 audio/mpeg（27,586 字节）并开始播放。高级候选经页面发布成为当前版本，旧版本转历史。页面取消后生成侧及宿主均 cancelled，0/6、活动请求 0、版本 draft、章节 0。详情首次 SSR 的两次连续 API 请求也验证通过。
 - Python lint、测试 Ruff、前端 lint 和 diff 检查通过；前端仍有 566 项已有风格 warnings。数据库 JSONType 的 cache_ok 警告来自既有类型，不影响本次断言。
-- `make check-design` 仅因本方案仍为 WIP 而禁止合并；PR 按 Mika 要求保持 draft。规格检查仍有基线已证实的 epub-beautify 归属缺失。
+- 当时 `make check-design` 仅因方案仍为 WIP 而禁止合并，PR 按 Mika 要求保持 draft；规格检查报基线 epub-beautify 归属缺失。本次获授权的收尾补齐该规格并将唯一方案转为 ACTIVE，当前门禁见方案及交付记录。
 
 本轮未重跑全量后端。此前全量的三项失败已在未改动的 Talebook db5744b1 + f3109d0 环境复现：两项规格归属检查与一项 Readest mock os.stat 回归；本记录不宣称全量通过。生成侧独立复审已通过；本次接入修复的独立复审及最终全链路验收仍由 Mika 后续安排。
 
@@ -59,4 +61,4 @@ npx playwright test --config playwright.audiobook-offline.config.ts
 
 故障检出对照：在隔离目录展开 `git archive b02a2e15f8bc278a7f0f5f305053253b65787630`，保持 Voicebook f3109d0 不变，用该目录作为 PYTHONPATH 执行同一适配脚本，应得到 before.json 的两个故障标记为 true。SSR 负对照仅将 AudioJobsPage 恢复为 b02a2e1 版本，使用当前新用例和 mock SSR 初始数据，应在首次轮询断连后失败。
 
-测试环境 Python 3.13.5、Node 22、Chromium 153。测试磁盘不足默认 5GB，只在测试初始化关闭空间预检查，容量专用用例仍验证 5GB；生产默认未变。Chrome DevTools MCP 不可用，以 Playwright Chromium 替代。真实供应商、实际多容器挂载、读屏器和 200% 缩放未验证；截图来自模拟书目。接口审查范围及六个领域结论记录在同一份 WIP HTML。
+测试环境 Python 3.13.5、Node 22、Chromium 153。测试磁盘不足默认 5GB，只在测试初始化关闭空间预检查，容量专用用例仍验证 5GB；生产默认未变。Chrome DevTools MCP 不可用，以 Playwright Chromium 替代。真实供应商、实际多容器挂载、读屏器和 200% 缩放未验证；截图来自模拟书目。接口审查范围及六个领域结论回写唯一方案，交付收尾后该文件为 ACTIVE。

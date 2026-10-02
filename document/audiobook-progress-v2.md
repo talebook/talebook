@@ -2,7 +2,7 @@
 
 Talebook 固定使用 Voicebook 提交 `3316bae6a7372e82d7037d31b9ffb32633ef2aa4`，显式选择 `voicebook-progress.v2`。此提交的版本字符串是 0.8.0，尚无发布标签。重新安装 `requirements.txt` 或重建镜像后生效。
 
-生成侧此提交已通过 QA 独立复审，Mika 已要求将最终依赖并入三项接入预审修复。接入 PR 仍保持草稿，接入侧独立复审和最终全链路验收由 Mika 继续安排，不能把离线自测视为整体验收。
+生成侧与接入侧的独立 QA 复审及离线功能验收已通过。实际被审版本为 Talebook `9cb3633be8fd1bb8f7b9ef782ceabd11a84a05a3` / Voicebook `3316bae6a7372e82d7037d31b9ffb32633ef2aa4`；交付收尾仅更新文档。验收范围、失败记录和未验证限制见 [独立 QA 验收与交付收尾](audiobook-progress-v2-review/qa-acceptance/README.md)。离线供应商夹具的验收不保证真实供应商或生产部署行为。
 
 页面显示章节标题和可朗读正文的语音片段完成量，不估算整书剩余时间。解析、人工审阅、音频合成、写入和发布各自显示阶段；生成侧完成也不会提前把 Talebook 任务标为完成。
 
@@ -38,7 +38,7 @@ Talebook 固定使用 Voicebook 提交 `3316bae6a7372e82d7037d31b9ffb32633ef2aa4
 
 本轮接入预审修复的前后证据、QA 探针适配说明及复现命令见 [复核记录](audiobook-progress-v2-review/README.md)。生成侧 v2 契约和当前固定依赖未改变。
 
-离线验证使用真实 Voicebook 生成管线和可控 WAV 模拟引擎，不调用语音供应商。页面核心自动化使用短生命周期 mock API；补充贯通使用真实 Talebook API / 数据库 / 调度器和固定生成侧管线，仅输入书、登录及供应商是夹具。快捷模式自动发布，高级候选经页面确认和发布后播放，页面取消贯通至生成侧。详情首次 SSR 的连续请求保持当前请求上下文。截图不代表开发者书库或整体验收。运行：
+离线验证使用真实 Voicebook 生成管线和可控 WAV 模拟引擎，不调用语音供应商。页面核心自动化使用短生命周期 mock API；QA 最终贯通使用构建后的 Nuxt SSR、真实 Talebook API / 数据库 / 调度器和固定生成侧 CLI，仅输入书、登录及供应商是夹具。快捷模式自动发布，高级候选经页面确认和发布后播放，页面取消贯通至生成侧。详情首次 SSR 的连续请求保持当前请求上下文。开发模式加载稳定性与首次失败根因仍未闭合，真实 TXT 转换未做完整贯通。截图来自隔离夹具。运行：
 
 ```bash
 pytest tests/test_audiobook_progress_v2.py tests/test_audiobook_reliability.py tests/test_audiobook.py tests/test_audiobook_media_type.py tests/test_audiobook_transactions.py

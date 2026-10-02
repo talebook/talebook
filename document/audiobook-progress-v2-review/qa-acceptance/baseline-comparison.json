@@ -1,0 +1,106 @@
+{
+  "baseline": [
+    {
+      "name": "tests.test_check_spec::test_repository_spec_passes",
+      "outcome": "failed",
+      "message": "AssertionError: Spec check failed:\n  - 插件 talebook.tool.epub-beautify 已注册但在 spec/插件/ 下没有归属\n  \nassert 1 == 0\n +  where 1 = <tests.test_check_spec.Result object at 0x7e21205fda90>.returncode"
+    },
+    {
+      "name": "tests.test_check_spec::test_command_line_entry_point",
+      "outcome": "failed",
+      "message": "AssertionError: Spec check failed:\n  - 插件 talebook.tool.epub-beautify 已注册但在 spec/插件/ 下没有归属\n  \nassert 1 == 0\n +  where 1 = CompletedProcess(args=['/usr/bin/python3', '/workspace/scripts/check_spec.py', '--root', '/workspace'], returncode=1, stdout='Spec check failed:\\n- 插件 talebook.tool.epub-beautify 已注册但在 spec/插件/ 下没有归属\\n', stderr='').returncode"
+    },
+    {
+      "name": "tests.test_readest_embed.TestReadestEmbed::test_resource_change_updates_bootstrap_revision",
+      "outcome": "failed",
+      "message": "KeyError: 'book'"
+    },
+    {
+      "name": "tests.test_scan.TestImport::test_long_titles_survive_scan_import_and_api",
+      "outcome": "failed",
+      "message": "AssertionError: '凡人修仙之仙界篇' != '命运攸关的抉择：1940-1941年间改变世界的十个决策 epub copy'\n- 凡人修仙之仙界篇\n+ 命运攸关的抉择：1940-1941年间改变世界的十个决策 epub copy"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[release-]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[release-prerelease]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-tag_commit]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-unsafe_version]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-outside_master]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    }
+  ],
+  "candidate": [
+    {
+      "name": "tests.test_check_spec::test_repository_spec_passes",
+      "outcome": "failed",
+      "message": "AssertionError: Spec check failed:\n  - 插件 talebook.tool.epub-beautify 已注册但在 spec/插件/ 下没有归属\n  \nassert 1 == 0\n +  where 1 = <tests.test_check_spec.Result object at 0x70fee4fe56a0>.returncode"
+    },
+    {
+      "name": "tests.test_check_spec::test_command_line_entry_point",
+      "outcome": "failed",
+      "message": "AssertionError: Spec check failed:\n  - 插件 talebook.tool.epub-beautify 已注册但在 spec/插件/ 下没有归属\n  \nassert 1 == 0\n +  where 1 = CompletedProcess(args=['/usr/bin/python3', '/workspace/scripts/check_spec.py', '--root', '/workspace'], returncode=1, stdout='Spec check failed:\\n- 插件 talebook.tool.epub-beautify 已注册但在 spec/插件/ 下没有归属\\n', stderr='').returncode"
+    },
+    {
+      "name": "tests.test_readest_embed.TestReadestEmbed::test_resource_change_updates_bootstrap_revision",
+      "outcome": "failed",
+      "message": "KeyError: 'book'"
+    },
+    {
+      "name": "tests.test_scan.TestImport::test_long_titles_survive_scan_import_and_api",
+      "outcome": "failed",
+      "message": "AssertionError: '凡人修仙之仙界篇' != '命运攸关的抉择：1940-1941年间改变世界的十个决策 epub copy'\n- 凡人修仙之仙界篇\n+ 命运攸关的抉择：1940-1941年间改变世界的十个决策 epub copy"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[release-]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[release-prerelease]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-tag_commit]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-unsafe_version]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    },
+    {
+      "name": "tests.test_upgrade_release::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-outside_master]",
+      "outcome": "failed",
+      "message": "PermissionError: [Errno 13] Permission denied: 'git'"
+    }
+  ]
+}

@@ -1,0 +1,160 @@
+{
+  "talebook_sha": "9cb3633be8fd1bb8f7b9ef782ceabd11a84a05a3",
+  "voicebook_sha": "3316bae6a7372e82d7037d31b9ffb32633ef2aa4",
+  "rows": [
+    {
+      "item": "attempt registration SQL race",
+      "status": "passed",
+      "before": "e0e2220 overwrote replacement; heartbeat rejected",
+      "after": "9cb3633 AudiobookLeaseLost; replacement seq1 preserved and seq2 accepted",
+      "evidence": [
+        "probe-registration-old.json",
+        "probe-registration-fixed.json"
+      ]
+    },
+    {
+      "item": "same-owner replacement claim v1/v2 callback and exception finisher",
+      "status": "passed",
+      "before": "both protocols polluted replacement and marked failed",
+      "after": "both protocols preserve full replacement row and generating",
+      "evidence": [
+        "claim-old.json",
+        "claim-fixed.json"
+      ]
+    },
+    {
+      "item": "original stale event and cancel-publication SQL probes",
+      "status": "passed",
+      "before": "b02a2e1 detects both faults with final generator",
+      "after": "9cb3633 accepts replacement heartbeat; cancelled/progress0/draft",
+      "evidence": [
+        "boundaries-old.json",
+        "boundaries-fixed.json"
+      ]
+    },
+    {
+      "item": "stage/control/retry/review write guards and CLI reaping",
+      "status": "passed",
+      "after": "118 core, including 54 transaction cases and actual TERM-resistant PID reap",
+      "evidence": [
+        "backend-core.log"
+      ]
+    },
+    {
+      "item": "SSR first poll failure, attempt reset, staleness and waiting UI",
+      "status": "passed",
+      "after": "original 4 page cases plus 3 format cases: first complete run 7/7",
+      "evidence": [
+        "mock-page-first.log"
+      ]
+    },
+    {
+      "item": "central wizard EPUB/TXT/MOBI",
+      "status": "passed isolated page tests",
+      "after": "EPUB/TXT detail format priority; MOBI conversion preserved; TXT 320px dark",
+      "evidence": [
+        "mock-page-first.log"
+      ]
+    },
+    {
+      "item": "author full-suite claimed baseline failures",
+      "status": "independently reproduced",
+      "after": "10 same failures both pinned candidate and db5744b1, full suite not rerun",
+      "evidence": [
+        "baseline-comparison.json",
+        "baseline-selected.xml",
+        "candidate-selected.xml"
+      ]
+    },
+    {
+      "item": "first development page failures",
+      "status": "limitations retained",
+      "after": "author original trace unavailable; original same assertions independently pass; own development module/network/resource failures retained, not declared resolved",
+      "evidence": [
+        "initial-network-failures.json",
+        "second-network-failures.json",
+        "real-cli-page-initial-failures.log",
+        "real-cli-page-second-failures.log"
+      ]
+    },
+    {
+      "item": "WIP and spec merge gates",
+      "status": "pending",
+      "after": "design gate WIP; spec baseline epub-beautify ownership",
+      "evidence": [
+        "design-gate.log",
+        "spec-gate.log"
+      ]
+    },
+    {
+      "item": "quick",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-generation-workflows.json",
+      "final_status": "completed",
+      "completed": 6,
+      "total": 6,
+      "peak_active_requests": 2,
+      "actual_retry_delay_seconds": null
+    },
+    {
+      "item": "advanced",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-generation-workflows.json",
+      "final_status": "completed",
+      "completed": 6,
+      "total": 6,
+      "peak_active_requests": 2,
+      "actual_retry_delay_seconds": null
+    },
+    {
+      "item": "active-request cancellation",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-recovery-workflows.json",
+      "final_status": "cancelled",
+      "completed": 0,
+      "total": 6,
+      "peak_active_requests": 1,
+      "actual_retry_delay_seconds": null
+    },
+    {
+      "item": "partial failure + page retry",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-recovery-workflows.json",
+      "final_status": "completed",
+      "completed": 6,
+      "total": 6,
+      "peak_active_requests": 2,
+      "actual_retry_delay_seconds": null
+    },
+    {
+      "item": "429 wait + refresh + successful retry",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-waiting-workflows.json",
+      "final_status": "completed",
+      "completed": 6,
+      "total": 6,
+      "peak_active_requests": 2,
+      "actual_retry_delay_seconds": 25.00144672393799
+    },
+    {
+      "item": "Edge shared interval wait + refresh + cancel",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-waiting-workflows.json",
+      "final_status": "cancelled",
+      "completed": 1,
+      "total": 6,
+      "peak_active_requests": 1,
+      "actual_retry_delay_seconds": null
+    },
+    {
+      "item": "Edge shared cooldown + mobile refresh + cancel",
+      "status": "passed in compiled SSR + actual Docker API",
+      "source": "real-cli-waiting-workflows.json",
+      "final_status": "cancelled",
+      "completed": 1,
+      "total": 6,
+      "peak_active_requests": 1,
+      "actual_retry_delay_seconds": null
+    }
+  ]
+}

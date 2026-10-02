@@ -1,0 +1,17 @@
+[
+  {
+    "case": "qa-registration-review-real-page-API-scheduler-CLI-recovery",
+    "trace_sha256": "cf04673f7a9bc06751a3972b110cd53322e54dcddb938cce2b8b6b68b4990854",
+    "network_failures": []
+  },
+  {
+    "case": "qa-registration-review-real-page-API-scheduler-CLI-waiting",
+    "trace_sha256": "6f89dfe78b216e072b9abfb591420f0bbce29de9ef9cd16ad02ae72bf2aba469",
+    "network_failures": []
+  },
+  {
+    "case": "qa-registration-review-rea-f8490-PI-scheduler-CLI-generation",
+    "trace_sha256": "6cdd8688776020700ab6945ff1fd5d0667bd6413a84a3754530fc6b8b1edaa79",
+    "network_failures": []
+  }
+]
