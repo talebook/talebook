@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="TB-234：Voicebook v2 后端与页面接入、共享预算配置、离线验证和页面演示。" />
     <link rel="icon" href="data:," />
-    <title>有声书真实制作进度接入 · ACTIVE</title>
+    <title>有声书真实制作进度接入 · WIP</title>
     <style>
       :root {
         color-scheme: light;
@@ -156,21 +156,21 @@
     </style>
   </head>
   <body><main class="page" id="main-content">
-<header class="hero"><h1>有声书真实制作进度接入</h1><p class="sub">TB-234 · 创建日期 2026-10-03 · 模块 webserver / app · 状态 ACTIVE</p></header>
-<section class="card"><h2>原始诉求</h2><p>将 Voicebook 单本并发和真实进度接入 Talebook，保留快捷与高级模式，避免长时间等待无解释。依据 Mika 指定的 Voicebook f3109d00d191066d887b3a76c19d60460bc5b253 的 v2 契约；本任务只交付接入，战队后续全链路验收。</p></section>
+<header class="hero"><h1>有声书真实制作进度接入</h1><p class="sub">TB-234 · 创建日期 2026-10-03 · 模块 webserver / app · 状态 WIP</p></header>
+<section class="card"><h2>原始诉求</h2><p>将 Voicebook 单本并发和真实进度接入 Talebook，保留快捷与高级模式，避免长时间等待无解释。依据本线程的 v2 契约，当前验证版本为 Voicebook f3109d00d191066d887b3a76c19d60460bc5b253；最终依赖等待生成侧修复通过复审；本任务只交付接入，战队后续全链路验收。</p></section>
 <section class="card"><h2>目标与边界</h2><p>展示实际标题/正文语音片段完成量、阶段、活动请求、失败/重试、限速排队/冷却、下次请求时间和更新时间。片段比例不表示整书耗时。Talebook 完成结果校验及数据库提交后才标记任务完成。</p><p>设计决策已由任务和 v2 契约确定：使用现有 JSON 数据字段持久化，登记每次调用的独立尝试 ID，拒绝错误身份及旧序号；旧 CLI 版本使用原参数并提示详细进度不可用。无需新增数据库迁移、供应商调用或生产部署。</p></section>
 <section class="card"><h2>方案</h2><div class="flow"><div class="step"><b>登记调用</b><p>稳定 task_id、新 attempt_id、清空旧计数和错误。</p></div><div class="step"><b>接收 JSONL</b><p>校验 schema / 身份 / seq，覆盖绝对快照；持久化。</p></div><div class="step"><b>API 与页面</b><p>刷新恢复，真实计数，等待原因与请求倒计时，区分连接异常。</p></div><div class="step"><b>发布</b><p>退出成功后校验 manifest / 音频 / 时间轴，再提交数据库并完成。</p></div></div><p>默认 Edge 连接上限 1、请求间隔 5 秒；每次 generate 显式传相同预算参数和绝对 SQLite 路径，默认 AUDIOBOOK_PATH/rate-limits/edge-budget.sqlite3，不放入会被清理的 cache。Qwen 默认单本并发 2；可配置 1–32。不同 worker 参数由 Voicebook 共享文件拒绝；多主机仍需集中调度。</p></section>
 <section class="card"><h2>影响范围与风险</h2><p>requirements.txt、webserver/settings.py、webserver/services/audiobook.py、任务 API、app/components/AudioJobsPage.vue 与两种语言文案、测试、spec/有声书.md、使用说明。保留旧章级计划作为辅助信息，v2 快照是全书真实计数来源。协议中断不推断成功，取消期间仍等待进程回收。SQLite 要求同机本地共享挂载，跨主机和真实供应商限制不由本接入保证。</p></section>
 <section class="card" id="tests"><h2>测试结果</h2>
-<p>最终依赖及相关验证版本：Voicebook <code>f3109d00d191066d887b3a76c19d60460bc5b253</code>。初始指定 f234080 的要求已由 Mika 在本线程调整为修复后的提交；schema、字段、CLI 参数和默认值未变化。</p>
+<p>当前草稿依赖及实际验证版本：Voicebook <code>f3109d00d191066d887b3a76c19d60460bc5b253</code>。初始指定 f234080 的要求已由 Mika 在本线程调整为修复后的提交；schema、字段、CLI 参数和默认值未变化。</p>
 <div class="table-wrap"><table><thead><tr><th>检查</th><th>实际结果</th></tr></thead><tbody>
-<tr><td>后端核心流程</td><td>最终依赖环境中 63 项通过：身份与序号、绝对快照、等待原因、进度失联、尝试重置、取消、旧 CLI、发布门禁、修订恢复、任务 API 和媒体类型。</td></tr>
-<tr><td>真实离线生成管线</td><td>使用最终提交的 generate_audio、ProgressEmitter 和 ffmpeg，注入可控 WAV 引擎；两章、7 个标题/正文单元，观察到活动请求并发 2–3；快照持久化且宿主先保持 generating，结果校验及数据库提交后完成。</td></tr>
+<tr><td>后端核心流程</td><td>f3109d0 依赖环境中 63 项通过：身份与序号、绝对快照、等待原因、进度失联、尝试重置、取消、旧 CLI、发布门禁、修订恢复、任务 API 和媒体类型。</td></tr>
+<tr><td>真实离线生成管线</td><td>使用f3109d0 提交的 generate_audio、ProgressEmitter 和 ffmpeg，注入可控 WAV 引擎；两章、7 个标题/正文单元，观察到活动请求并发 2–3；快照持久化且宿主先保持 generating，结果校验及数据库提交后完成。</td></tr>
 <tr><td>共享预算</td><td>宿主参数一致性、绝对路径校验、两个独立 Python 进程共用宿主预算文件及冲突配置拒绝均通过。没有使用真实 Edge 服务。</td></tr>
 <tr><td>组件状态</td><td>Vitest 16 项通过，包括四种等待、未知计划时间、倒计时归零、旧协议、失败/取消/收尾优先级、断线和新尝试。</td></tr>
 <tr><td>真实 Nuxt 页面 / 模拟 API</td><td id="browser-result">3 个 Playwright 场景全部通过；桌面浅色/深色、320px 窄屏，任务列表与详情、刷新恢复、尝试重置、API 失败恢复、生产者完成到宿主发布。截图中的书与状态明确标为模拟。</td></tr>
-<tr><td>静态检查</td><td>make lint-py、新增测试 Ruff、git diff --check 通过；前端 lint 0 错误、566 项已有风格警告。make check-design 在 ACTIVE 后通过。make check-spec 仍报基线已有 epub-beautify 归属缺失。</td></tr>
-<tr><td>全量后端</td><td>此前在 f234080 依赖环境运行：1831 通过、40 跳过、3 失败。最终依赖环境重跑核心 63 项通过；并在未修改的 Talebook 基线 db5744b1 复现了同样 3 项失败：两个规格检查缺少既有 epub-beautify 归属；Readest 资源修订测试 mock os.stat 后返回 503。未宣称全量通过。</td></tr>
+<tr><td>静态检查</td><td>make lint-py、新增测试 Ruff、git diff --check 通过；前端 lint 0 错误、566 项已有风格警告。完成接入验证时 ACTIVE 设计门禁通过（166 份文档）；后续收到生成侧残余问题后，唯一方案退回 WIP，待更换依赖及复验后转为 ACTIVE。make check-spec 仍报基线已有 epub-beautify 归属缺失。</td></tr>
+<tr><td>全量后端</td><td>此前在 f234080 依赖环境运行：1831 通过、40 跳过、3 失败。f3109d0 依赖环境重跑核心 63 项通过；并在未修改的 Talebook 基线 db5744b1 复现了同样 3 项失败：两个规格检查缺少既有 epub-beautify 归属；Readest 资源修订测试 mock os.stat 后返回 503。未宣称全量通过。</td></tr>
 </tbody></table></div>
 <h3>复现命令与环境</h3><pre><code>make lint-py
 ruff check tests/test_audiobook_progress_v2.py
@@ -181,7 +181,7 @@ npx vitest run test/components/AudiobookGenerationProgress.spec.ts
 npx playwright test --config playwright.audiobook-progress.config.ts
 npm run lint</code></pre>
 <p>Python 验证在含 Calibre、ffmpeg 及最终 Voicebook 提交的 Talebook Docker 测试镜像中执行。测试环境可用磁盘低于默认 5GB，仅测试初始化将 AUDIOBOOK_MIN_FREE_GB 设为 0；容量限制专用用例仍显式验证 5GB，生产默认未改变。Node 22；Chromium 153。默认浏览器下载受网络限制，使用仓库外安装的 Chromium 并通过 TB234_CHROMIUM_PATH 注入；普通环境可使用 Playwright 默认浏览器。所有模拟服务由 Playwright 创建并回收。</p>
-<p>Chrome DevTools MCP 在本运行工具中不可用，使用 Playwright 的真实 Chromium 页面作为替代证据。真实供应商、实际部署中的多容器挂载、完整供应商到播放/发布链路、读屏器与 200% 缩放尚未验证；最终全链路验收由 Mika 后续安排。生成侧修复也仍待独立 QA 复审。</p></section>
+<p>Chrome DevTools MCP 在本运行工具中不可用，使用 Playwright 的真实 Chromium 页面作为替代证据。真实供应商、实际部署中的多容器挂载、完整供应商到播放/发布链路、读屏器与 200% 缩放尚未验证；最终全链路验收由 Mika 后续安排。QA 已关闭生成侧原有租约、取消文件及音频验证问题，但新增 Edge 同伴失败 Medium 尚未关闭。Mika 在 2026-10-03 01:57:59（北京时间）要求最终依赖跟随复审通过的提交。本轮交付草稿 PR 和页面证据；后续替换依赖、重跑核心验证及全部分支界面审查后再转 ACTIVE。</p></section>
 <section class="card" id="interface-review"><h2>Interface review · full</h2>
 <h3>Scope and Coverage</h3><div class="table-wrap"><table><tbody>
 <tr><th>Target</th><td>当前分支相对默认分支的全部本地改动；含已提交和未提交、新增文件。</td></tr>
