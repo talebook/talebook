@@ -1,8 +1,8 @@
 # 有声书真实进度与并发配置
 
-Talebook 固定使用 Voicebook 提交 `f3109d00d191066d887b3a76c19d60460bc5b253`，显式选择 `voicebook-progress.v2`。此提交的版本字符串是 0.8.0，尚无发布标签。重新安装 `requirements.txt` 或重建镜像后生效。
+Talebook 固定使用 Voicebook 提交 `3316bae6a7372e82d7037d31b9ffb32633ef2aa4`，显式选择 `voicebook-progress.v2`。此提交的版本字符串是 0.8.0，尚无发布标签。重新安装 `requirements.txt` 或重建镜像后生效。
 
-当前为接入草稿的实际验证版本。QA 在此提交补查出 Edge 同伴失败期间的慢媒体回收缺口；Mika 要求最终依赖跟随生成侧复审通过的提交。合并或部署前必须更新到该提交并重跑核心验证，不能把当前离线自测视为整体验收。
+生成侧此提交已通过 QA 独立复审，Mika 已要求将最终依赖并入三项接入预审修复。接入 PR 仍保持草稿，接入侧独立复审和最终全链路验收由 Mika 继续安排，不能把离线自测视为整体验收。
 
 页面显示章节标题和可朗读正文的语音片段完成量，不估算整书剩余时间。解析、人工审阅、音频合成、写入和发布各自显示阶段；生成侧完成也不会提前把 Talebook 任务标为完成。
 
@@ -34,10 +34,14 @@ Talebook 固定使用 Voicebook 提交 `f3109d00d191066d887b3a76c19d60460bc5b253
 
 任务 API 的 `generation` 包含 `protocol_version`、`task_id`、当前 `attempt_id`、已接收 `seq`、`connection` 和持久化 `snapshot`。消费者直接覆盖绝对计数；不同尝试的序号不能互比。`plan.overall_percent` 在未完成时为 null，仅宿主提交成功后为 100；旧的 `progress` 数值在未完成时为 0。旧 CLI（0.7.x）只传原参数，保留阶段及章级记录并提示详细实时进度不可用。
 
-离线验证使用真实 Voicebook 生成管线和可控 WAV 模拟引擎，不调用语音供应商。页面自动化使用短生命周期 mock API，属于隔离页面自测；截图不代表真实书库或整体验收。运行：
+事件接收使用数据库条件更新，读取后发生的租约接管、新尝试或新序号会拒绝旧写入。取消与发布竞争同一任务行：取消先提交时保持 cancelled、进度 0，不发布；发布先提交时拒绝取消并保留完成结果。章节、版本和任务完成状态在同一事务内提交或回滚。SSR 首次渲染的任务列表也作为已确认缓存，首次浏览器轮询失败时保留卡片与计数。
+
+本轮接入预审修复的前后证据、QA 探针适配说明及复现命令见 [复核记录](audiobook-progress-v2-review/README.md)。生成侧 v2 契约和当前固定依赖未改变。
+
+离线验证使用真实 Voicebook 生成管线和可控 WAV 模拟引擎，不调用语音供应商。页面核心自动化使用短生命周期 mock API；补充贯通使用真实 Talebook API / 数据库 / 调度器和固定生成侧管线，仅输入书、登录及供应商是夹具。快捷模式自动发布，高级候选经页面确认和发布后播放，页面取消贯通至生成侧。详情首次 SSR 的连续请求保持当前请求上下文。截图不代表开发者书库或整体验收。运行：
 
 ```bash
-pytest tests/test_audiobook_progress_v2.py tests/test_audiobook_reliability.py tests/test_audiobook.py
+pytest tests/test_audiobook_progress_v2.py tests/test_audiobook_reliability.py tests/test_audiobook.py tests/test_audiobook_media_type.py tests/test_audiobook_transactions.py
 cd app
 npx vitest run test/components/AudiobookGenerationProgress.spec.ts
 npx playwright test --config playwright.audiobook-progress.config.ts

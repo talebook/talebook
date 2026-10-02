@@ -2,6 +2,11 @@ import { withBasePath } from '@/utils/base-path';
 import { useMainStore } from '@/stores/main';
 
 export default defineNuxtPlugin((nuxtApp) => {
+  // Capture request-scoped values while the plugin still has Nuxt context.
+  const backendConfig = useRuntimeConfig();
+  const backendHeaders = process.server
+    ? useRequestHeaders(['cookie', 'host', 'x-forwarded-for', 'x-forwarded-proto', 'x-scheme'])
+    : {};
   const store = useMainStore();
   const activeRedirects = new Map();
 
@@ -69,11 +74,11 @@ export default defineNuxtPlugin((nuxtApp) => {
       mode: 'cors', redirect: 'follow', credentials: 'include',
     };
 
-    const config = useRuntimeConfig();
+    const config = backendConfig;
     let server = '';
         
     if (process.server) {
-      const headers = useRequestHeaders(['cookie', 'host', 'x-forwarded-for', 'x-forwarded-proto', 'x-scheme']);
+      const headers = backendHeaders;
       server = config.public.api_url;
       args.headers = {
         'cookie': headers.cookie,

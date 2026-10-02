@@ -22,7 +22,7 @@ psutil
 requests-toolbelt
 
 # Voicebook progress v2; 0.8.0 is not tagged yet. Keep the reviewed revision immutable.
-voicebook-tool @ https://github.com/talebook/voicebook/archive/f3109d00d191066d887b3a76c19d60460bc5b253.tar.gz
+voicebook-tool @ https://github.com/talebook/voicebook/archive/3316bae6a7372e82d7037d31b9ffb32633ef2aa4.tar.gz
 
 # WebDAV service (mount the book library over WebDAV)
 WsgiDAV>=4.0.0

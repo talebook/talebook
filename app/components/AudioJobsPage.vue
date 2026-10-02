@@ -667,6 +667,8 @@ const { data, pending, error, refresh } = await useAsyncData<{ jobs: AudiobookJo
     lastConfirmedJobs.value = response.jobs || [];
     return response;
 }, { default: () => ({ jobs: [] }) });
+// Hydration can use the SSR payload without invoking the request handler.
+lastConfirmedJobs.value = data.value?.jobs || [];
 
 const filteredJobs = computed(() => {
     // useAsyncData resets data to its default on refresh errors; keep confirmed progress visible.

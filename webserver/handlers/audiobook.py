@@ -377,8 +377,7 @@ class AudiobookDetail(BaseHandler):
         active_jobs_cancelled = 0
         for job in jobs:
             if job.status in ACTIVE_JOB_STATUSES:
-                request_cancel(storage, job)
-                active_jobs_cancelled += 1
+                active_jobs_cancelled += int(request_cancel(storage, job))
 
         deleted = {
             "editions": len(edition_ids),
@@ -617,14 +616,18 @@ class AudiobookJobAction(BaseHandler):
         action = body.get("action")
         storage = AudiobookStorage()
         if action == "cancel":
-            if job.status == "queued":
-                job.status = "cancelled"
-                job.phase = "CANCELLED"
-                job.finished_at = utcnow()
-            elif job.status in {"inspecting", "awaiting_review", "generating", "finalizing"}:
-                request_cancel(storage, job)
-            else:
+            if job.status not in ACTIVE_JOB_STATUSES or not request_cancel(storage, job):
                 return {"err": "state.invalid", "msg": _("当前状态不能取消")}
+            # request_cancel holds the job write lock until this transaction ends.
+            self.session.query(AudiobookJob).filter(AudiobookJob.id == job.id, AudiobookJob.status == "queued").update(
+                {
+                    AudiobookJob.status: "cancelled",
+                    AudiobookJob.phase: "CANCELLED",
+                    AudiobookJob.progress: 0.0,
+                    AudiobookJob.finished_at: utcnow(),
+                },
+                synchronize_session="fetch",
+            )
         elif action == "retry":
             if job.status not in {"failed", "cancelled"}:
                 return {"err": "state.invalid", "msg": _("只有失败或已取消任务可以重试")}
@@ -635,6 +638,7 @@ class AudiobookJobAction(BaseHandler):
         else:
             return {"err": "params.invalid", "msg": _("任务操作无效")}
         self.session.commit()
+        self.session.refresh(job)
         return {"err": "ok", "job": _job_dict(job)}
 
 

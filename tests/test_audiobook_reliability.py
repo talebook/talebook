@@ -571,6 +571,9 @@ def test_revision_finalize_rejects_manifest_with_fewer_chapters_than_baseline():
         scheduler = _scheduler(session_maker, storage)
         fixture = _revision_fixture(session_maker, storage)
         invalid_dir = storage.edition_dir(fixture.edition_id) / "manifests"
+        with session_maker() as session:
+            session.get(models.AudiobookJob, fixture.job_id).status = "finalizing"
+            session.commit()
         invalid_chapter = _write_chapter_files(storage.edition_dir(fixture.edition_id), 1, "invalid")
         _write_manifest(
             invalid_dir,

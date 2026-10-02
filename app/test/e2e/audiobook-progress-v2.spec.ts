@@ -25,6 +25,7 @@ function makeJob() {
     return {
         id: 234, book_id: 1, edition_id: 1, mode: 'quick', status: 'generating', phase: 'GENERATING',
         progress: 0, cancel_requested: false, config: { engine: 'qwen3tts', speed: 'x1.0' },
+        data: {},
         book: { id: 1, title: '并发生成测试书（模拟场景）', author: '离线模拟引擎', thumb: '/get/thumb_60x80/1.jpg' },
         plan: {
             detailed: true, overall_percent: null,
@@ -137,4 +138,33 @@ test('does not complete until host publication and exposes stalled updates', asy
     job.phase = 'COMPLETED';
     await expect(page.locator('[data-job-id="234"]')).toContainText('100%');
     await expect(page.getByRole('link', { name: '查看有声书', exact: true })).toBeVisible();
+});
+
+test('SSR confirmed counts survive the first browser poll failing and recover', async ({ page, request }) => {
+    await request.post('http://127.0.0.1:8089/_test/reset', { data: { installed: true, loggedIn: true } });
+    const job = makeJob();
+    await request.post('http://127.0.0.1:8089/_test/audiobook-jobs', { data: { jobs: [job] } });
+    let browserPolls = 0;
+    let disconnected = true;
+    await page.route('**/api/audio-jobs', async route => {
+        browserPolls += 1;
+        await route.fulfill({ json: disconnected
+            ? { err: 'unavailable', msg: '模拟 SSR 首次客户端轮询断连' }
+            : { err: 'ok', jobs: [job] } });
+    });
+    const response = await page.goto('/audio-job/234');
+    const html = await response!.text();
+    expect(html).toContain('data-job-id="234"');
+    expect(html).toContain('已生成 3/12');
+    await expect(page.getByTestId('generation-count')).toContainText('3/12', { timeout: 45000 });
+    await expect(page.getByText('模拟 SSR 首次客户端轮询断连', { exact: true })).toBeVisible();
+    expect(browserPolls).toBeGreaterThan(0);
+    await expect(page.getByTestId('generation-api-error')).toContainText('连接中断');
+    await expect(page.getByTestId('generation-count')).toContainText('3/12');
+    await capture(page, 'ssr-first-poll-retained');
+    disconnected = false;
+    job.generation.snapshot.completed = 5;
+    job.generation.snapshot.pending = 4;
+    await expect(page.getByTestId('generation-api-error')).toHaveCount(0);
+    await expect(page.getByTestId('generation-count')).toContainText('5/12');
 });
