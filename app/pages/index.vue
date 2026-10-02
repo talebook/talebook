@@ -1,6 +1,6 @@
 <template>
     <div>
-        <v-row>
+        <v-row v-if="indexData?.recommendations_enabled !== false">
             <v-col cols="12">
                 <p class="ma-0 title">
                     {{ t('navigation.recommended') }}
@@ -42,10 +42,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        {{ t('library.noBooks') }}
+                        {{ t(indexData?.visible_books_count ? 'index.noUnreadRecommendations' : 'library.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        {{ t('library.addBooksFirst') }}
+                        {{ t(indexData?.visible_books_count ? 'index.noUnreadRecommendationsHint' : 'library.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
@@ -121,9 +121,11 @@ onMounted(() => {
     }
 });
 
-// 修复: 直接使用 useAsyncData 不添加 await
-const { data: indexData, pending: indexPending } = useAsyncData('index', () =>
-    $backend('/index')
+// 每次返回首页都按当前账号和阅读状态重新计算推荐。
+const { data: indexData, pending: indexPending } = useAsyncData(
+    'index',
+    () => $backend('/index'),
+    { getCachedData: () => undefined }
 );
 
 store.setNavbar(true);
