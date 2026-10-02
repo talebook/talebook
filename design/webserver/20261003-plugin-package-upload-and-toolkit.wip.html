@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 插件包上传、版本生命周期、独立进程运行时与开发工具设计方案。" />
+    <link rel="icon" href="data:," />
+    <title>插件包上传与开发工具 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      .toc-fab nav { max-height: min(600px, calc(100vh - 100px)); overflow-y: auto; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+<a class="skip-link" href="#main-content">跳到正文</a>
+<nav class="toc-edge" aria-label="章节目录"><a href="#request"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a><a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a><a href="#evidence"><span class="rail-index">03</span><span class="rail-title">现状与缺口</span></a><a href="#package"><span class="rail-index">04</span><span class="rail-title">插件包契约</span></a><a href="#install"><span class="rail-index">05</span><span class="rail-title">上传与生命周期</span></a><a href="#runtime"><span class="rail-index">06</span><span class="rail-title">独立进程运行时</span></a><a href="#toolkit"><span class="rail-index">07</span><span class="rail-title">开发工具与SDK</span></a><a href="#ui"><span class="rail-index">08</span><span class="rail-title">管理界面与扩展UI</span></a><a href="#delivery"><span class="rail-index">09</span><span class="rail-title">实施与验收</span></a><a href="#impact"><span class="rail-index">10</span><span class="rail-title">影响与风险</span></a><a href="#tests"><span class="rail-index">11</span><span class="rail-title">验证记录</span></a><a href="#decisions"><span class="rail-index">12</span><span class="rail-title">决策记录</span></a></nav>
+<details class="toc-fab"><summary>目录</summary><nav aria-label="章节目录"><a href="#request">01 原始诉求</a><a href="#goals">02 目标与边界</a><a href="#evidence">03 现状与缺口</a><a href="#package">04 插件包契约</a><a href="#install">05 上传与生命周期</a><a href="#runtime">06 独立进程运行时</a><a href="#toolkit">07 开发工具与SDK</a><a href="#ui">08 管理界面与扩展UI</a><a href="#delivery">09 实施与验收</a><a href="#impact">10 影响与风险</a><a href="#tests">11 验证记录</a><a href="#decisions">12 决策记录</a></nav></details>
+<div class="page"><header class="hero">
+<h1>插件包上传与开发工具</h1>
+<p class="sub">让管理员从插件包完成安装，让开发者通过独立工具交付插件，同时延续 Talebook 的能力契约、连接所有权与运行审计。</p>
+<div class="chips" aria-label="方案元信息"><span class="chip wip">状态：WIP</span><span class="chip">创建日期：2026-10-03</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：后端 / app / SDK / 文档</span><span class="chip">需求来源：房间开发者消息</span><span class="chip">交付：调研与设计提案</span></div>
+</header><div class="content-grid"><main id="main-content" class="main-column"><section id="request" class="card">
+<h2>1. 原始诉求与交付范围</h2>
+<div class="callout warn">“talebook有插件功能，但是这个插件不支持直接上传插件的方式进行导入……还实现了开发插件的工具，你看看它们是怎么实现的。”</div>
+<p>需求来源为当前房间的开发者消息。引文省略外部项目名称和链接。本轮完成源码调研与可评审的实现方案，后续实现继续更新这一份 WIP。</p>
+<p>目标场景：管理员拿到一个插件 ZIP 包，在插件中心上传、查看能力和权限、安装并启用；插件作者用工具生成项目、验证、打包、升级版本，独立于 Talebook 主仓库发版。</p>
+<div class="callout"><strong>当前状态：</strong>上传、外部运行时、SDK 与 CLI 尚未实现。本文件是设计提案；现有产品行为仍由 <code>spec/插件/插件平台.md</code> 描述。</div>
+</section><section id="goals" class="card">
+<h2>2. 目标与首期边界</h2>
+<div class="grid"><article class="choice recommended"><h3>首期形成完整闭环</h3><ul>
+<li>支持管理员上传 ZIP，静态检查成功后再安装；首期只接受可信来源的 Python 插件。</li>
+<li>支持元数据检索和正文处理两类模板，对应 <code>metadata.lookup</code> 与 <code>integrations.tool</code>。</li>
+<li>提供安装、升级、停用、卸载和恢复上一可用版本；来源、安装版本、运行版本分别可见。</li>
+<li>复用 Definition、Installation、Connection、Secret、Run 与既有权限模型。</li>
+<li>提供项目生成、目录与归档校验、契约测试、构建、版本升级命令及示例。</li>
+</ul></article><article class="choice"><h3>明确后续范围</h3><ul>
+<li>批注、评价、书源、推送及综合插件的完整进程适配器分后续批次补齐；未支持的能力必须拒绝安装。</li>
+<li>首期使用宿主的配置表单、能力测试和通用工具页面；自带 HTML/JS 页面单独进入第二阶段。</li>
+<li>插件市场、在线依赖安装、7z、任意 Shell 入口和代码热加载不进入首期。</li>
+<li>独立进程提供故障终止边界；面对不可信代码的操作系统沙箱需另行落地，首期不承诺。</li>
+</ul></article></div>
+<p>选择元数据与正文工具作为首期，是为了同时验证只读结果和文件处理两条真实能力链路。它们不是新增的通用 <code>execute()</code> 契约，仍分别使用既有类型接口。</p>
+</section><section id="evidence" class="card">
+<h2>3. 已核实的现状与缺口</h2>
+<p>源码基线：Talebook 提交 <code>db5744b13e245414762bafc6219c6056fcb33837</code>。以下判断来自实际代码；枚举值、字段存在，不等于执行后端已经实现。</p>
+<div class="table-wrap" role="region" aria-label="现状证据" tabindex="0"><table><thead><tr><th>位置</th><th>已存在</th><th>此次要补的部分</th></tr></thead><tbody>
+<tr><td><code>webserver/handlers/plugins.py:297</code></td><td>安装接口读取 JSON 的 plugin_key，调用 install_builtin。</td><td>接收文件、静态验证、预览包信息、外部安装与版本切换。</td></tr>
+<tr><td><code>webserver/services/plugin_runtime.py:112</code></td><td>Registry 校验 Manifest 与能力契约，启动时装配内置 Provider。</td><td>只注册宿主自有进程代理；禁止把外部代码 import 进 Web 进程。</td></tr>
+<tr><td><code>webserver/services/plugin_runtime.py:155</code></td><td>定义物化及内置安装遍历 registry，写入 builtin 来源。</td><td>明确内置集合，外部安装单独处理，避免外部记录被当成内置物化或改写。</td></tr>
+<tr><td><code>webserver/plugins/runtime/protocol.py:9</code></td><td>协议 talebook.plugin/v1；运行时枚举含 managed_process；Manifest 字段封闭。</td><td>实现进程传输和实际兼容性判定；包入口放独立描述文件。</td></tr>
+<tr><td><code>webserver/models.py:997</code>、<code>:1048</code></td><td>按版本的 Definition、唯一 Installation、来源和 checksum 字段。</td><td>包实体、有效版本、加载失败信息、生命周期操作记录。</td></tr>
+<tr><td><code>app/pages/admin/plugins/index.vue:604</code></td><td>按 talebook ID 前缀分组，文案说明只有内置插件。</td><td>外部来源、上传操作与版本状态；服务端返回主类型，支持作者命名空间。</td></tr>
+<tr><td><code>document/PluginGuide.md</code></td><td>完整能力、类型和连接规范。</td><td>独立项目模板、构建工具、安装调试流程与支持矩阵。</td></tr>
+</tbody></table></div>
+<p><code>design/webserver/20260814-plugin-runtime-foundation.active.html</code> 明确规定 V1 不允许 Web 进程动态 import 外部代码。该边界继续保留，选择 <code>managed_process</code>。</p>
+<div class="callout"><strong>调研所得的通用流程：</strong>描述清单 + 后端代码 + 可选静态前端 → 归档包 → 管理端上传或分发 → 校验并持久化 → 加载运行；配套工具负责模板、校验、构建与版本管理。迁入 Talebook 时需适配现有能力契约和连接所有权。</div>
+</section><section id="package" class="card">
+<h2>4. 插件包契约</h2>
+<pre aria-label="建议插件项目结构"><code>example.meta.catalog/
+├── manifest.json                 # 现有 talebook.plugin/v1 声明
+├── plugin-package.json           # 新增 talebook.package/v1 包描述
+├── backend/
+│   ├── __init__.py
+│   └── provider.py               # SDK Provider；由 runner 加载
+├── tests/                        # 开发者契约与业务测试，不进入发布包
+├── README.md
+└── LICENSE
+</code></pre>
+<p><code>manifest.json</code> 保留既有必填字段和闭集规则，设置 <code>runtime_kind=managed_process</code>。不添加 entrypoint、api_routes 等未知键。插件 ID 使用作者命名空间，例如 <code>example.meta.catalog</code>；<code>talebook.*</code> 留给内置插件，上传不得占用已有身份或系统前缀。</p>
+<pre aria-label="建议包描述"><code>{
+  "format": "talebook.package/v1",
+  "entrypoint": "backend.provider:PROVIDER",
+  "primary_type": "meta",
+  "sdk_version": "1.0.0"
+}</code></pre>
+<p>包描述只表达入口、主类型与 SDK 要求，不重复 ID、版本、能力、权限和配置。入口必须是包内 Python 模块及合法符号名，不接受命令、路径跳转或绝对路径。主类型与所声明能力必须匹配。</p>
+<p>兼容性同时检查包格式、插件协议、SDK 主版本及 <code>manifest.compatibility.talebook</code> 范围。应使用统一的实际发行版本标识；现有 <code>webserver/version.py</code> 值不是完整的标准 SemVer，不能未经定义直接做字符串比较。编码时应接入现有发行版本解析或明确不支持的版本表达式。</p>
+<div class="callout warn"><strong>默认校验上限（提案）：</strong>压缩包 20 MiB、解压总量 100 MiB、单文件 20 MiB、文件数 2,000、JSON 清单 256 KiB；均在传输层上限之内单独强制执行。允许后续按真实样本调整，不借用电子书上传的业务上限。</div>
+<ul><li>按归档实际内容识别 ZIP；拒绝加密包、符号链接、特殊文件、绝对路径、盘符、反斜线绕过、路径穿越和规范化后重名。</li><li>先枚举所有成员，再逐个受限写出；解压过程中计数，不能只相信 ZIP 声明的大小。</li><li>生成 SHA256 用于内容身份、重复包判定和重试，不把摘要等同于作者签名或来源认证。</li><li>同 ID 同版本同摘要为幂等请求；同版本不同摘要拒绝。升级包 ID 必须与目标安装一致。</li><li>首期不安装 requirements，不执行安装钩子、前端构建命令或打包脚本；新增第三方依赖需由服务版本提供。</li></ul>
+</section><section id="install" class="card">
+<h2>5. 上传、安装与版本生命周期</h2>
+<div class="flow" aria-label="上传安装流程">
+<article class="step"><span class="label">Upload</span><b>上传与静态验证</b><p>验证管理员身份和上传开关，限制大小、目录、字段与兼容性；此时不执行外部代码。</p></article>
+<article class="step"><span class="label">Review</span><b>预览并确认安装</b><p>展示名称、版本、来源、能力、权限、数据策略与兼容性；管理员选择授权。</p></article>
+<article class="step"><span class="label">Commit</span><b>保存待加载版本</b><p>保留旧有效版本和所有连接；新包持久化成功后标为待重启，新安装默认停用。</p></article>
+<article class="step"><span class="label">Activate</span><b>重启校验与切换</b><p>独立 runner 校验握手和契约；成功后切换有效版本，失败则保留旧版本并展示原因。</p></article>
+</div>
+<p>首期采用重启加载新代码的模型，不在线修改 Web 路由或 Python 模块。界面同时展示安装版本和当前运行版本；更新已有插件时，不能把仍可用的旧安装整体标为 inactive。停用安装不启动插件进程，重启仅按清单登记宿主代理；首次启用后执行受限握手，加载失败时不允许业务调用。</p>
+<div class="table-wrap" role="region" aria-label="建议接口" tabindex="0"><table><thead><tr><th>方法与路径（均为提案）</th><th>输入</th><th>语义</th></tr></thead><tbody>
+<tr><td>POST <code>/api/admin/plugins/package</code></td><td>multipart file</td><td>创建暂存包，返回 upload_id、SHA256、规范清单、兼容性与权限预览。</td></tr>
+<tr><td>GET / DELETE <code>/api/admin/plugins/package/&lt;upload_id&gt;</code></td><td>上传标识</td><td>查看验证结果或删除未安装暂存包；仅上传管理员可读取，建议 TTL 24 小时。</td></tr>
+<tr><td>POST <code>/api/admin/plugins/installation</code></td><td>upload_id、expected_checksum、approved_permissions</td><td>安装全新外部插件；不改变旧 builtin 安装接口。</td></tr>
+<tr><td>POST <code>/api/admin/plugins/installations/&lt;id&gt;/version</code></td><td>upload_id、expected_current_version、approved_permissions</td><td>以乐观并发检查提交新版本，默认只允许版本前进。</td></tr>
+<tr><td>POST <code>/api/admin/plugins/installations/&lt;id&gt;/restore</code></td><td>上一可用 artifact_id、expected_current_version</td><td>显式恢复旧代码版本；与业务 Run 的 rollback 区分。</td></tr>
+<tr><td>DELETE <code>/api/admin/plugins/installations/&lt;id&gt;</code></td><td>外部安装 ID</td><td>立即阻止新运行，标记卸载；保留历史运行、已导入数据和连接，等待运行结束后清理代码。</td></tr>
+</tbody></table></div>
+<p>JSON 接口复用 <code>@js</code> 与 <code>@is_admin</code>；成功使用 <code>err=ok</code>，失败用稳定业务错误码。上传是特权操作，必须补齐同源或 CSRF 校验；当前全局 <code>xsrf_cookies=False</code> 不能直接视为安装端点的安全保障。</p>
+<h3>持久化与崩溃恢复</h3>
+<p>建议代码目录为 <code>/data/books/plugins/artifacts/&lt;sha256&gt;/</code>，另有 staging 与按插件隔离的工作目录；不存到应用镜像或可被下载的电子书目录。最终目录不可原地覆盖，暂存目录与目标位于同一文件系统，校验完以 rename 完成发布。</p>
+<p>新增 <code>PluginArtifact</code>，保存插件 ID、版本、完整清单、包描述、摘要、来源、安装者及加载诊断；新增 <code>PluginLifecycleOperation</code> 记录安装、升级、恢复、卸载。Installation 增加 desired_artifact_id 与 active_artifact_id；内置安装两者为空。</p>
+<p>执行顺序：锁定插件身份 → 创建经验证的不可变产物 → 单事务记录 artifact、目标版本、授权和操作事件 → 提交。提交失败只清理未引用的新产物；启动时回收无引用残留并校验当前引用是否缺失。数据库和文件系统不是一个事务，必须显式恢复；不得先删除旧目录再尝试安装。</p>
+<h3>启停、升级、卸载与恢复</h3>
+<ul><li>停用立即拒绝新调用；正在运行的任务按既有生命周期处理，保留连接、凭据和业务数据。</li><li>升级仍复用 installation_id，个人与实例连接身份不变。权限新增项不自动授权；只有新版本校验成功后才切换 active artifact。</li><li>新配置 schema 不兼容现有连接时显示“需要更新配置”，暂停受影响连接；不能自动删除凭据或擅自迁移。</li><li>每次 Run 绑定实际使用的 artifact_id，保证重试和诊断可区分代码版本；代码清理必须避开仍被运行引用的版本。</li><li>卸载后以墓碑状态保留旧连接和运行；重新安装同 ID 可恢复配置。页面提供单独的数据清理流程，不把卸载当作删除书籍或读者笔记。</li><li>恢复旧版本只切换代码和匹配的授权快照，不自动撤销插件已经写入的领域数据。</li></ul>
+</section><section id="runtime" class="card">
+<h2>6. 独立进程接入既有能力</h2>
+<div class="callout good"><strong>调用链：</strong>现有业务入口 → PluginRuntime（连接、授权、租约、审计）→ 宿主自有 typed adapter → runner 进程 → SDK Provider → 类型化结果 → 宿主校验和领域 writer。</div>
+<p>Web 进程只加载由 Talebook 交付的适配器代码。runner 使用固定 Python 可执行文件和固定 SDK 入口启动，以包摘要作为代码身份，在子进程内加载插件。命令参数不用 shell，不接受插件提供的任意执行命令。</p>
+<p>用有请求 ID 的 JSON Lines 做本地双向通信，stdout 只写协议帧、stderr 写受限日志。握手返回协议、SDK 版本及实现的能力；宿主只接受清单声明和该阶段适配器支持范围的交集。请求超时关闭结果、终止并回收确切进程；晚到结果不能写入或推进游标。</p>
+<div class="table-wrap" role="region" aria-label="首期能力桥" tabindex="0"><table><thead><tr><th>能力</th><th>桥接方法</th><th>重要校验</th></tr></thead><tbody>
+<tr><td>metadata.lookup</td><td>search_books、get_metadata、get_cover、self_check</td><td>输入与 BookMetadata 对齐；封面二进制编码有上限，URL 经宿主网络策略校验。</td></tr>
+<tr><td>integrations.tool</td><td>preview、apply、self_check</td><td>只传本次授权书籍的输入副本和输出工作目录；ToolReport、ToolOutput 由宿主重建与验证。</td></tr>
+<tr><td>其他既有能力</td><td>逐个实现 typed adapter 后再开放</td><td>不注册一个假装实现全部协议的万能代理，也不把任意 extra feature 开放为 Shell 执行。</td></tr>
+</tbody></table></div>
+<p>进程按 artifact_id 与 connection_id 隔离复用，不让不同读者共享保留凭据的进程状态；按插件限制总并发、任务按连接取得租约，空闲超时后回收。请求环境只包含必要配置，不继承服务密钥环境变量；只传本次连接解密后的最小凭据，禁止把 SQLAlchemy session、Calibre DB、所有读者配置或全局设置传进插件。</p>
+<h3>宿主能力与工具文件</h3>
+<p>首期 SDK 以接收参数、返回结构化结果为主。需要 HTTP 时走宿主的受控网络 RPC，复用 SafeHttpClient、逐跳目标验证、响应上限和按插件与主机排队；不能让插件配置给自己创建私网白名单。</p>
+<p>元数据由宿主现有写入路径消费。正文工具由通用编排入口复制输入、执行 preview/apply、确认预览、备份、导入或写回书库。返回的相对路径必须位于本次输出目录，拒绝链接和目录逃逸，输出格式与内容再次校验。插件无权自行决定 book_id 的所有权。</p>
+<p>新增通用工具接口 <code>/api/plugins/connections/&lt;id&gt;/tool/preview</code> 与 <code>/tool/run</code>（提案），显式执行资源级权限检查，并绑定输入摘要、选项与 artifact 的预览标识。既有内置工具页面继续走自身编排。</p>
+<div class="callout warn"><strong>可信代码边界：</strong>相同系统账号下的子进程仍可直接读磁盘或联网。独立进程、清单权限和 RPC 约束不会自动形成强沙箱。因此首期仅限管理员安装可信包；不可信分发要先落地独立账号、文件挂载、出网与资源限制，才可对外承诺隔离。</div>
+</section><section id="toolkit" class="card">
+<h2>7. SDK、模板与开发工具</h2>
+<p>建议新增独立 Python 包 <code>talebook-plugin-sdk</code>，提供公共类型、Provider 协议、清单校验、进程握手与消息编解码，并暴露 <code>talebook-plugin</code> 命令。名称和命令均为提案，尚未发布。选择 Python 可与服务端共享验证器，避免为清单再维护一份不同语言的规则。</p>
+<p>将 <code>webserver/plugins/runtime/</code> 中公共契约提取到不依赖 Calibre、ORM 和 Tornado 的公共 SDK，宿主保留兼容导出；迁移必须保持现有导入和全部内置契约测试通过。SDK 不导出 webserver 内部模型，也不直接提供数据库 session。</p>
+<div class="table-wrap" role="region" aria-label="开发命令提案" tabindex="0"><table><thead><tr><th>命令（提案）</th><th>作用</th><th>验证重点</th></tr></thead><tbody>
+<tr><td><code>talebook-plugin init example.meta.catalog --type meta</code></td><td>生成清单、包描述、Provider、测试、README 与 LICENSE 模板。</td><td>模板能形成真实可运行包；ID、协议与能力一致。</td></tr>
+<tr><td><code>talebook-plugin validate .</code> / <code>validate file.zip</code></td><td>静态校验结构、路径、清单、版本和支持矩阵。</td><td>不导入代码，不执行钩子；服务端仍重新完整验证。</td></tr>
+<tr><td><code>talebook-plugin test .</code></td><td>显式在子进程执行契约测试和开发者测试。</td><td>缺方法、错误返回类型、超时与无效输出都要失败。</td></tr>
+<tr><td><code>talebook-plugin build .</code></td><td>白名单打包到 dist，生成 SHA256。</td><td>稳定排序、固定 ZIP 时间；排除凭据、.env、.git、虚拟环境、缓存和嵌套 dist。</td></tr>
+<tr><td><code>talebook-plugin bump patch</code></td><td>修改 manifest 的 version；支持 major、minor、patch。</td><td>不在后台偷偷修改版本或上传发布。</td></tr>
+</tbody></table></div>
+<p>打包采用显式允许清单：manifest、包描述、backend 中的许可文件、README、LICENSE 与可选安全图标。前端进入第二阶段后才把构建产物加入清单；前端命令只在作者本机显式执行，服务器不会执行。</p>
+<p>首期调试路径：本地生成 → 编辑 Provider → validate/test → build → 上传真实 Talebook 开发实例 → 查看诊断与运行记录。CLI test 可以使用隔离样本，但不能将其描述成完整书库联调；真实安装测试仍需要项目既有 Docker 后端。</p>
+<p>CLI 发布验收必须启动真实命令入口，不只测 runInit/runBuild 等内部函数；同时检查支持的 Python 版本、安装后可执行性及模板依赖。</p>
+</section><section id="ui" class="card">
+<h2>8. 管理界面与自带前端</h2>
+<p>在 <code>/admin/plugins</code> 工具栏增加“上传插件”，开关关闭时显示明确原因。步骤为选包 → 验证进度 → 包信息与权限预览 → 安装结果。已有插件卡片增加来源、安装版本、运行版本、待重启与加载失败信息，并提供更新、恢复和卸载。</p>
+<p>内置插件保留启停行为。目录接口必须同时返回已安装的失败外部包，不能沿用“只展示已注册 Provider”的过滤而使问题插件从界面消失。类型由服务端明示；作者命名空间不能导致列表漏项。</p>
+<p>首期复用现有配置 schema 表单与能力测试组件，正文工具进入宿主通用页面，不接受任意 manage_route 指向脚本页面。上传成功不等于可运行，停用状态、未配置状态和加载失败分别展示。</p>
+<h3>第二阶段：独立静态前端</h3>
+<p>若插件需要自带页面，包中增加受控 <code>frontend/index.html</code> 及静态资源，由固定动态宿主页承载，不让插件添加 Nuxt 编译期路由。主题、语言、提示与高度通过版本化桥接消息同步，不因换主题重载页面。</p>
+<p>使用只允许必要脚本的 iframe sandbox，避免同时给同源页面 allow-scripts 与 allow-same-origin。推荐以独立源或不透明源隔离，配置限制性 CSP；父页校验 event.source、会话 nonce、插件身份及消息 schema，使用 MessageChannel 传输。插件不能直接读取主站 Cookie 或把任意 URL 交给宿主请求。</p>
+<p>桥接请求由父页调用项目统一 backend()，服务端仍逐请求校验连接所有权、插件启用状态、能力与资源权限。前端桥是交互协议，不替代服务器鉴权；样式隔离也不等于安全隔离。</p>
+</section><section id="delivery" class="card">
+<h2>9. 实施顺序与验收</h2>
+<div class="table-wrap" role="region" aria-label="里程碑" tabindex="0"><table><thead><tr><th>阶段</th><th>代码落点（提案）</th><th>验收</th></tr></thead><tbody>
+<tr><td>M1 包与数据</td><td>services/plugin_packages.py、PluginArtifact / LifecycleOperation、schema migrations</td><td>所有异常包被静态拒绝；幂等、并发升级、提交失败与崩溃恢复保护有效版本。</td></tr>
+<tr><td>M2 SDK 与 runner</td><td>独立 SDK、services/plugin_process.py、宿主 typed adapters</td><td>两个模板运行成功；契约、总超时、进程回收、类型与文件校验；内置插件测试不回退。</td></tr>
+<tr><td>M3 安装与能力闭环</td><td>handlers/plugins.py、通用 tool 编排、PluginCenter 页面与配置表单</td><td>上传元数据包 → 重启 → 配连接 → 检索；上传工具包 → 预览 → 执行 → 恢复上一代码版本。</td></tr>
+<tr><td>M4 开发工具与交付</td><td>SDK CLI、templates、document/PluginGuide.md、spec/插件/插件平台.md</td><td>真实命令入口和模板通过；使用官方流程在真实 Docker 实例上传安装，并更新领域规格。</td></tr>
+<tr><td>后续独立批次</td><td>其余能力桥、前端宿主页、bridge、安全沙箱</td><td>按真实能力和信任目标单独验证，再扩充支持矩阵；不靠协议枚举推定支持。</td></tr>
+</tbody></table></div>
+<p>实施前需逐项澄清并写回本文件：是否接受首期两类能力；是否必须首期提供自带 HTML UI；可信包范围是否满足部署场景。当前首期边界是为评审提供的默认建议，不把未收到的回答写成已确认。</p>
+</section><section id="impact" class="card">
+<h2>10. 影响范围、风险与回滚</h2>
+<p>当前仓库改动仅为本 WIP，产品运行行为未改变，因此此时不更新 spec。实现后在同一交付中更新 <code>spec/插件/插件平台.md</code>；新增通用正文工具行为时同步更新对应正文工具规格与索引，明确内置和外部安装的区别。</p>
+<p>计划影响后端：插件模型、迁移、包管理、启动加载、运行时注册与发现、进程代理、工具编排、鉴权和下载边界。前端：插件中心、配置、通用工具、国际化与 E2E。部署：持久插件目录、可用 SDK 与进程运行环境。</p>
+<ul><li>升级失败或产物缺失：保留 active artifact 与旧目录，目录页面显示错误；启动与升级故障注入验证。</li><li>恶意或错误插件：可信来源限制、进程总时限、输出校验、权限限制；强沙箱进入后续范围。</li><li>用户连接被覆盖：升级保持 installation_id，测试两个读者的独立凭据与 role；管理员接口不返回个人凭据。</li><li>内置物化污染外部安装：物化只枚举内置集合；来源和版本保真回归测试。</li><li>全局开关关闭：拒绝新上传和新的外部运行；不删除已安装产物或历史数据。</li></ul>
+<p>回滚实现版本前先停用外部运行时；保留插件数据库、产物和领域数据，按显式迁移恢复读兼容。恢复包版本与回滚业务数据是两个操作，不让恢复旧代码自动删除书籍。</p>
+</section><section id="tests" class="card">
+<h2>11. 测试计划与当前结果</h2>
+<div class="table-wrap" role="region" aria-label="验证结果" tabindex="0"><table><thead><tr><th>验证层</th><th>命令或范围</th><th>实际状态</th></tr></thead><tbody>
+<tr><td>源码调研</td><td>安装 handler、包管理器、前端承载、Core API、脚手架代码、Talebook 契约与安装路径。</td><td class="verified">已完成静态核对；没有执行完整书库联调。</td></tr>
+<tr><td>开发工具样本</td><td><code>npm test</code>，使用隔离下载的脚手架代码。</td><td class="verified">9 个测试通过，包括 init → validate → build → validate(zip)。该结果不代表 Talebook 已有上传能力。</td></tr>
+<tr><td>真实 CLI 启动</td><td><code>node bin/mytool.js --help</code>，Node 18.19.1。</td><td class="pending">受限：依赖要求 Node ≥22.12，当前环境出现 ERR_REQUIRE_ESM；已作为 CLI 验收需覆盖实际入口的依据，未改外部代码。</td></tr>
+<tr><td>方案结构与禁词</td><td>项目检查器 validate_path() / inspect_html()；附加检查内部锚点、模板占位、必备章节和本轮文本约束。</td><td id="structure-result" class="verified">已通过：路径合法、HTML 结构和内嵌资源合规、12 节锚点有效、无遗留占位、符合名称排除要求。</td></tr>
+<tr><td>设计合并门禁</td><td><code>make check-design</code></td><td id="gate-result" class="pending">已执行，唯一拒绝原因是本方案仍为 WIP；make 退出码 2。该结果符合提案不合并的状态要求，不记为完整门禁通过。</td></tr>
+<tr><td>实现测试</td><td>归档穿越、膨胀、权限、更新并发、加载失败、进程终止、结果校验与两条完整能力流程。</td><td class="pending">待实现后执行。</td></tr>
+<tr><td>界面与联调</td><td>真实 Docker 后端；PC/手机、浅色/深色、上传失败、待重启、升级失败、停用。</td><td class="pending">未执行：本轮没有业务代码或 UI 改动。实现后需 Chrome DevTools 实际渲染与项目 interface-review full 审查。</td></tr>
+</tbody></table></div>
+<p>本轮没有宣称服务端安装、强沙箱或前端验收通过。只有实现与相关验证完成，才将本文件改名为 ACTIVE；本轮不提交可合并 PR。</p>
+</section><section id="decisions" class="card">
+<h2>12. 决策记录</h2>
+<ol><li><strong>2026-10-03：</strong>沿用既有插件领域模型和能力契约；独立包格式与现有 Manifest 分层。</li>
+<li><strong>2026-10-03：</strong>采用 managed_process，延续 Web 进程不执行外部代码的架构约束。</li>
+<li><strong>2026-10-03：</strong>首期建议元数据与正文工具闭环、宿主通用 UI、可信管理员上传；其余能力和自带页面分后续批次。</li>
+<li><strong>2026-10-03：</strong>开发工具验证增加真实 CLI 入口，不用内部函数测试代替命令可用性。</li>
+<li><strong>2026-10-03：</strong>源码调研完成，功能实现和联调尚未开始，本方案保持唯一 WIP。</li></ol>
+</section></main></div><footer>Talebook internal design · webserver · WIP · 2026-10-03</footer></div><script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>
