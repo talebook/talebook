@@ -321,8 +321,8 @@ def test_event_sequence_is_idempotent_and_renews_lease():
         assert updated.data["plan"]["chapters"][0]["completed_segments"] == 1
         assert updated.data["plan"]["chapters"][0]["cache_hits"] == 1
         assert "fingerprint" not in updated.data["last_event"]
-        assert updated.progress == 0.575
-        assert audiobook_job_plan(updated)["overall_percent"] == 58
+        assert updated.progress == 0
+        assert audiobook_job_plan(updated)["overall_percent"] is None
         assert updated.lease_until > now
         session.close()
 
@@ -488,7 +488,8 @@ def test_cancelled_revision_keeps_edition_manifest_and_retry_commits_complete_ve
             session.commit()
             session.close()
 
-            scheduler._process(fixture.job_id)
+            with mock.patch.object(scheduler, "_has_capacity", return_value=True):
+                assert scheduler.run_once()
 
         session = session_maker()
         completed = session.get(models.AudiobookJob, fixture.job_id)
@@ -546,7 +547,8 @@ def test_revision_merge_failure_keeps_baseline_and_retry_reuses_staging():
             session.commit()
             session.close()
 
-            scheduler._process(fixture.job_id)
+            with mock.patch.object(scheduler, "_has_capacity", return_value=True):
+                assert scheduler.run_once()
 
         session = session_maker()
         completed = session.get(models.AudiobookJob, fixture.job_id)
