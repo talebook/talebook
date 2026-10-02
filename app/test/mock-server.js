@@ -622,8 +622,16 @@ router.post('/api/book/:bookId/audio-jobs', eventHandler(async (event) => {
   return { err: 'ok', job, deduplicated: false };
 }));
 
+// Set an explicit v2 snapshot for SSR tests; normal legacy fixtures keep auto progression.
+router.post('/_test/audiobook-jobs', eventHandler(async (event) => {
+  const body = await readBody(event);
+  audiobookJobs = body.jobs;
+  audiobookJobPolls = 0;
+  return { err: 'ok' };
+}));
+
 router.get('/api/audio-jobs', eventHandler(() => {
-  if (audiobookJobs.length) {
+  if (audiobookJobs.length && !audiobookJobs[0].generation) {
     audiobookJobPolls += 1;
     const job = audiobookJobs[0];
     if (job.mode === 'advanced' && audiobookJobPolls >= 2 && !job.data.confirmed) {

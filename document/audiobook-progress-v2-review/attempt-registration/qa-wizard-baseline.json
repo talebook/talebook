@@ -1,0 +1,56 @@
+{
+  "detail": {
+    "book_id": 1,
+    "available_formats": null,
+    "files": [
+      {
+        "format": "EPUB"
+      }
+    ],
+    "generation": {
+      "compatible": true,
+      "can_generate": true,
+      "reason": ""
+    }
+  },
+  "stream_summary": {
+    "book_id": 1,
+    "available_formats": null,
+    "files": null,
+    "keys": [
+      "id",
+      "title",
+      "rating",
+      "timestamp",
+      "pubdate",
+      "author",
+      "authors",
+      "author_sort",
+      "tag",
+      "tags",
+      "publisher",
+      "comments",
+      "series",
+      "language",
+      "isbn",
+      "img",
+      "thumb",
+      "collector",
+      "count_visit",
+      "count_download",
+      "media_type",
+      "media_type_locked",
+      "online_readable",
+      "author_url",
+      "publisher_url",
+      "scope",
+      "state"
+    ]
+  },
+  "source": {
+    "file": "app/pages/audios/create.vue",
+    "unchanged_from_baseline": true,
+    "sha256": "c5b2d67857bfbbdf074776d8e4ec0736476fcadb5e09beedbf0cd8e8b36abd59",
+    "baseline_revision": "db5744b13e245414762bafc6219c6056fcb33837"
+  }
+}

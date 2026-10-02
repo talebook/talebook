@@ -381,9 +381,9 @@ const { data: jobData, refresh: refreshJobs } = await useAsyncData('audiobook-cr
 }, { default: () => ({ jobs: [] }) });
 
 const selectedBook = computed(() => {
-    const candidate = books.value.find(book => Number(book.id) === selectedBookId.value)
-        || detailsByBookId[selectedBookId.value || 0]?.book
-        || null;
+    const summary = books.value.find(book => Number(book.id) === selectedBookId.value);
+    const detail = detailsByBookId[selectedBookId.value || 0]?.book;
+    const candidate = detail ? { ...summary, ...detail } : summary;
     return isAudiobookSourceBook(candidate) ? candidate : null;
 });
 const selectedDetail = computed(() => (selectedBookId.value ? detailsByBookId[selectedBookId.value] : null));
@@ -525,9 +525,10 @@ function bookStatus(book: any) {
 }
 
 function bookFormats(book: any) {
-    const values = book.available_formats?.length
-        ? book.available_formats
-        : (book.files || []).map((item: any) => item.format);
+    const source = detailsByBookId[Number(book.id)]?.book || book;
+    const values = source.available_formats?.length
+        ? source.available_formats
+        : (source.files || []).map((item: any) => item.format);
     return [...new Set((values || []).map((item: any) => String(item).toUpperCase()))];
 }
 

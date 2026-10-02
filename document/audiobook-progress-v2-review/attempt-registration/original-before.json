@@ -1,0 +1,42 @@
+{
+  "begin_invocation_interleaving": {
+    "lease_owner": "replacement-worker",
+    "attempt_id": "f504af14-c80b-46ff-8ac6-64899178e8a2",
+    "seq": 1,
+    "completed": null,
+    "data_after_old_commit": {
+      "inspected": true,
+      "revision": {
+        "source_edition_id": 1,
+        "scope": "chapter",
+        "chapter_number": 1,
+        "structural_changed": false
+      },
+      "plan": {
+        "version": 1,
+        "chapters": [],
+        "phases": {
+          "queue": {
+            "started_at": "2026-10-03T03:53:55.463443"
+          },
+          "generate": {
+            "started_at": "2026-10-03T03:53:55.535985"
+          }
+        },
+        "last_active_phase": "generate",
+        "review_status": "pending"
+      },
+      "voicebook_invocation": {
+        "version": 2,
+        "task_id": "talebook-job-1",
+        "attempt_id": "f504af14-c80b-46ff-8ac6-64899178e8a2",
+        "started_at": "2026-10-02T19:53:55.535972+00:00"
+      }
+    },
+    "previous_attempt_before_registration": "96cb8372-bbf8-4bf7-8e65-d35da2d39357",
+    "new_attempt_before_old_commit": "de193380-0d86-4fc2-90e7-d57ad7c1cd89",
+    "interleaving_executed": true,
+    "stale_registration_overwrote_new_attempt": true,
+    "replacement_heartbeat_accepted": false
+  }
+}

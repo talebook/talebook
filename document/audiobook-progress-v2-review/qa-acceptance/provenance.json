@@ -1,0 +1,23 @@
+{
+  "qa_comment_id": "c5cab4c9-7334-4342-8f69-8401e1a18354",
+  "attachment_id": "01a0fe6c-a540-772f-9d25-ce533d05ce75",
+  "attachment_filename": "qa-review-9cb3633-3316bae.zip",
+  "attachment_sha256": "687688bb11bc440829075b75851121b0c6274ad499ff14b5ded66a98c12327f8",
+  "talebook_sha": "9cb3633be8fd1bb8f7b9ef782ceabd11a84a05a3",
+  "voicebook_sha": "3316bae6a7372e82d7037d31b9ffb32633ef2aa4",
+  "copied_verbatim_sha256": {
+    "acceptance-matrix.json": "314732859ee3fe72c447ed64e8c839d419d748384aaf5d46dcf67982b873e72f",
+    "environment-and-checks.json": "2106ee76d546a6803826ad532da81bab1bcbcf165bb13cc74bc6a9bf6beefff6",
+    "source-verification.json": "c96b5cf7110f6f385da8f26e68aada91d6f93b4742c68b49bb54f6e4cc347c1e",
+    "baseline-comparison.json": "ae381286750960fbb722994657fa24880078d8cdaae8e20b18429d2d4055b02d",
+    "baseline-comparison-summary.json": "fe1da46e7a9f1e7778587850d5438abd4691963ec8c995a1cb161768e84874ba",
+    "initial-network-failures.json": "4f39fce11802e42927ede1c23b8421612f804903c667764f6b60dd661fb2d8d7",
+    "second-network-failures.json": "81e438f20b8a666d129a80ce71992902dfb8c2be946d1b29a6bec82be880473e"
+  },
+  "embedded_qa_screenshot_sha256": {
+    "quick-real-cli-playback.png": "439caa9f1932358ae6df0869b3ee4eac15301256d18515e0972669b2691223a4",
+    "advanced-real-cli-playback.png": "52990de10f0d2918504360a43d5ddcf2f75bc63853b20fdf02f1ea79447dda6d",
+    "real-edge-cooldown-mobile-dark.png": "2b5a67432a5957b3f46926e4d5432f7b5630cdc752be6b5caed0df0e574468c0"
+  },
+  "historical_gates": "copied matrix/environment describe WIP at QA reviewed 9cb3633; current final gates recorded in ACTIVE design and delivery comment"
+}
