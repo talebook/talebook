@@ -68,10 +68,44 @@ def test_unread_favorites_and_wants_remain_candidates():
     assert rank([book(1), book(2), book(3)], [state(1, favorite=1), state(2, wants=1)]) == [1, 2, 3]
 
 
-def test_cold_start_uses_rating_popularity_and_recency():
-    assert rank([book(1, rating=10), book(2, rating=8, count_visit=30), book(3)]) == [1, 2, 3]
+def test_cold_start_prioritizes_popularity_before_rating_and_recency():
+    assert rank([book(1, rating=10, timestamp=NOW), book(2, rating=0, count_visit=30), book(3)]) == [2, 1, 3]
     assert rank([book(1), book(2, count_visit=20)]) == [2, 1]
+
+
+def test_cold_start_weights_downloads_and_does_not_cap_popularity():
+    assert rank([book(1, count_visit=19), book(2, count_download=10)]) == [2, 1]
+    assert rank([book(1, rating=10, count_visit=10**8), book(2, rating=0, count_visit=10**9)]) == [2, 1]
+
+
+def test_cold_start_breaks_heat_ties_with_rating_and_recency():
+    assert rank([book(1, count_visit=20, rating=10), book(2, count_visit=20, rating=8)]) == [1, 2]
     assert rank([book(1, timestamp=NOW), book(2, timestamp=NOW - datetime.timedelta(days=300))]) == [1, 2]
+
+
+def test_opening_only_and_stale_interest_records_still_get_popular_books():
+    books = [book(1, rating=10), book(2, count_visit=20)]
+    assert rank(books, [state(1, online_read=1), state(99, favorite=1)]) == [2, 1]
+
+
+def test_cold_start_keeps_hot_order_even_when_one_author_has_multiple_books():
+    books = [
+        book(1, authors=["甲"], count_visit=100),
+        book(2, authors=["甲"], count_visit=90),
+        book(3, authors=["乙"], count_visit=80, rating=10),
+    ]
+    assert rank(books) == [1, 2, 3]
+
+
+def test_guest_popular_recommendations_use_visible_book_counters():
+    cache, session = mock.Mock(), mock.Mock()
+    cache.all_field_for.side_effect = lambda field, ids: {1: 10, 2: 0} if field == "rating" else {}
+    session.query.return_value.all.return_value = [
+        SimpleNamespace(book_id=1, count_visit=0, count_download=0),
+        SimpleNamespace(book_id=2, count_visit=1, count_download=20),
+        SimpleNamespace(book_id=3, count_visit=10**9, count_download=0),
+    ]
+    assert recommend_book_ids(cache, session, None, [1, 2], 12) == [2, 1]
 
 
 def test_unknown_authors_do_not_create_false_affinity():
@@ -96,8 +130,9 @@ def test_authors_and_series_are_diversified_without_dropping_books():
         book(1, authors=["甲"], series="系列甲", rating=10),
         book(2, authors=["甲"], series="系列甲", rating=10),
         book(3, authors=["乙"], rating=9),
+        book(4),
     ]
-    assert rank(books) == [2, 3, 1]
+    assert rank(books, [state(4, read_state=2)]) == [2, 3, 1]
 
 
 def test_ranking_is_stable_independent_of_candidate_order():
@@ -114,7 +149,8 @@ def test_large_recommendation_count_remains_supported():
 def test_an_author_cannot_crowd_all_alternatives_out_of_the_candidate_pool():
     books = [book(bid, authors=["甲"], rating=10) for bid in range(200)]
     books.append(book(200, authors=["乙"], rating=9))
-    assert rank(books, count=12)[1] == 200
+    books.append(book(201))
+    assert rank(books, [state(201, read_state=2)], count=12)[1] == 200
 
 
 def test_missing_metadata_and_stale_states_are_safe():

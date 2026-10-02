@@ -58,7 +58,7 @@ test.describe('Homepage', () => {
         await page.goto('/');
         const cards = page.locator('.book-card a');
         await expect(cards).toHaveCount(books.length);
-        expect(await cards.evaluateAll(elements => elements.map(element => element.getAttribute('href'))))
+        await expect.poll(() => cards.evaluateAll(elements => elements.map(element => element.getAttribute('href'))))
             .toEqual(books.map(book => `/book/${book.id}`));
     });
 

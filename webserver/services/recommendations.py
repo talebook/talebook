@@ -47,6 +47,10 @@ def _signal_weight(state):
     return max(5 * bool(state.favorite), 3 * bool(state.wants), 2 * (state.read_state == 2), state.read_state == 1)
 
 
+def _popularity(book):
+    return max(0, book.get("count_visit") or 0) + 2 * max(0, book.get("count_download") or 0)
+
+
 def rank_book_ids(books, states=(), count=12, now=None):
     """Rank lightweight metadata. Both books and states must already be scoped to the reader."""
     if count <= 0 or not books:
@@ -54,14 +58,32 @@ def rank_book_ids(books, states=(), count=12, now=None):
     now_ts = _timestamp(now or datetime.datetime.now(datetime.timezone.utc))
     book_map = {book["id"]: book for book in books}
     state_map = {state.book_id: state for state in states if state.book_id in book_map}
-    features = {bid: {field: _terms(book.get(field)) for field in _FEATURE_WEIGHTS} for bid, book in book_map.items()}
-    tag_frequency = Counter(tag for feature in features.values() for tag in feature["tags"])
-    profiles = {field: Counter() for field in _FEATURE_WEIGHTS}
+    eligible = {
+        bid: book
+        for bid, book in book_map.items()
+        if not ((state := state_map.get(bid)) and (state.read_state in (1, 2) or state.progress))
+    }
     seeds = sorted(
         (state for state in state_map.values() if _signal_weight(state)),
         key=lambda state: (_state_time(state), state.book_id),
         reverse=True,
     )[:_MAX_SEEDS]
+    if not seeds:
+        # Without personal interest, show genuinely popular books first.
+        # Ratings and recency only break heat ties; do not cap or diversify heat.
+        return heapq.nlargest(
+            count,
+            eligible,
+            key=lambda bid: (
+                _popularity(eligible[bid]),
+                min(10, max(0, eligible[bid].get("rating") or 0)),
+                _timestamp(eligible[bid].get("timestamp")),
+                bid,
+            ),
+        )
+    features = {bid: {field: _terms(book.get(field)) for field in _FEATURE_WEIGHTS} for bid, book in book_map.items()}
+    tag_frequency = Counter(tag for feature in features.values() for tag in feature["tags"])
+    profiles = {field: Counter() for field in _FEATURE_WEIGHTS}
     for state in seeds:
         age_days = max(0, now_ts - _state_time(state)) / 86400 if _state_time(state) else 0
         weight = _signal_weight(state) / (1 + age_days / 180)
@@ -74,10 +96,8 @@ def rank_book_ids(books, states=(), count=12, now=None):
     profile_max = {field: max(profile.values(), default=1) for field, profile in profiles.items()}
 
     scores = {}
-    for bid, book in book_map.items():
+    for bid, book in eligible.items():
         state = state_map.get(bid)
-        if state and (state.read_state in (1, 2) or state.progress):
-            continue
         score = 0.0
         for field, weight in _FEATURE_WEIGHTS.items():
             match = max((profiles[field][term] for term in features[bid][field]), default=0)
@@ -87,8 +107,7 @@ def rank_book_ids(books, states=(), count=12, now=None):
         # Calibre ratings range from zero to ten. Popularity is capped so one
         # heavily exposed title cannot overwhelm content affinity.
         score += 6 * min(10, max(0, book.get("rating") or 0)) / 10
-        popularity = max(0, book.get("count_visit") or 0) + 2 * max(0, book.get("count_download") or 0)
-        score += min(2, math.log1p(popularity) / 4)
+        score += min(2, math.log1p(_popularity(book)) / 4)
         timestamp = _timestamp(book.get("timestamp"))
         if timestamp:
             score += 1 / (1 + max(0, now_ts - timestamp) / (86400 * 90))
