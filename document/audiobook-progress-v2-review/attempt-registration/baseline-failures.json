@@ -1,0 +1,26 @@
+{
+  "default_branch_sha": "db5744b13e245414762bafc6219c6056fcb33837",
+  "voicebook_sha": "3316bae6a7372e82d7037d31b9ffb32633ef2aa4",
+  "candidate_full_result": {
+    "passed": 1877,
+    "skipped": 40,
+    "failed": 10
+  },
+  "default_branch_targeted_reproduction_result": {
+    "failed": 10
+  },
+  "failures_identical": true,
+  "failure_names": [
+    "tests/test_check_spec.py::test_repository_spec_passes",
+    "tests/test_check_spec.py::test_command_line_entry_point",
+    "tests/test_readest_embed.py::TestReadestEmbed::test_resource_change_updates_bootstrap_revision",
+    "tests/test_scan.py::TestImport::test_long_titles_survive_scan_import_and_api",
+    "tests/test_upgrade_release.py::test_workflow_resolves_annotated_tag_and_validates_manual_commit[release-]",
+    "tests/test_upgrade_release.py::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-]",
+    "tests/test_upgrade_release.py::test_workflow_resolves_annotated_tag_and_validates_manual_commit[release-prerelease]",
+    "tests/test_upgrade_release.py::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-tag_commit]",
+    "tests/test_upgrade_release.py::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-unsafe_version]",
+    "tests/test_upgrade_release.py::test_workflow_resolves_annotated_tag_and_validates_manual_commit[workflow_dispatch-outside_master]"
+  ],
+  "note": "Full run preceded final control reread and callback claim-identity refinement; final affected core suite rerun: 118 passed. Full suite is not reported as passing."
+}

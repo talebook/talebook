@@ -152,6 +152,8 @@ def test_retry_clears_old_percentage_errors_counts_and_attempt(running_job):
     assert not job.error_message
     job.status = "generating"
     job.lease_owner = "test-worker"
+    job.lease_until = datetime.datetime.now() + datetime.timedelta(minutes=1)
+    job.attempts += 1
     f.session.commit()
     f.scheduler._begin_invocation(job.id, 2, "GENERATING")
     job = refresh(f)

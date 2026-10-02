@@ -954,7 +954,7 @@ description: 高级模式测试
         scheduler = AudiobookScheduler()
         with mock.patch.object(scheduler, "_process") as process:
             self.assertTrue(scheduler.run_once())
-            process.assert_called_once_with(job.id)
+            process.assert_called_once_with(job.id, (scheduler.worker_id, 2, None))
         session = test_main.get_db()
         reclaimed = session.get(models.AudiobookJob, job.id)
         self.assertEqual(reclaimed.status, "generating")

@@ -3,7 +3,7 @@ import { defineConfig } from '@playwright/test';
 // Isolated, short lived mock services are owned and stopped by Playwright.
 export default defineConfig({
     testDir: './test/e2e',
-    testMatch: 'audiobook-progress-v2.spec.ts',
+    testMatch: ['audiobook-progress-v2.spec.ts', 'audiobook-create-formats.spec.ts'],
     workers: 1,
     retries: 0,
     timeout: 120000,

@@ -631,7 +631,8 @@ class AudiobookJobAction(BaseHandler):
         elif action == "retry":
             if job.status not in {"failed", "cancelled"}:
                 return {"err": "state.invalid", "msg": _("只有失败或已取消任务可以重试")}
-            reset_for_retry(storage, job)
+            if not reset_for_retry(storage, job):
+                return {"err": "state.invalid", "msg": _("任务状态已改变，请刷新后重试")}
         elif action == "priority" and self.is_admin():
             job.priority = max(-100, min(100, int(body.get("priority", 0))))
             job.update_time = utcnow()
@@ -643,6 +644,20 @@ class AudiobookJobAction(BaseHandler):
 
 
 class AudiobookWorkspace(BaseHandler):
+    def _reserve_review(self, job):
+        from webserver.services.audiobook import AudiobookLeaseLost
+
+        try:
+            AudiobookScheduler._write_worker_job(
+                self.session,
+                job,
+                AudiobookScheduler._job_write_conditions(job),
+                {AudiobookJob.update_time: utcnow()},
+            )
+        except AudiobookLeaseLost:
+            return False
+        return True
+
     def _job(self, job_id):
         job = self.session.get(AudiobookJob, int(job_id))
         if not job or (not self.is_admin() and job.creator_id != self.user_id()):
@@ -676,6 +691,8 @@ class AudiobookWorkspace(BaseHandler):
         if job.status != "awaiting_review":
             return {"err": "state.invalid", "msg": _("任务当前不在审查阶段")}
         body = _json_body(self)
+        if not self._reserve_review(job):
+            return {"err": "state.invalid", "msg": _("任务状态已改变，请刷新后重试")}
         try:
             if body.get("kind") == "characters":
                 workspace = save_script_roles(path, body.get("characters"), body.get("revision"))
@@ -712,6 +729,8 @@ class AudiobookConfirm(BaseHandler):
             body = _json_body(self)
         except ValueError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
+        if not AudiobookWorkspace._reserve_review(self, job):
+            return {"err": "state.invalid", "msg": _("任务状态已改变，请刷新后重试")}
         data = dict(job.data or {})
         revision = dict(data.get("revision") or {})
         if revision:

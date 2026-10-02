@@ -1,11 +1,14 @@
 import datetime
 import json
+import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -257,6 +260,38 @@ def test_cancel_escalates_to_term_and_returns_cancelled_status():
         assert status == 3
 
 
+def test_lease_loss_reaps_a_child_that_ignores_termination():
+    with tempfile.TemporaryDirectory() as directory:
+        storage = AudiobookStorage(directory)
+        storage.ensure()
+        command = [
+            sys.executable,
+            "-u",
+            "-c",
+            "import os, signal, json, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+            "print(json.dumps({'ready': os.getpid()}), flush=True); time.sleep(30)",
+        ]
+        events = []
+        started = time.monotonic()
+        with (
+            mock.patch.object(VoicebookProcess, "command", new_callable=mock.PropertyMock, return_value=command),
+            mock.patch.dict(
+                "webserver.services.audiobook.CONF",
+                {"AUDIOBOOK_HEARTBEAT_SECONDS": 0.05, "AUDIOBOOK_CANCEL_KILL_SECONDS": 0.1},
+            ),
+            pytest.raises(RuntimeError, match="租约已丢失"),
+        ):
+            VoicebookProcess(storage).run(
+                SimpleNamespace(id=3),
+                ["ignored"],
+                events.append,
+                lambda: {"lease_owned": not bool(events), "cancel_requested": False},
+            )
+        assert time.monotonic() - started < 3
+        with pytest.raises(ProcessLookupError):
+            os.kill(events[0]["ready"], 0)
+
+
 def test_event_sequence_is_idempotent_and_renews_lease():
     session_maker = _session_maker()
     with tempfile.TemporaryDirectory() as directory:
@@ -282,7 +317,7 @@ def test_event_sequence_is_idempotent_and_renews_lease():
             config={},
             config_hash="seq-test",
             lease_owner="test-worker",
-            lease_until=now,
+            lease_until=now + datetime.timedelta(minutes=1),
             data={"plan": create_audiobook_job_plan("quick", now)},
             create_time=now,
             update_time=now,
@@ -351,6 +386,8 @@ def test_inspect_completion_keeps_only_bounded_voicebook_quality_counters():
             phase="INSPECTING",
             config={},
             config_hash="inspect-report",
+            lease_owner="test-worker",
+            lease_until=now + datetime.timedelta(minutes=1),
             data={"plan": create_audiobook_job_plan("advanced", now)},
             create_time=now,
             update_time=now,

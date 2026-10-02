@@ -6,13 +6,28 @@ test('offline quick and advanced jobs play real MP3; page cancellation reaches t
     const backend = 'http://127.0.0.1:8091';
     const folder = resolve('../document/audiobook-progress-v2-review');
     await page.goto('/');
-    await expect(page.locator('.v-main')).toBeVisible({ timeout: 90000 });
+    try {
+        await expect(page.locator('.v-main')).toBeVisible({ timeout: 10000 });
+    } catch {
+        await page.reload();
+        await expect(page.locator('.v-main')).toBeVisible({ timeout: 45000 });
+    }
     await page.goto('/audio-jobs');
     await expect(page.getByTestId('create-audiobook-from-jobs')).toBeVisible({ timeout: 45000 });
     const playback = [];
     for (const mode of ['quick', 'advanced']) {
-        const response = await request.post(`${backend}/api/book/1/audio-jobs`, { data: { mode, engine: 'qwen3tts', speed: 'x1.0' } });
-        const created = await response.json();
+        await page.goto('/audios/create?book=1');
+        await expect(page.getByTestId('select-audiobook-book-1')).toBeVisible({ timeout: 45000 });
+        await expect(page.getByTestId('selected-book-panel')).toContainText('EPUB');
+        await expect(page.getByTestId('create-wizard-unsupported-format')).toHaveCount(0);
+        if (mode === 'advanced') await page.getByRole('button', { name: '高级模式', exact: true }).click();
+        await page.getByRole('combobox', { name: '语音引擎' }).focus();
+        await page.keyboard.press('ArrowDown');
+        await page.getByRole('option', { name: 'Qwen3 TTS', exact: true }).click();
+        await expect(page.getByTestId('submit-create-wizard')).toBeEnabled();
+        const response = page.waitForResponse(response => response.url().endsWith('/api/book/1/audio-jobs') && response.request().method() === 'POST');
+        await page.getByTestId('submit-create-wizard').click();
+        const created = await (await response).json();
         expect(created.err).toBe('ok');
         const id = created.job.id;
         await page.goto(`/audio-job/${id}`);
