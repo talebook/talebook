@@ -18,6 +18,7 @@ let isInvited = true;
 let demoMode = false;
 let showNetworkLibrary = true;
 let networkSourceState = 'ready';
+let indexOverride = null;
 let users = [];
 let saveStarted = false;
 let saveStatusPolls = 0;
@@ -173,6 +174,7 @@ router.post('/_test/reset', eventHandler(async (event) => {
   demoMode = !!(body && body.demoMode);
   showNetworkLibrary = body?.showNetworkLibrary !== false;
   networkSourceState = body?.networkSourceState || 'ready';
+  indexOverride = body?.indexData || null;
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
   saveStarted = false;
@@ -920,7 +922,7 @@ router.get('/api/index', eventHandler(() => {
   console.log('[Mock] GET /api/index, isInstalled:', isInstalled);
   const accessError = accessControlEnvelope();
   if (accessError) return accessError;
-  return readJson('api_index.json') || { err: 'error', msg: 'mock not found' };
+  return indexOverride || readJson('api_index.json') || { err: 'error', msg: 'mock not found' };
 }));
 
 router.get('/api/welcome', eventHandler(() => {
