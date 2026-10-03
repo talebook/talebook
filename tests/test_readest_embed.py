@@ -1,4 +1,5 @@
 import json
+import os
 import urllib.parse
 from pathlib import Path
 from unittest import mock
@@ -159,11 +160,29 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(revoked.code, 403)
 
     def test_resource_change_updates_bootstrap_revision(self):
-        initial = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
-        changed_stat = mock.Mock(st_mtime_ns=9999999999000000000, st_size=initial["book"]["id"] + 123)
-        with mock.patch("webserver.handlers.book.os.stat", return_value=changed_stat):
-            changed = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
-        self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
+        path = self._app.settings["legacy"].format_abspath(BID_EPUB, "EPUB", index_is_id=True)
+        original_stat = os.stat(path)
+        bootstrap_url = "/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB
+        try:
+            initial_response = self.fetch(bootstrap_url)
+            self.assertEqual(initial_response.code, 200)
+            initial = json.loads(initial_response.body)
+
+            # Change only the book resource, leaving reader assets and filesystem
+            # checks intact. Patching book.os.stat also patches the shared os module.
+            os.utime(path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns + 2_000_000_000))
+            changed_response = self.fetch(bootstrap_url)
+            self.assertEqual(changed_response.code, 200)
+            changed = json.loads(changed_response.body)
+
+            self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
+            self.assertNotEqual(initial["resource"]["url"], changed["resource"]["url"])
+            self.assertEqual(self.fetch(initial["resource"]["url"]).code, 409)
+            current = self.fetch(changed["resource"]["url"], headers={"Range": "bytes=0-3"})
+            self.assertEqual(current.code, 206)
+            self.assertEqual(current.body, b"PK\x03\x04")
+        finally:
+            os.utime(path, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
 
     def test_stale_resource_revision_is_rejected(self):
         bootstrap = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
