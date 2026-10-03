@@ -39,7 +39,13 @@ function __deliver() {
     const reply = __reply;
     const waiting = __waiting[reply.id];
     delete __waiting[reply.id];
-    waiting.resolve(reply.response);
+    if (reply.error) {
+        const error = new Error('Venera upstream request failed');
+        error.__requestId = reply.id;
+        waiting.reject(error);
+    } else {
+        waiting.resolve(reply.response);
+    }
 }
 function __chapters(map, group = '') {
     const entries = map instanceof Map ? [...map] : Object.entries(map || {});

@@ -20,7 +20,10 @@ def main():
     ctx.eval("const __input = JSON.parse(__input_json);")
     ctx.eval(payload["host"])
     ctx.eval(payload["source"] + "\nconst source = new MangaDex();")
-    ctx.eval("__run(source).then(value => {__result = {result: value}}, () => {__result = {error: true}});")
+    ctx.eval(
+        "__run(source).then(value => {__result = {result: value}}, "
+        "error => {__result = {error: true, requestId: error?.__requestId}});"
+    )
     for _ in range(10000):
         # Every job retains the QuickJS execution limit; no Python callback is exposed.
         if ctx.execute_pending_job():

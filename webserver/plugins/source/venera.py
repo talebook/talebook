@@ -152,6 +152,7 @@ def run_source(script, operation, args, config, http):
         process.stdin.flush()
         buffer = b""
         request_count = 0
+        request_failures = {}
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0 or not selector.select(remaining):
@@ -166,6 +167,9 @@ def run_source(script, operation, args, config, http):
                 line, buffer = buffer.split(b"\n", 1)
                 message = json.loads(line)
                 if message.get("error"):
+                    failure = request_failures.get(message.get("requestId"))
+                    if failure is not None:
+                        raise failure
                     raise VeneraUnsupported("Venera 源执行失败：接口不兼容或上游响应异常")
                 if "result" in message:
                     return message["result"]
@@ -189,15 +193,24 @@ def run_source(script, operation, args, config, http):
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise VeneraTimeout("Venera 漫画源请求超时")
-                response = http.request("GET", request["url"], timeout=remaining)
-                reply = {
-                    "id": request["id"],
-                    "response": {
-                        "status": response.status_code,
-                        "headers": {},
-                        "body": response.content.decode("utf-8"),
-                    },
-                }
+                try:
+                    response = http.request("GET", request["url"], timeout=remaining)
+                except (EndpointPolicyError, EndpointResponseTooLarge):
+                    # Host policy and resource limits cannot be swallowed by source code.
+                    raise
+                except (requests.RequestException, UpstreamError) as exc:
+                    request_failures[request["id"]] = exc
+                    # Only a correlation ID crosses IPC; exception text may contain secrets.
+                    reply = {"id": request["id"], "error": True}
+                else:
+                    reply = {
+                        "id": request["id"],
+                        "response": {
+                            "status": response.status_code,
+                            "headers": {},
+                            "body": response.content.decode("utf-8"),
+                        },
+                    }
                 process.stdin.write((json.dumps(reply) + "\n").encode())
                 process.stdin.flush()
     except (BrokenPipeError, ValueError, KeyError, TypeError) as exc:

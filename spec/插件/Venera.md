@@ -47,6 +47,8 @@ Venera 漫画源插件让读者在 Talebook 在线书库中浏览并阅读受支
 
 图片需要当前登录与阅读权限，访问凭证绑定读者和源并短期有效。源关闭或登录失效后停止读取图片。源访问被拒绝、网络超时、接口不兼容与空章节有明确反馈。
 
+源脚本允许捕获可选接口的网络失败并按自身规则降级；例如 MangaDex 的统计接口不可用时，漫画详情与章节仍可读取。必需请求未处理的失败明确报错。网络策略、响应大小、请求数及整体执行时间限制不能由源脚本捕获后绕过。
+
 在线漫画不产生本地书籍或持久阅读进度；读者从详情选择章节，退出阅读返回详情。其他源、DRM 变换、非标准图片节点端口与需额外宿主 API 的脚本不在兼容范围。
 
 ## 6. 关联实体
@@ -93,6 +95,7 @@ Venera 漫画源插件让读者在 Talebook 在线书库中浏览并阅读受支
 | JS 宿主与隔离进程 | `webserver/plugins/source/venera_host.js` / `webserver/plugins/source/venera_worker.py` |
 | 漫画页面与图片接口 | `webserver/handlers/network_comic.py` |
 | 阅读器宿主 | `webserver/resources/book/online-comic-reader.html` |
+| 生产与开发阅读入口代理 | `conf/nginx/talebook.conf` / `conf/nginx/server-side-render.conf` / `conf/nginx/dev.conf` |
 | 在线书库与详情 | `app/pages/library/network.vue` / `app/pages/network/book.vue` |
 
 ### 7.5 界面文案

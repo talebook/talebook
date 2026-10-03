@@ -40,6 +40,7 @@ def run():
                 "html_path": str(root / "app/public"),
                 "resource_path": str(root / "webserver/resources"),
                 "settings_path": temporary,
+                "themes_path": str(Path(temporary) / "themes"),
                 "upload_path": temporary,
                 "extract_path": temporary,
                 "progress_path": temporary,

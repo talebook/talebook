@@ -65,6 +65,7 @@ class TestNetworkComic(TestWithUserLogin):
     def test_reader_template_keeps_its_copy_separate_from_account_notifications(self):
         response = self.fetch("/read-online-comic?" + urlencode({"source_id": self.source}))
         assert response.code == 200
+        assert response.headers["Cache-Control"] == "no-store"
         messages = re.search(rb'<script id="messages" type="application/json">(.*?)</script>', response.body)
         copy = json.loads(messages.group(1))
         assert copy["title"] == "在线漫画"

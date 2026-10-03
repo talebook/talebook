@@ -6,7 +6,7 @@ import pytest
 import requests
 
 from webserver.plugins.runtime.domains import SourceChapter
-from webserver.plugins.runtime.protocol import UpstreamAuthError
+from webserver.plugins.runtime.protocol import UpstreamAuthError, UpstreamError, UpstreamRateLimitError
 from webserver.plugins.runtime.safe_http import EndpointPolicyError, EndpointResponseTooLarge
 from webserver.plugins.source import venera
 
@@ -192,3 +192,71 @@ def test_source_request_count_is_bounded():
     with pytest.raises(venera.VeneraUnsupported, match="请求过多"):
         venera.run_source(script, "browse", {"category": "recent", "page": 1}, {}, http)
     assert len(http.calls) == venera.MAX_REQUESTS
+
+
+OPTIONAL_SCRIPT = """
+class MangaDex extends ComicSource {
+    key = 'manga_dex';
+    comic = {loadInfo: async id => {
+        await fetch('https://api.mangadex.org/manga/' + id);
+        let description = 'Statistics available';
+        try { await fetch('https://api.mangadex.org/statistics/manga/' + id); }
+        catch (error) { description = error.message; }
+        return new ComicDetails({title: '漫画', description,
+            chapters: new Map([['Volume 1 - EN', new Map([['EP_ID', '1: First']])]])});
+    }};
+}
+""".replace("EP_ID", EP_ID)
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [UpstreamError("private HTTP 503 body"), requests.ConnectionError("private URL"), requests.ReadTimeout()],
+)
+def test_optional_request_failure_is_catchable_without_exposing_exception_text(failure):
+    http = Http()
+    original = http.request
+
+    def request(method, url, **kwargs):
+        if "/statistics/manga/" in url:
+            raise failure
+        return original(method, url, **kwargs)
+
+    http.request = request
+    with (
+        mock.patch.object(venera, "source_script", return_value=OPTIONAL_SCRIPT),
+        mock.patch.object(venera, "public_http", return_value=http),
+    ):
+        provider = venera.VeneraProvider()
+        book = provider.get_book(BOOK_ID, {})
+        assert book.description == "Venera upstream request failed"
+        assert provider.get_toc(book, {})[0].title == "Volume 1 - EN · 1: First"
+
+
+@pytest.mark.parametrize(
+    "failure,expected",
+    [
+        (UpstreamError("HTTP 503"), UpstreamError),
+        (UpstreamAuthError(), UpstreamAuthError),
+        (UpstreamRateLimitError(), UpstreamRateLimitError),
+        (requests.ConnectionError("private URL"), UpstreamError),
+        (requests.ReadTimeout(), venera.VeneraTimeout),
+    ],
+)
+def test_uncaught_required_request_failure_preserves_explicit_error_type(failure, expected):
+    with (
+        mock.patch.object(venera, "source_script", return_value=OPTIONAL_SCRIPT),
+        mock.patch.object(venera, "public_http", return_value=Http()) as factory,
+    ):
+        factory.return_value.request = mock.Mock(side_effect=failure)
+        with pytest.raises(expected):
+            venera.VeneraProvider().get_book(BOOK_ID, {})
+
+
+@pytest.mark.parametrize("failure", [EndpointPolicyError(), EndpointResponseTooLarge()])
+def test_source_catch_cannot_bypass_host_network_or_size_limits(failure):
+    http = Http()
+    http.request = mock.Mock(side_effect=failure)
+    catching = OPTIONAL_SCRIPT.replace("await fetch('https://api.mangadex.org/manga/' + id);", "")
+    with pytest.raises(type(failure)):
+        venera.run_source(catching, "book", {"id": BOOK_ID}, {}, http)

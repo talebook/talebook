@@ -4,6 +4,8 @@
 
 公开阅读无需 MangaDex 账号。配置支持标题语言、原图或压缩图、搜索内容分级及连接超时。默认搜索 safe 内容；浏览分类沿用官方源的行为，不作为内容分级过滤。默认超时 20 秒，网络较慢时可调至 60 秒。未启用、连接不兼容、网络失败或权限不足会显示错误；详情和阅读器提供重试。
 
+可选统计接口失败时，官方脚本会降级显示，漫画详情和章节仍可读取；必需接口失败仍明确报错。源脚本不能绕过宿主的网络策略或资源限制。SPA、SSR 和开发 Nginx 配置均将无尾斜线的 `/read-online-comic` 精确代理到后端；子路径部署按 [反向代理说明](reverse-proxy.md) 由外层代理移除前缀，后端和静态资源使用相同的构建前缀。
+
 ## 接入机制与兼容范围
 
 Venera 的源是客户端 JavaScript 扩展。官方无头模式没有可直接对接的漫画 HTTP 服务。本插件运行已验证的官方源脚本，通过受限宿主 API 将结果映射到 Talebook 的 SourceProvider。
@@ -36,5 +38,9 @@ node test/venera-live.mjs ../.local-e2e/access.json ../document/screenshots/tb-2
 可用 `CHROMIUM_EXECUTABLE` 指定已有浏览器，`PLAYWRIGHT_BASE_URL` 指定预览地址。访问文件及浏览器认证文件含临时凭据，应保存在私有工作目录并在验证后删除，不要提交。验证结束停止上述进程。
 
 实际记录见同目录 [`screenshots/tb-236/live-report.json`](screenshots/tb-236/live-report.json) 与截图。上游内容、目录和图片节点会随时间变化，报告记录的是验证时的结果。
+
+生产代理回归：`pytest tests/test_venera_deployment.py` 在隔离的 Nginx 容器中检查三种配置、根路径与 `/team/books` 子路径的 cookie、查询参数及缓存头。实际源验证工具 `python3 -m scripts.venera_proxy_live` 配合 `app/test/venera-proxy.mjs` 检查真实后端、图片和 Reader；前者等待后者完成并收集结果后退出。运行时保持临时后端与验证工具在前台；访问文件含临时凭据，结束后删除。代理验证使用生产 location 规则和公开 Reader 静态资源，静态首页标记仅用于判别路由兜底，不代表重新构建整个 SPA。
+
+可选统计故障验证：`python3 -m scripts.venera_optional_statistics` 使用固定官方脚本及真实漫画、章节 API，只对统计请求注入 503，并额外确认必需请求失败仍有错误。实际结果见 `screenshots/tb-236/optional-statistics-report.json` 和 `screenshots/tb-236/proxy-root/`、`screenshots/tb-236/proxy-prefix/`。
 
 机制依据：[Venera 源文档](https://github.com/venera-app/venera/blob/master/doc/comic_source.md)、[固定版本 MangaDex 脚本](https://github.com/venera-app/venera-configs/blob/d8a71168a83a6797482a5be9c000989dabf21c08/manga_dex.js)。

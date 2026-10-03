@@ -136,9 +136,8 @@ class OnlineComicReader(NetworkBaseHandler):
         source = self.get_source(self.get_argument("source_id", ""))
         if not source or source.plugin_key != PLUGIN_ID:
             raise tornado.web.HTTPError(404)
-        self.set_header("Cache-Control", "no-store")
         self.set_header("Referrer-Policy", "same-origin")
-        return self.html_page(
+        self.html_page(
             "book/online-comic-reader.html",
             {
                 "READER_VERSION": KOMGA_READER_VERSION,
@@ -158,6 +157,8 @@ class OnlineComicReader(NetworkBaseHandler):
                 },
             },
         )
+        # html_page sets its default cache header; the authenticated Reader must override it.
+        self.set_header("Cache-Control", "no-store")
 
 
 def routes():

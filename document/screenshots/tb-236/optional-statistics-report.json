@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-10-03T07:31:18.174370+00:00",
+  "source_commit": "d8a71168a83a6797482a5be9c000989dabf21c08",
+  "source_sha256": "c8beb84262da8fa3922ff0392fc2f79f03ee36ae08933d10571172ef6c8ce21d",
+  "real_pinned_script": true,
+  "required_metadata_chapter_api_mocks": false,
+  "statistics_injected_status": 503,
+  "detail_succeeded": true,
+  "title": "薄花少女",
+  "chapters": 30,
+  "successful_calls_before_statistics": 3,
+  "successful_required_mangadex_requests": 2,
+  "separate_required_failure_error": "provider_error"
+}
