@@ -1,0 +1,129 @@
+diff --git a/assets/init.js b/assets/init.js
+index a2e1da8..196cb38 100644
+--- a/assets/init.js
++++ b/assets/init.js
+@@ -459,6 +459,8 @@ function Cookie({name, value, domain}) {
+  * @namespace Network
+  */
+ let Network = {
++    // Capability for source and image requests that never enter network logs.
++    sensitiveRequestsVersion: 1,
+     /**
+      * Sends an HTTP request.
+      * @param {string} method - The HTTP method (e.g., GET, POST, PUT, PATCH, DELETE).
+diff --git a/lib/components/comic.dart b/lib/components/comic.dart
+index 3401429..b937a8b 100644
+--- a/lib/components/comic.dart
++++ b/lib/components/comic.dart
+@@ -1196,7 +1196,17 @@ class ComicListState extends State<ComicList> {
+   }
+
+   Future<void> _fetchNext() async {
+-    var res = await widget.loadNext!(_nextUrl);
++    Res<List<Comic>> res;
++    while (true) {
++      res = await widget.loadNext!(_nextUrl);
++      if (!res.success) {
++        throw res.errorMessage ?? "Failed to load comics";
++      }
++      if (res.data.isNotEmpty || res.subData == null) break;
++      final next = res.subData as String;
++      if (next == _nextUrl) throw "Comic source pagination did not advance";
++      _nextUrl = next;
++    }
+     _data[_data.length + 1] = res.data;
+     if (res.subData == null) {
+       _maxPage = _data.length;
+diff --git a/lib/foundation/js_engine.dart b/lib/foundation/js_engine.dart
+index efe6c32..d1ba2ae 100644
+--- a/lib/foundation/js_engine.dart
++++ b/lib/foundation/js_engine.dart
+@@ -214,6 +214,7 @@ class JsEngine with _JSEngineApi, JsUiApi, Init {
+   Future<Map<String, dynamic>> _http(Map<String, dynamic> req) async {
+     Response? response;
+     String? error;
++    Dio? sensitiveClient;
+
+     try {
+       var headers = Map<String, dynamic>.from(req["headers"] ?? {});
+@@ -222,7 +223,14 @@ class JsEngine with _JSEngineApi, JsUiApi, Init {
+         headers["User-Agent"] = webUA;
+       }
+       var dio = _dio;
+-      if (headers['http_client'] == "dart:io") {
++      if (extra['sensitive'] == true) {
++        sensitiveClient = AppDio(BaseOptions(
++          responseType: ResponseType.plain,
++          validateStatus: (status) => true,
++          extra: extra,
++        ));
++        dio = sensitiveClient;
++      } else if (headers['http_client'] == "dart:io") {
+         dio = Dio(BaseOptions(
+           responseType: ResponseType.plain,
+           validateStatus: (status) => true,
+@@ -251,6 +259,8 @@ class JsEngine with _JSEngineApi, JsUiApi, Init {
+       );
+     } catch (e) {
+       error = e.toString();
++    } finally {
++      sensitiveClient?.close(force: true);
+     }
+
+     Map<String, String> headers = {};
+diff --git a/lib/network/app_dio.dart b/lib/network/app_dio.dart
+index 4d5549d..880788f 100644
+--- a/lib/network/app_dio.dart
++++ b/lib/network/app_dio.dart
+@@ -1,7 +1,9 @@
+ import 'dart:async';
+ import 'dart:convert';
++import 'dart:io';
+
+ import 'package:dio/dio.dart';
++import 'package:dio/io.dart';
+ import 'package:flutter/services.dart';
+ import 'package:rhttp/rhttp.dart' as rhttp;
+ import 'package:venera/foundation/appdata.dart';
+@@ -128,6 +130,21 @@ class MyLogInterceptor implements Interceptor {
+ class AppDio with DioMixin {
+   AppDio([BaseOptions? options]) {
+     this.options = options ?? BaseOptions();
++    if (this.options.extra['sensitive'] == true) {
++      // Cookie, login responses and signed image URLs must never enter a log
++      // interceptor or a shared network cache. Never replay them on redirects.
++      this.options.followRedirects = false;
++      this.options.connectTimeout = const Duration(seconds: 15);
++      this.options.receiveTimeout = const Duration(seconds: 15);
++      this.options.sendTimeout = const Duration(seconds: 15);
++      httpClientAdapter = IOHttpClientAdapter(
++        createHttpClient: () => HttpClient()..idleTimeout = const Duration(seconds: 15),
++      );
++      if (App.isInitialized) {
++        interceptors.add(CookieManagerSql(SingleInstanceCookieJar.instance!));
++      }
++      return;
++    }
+     httpClientAdapter = RHttpAdapter();
+     if (App.isInitialized) {
+       interceptors.add(CookieManagerSql(SingleInstanceCookieJar.instance!));
+diff --git a/lib/network/images.dart b/lib/network/images.dart
+index 8f311d7..5443312 100644
+--- a/lib/network/images.dart
++++ b/lib/network/images.dart
+@@ -47,6 +47,7 @@ abstract class ImageDownloader {
+     }
+
+     var dio = AppDio(BaseOptions(
++      extra: {'sensitive': configs['sensitive'] == true},
+       headers: Map<String, dynamic>.from(configs['headers']),
+       method: configs['method'] ?? 'GET',
+       responseType: ResponseType.stream,
+@@ -163,6 +164,7 @@ abstract class ImageDownloader {
+         }
+
+         var dio = AppDio(BaseOptions(
++          extra: {'sensitive': configs['sensitive'] == true},
+           headers: configs['headers'],
+           method: configs['method'] ?? 'GET',
+           responseType: ResponseType.stream,

@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>Venera Talebook 漫画源 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page" id="main-content">
+<header class="hero"><h1>Venera Talebook 漫画源</h1><p class="sub">让 Venera 连接自托管 Talebook，浏览并阅读漫画容器。</p><div class="chips"><span class="chip">创建：2026-10-03</span><span class="chip">模块：contrib/venera</span><span class="chip wip">WIP</span><span class="chip">来源：TB-235</span></div></header>
+<section class="card"><h2>原始诉求</h2><p>按事项确定的方向提供 Venera 中的 Talebook 书源，不在 Talebook 执行第三方 Venera 书源。交付可评审 PR、安装说明、认证与阅读验证及 QA 复核项。</p></section>
+<section class="card"><h2>目标与边界</h2><p>支持服务器地址、访问码、原生账号登录，漫画列表与搜索、详情、封面、单册章节和自然顺序页面。仅展示 media_type=comic 且存在 CBZ/ZIP/CBR/RAR 的书籍；漫画型 EPUB 不冒充可读取容器。不改后端、数据库、站内界面；每本书映射为“完整漫画”，不推测系列合并或拆章节，阅读进度留在 Venera。</p></section>
+<section class="card"><h2>方案核对</h2><p>Talebook master db5744b13e245414762bafc6219c6056fcb33837 包含已合并 PR #1012。Mihon PR #1、#3 已合并，仓库更名为 mihon-talebook-plugin；继承 user.is_login 判断，避免强制 user.id。官方 Venera 当前发布版为 v1.6.3，参考该标签的 comic_source.md、assets/init.js、parser.dart 和图片下载实现。</p><p>决策已由事项和现有接口确定；grill 技能在运行环境和仓库中未找到，使用本段逐项记录决策及未决问题。分发位置为已有 Talebook 仓库 contrib/venera，不新建仓库、不发布客户端或部署服务。</p></section>
+<section class="card"><h2>实现方案</h2><div class="flow"><div class="step"><b>配置与登录</b><p>校验 HTTP(S) 地址；账号密码走 Venera 原生登录；访问码走单独设置按钮。服务器变化后必须重新登录。</p></div><div class="step"><b>筛选与分页</b><p>复用 library/recent/search，使用游标跨过电子书页，保留漫画顺序与去重；限制单次扫描预算。</p></div><div class="step"><b>详情与章节</b><p>复核分类和容器格式，生成单册“完整漫画”。封面仅使用本站 /get/cover/ URL。</p></div><div class="step"><b>页面与恢复</b><p>校验 contract_version=1 和连续零基 index，排序后读取；认证失效只重试一次，损坏/权限错误给出固定提示。</p></div></div></section>
+<section class="card"><h2>日志隐私与客户端约束</h2><p>官方 Venera 1.6.3 会将响应 Set-Cookie 和图片请求 Cookie 写入日志，不能仅靠书源 maskDataInLog 满足凭据隐私。提供固定标签可应用的最小客户端补丁：新增 Network.sensitiveRequestsVersion=1；敏感请求使用不记录日志、不缓存、不跟随重定向的 Dio IO 连接，保留证书校验、CookieJar 和 15 秒超时；图片配置沿用同一通道。同时修复官方 ComicList 在空批次仍有游标时停止继续加载的问题，拒绝未前进的游标并保留错误。书源在发送任何网络请求前检查能力，原版客户端明确拒绝联网，避免泄露凭据。补丁仅提供审核文件，不向 Venera 上游提交 PR。</p><p>未决风险：缺少可构建客户端的 Flutter SDK 与真实设备；需 QA 用补丁客户端验证安装、认证和逐页阅读，不能声称原版 v1.6.3 完成登录验证。</p></section>
+<section class="card"><h2>影响范围</h2><p>contrib/venera/talebook.js、客户端补丁、tests/venera（含真实 Talebook 测试夹具）、document/Venera.zh_CN.md、spec/外部访问.md。后端接口不变。外部访问规格补充漫画源筛选、单册映射和安全客户端约束。大书库因服务端无漫画筛选，首次加载扫描预算每次最多 10 个原始页；预算用尽可继续加载，避免空页误报结束。</p></section>
+<section class="card" id="tests"><h2>测试结果</h2><ul><li>node --test tests/venera/*.test.cjs：22 项通过；VENERA_INIT_JS 指向官方 v1.6.3 补丁后的 assets/init.js：22 项通过。包含旧 API 路径与已带 BASE_PATH 的页面地址，部署前缀只应用一次。</li><li>TALEBOOK_TEST_SERVER 指向隔离 Docker 的真实 Talebook Handler/Calibre 测试书库，配合官方 API 库：根路径与 /books 反向代理部署各 23 项通过，包括错误密码、正确认证、仅漫画列表、搜索、详情、3 页 CBZ 与封面实际图片字节。容器测试后已停止。</li><li>python tests/venera/quickjs_smoke.py --api-init（固定版本补丁 API）：导入、异步认证、浏览、详情、章节、排序和 token 移除通过。quickjs 1.19.4，仅使用合成测试凭据。</li><li>Docker 测试环境运行 pytest tests/test_comic_reader.py tests/test_comic_media_api.py -q：21 项通过，归档安全、媒体分类、实际漫画 API 无回归。曾与真实后端夹具并行运行导致 book_aliases 缺表，停止并行后单模块 16＋5 项、合并重跑 21 项均通过。未改后端，未扩展全仓测试。</li><li>固定 v1.6.3 五个文件的干净副本运行 git apply --check：通过；git diff --check：通过。Python 测试脚本 black/isort/flake8（行宽 120）通过。</li><li>make check-spec：失败，主分支已注册 talebook.tool.epub-beautify 但 spec/插件 没有归属。用未修改 master 的规格语料运行 check_plugin_coverage 得到同一错误；不在本次扩大修复范围。make check-design：按预期拒绝 WIP，当前客户端补丁尚未构建，不将方案转成 ACTIVE。此限制禁止合并，不表示可发布。</li><li>官方 Linux 1.6.3 安装包 SHA256 与 GitHub release digest 一致。在隔离 XDG 配置和 Xvfb 中安装脚本，原生设置页面实际显示；测试连接错误能够显示且不发起网络请求。截图见 document/screenshots/tb-235/。检查后停止客户端及 Xvfb。</li><li class="pending">未验证：补丁客户端 Flutter 编译、真实设备安装、客户端登录和翻页；缺少 Flutter 3.41.4、Rust 构建环境及足够的可用磁盘。Node 直连真实后端不等于客户端已能安全阅读。安卓/iOS、屏幕阅读器与移动尺寸留待 QA。</li></ul>
+<h3>完整本地界面审查（full interface-review）</h3><p>按 .agents/skills/interface-review/SKILL.md 及 better-interface 的六个领域检查相对 origin/master db5744b13e245414762bafc6219c6056fcb33837 的全部变更，目标为 tb-235-venera-source 分支；审查时 1 个功能提交加 6 个未提交文件，共 10 个文件，排除截图后 8 个文本文件。消费者扩展为固定官方 parser、源设置/登录页、ComicList、ImageDownloader。排除两张生成的截图二进制；其渲染内容用于验证。无旧产品控件、路由或文案删除。</p>
+<div class="table-wrap"><table><thead><tr><th>领域</th><th>证据与覆盖</th><th>结论</th></tr></thead><tbody><tr><td>Accessibility</td><td>原生设置标签/按钮沿用 Flutter 组件；方案有 main、层级标题和响应式基线。键盘/屏幕阅读器未实测。</td><td>代码范围无可操作问题；运行验证有缺口</td></tr><tr><td>Layout</td><td>原生桌面设置、错误消息截图；使用原生设置分组。窄屏未验证。</td><td>桌面已核对，移动端待 QA</td></tr><tr><td>Writing</td><td>配置步骤、登录/错误/隐私门禁/空书库提示；修复回调异常不在界面显示的问题。</td><td>原有 MEDIUM Introduced 已修复并复测</td></tr><tr><td>Typography</td><td>原生标题和中文标签未截断；方案沿用模板字体和行高。</td><td>桌面无可操作问题</td></tr><tr><td>Colors</td><td>未改客户端色板，方案沿用模板状态色和文字状态。</td><td>客户端颜色无新增代码证据；对比度未测量</td></tr><tr><td>UI</td><td>测试按钮等待态沿用原生组件；成功与失败主动给出反馈；空批次消费逻辑补丁已核对。</td><td>源设置实际验证；补丁消费端运行待 QA</td></tr></tbody></table></div><p>考虑但未采纳：更换原生登录表单（已有密码输入与原生存储，扩大范围）；按系列自动拆卷（服务端没有可靠章节契约）；将测试成功等同版本兼容（必须分开认证与漫画 API 核验）。重新核对新增子路径兼容测试与安装步骤，未新增原生控件或文案状态；当前变更没有待修复 HIGH/MEDIUM 界面代码问题。审查结论仅覆盖已检查的代码、文案和原版桌面设置，未验证的移动/补丁消费端不得据此批准交付。</p><p>Verification：git symbolic-ref refs/remotes/origin/HEAD、git merge-base origin/master HEAD、git diff HEAD、git ls-files --others --exclude-standard、上述测试及两次原版 GUI 截图。审查阶段未修改工作区或执行 fetch。Verdict：Approve（已声明的代码与原版桌面设置范围）；发布和验收仍受补丁客户端构建阻塞，保留 WIP。</p></section>
+</main></body></html>
