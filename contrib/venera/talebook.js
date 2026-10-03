@@ -1,5 +1,5 @@
 // Talebook source for Venera 1.6.3 with the accompanying privacy patch.
-// SPDX-License-Identifier: GPL-3.0-or-later
+// SPDX-License-Identifier: BSD-2-Clause
 class TalebookSource extends ComicSource {
     name = "Talebook";
     key = "talebook";

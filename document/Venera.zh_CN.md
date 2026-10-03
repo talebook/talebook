@@ -123,7 +123,7 @@ QA 使用自己的测试账号和测试漫画，检查：
 - [Talebook 漫画接口与识别 PR #1012](https://github.com/talebook/talebook/pull/1012) 已合并；现有接口见本仓库 `document/ComicReaderApi.zh_CN.md` 。
 - [Mihon 初版 PR #1](https://github.com/hehetoshang/mihon-talebook-plugin/pull/1)、[user.is_login 兼容修复 PR #3](https://github.com/hehetoshang/mihon-talebook-plugin/pull/3) 均已合并；项目资源中的旧仓库名已更名。
 
-源码按 Talebook 仓库许可证提供；客户端补丁针对 GPL-3.0 的 Venera，只包含本次修改的 diff，不重新许可上游。
+书源脚本按 Talebook 仓库的 BSD-2-Clause 许可证提供；客户端补丁针对 GPL-3.0 的 Venera，只包含本次修改的 diff，不重新许可上游。
 
 ## 原版客户端安装检查截图
 
