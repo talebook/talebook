@@ -231,6 +231,7 @@ def test_catalog_declares_real_capabilities_and_keeps_excluded_servers_out():
         "talebook.source.webdav",
         "talebook.source.watch-folder",
         "talebook.source.tomato-downloader",
+        "talebook.source.venera",
     }
     assert manifests["talebook.source.webdav"]["capabilities"] == [
         "sources.browse",

@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-10-03T06:49:31.263Z",
+  "backend": "real Talebook + Calibre",
+  "mocks": false,
+  "browse": {
+    "books": 20,
+    "hasMore": true
+  },
+  "search": {
+    "query": "Pepper",
+    "groups": 1,
+    "books": 9
+  },
+  "comic": {
+    "id": "df25d42b-806c-4cc5-9aef-ce08daa4b83a",
+    "title": "薄花少女",
+    "chapter": "Volume 1 - UK · 1: М'ятна дівчинка",
+    "chapters": 30,
+    "pages": 51
+  },
+  "images": [
+    {
+      "label": "cover",
+      "status": 200,
+      "type": "image/jpeg",
+      "bytes": 35810
+    },
+    {
+      "label": "page1",
+      "status": 200,
+      "type": "image/png",
+      "bytes": 63915
+    },
+    {
+      "label": "page2",
+      "status": 200,
+      "type": "image/png",
+      "bytes": 2993743
+    }
+  ],
+  "browserSource": {
+    "browse": true,
+    "search": true,
+    "detailFromSearch": true
+  },
+  "configuration": {
+    "saved": true,
+    "testStatus": "succeeded"
+  },
+  "reader": {
+    "keyboardChapter": true,
+    "flipped": true,
+    "imageDecoded": true
+  },
+  "mobile": {
+    "width": 320,
+    "overflow": false
+  }
+}
