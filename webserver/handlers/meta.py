@@ -81,15 +81,18 @@ class MetaList(ListHandler):
         }
         title = titles.get(meta, _("未知")) % vars()
         if meta == "format":
-            # 使用Calibre API获取所有格式及其对应的书籍数量
+            # 直接聚合 data 表：data 每行 = 一本书的一个格式。
+            # 原实现遍历全库、逐本调用 new_api.formats()，20 万册规模下单次请求可达数分钟，
+            # 并因 Tornado 单线程阻塞整个站点。
             from collections import defaultdict
 
             format_count = defaultdict(int)
-            all_book_ids = self.db.new_api.all_book_ids()
-            for book_id in all_book_ids:
-                book_formats = self.db.new_api.formats(book_id)
-                for fmt in book_formats:
-                    format_count[fmt] += 1
+            with self._db_lock:
+                rows = self.cache.backend.conn.get(
+                    "SELECT format, count(*) FROM data GROUP BY format"
+                )
+            for fmt, count in rows:
+                format_count[fmt] = count
             items = [{"id": fmt, "name": fmt, "count": count} for fmt, count in format_count.items()]
         else:
             items = self.get_category_with_count(meta)
@@ -159,13 +162,11 @@ class MetaBooks(ListHandler):
         title = titles.get(meta, _("未知")) % vars()  # noqa: F841
 
         if meta == "format":
-            # 使用Calibre API获取指定格式的书籍
-            all_book_ids = self.db.new_api.all_book_ids()
-            matching_ids = []
-            for book_id in all_book_ids:
-                book_formats = self.db.new_api.formats(book_id)
-                if name in book_formats:
-                    matching_ids.append(book_id)
+            # 同样改为一次查询（原实现逐本 formats()，大库下极慢）。
+            with self._db_lock:
+                matching_ids = [v[0] for v in self.cache.backend.conn.get(
+                    "SELECT book FROM data WHERE format = ?", (name,)
+                )]
             books = self.db.get_data_as_dict(ids=matching_ids)
         else:
             category = meta + "s" if meta in ["tag", "author"] else meta
