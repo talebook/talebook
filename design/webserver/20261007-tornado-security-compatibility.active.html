@@ -174,45 +174,48 @@
             <tr><td>处理器初始化</td><td>两个处理器显式调用 StaticFileHandler.initialize(self, path="/")，随后执行既有 BaseHandler 初始化。</td><td>保留已有由书目解析绝对路径的设计，避免依赖上游的类属性回退。</td></tr>
             <tr><td>logo 软链接</td><td>在静态 catch-all 前增加 /logo/(.*) 路由，以 html_path/logo 为静态根。</td><td>静态根自身可以是部署维护的软链接；根下指向外部文件的链接、路径穿越仍由 Tornado 拒绝。无需扩大整个站点的允许目录。</td></tr>
             <tr><td>中文错误说明</td><td>BaseHandler.write_error 从 HTTPError.reason 读取说明，经 HTML 转义后写入正文；状态行仍由上游安全校验，调试栈输出委托父类。</td><td>6.5.3 起状态行禁止不符合协议的字符，中文 reason 变为 Unknown；只恢复正文中的说明，不恢复危险状态行。</td></tr>
+            <tr><td>正式启动与请求头</td><td>删除旧版 HTTPHeaders.add 全局补丁和启动调用，使用 Tornado 6.5.10 原生的 UTF-8 multipart 文件名支持与请求头校验。</td><td>旧补丁不接受新增的 _chars_are_bytes 参数，并依赖已移除的 _dict；正式启动后普通请求解析失败。只扩充补丁签名仍会绕过安全校验，原生解析已覆盖原需求。</td></tr>
             <tr><td>回归验证</td><td>真实后端下载、EPUB 资源、权限与 Range 测试；独立静态路由测试覆盖正常 logo、普通静态文件、外部链接、穿越、缺失文件。</td><td>使用已有 Calibre 测试镜像与当前源码，并挂载所需 Tornado 版本，避免重建大镜像。</td></tr>
           </tbody></table></div>
           <p>设计边界已由开发者请求与上一轮兼容性复现确定：直接更新现有 PR 分支，不合并 PR；保持数据、配置及身份权限契约；补充安全边界与核心接口回归测试。</p>
         </section>
         <section class="card" id="impact"><h2>3. 影响范围、风险与回滚</h2>
-          <p>涉及 pyproject.toml、requirements.txt、uv.lock、webserver/handlers/base.py、webserver/handlers/book.py、webserver/handlers/files.py 与 tests/ 的相关用例。spec/系统设置.md 补充自定义站点标识的资源边界；阅读与下载的既有产品规则不变，中文错误说明延续原有页面契约。</p>
+          <p>涉及 pyproject.toml、requirements.txt、uv.lock、webserver/main.py、webserver/handlers/base.py、webserver/handlers/book.py、webserver/handlers/files.py 与 tests/ 的相关用例。spec/系统设置.md 补充自定义站点标识的资源边界；阅读与下载的既有产品规则不变，中文错误说明与中文文件名延续原有契约。</p>
           <p>跨目录软链接仍可能影响其他自定义静态资源；只适配部署已支持的 logo 根目录。调用已有文件初始化不改变 BaseHandler 的认证与授权顺序。</p>
           <p>本次不修改前端页面、交互、文案或布局。使用 interface-review full 审查完整分支改动及下载/阅读/标识的消费者；实际浏览器渲染不属于这次后端兼容修复的验证范围，最终记录审查覆盖与剩余限制。</p>
           <p>回滚单位为本次修复提交，无数据库迁移。回退到 6.5.9 会重新引入初始化兼容风险；回退到 6.5 会失去安全修复。</p>
         </section>
         <section class="card" id="tests"><h2>4. 测试结果与限制</h2>
+          <p>后续检查发现正式启动路径没有被上一轮 HTTP 测试执行，同一份未合并方案退回 WIP 补充验证。已合入最新 master 并保留上游 Readest 测试修复；新增启动入口的 4 项回归通过，最终全量 1821 passed / 40 skipped，无失败。完成代码、规格与界面审查后恢复 ACTIVE；第一轮记录保留为历史验证。</p>
           <div class="table-wrap" role="region" aria-label="实际验证记录" tabindex="0"><table><thead><tr><th>验证层</th><th>实际执行</th><th>结果</th></tr></thead><tbody>
+            <tr><td>正式启动回归</td><td>pytest.main(['tests/test_tornado_startup.py', '-q', '-p', 'no:cacheprovider', '--tb=short'])</td><td class="verified">4 passed；保留旧补丁时普通 HTTP 请求用例先失败，删除补丁后正常请求、中文 multipart 文件名、重复 Content-Disposition 与非法头值拒绝均通过。测试执行 main()，隔离监听端口、阻塞事件循环与书库初始化。</td></tr>
             <tr><td>原 PR 复现</td><td>原处理器、Tornado 6.5.9：pytest tests/test_tornado_static_files.py -q</td><td>5 failed / 3 passed；下载与资源 500、logo 403、缺失 logo 的状态异常已复现。修复处理器与路由后，同版本的 8 个用例全部通过。</td></tr>
-            <tr><td>最终定向回归</td><td>Tornado 6.5.10 容器中 pytest.main([tests/test_tornado_static_files.py, tests/test_readest_embed.py, tests/test_main.py::TestBook, tests/test_upload.py, tests/test_comic_media_api.py, -q, -p, no:cacheprovider, --tb=short])</td><td class="verified">130 passed；包含新增 12 个用例。GET、HEAD、Range、ETag、OPDS、PDF、阅读/下载权限、跨目录链接拒绝、中文错误提示、HTML 转义、状态行注入防护和调试回退通过。</td></tr>
-            <tr><td>最终全量回归</td><td>Tornado 6.5.10 容器中 pytest.main([tests, -v, --cov=webserver, --cov-report=term-missing, -p, no:cacheprovider, --tb=short])</td><td>1814 passed / 40 skipped / 3 failed，后端覆盖率 74%。失败均已在未修改 PR 分支或旧版 Tornado 下复现，详见下文。</td></tr>
+            <tr><td>第一轮定向回归</td><td>Tornado 6.5.10 容器中 pytest.main([tests/test_tornado_static_files.py, tests/test_readest_embed.py, tests/test_main.py::TestBook, tests/test_upload.py, tests/test_comic_media_api.py, -q, -p, no:cacheprovider, --tb=short])</td><td class="verified">130 passed；包含新增 12 个用例。GET、HEAD、Range、ETag、OPDS、PDF、阅读/下载权限、跨目录链接拒绝、中文错误提示、HTML 转义、状态行注入防护和调试回退通过。</td></tr>
+            <tr><td>最终全量回归</td><td>Tornado 6.5.10 容器中 pytest.main([tests, -v, --cov=webserver, --cov-report=term-missing, -p, no:cacheprovider, --tb=short])</td><td class="verified">1821 passed / 40 skipped，无失败，后端覆盖率 74%。新增的 16 项回归全部通过，上一轮 3 项失败在本轮均未出现。</td></tr>
             <tr><td>依赖</td><td>uv lock --upgrade-package tornado；uv lock --check；对比锁文件包版本</td><td class="verified">通过；56 个锁定包中仅 Tornado 从 6.5.9 改为 6.5.10；锁文件由 uv 生成。</td></tr>
             <tr><td>格式与代码检查</td><td>make lint-py-fix；make lint-py；ruff check 与 ruff format --check（两个修改的测试文件）；git diff --check</td><td class="verified">通过；没有无关格式修改。</td></tr>
-            <tr><td>规格检查</td><td>make check-spec；对 git archive HEAD 得到的原 PR 文件树运行 scripts/check_spec.py --root</td><td>两者都只报告 talebook.tool.epub-beautify 缺少 spec/插件 归属；本次规格修改未引入新错误。</td></tr>
+            <tr><td>规格检查</td><td>make check-spec；先前对原 PR 文件树的独立基线检查</td><td class="verified">最终 24 份规格通过；先前 talebook.tool.epub-beautify 缺少归属的问题已由上游 a996cb4b 修复并合入。</td></tr>
             <tr><td>方案检查</td><td>DesignHTMLParser 结构与外部资源校验；make check-design</td><td id="design-gate">通过：166 份方案通过结构、自包含资源与名称门禁校验。</td></tr>
-            <tr><td>界面审查</td><td>interface-review full，覆盖完整分支和所有未提交文件及 5 个消费者</td><td class="verified">Approve；无遗留 HIGH / MEDIUM / LOW；浏览器渲染 Not verified。</td></tr>
+            <tr><td>界面审查</td><td>interface-review full，覆盖完整分支和所有未提交文件及 5 个消费者</td><td class="verified">Approve；后续完整分支重审无遗留 HIGH / MEDIUM / LOW；浏览器渲染 Not verified。</td></tr>
           </tbody></table></div>
-          <h3>全量失败的独立复现</h3>
-          <p>tests/test_check_spec.py 的两个失败均来自已存在的 EPUB 美化插件规格归属缺失；原 PR 的 git archive HEAD 文件树报告完全相同错误。</p>
-          <p>tests/test_scan.py::TestImport::test_long_titles_survive_scan_import_and_api 在原 PR 文件树、Tornado 6.5 下也失败：测试镜像的 html5-parser 与 lxml 使用不同 libxml2 版本（2.9.14 / 2.14.6），且缺少 calibre-parallel，EPUB 元数据无法改写。这不是 Tornado 或本次处理器修改引起的回归。</p>
+          <h3>上一轮失败与后续结果</h3>
+          <p>第一轮全量为 1814 passed / 40 skipped / 3 failed。tests/test_check_spec.py 的两个失败来自已存在的 EPUB 美化插件规格归属缺失，原 PR 文件树报告相同错误；合入上游 a996cb4b 后，两项测试及 make check-spec 均通过。</p>
+          <p>第一轮 tests/test_scan.py::TestImport::test_long_titles_survive_scan_import_and_api 在原 PR 文件树、Tornado 6.5 下也失败，日志显示 html5-parser 与 lxml 的 libxml2 版本不匹配（2.9.14 / 2.14.6），并缺少 calibre-parallel。后续完整回归中该用例通过；本次没有修补 Calibre 镜像依赖，不能据此宣称先前环境问题已永久解决。</p>
           <p>初次 make pytest 使用容器内 pytest 可执行文件，另受宿主磁盘不足和 git 不可执行影响。最终通过原始书库 fixture、8 GiB 容量的测试 tmpfs 与只读 git 工具挂载排除了这两类环境失败，未修改有声书或发布流程业务逻辑。所有容器前台运行并在测试结束后删除。</p>
-          <p>未执行生产镜像重建、ARM 架构构建或浏览器端到端验收；本次没有部署、数据库迁移、前端资源或组件更改。现有可复现的规格与 Calibre 测试环境问题仍需单独处理，不能声称全量测试全部通过。</p>
+          <p>未执行生产镜像重建、ARM 架构构建或浏览器端到端验收；本次没有部署、数据库迁移、前端资源或组件更改。最新本地全量全部通过；先前 Calibre 环境失败保留历史说明，生产镜像和其他架构的行为仍未验证。</p>
         </section>
         <section class="card" id="interface-review"><h2>5. 界面审查 · interface-review full</h2>
           <h3>范围与覆盖（Scope and Coverage）</h3>
           <div class="table-wrap" role="region" aria-label="审查范围" tabindex="0"><table><thead><tr><th>字段</th><th>范围</th></tr></thead><tbody>
-            <tr><td>目标与基线</td><td>完整本地分支及未提交内容；origin/master 与 HEAD 的 merge-base 为 db5744b13e245414762bafc6219c6056fcb33837。审查时 HEAD 为 ca06e09222014f76e19c4402194a4d184b7e03f4，包含原 PR 的 1 个提交和 10 个未提交文件。</td></tr>
-            <tr><td>文件</td><td>合并去重后 10 个文件；排除 uv.lock，审查其他 9 个文件的增删两侧，包含新测试与本方案。修复后的重新检查未增加界面变更。</td></tr>
-            <tr><td>消费者</td><td>app/pages/book/[bid]/index.vue、app/public/readest/talebook-launch.js、app/components/SidebarHelpMenu.vue、webserver/handlers/opds.py、webserver/utils.py；按下载、阅读、标识入口及协议顺序选择 5 个消费者，未扩展无关页面。</td></tr>
+            <tr><td>目标与基线</td><td>后续 full 审查完整本地分支及未提交内容；origin/master 与 HEAD 的 merge-base 为 a996cb4b810fef34742245a5d5fd75140163c9b0。审查时 HEAD 为 5f29ea59478f871bbec07c901a1d91a4fa467e1a，分支相对基线有 3 个提交；未提交有 4 个状态项，方案暂时重命名按 1 个逻辑文件计。</td></tr>
+            <tr><td>文件</td><td>方案临时重命名合并去重后共 11 个逻辑文件；排除 uv.lock，审查其他 10 个文件的增删两侧，包含启动入口、新测试与本方案。上游 Readest 测试与本分支一致，不再作为本 PR 改动计入。</td></tr>
+            <tr><td>消费者</td><td>app/pages/book/[bid]/index.vue、app/public/readest/talebook-launch.js、app/components/SidebarHelpMenu.vue、app/components/Upload.vue、webserver/handlers/opds.py。资源路径检索命中 11 个文件，排除 2 个 Readest 生成资源/构建元数据；从 9 个候选中选择这 5 个对应下载、阅读、标识和上传契约的消费者，其他 4 个未扩展，不声称整站审查。</td></tr>
             <tr><td>约定与边界</td><td>阅读 AGENTS.md、webserver/CLAUDE.md 与 app/CLAUDE.md；Nuxt 4 / Vue 3 / Vuetify 3 / Pinia / i18n。无界面组件、主题 token、字体或布局修改；审查后端契约在现有消费者中的一致性。</td></tr>
           </tbody></table></div>
           <div class="table-wrap" role="region" aria-label="六个审查领域" tabindex="0"><table><thead><tr><th>领域</th><th>证据</th><th>结论</th></tr></thead><tbody>
             <tr><td>Accessibility</td><td>所有删改行、既有下载链接与 logo 消费者；未删除程序化名称、角色、键盘或焦点属性。错误正文沿用原有 HTML 结构。</td><td>Clear：未引入或退化已有界面语义；浏览器与屏幕阅读器实测未执行。</td></tr>
             <tr><td>Layout</td><td>分支所有变更及上述消费者；无产品布局或断点变更。</td><td>Not reviewed: no evidence in the change scope；不声称已验证窄屏渲染。</td></tr>
-            <tr><td>Writing</td><td>HTTPError 原始中文说明、异常通用提示与调试输出；既有阅读启动状态、重试与下载状态。</td><td>Clear：保留原说明与既有界面词汇，130 项定向回归覆盖接口和错误文本。</td></tr>
+            <tr><td>Writing</td><td>HTTPError 原始中文说明、异常通用提示与调试输出；既有阅读启动、重试、下载与上传状态；中文文件名协议。</td><td>Clear：保留原说明与既有界面词汇，HTTP 回归覆盖接口、错误文本和中文文件名。</td></tr>
             <tr><td>Typography</td><td>分支所有变更；无产品字体、文本样式或语言目录变更。</td><td>Not reviewed: no evidence in the change scope。</td></tr>
             <tr><td>Colors</td><td>分支所有变更；无产品颜色或主题 token 变更。</td><td>Not reviewed: no evidence in the change scope。</td></tr>
             <tr><td>UI</td><td>logo 资源路径、下载链接和启动器；无图片替换、动效、图标或组件外观变更。</td><td>Clear：资源与既有状态契约保持一致；实际视觉呈现 Not verified。</td></tr>
@@ -222,11 +225,13 @@
           <div class="table-wrap" role="region" aria-label="未采用的界面调整" tabindex="0"><table><thead><tr><th>位置</th><th>候选调整</th><th>未采用原因</th></tr></thead><tbody>
             <tr><td>app/public/readest/talebook-launch.js</td><td>新增依赖升级专用错误界面</td><td>启动器已有错误说明、重试与 Candle 回退；本次恢复同一资源协议，不增加需要新界面表示的状态。</td></tr>
             <tr><td>app/components/SidebarHelpMenu.vue</td><td>修改标识的图片 DOM 与样式</td><td>标识配置和 DOM 没有变更，独立静态根已恢复原资源；外观与替代文本不属于本次接口兼容改动。</td></tr>
+            <tr><td>app/components/Upload.vue</td><td>为框架升级改写文件名编码和上传状态</td><td>现有组件已使用单文件或每次 4 个 multipart 分片字段，远低于新版 100 部分限制；URL 编码契约和进度/失败状态保留，原生解析能兼容中文文件名，无需改变消费者。</td></tr>
           </tbody></table></div>
-          <h3>验证（Verification）</h3><p>已执行 git diff origin/master...HEAD、git diff HEAD 与 git ls-files --others --exclude-standard 并读取全部增删内容；检查 5 个消费者。130 项真实 Calibre 后端定向测试通过，涵盖资源、Range、HEAD、权限、中文提示与正文转义。浏览器渲染、缩放和屏幕阅读器 Not verified；没有新增前端布局或交互，未启动预览服务。</p>
+          <h3>验证（Verification）</h3><p>执行 git fetch origin master 更新远端引用，并完成已授权的合入冲突修复后开始只读审查；审查期间执行 git diff origin/master...HEAD --name-status、git diff origin/master...HEAD、git diff HEAD --name-status、git diff -- webserver/main.py、git status --short、git rev-list --count origin/master..HEAD，读取未跟踪启动测试和 WIP 方案，检查上述 5 个消费者。审查期间没有 checkout、stash、工作树写入或预览服务。新增 4 项启动入口回归通过；资源、Range、HEAD、权限、中文提示与正文转义沿用前次验证并在最终全量回归中复查。浏览器渲染、缩放和屏幕阅读器 Not verified。</p>
           <h3>结论（Verdict）</h3><p><strong>Approve</strong>：变更范围和消费者检查完成，未发现引入或退化的界面问题；仅对上述已检查范围给出结论。</p>
         </section>
         <section class="card" id="decisions"><h2>6. 决策记录</h2>
+          <p>2026-10-07 后续检查：已复现正式启动补丁使 HTTPHeaders.parse("Host: localhost") 抛出 _chars_are_bytes 参数错误。主分支新增 a996cb4b 修复既有 EPUB 美化规格与 Readest 模拟，导致测试冲突；合入时采用上游测试，不重复覆盖该修复。编码前重开同一份未合并方案，删除过时全局补丁并新增启动入口测试，产品规则没有新增变化。</p>
           <p>2026-10-07：依据已有隔离 HTTP 复现，选择 6.5.10 与显式父类初始化；logo 使用独立静态根，不将 allowed_symlink_directory 扩大到 /data 或文件系统根。编码前创建本方案 WIP，验证与方案调整记录于同一文档；定向测试和界面审查通过后转为 ACTIVE。</p>
           <p>2026-10-07：定向测试出现既有的 revision 用例失败；同一用例在 Tornado 6.5 下也返回 503。原用例替换全局 os.stat，导致 MAINTENANCE.exists() 把不存在的维护标记判为存在。将模拟收窄为 book 模块的 os 引用，其他 os 操作委托真实模块，不修改维护检查或 revision 业务逻辑。</p>
           <p>2026-10-07：全量测试的漫画容器错误页面用例在 6.5 通过、6.5.10 失败。确认新版 set_status 将中文 reason 替换为 Unknown；新增 BaseHandler.write_error 正文适配，覆盖中文错误说明、HTML 转义与状态行注入防护。磁盘容量不足导致的有声书失败及原分支缺少 EPUB 美化插件规格归属另行记录，不改动相关业务。</p>
