@@ -1,4 +1,5 @@
 import json
+import os
 import urllib.parse
 from pathlib import Path
 from unittest import mock
@@ -161,7 +162,10 @@ class TestReadestEmbed(TestWithUserLogin):
     def test_resource_change_updates_bootstrap_revision(self):
         initial = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
         changed_stat = mock.Mock(st_mtime_ns=9999999999000000000, st_size=initial["book"]["id"] + 123)
-        with mock.patch("webserver.handlers.book.os.stat", return_value=changed_stat):
+        # Keep the maintenance gate's filesystem checks real while changing
+        # the EPUB stat used to compute its resource revision.
+        with mock.patch("webserver.handlers.book.os", wraps=os) as book_os:
+            book_os.stat.return_value = changed_stat
             changed = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
         self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
 

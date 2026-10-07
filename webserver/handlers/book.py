@@ -1066,8 +1066,7 @@ class BookDownload(BaseHandler, web.StaticFileHandler):
         raise web.Finish()
 
     def initialize(self):
-        self.root = "/"
-        self.default_filename = None
+        web.StaticFileHandler.initialize(self, path="/")
         self.is_opds = self.get_argument("from", "") == "opds"
         self.is_inline = self.get_argument("inline", "") == "1"
         BaseHandler.initialize(self)
@@ -1903,8 +1902,7 @@ class BookReaderResource(BaseHandler, web.StaticFileHandler):
     """Stream an EPUB using online-reading, rather than download, permission."""
 
     def initialize(self):
-        self.root = "/"
-        self.default_filename = None
+        web.StaticFileHandler.initialize(self, path="/")
         BaseHandler.initialize(self)
 
     def prepare(self):
