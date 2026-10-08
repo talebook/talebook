@@ -133,7 +133,7 @@ export default defineNuxtConfig({
                 } catch { }
                 if (!hash) return
                 const langDir = resolve('i18n/locales')
-                for (const locale of ['zh-CN', 'en-US']) {
+                for (const locale of ['zh-CN', 'en-US', 'ru-RU']) {
                     const outDir = join(publicDir, '_i18n', hash, locale)
                     mkdirSync(outDir, { recursive: true })
                     const messages = JSON.parse(readFileSync(join(langDir, `${locale}.json`), 'utf8'))
@@ -165,6 +165,12 @@ export default defineNuxtConfig({
                 name: 'English (US)',
                 iso: 'en-US',
                 file: 'en-US.json'
+            },
+            {
+                code: 'ru-RU',
+                name: 'Русский',
+                iso: 'ru-RU',
+                file: 'ru-RU.json'
             }
         ],
         

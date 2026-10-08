@@ -2,22 +2,29 @@
 
 ## 1. 定义
 
-EPUB美化是对书库中已有 EPUB 的目录、章节标题与排版进行整理，并生成一本新书的书籍工具。它不依赖外部服务，原书文件保持不变。
+EPUB美化是**调整书库中 EPUB 的目录、章节标题与正文排版，并将结果另存为新书的书籍工具**。它在站内处理已有书籍，不需要外部账号，原书保持不变。
 
-**不是什么：**不是元数据编辑、格式转换或在线阅读器主题设置；不是覆盖原书的正文查找替换，也不处理 TXT、PDF 或漫画容器。
+**不是什么：**
+
+- **不是格式转换。** 只处理已有 EPUB，其他格式见 [书籍](../书籍.md)。
+- **不是元数据编辑。** 修改书名、作者见 [元数据](../元数据.md)。
+- **不是正文查找替换。** 自定义替换规则见 [正文查找替换](正文查找替换.md)。
+- **不是阅读器设置。** 美化结果保存在新书文件中，阅读时的显示设置见 [阅读器](../阅读器.md)。
 
 ## 2. 使用场景
 
-- 管理员为《唐诗三百首》选择古籍排版与目录样式，保留原版并生成美化版。
-- 读者先分析《百年孤独》的章节与目录，再决定是否请管理员生成新版本。
-- 管理员调整一本 EPUB 的字体、配色、段距或背景纹理，便于在不同阅读器中阅读。
+- 读者希望统一《百年孤独》的章节标题、字体与段落间距。
+- 读者希望为没有书内目录的 EPUB 生成目录，或清理目录中的空白项。
+- 管理员希望为古籍选择竖排右翻的排版预设，同时保留原始版本。
+- 读者希望先查看章节、目录与标注分析，再决定是否生成美化版。
 
 ## 3. 功能
 
-- 提供十二套排版预设、四种目录样式及内置背景纹理。
-- 分析 EPUB 的结构，返回章节、目录与可用选项，预览不写入书库。
-- 配置字体、配色、段落、目录深度、标题整理与标注处理；古籍预设支持竖排右翻。
-- 管理员执行美化后生成新书，返回新书标识与处理统计。
+- 选择书库中具有 EPUB 格式的书籍并分析正文与目录。
+- 提供 12 套排版预设、4 种目录形式与 6 种内置背景纹理。
+- 调整字体、底色、段落模式、段距、目录层级与目录分栏。
+- 按选项清理正文与目录，处理对话段落、章节标题和标注。
+- 生成一本新书，保留原书，并记录执行结果。
 
 ## 4. 术语与界面用词
 
@@ -25,37 +32,47 @@ EPUB美化是对书库中已有 EPUB 的目录、章节标题与排版进行整�
 
 | 标准用词 | 英文 | 含义 | 示例 |
 |---|---|---|---|
-| EPUB美化 | EPUB beautification | 整理 EPUB 的目录与排版并生成新版本 | 管理员美化《唐诗三百首》 |
-| 排版预设 | layout preset | 一组字体、颜色与段落规则 | 为《百年孤独》选择经典排版 |
-| 结构分析 | structure analysis | 读取章节与目录结构，不写入文件 | 读者查看《百年孤独》的章节分析 |
-| 美化版 | beautified edition | 美化后另行入库的新书 | 《唐诗三百首（美化版）》与原书同时保留 |
+| 排版预设 | preset | 一组字体、配色与版式设置 | 管理员为《唐诗三百首》选择古籍竖排预设 |
+| 书内目录 | in-book table of contents | 保存在 EPUB 正文中的可导航目录页 | 读者从《百年孤独》的目录跳到第一章 |
+| 分析 | analysis | 检查原书的正文、标题、目录与标注，不写入书库 | 读者先查看《百年孤独》的章节数量 |
+| 美化版 | beautified edition | 根据选项生成并另存的新书 | 管理员生成《百年孤独（美化版）》后仍保留原书 |
 
-界面入口使用「EPUB 美化」，位于插件中心及专属工具页。生成结果默认使用「（美化版）」书名后缀，管理员可以自定义后缀。
+### 操作按钮用词
+
+| 界面用词 | 位置 | 行为 |
+|---|---|---|
+| EPUB 美化 | 插件中心、书籍工具入口 | 进入专属工具页 |
+| 分析 | 工具页 | 分析选中书籍，不生成新书 |
+| 执行 | 工具页 | 按选项生成美化版并入库 |
 
 ## 5. 行为逻辑
 
-### 5.1 分析与执行分离
+### 5.1 处理范围与分析
 
-登录读者可以取得选项与分析其可见书籍。分析只读取 EPUB，不生成新书，也不持久化排版修改。正式执行仅限管理员，并仍校验书籍可见范围、插件启用状态与读写授权。
+仅处理站内书籍的 EPUB 格式。没有 EPUB 格式的书籍不能执行美化。
 
-### 5.2 仅生成新书
+分析返回正文、章节标题、目录与标注等信息，并提供可选的排版预设与目录形式；分析不修改原书，也不生成新书。
 
-美化结果通过正常书库导入链路另存，原书的 EPUB 不覆盖、不删除。新书归执行者收集，标题使用原书名加后缀。因为原书不改动，本工具没有写回与回滚选项。
+### 5.2 排版选项
 
-### 5.3 格式与参数校验
+执行时选择排版预设，可调整字体、目录形式与层级、配色、段落缩进或间距、背景纹理、目录分栏、对话段落、标题拆分和标注样式。无效的预设、纹理或其他参数会明确返回错误。
 
-书籍必须具备 EPUB 格式；缺少格式、无权查看、插件不可用或参数非法时返回明确失败。预设、目录形式、配色、段距、背景纹理与标注样式按工具支持范围校验，不把非法参数静默当作成功。
+背景纹理启用后接管底色效果。古籍预设可以指定竖排右翻的阅读方向。
 
-### 5.4 连接归属
+### 5.3 新书与原书
 
-工具使用实例连接，不需要外部账号。执行经插件运行机制记录操作与结果，临时输出在处理结束后清理。
+美化结果始终另存为新书，不覆盖原书。默认书名后缀为「（美化版）」，可指定其他后缀。新书通过正常入库链路创建，处理失败时不导入美化结果。
+
+### 5.4 权限与运行记录
+
+查看选项与分析需要登录；分析还需满足原书的可见范围与书籍工具权限。执行仅允许管理员操作，并记录运行状态与结果。工具使用实例级连接，不需要外部账号配置。
 
 ## 6. 关联实体
 
-- [书籍](../书籍.md)：输入格式文件、可见范围与新书身份。
-- [书库](../书库.md)：美化版的导入与收集。
-- [插件平台](插件平台.md)：实例连接、插件授权与执行记录。
-- [正文查找替换](正文查找替换.md)：可写回原书的另一种正文工具。
+- [书籍](../书籍.md)——EPUB 格式、可见范围与原书。
+- [书库](../书库.md)——美化版的入库链路。
+- [插件平台](插件平台.md)——书籍工具能力、实例连接与运行审计。
+- [正文查找替换](正文查找替换.md)、[繁简转换](繁简转换.md)、[TXT编码修复](TXT编码修复.md)——其他书籍工具。
 
 ## 7. 实现对照
 
@@ -63,44 +80,44 @@ EPUB美化是对书库中已有 EPUB 的目录、章节标题与排版进行整�
 
 | 概念 | 存储 | 说明 |
 |---|---|---|
-| 原书与美化版 | Calibre 书库的 EPUB 文件与书籍记录 | 结果作为新书导入，原书不覆盖 |
-| 插件与连接 | `plugin_definitions` / `plugin_connections` | 实例级工具连接 |
-| 执行记录 | `plugin_runs` | 保存插件执行状态与审计信息 |
+| 原书与美化版 | Calibre 书库的 EPUB 格式文件 | 保留原书，将结果作为新书入库 |
+| 插件定义与连接 | `plugin_definitions` / `plugin_connections` | 实例级连接 |
+| 执行记录 | `plugin_runs` | 记录状态、原书、预设与新书结果 |
 
 ### 7.2 API 接口
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/plugins/tools/books` | 工具可选择的书籍 |
-| GET | `/api/plugins/tools/epub-beautify/presets` | 排版预设、目录样式与纹理 |
-| POST | `/api/plugins/tools/epub-beautify/preview` | 登录读者分析可见 EPUB |
-| POST | `/api/plugins/tools/epub-beautify/run` | 管理员执行并导入新书 |
+| GET | `/api/plugins/tools/books` | 可处理的书籍列表 |
+| GET | `/api/plugins/tools/epub-beautify/presets` | 预设、目录形式与背景纹理 |
+| POST | `/api/plugins/tools/epub-beautify/preview` | 分析原书 |
+| POST | `/api/plugins/tools/epub-beautify/run` | 生成美化版并入库 |
 
 ### 7.3 关键定义
 
 | 符号 | 值 | 含义 |
 |---|---|---|
-| 插件 ID | `talebook.tool.epub-beautify` | 内置插件稳定身份 |
-| 分类 / 能力 | `integrations` / `integrations.tool` | 书籍工具 |
-| 权限 | `books.read` / `books.write` | 分析与生成授权 |
-| 连接归属 | `instance` | 无外部账号 |
-| 管理入口 | `/plugins/epub-beautify` | 专属工具页面 |
-| 输出模式 | `new` | 仅生成新书 |
+| 插件 ID | `talebook.tool.epub-beautify` | 稳定身份 |
+| 分类 / 能力 | `["integrations"]` / `["integrations.tool"]` | 书籍工具 |
+| 权限 | `books.read` / `books.write` | 读取原书与导入美化版 |
+| 连接归属 | `["instance"]` | 无外部账号 |
+| `manage_route` | `/plugins/epub-beautify` | 专属工具页 |
+| 支持格式 | EPUB | 其他格式不处理 |
+| `output_mode` | `new` | 只另存为新书 |
 
 ### 7.4 代码落点
 
 | 行为 | 文件与函数 |
 |---|---|
-| 插件定义与处理 | `webserver/plugins/tool/epub_beautify/provider.py` 的 `EpubBeautifyTransformPlugin` |
-| EPUB 分析与重写 | `webserver/plugins/tool/epub_beautify/beautify_lib.py` |
-| 预设、目录与纹理 | `webserver/plugins/tool/epub_beautify/styles/` |
-| API 编排与权限 | `webserver/handlers/plugin_booktools.py` 的 `UserEpubBeautifyPresets`、`UserEpubBeautifyPreview`、`UserEpubBeautifyRun` |
-| 新书导入 | `webserver/services/booktools.py` 的 `import_as_new_book` |
-| 工具页面 | `app/pages/plugins/epub-beautify.vue` |
+| 插件实现与参数校验 | `webserver/plugins/tool/epub_beautify/provider.py` 的 `EpubBeautifyTransformPlugin` |
+| EPUB 分析与生成 | `webserver/plugins/tool/epub_beautify/beautify_lib.py` 的 `analyze_epub()` / `beautify()` |
+| 排版预设与纹理 | `webserver/plugins/tool/epub_beautify/styles/` |
+| 接口与新书入库 | `webserver/handlers/plugin_booktools.py` 的 `UserEpubBeautifyPresets` / `UserEpubBeautifyPreview` / `UserEpubBeautifyRun` |
+| 前端页面 | `app/pages/plugins/epub-beautify.vue` |
 
 ### 7.5 界面文案
 
 | i18n 分组 | 覆盖 |
 |---|---|
-| `bookTools.epubBeautify.*` | 排版选项、分析与生成反馈 |
-| `pluginManagement.*` | 插件中心入口 |
+| `bookTools.epubBeautify.*` | 排版选项、分析结果与执行反馈 |
+| `bookTools.common.*` | 书籍选择、执行与新书后缀 |
