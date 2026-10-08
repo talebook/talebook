@@ -473,7 +473,7 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertTrue(job["book"]["author"])
         self.assertIn(f"/get/thumb_60x80/{test_main.BID_EPUB}.jpg", job["book"]["thumb"])
         self.assertTrue(job["plan"]["detailed"])
-        self.assertEqual(job["plan"]["overall_percent"], 0)
+        self.assertIsNone(job["plan"]["overall_percent"])
         self.assertEqual(
             [phase["key"] for phase in job["plan"]["phases"]],
             ["queue", "inspect", "review", "generate", "finalize", "complete"],
@@ -954,7 +954,7 @@ description: 高级模式测试
         scheduler = AudiobookScheduler()
         with mock.patch.object(scheduler, "_process") as process:
             self.assertTrue(scheduler.run_once())
-            process.assert_called_once_with(job.id)
+            process.assert_called_once_with(job.id, (scheduler.worker_id, 2, None))
         session = test_main.get_db()
         reclaimed = session.get(models.AudiobookJob, job.id)
         self.assertEqual(reclaimed.status, "generating")

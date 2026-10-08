@@ -88,9 +88,7 @@ class MetaList(ListHandler):
 
             format_count = defaultdict(int)
             with self._db_lock:
-                rows = self.cache.backend.conn.get(
-                    "SELECT format, count(*) FROM data GROUP BY format"
-                )
+                rows = self.cache.backend.conn.get("SELECT format, count(*) FROM data GROUP BY format")
             for fmt, count in rows:
                 format_count[fmt] = count
             items = [{"id": fmt, "name": fmt, "count": count} for fmt, count in format_count.items()]
@@ -164,9 +162,7 @@ class MetaBooks(ListHandler):
         if meta == "format":
             # 同样改为一次查询（原实现逐本 formats()，大库下极慢）。
             with self._db_lock:
-                matching_ids = [v[0] for v in self.cache.backend.conn.get(
-                    "SELECT book FROM data WHERE format = ?", (name,)
-                )]
+                matching_ids = [v[0] for v in self.cache.backend.conn.get("SELECT book FROM data WHERE format = ?", (name,))]
             books = self.db.get_data_as_dict(ids=matching_ids)
         else:
             category = meta + "s" if meta in ["tag", "author"] else meta
