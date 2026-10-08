@@ -172,7 +172,9 @@
                                 v-if="!g.show_when || g.show_when()"
                                 v-model="settings[g.key]"
                                 density="compact"
-                                hide-details
+                                :hide-details="!g.hint"
+                                :hint="g.hint"
+                                :persistent-hint="!!g.hint"
                                 :label="g.label"
                                 color="primary"
                             />
@@ -739,6 +741,7 @@ const cards = computed(() => [
             {
                 key: 'CAPTCHA_ENABLE_FOR_DOWNLOAD',
                 label: t('admin.settings.label.captchaEnableForDownload'),
+                hint: t('admin.settings.message.captchaDownloadOpdsHint'),
                 show_when: () => ['image', 'geetest', 'turnstile'].includes(settings.value.CAPTCHA_PROVIDER),
             },
             {
