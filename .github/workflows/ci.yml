@@ -44,6 +44,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install ffmpeg for audiobook integration test
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends ffmpeg
+          rm -rf /var/lib/apt/lists/*
+          command -v ffmpeg
+          command -v ffprobe
+
       - name: Inspect environment
         run: |
           command -v ebook-convert
