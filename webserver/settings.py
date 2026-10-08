@@ -219,11 +219,15 @@ settings = {
     ],
 
     # 人机验证配置
-    'CAPTCHA_PROVIDER': '',  # 验证提供商，可选值: 'geetest' 或空字符串表示不启用
+    'CAPTCHA_PROVIDER': '',  # 验证提供商，可选值: 'image', 'geetest', 'turnstile' 或空字符串表示不启用
     'CAPTCHA_ENABLE_FOR_REGISTER': False,  # 注册界面启用认证
     'CAPTCHA_ENABLE_FOR_LOGIN': False,     # 登录页面启用认证
     'CAPTCHA_ENABLE_FOR_WELCOME': False,   # 私人图书馆界面启用认证
     'CAPTCHA_ENABLE_FOR_RESET': False,     # 重置密码页面启用认证
+    'CAPTCHA_ENABLE_FOR_DOWNLOAD': False,  # 下载书籍启用认证
+    'CAPTCHA_ENABLE_FOR_READ': False,      # 在线阅读启用认证
+    'TURNSTILE_SITE_KEY': '',             # Cloudflare Turnstile 公钥
+    'TURNSTILE_SECRET_KEY': '',           # Cloudflare Turnstile 私钥
     'GEETEST_CAPTCHA_ID': '',              # 极验 Captcha ID (公钥)
     'GEETEST_CAPTCHA_KEY': '',             # 极验 Captcha Key (私钥)
 

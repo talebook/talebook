@@ -548,6 +548,10 @@ class AdminSettings(BaseHandler):
             "CAPTCHA_ENABLE_FOR_LOGIN",
             "CAPTCHA_ENABLE_FOR_WELCOME",
             "CAPTCHA_ENABLE_FOR_RESET",
+            "CAPTCHA_ENABLE_FOR_DOWNLOAD",
+            "CAPTCHA_ENABLE_FOR_READ",
+            "TURNSTILE_SITE_KEY",
+            "TURNSTILE_SECRET_KEY",
             "GEETEST_CAPTCHA_ID",
             "GEETEST_CAPTCHA_KEY",
             # 首页设置
