@@ -44,6 +44,18 @@ class TestAnnotationModelsAndMigration(unittest.TestCase):
         self.assertIn("uq_annotation_source_connection", source_constraints)
         self.assertIn("uq_annotation_source_identity", source_constraints)
 
+    def test_upgrade_adds_indexes_for_reply_columns(self):
+        engine = create_engine("sqlite://")
+        models.Base.metadata.create_all(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql("DROP INDEX ix_annotations_root_id")
+            conn.exec_driver_sql("DROP INDEX ix_annotations_thread_id")
+
+        self.assertTrue(compare_and_migrate(engine))
+
+        indexes = {item["name"] for item in inspect(engine).get_indexes("annotations")}
+        self.assertTrue({"ix_annotations_root_id", "ix_annotations_thread_id"} <= indexes)
+
     def test_source_identity_is_unique_across_authoritative_annotations(self):
         engine = create_engine("sqlite://")
         models.Base.metadata.create_all(engine)
@@ -696,6 +708,123 @@ class TestAnnotations(TestWithUserLogin):
         session.expire_all()
         # 私有内容永不外发：主评论与其回复的外部映射都已解除，之后重新公开会作为新记录同步。
         self.assertEqual(brs_like.count(), 0)
+
+    def test_idempotent_upsert_cannot_change_the_reply_relationship(self):
+        root = self._comment("root", reader=2)
+        other_root = self._comment("other-root", reader=2)
+        top = self._post_local(client_id="taken", is_private=True, content="私密笔记")["annotation"]
+        # client_id 已属于一条顶层私密笔记：不能借回复把它挂到别人评论下并改为公开。
+        self.assertEqual(self._reply(root, "回复", client_id="taken")["err"], "annotation.id_conflict")
+        reply = self._reply(root, "回复", client_id="reply-1")["annotation"]
+        # client_id 已属于另一条主评论下的回复，也不能被挪走。
+        self.assertEqual(self._reply(other_root, "挪走", client_id="reply-1")["err"], "annotation.id_conflict")
+        self.assertEqual(self._post_local(client_id="reply-1", content="改成顶层")["err"], "annotation.id_conflict")
+        session = get_db()
+        session.expire_all()
+        self.assertTrue(session.get(models.Annotation, top["id"]).is_private)
+        self.assertEqual(session.get(models.Annotation, reply["id"]).root_id, root)
+        # 同一回复关系下的幂等更新照常生效。
+        again = self._reply(root, "回复（修改）", client_id="reply-1")
+        self.assertEqual((again["err"], again["annotation"]["id"]), ("ok", reply["id"]))
+
+    def test_reopening_a_root_resyncs_its_replies(self):
+        AnnotationSyncService.register_writer(
+            "brs-like", lambda annotation, source: {"source_annotation_id": "remote-%s" % annotation["id"]}
+        )
+        root = self._post_local(client_id="root", is_private=False, content="主评论")["annotation"]
+        reply = self._reply(root["id"], "回复")["annotation"]
+        url = "/api/book/%d/annotations/%d" % (BID_EPUB, root["id"])
+        self.json(url, method="PUT", body=json.dumps({"is_private": True}))
+        self.json(url, method="PUT", body=json.dumps({"is_private": False}))
+        session = get_db()
+        session.expire_all()
+        synced = {
+            source.annotation_id: source.source_sync_status
+            for source in session.query(models.AnnotationSource).filter_by(source_name="brs-like")
+        }
+        self.assertEqual(synced, {root["id"]: "synced", reply["id"]: "synced"})
+
+    def test_collection_endpoints_hide_replies_under_a_private_root(self):
+        root = self._comment("root", reader=2)
+        reply = self._reply(root, "我的回复")["annotation"]
+        own = self._post_local(client_id="own", content="我的笔记")["annotation"]
+        listed = [item["id"] for item in self.json("/api/annotations?book_id=%d" % BID_EPUB)["annotations"]]
+        self.assertEqual(listed, [own["id"]])
+        exported = [item["id"] for item in self.json("/api/annotations/export?book_id=%d" % BID_EPUB)["export"]["annotations"]]
+        self.assertEqual(sorted(exported), sorted([own["id"], reply["id"]]))
+
+        session = get_db()
+        session.get(models.Annotation, root).is_private = True
+        session.commit()
+        exported = [item["id"] for item in self.json("/api/annotations/export?book_id=%d" % BID_EPUB)["export"]["annotations"]]
+        self.assertEqual(exported, [own["id"]])
+
+    def test_remote_parent_ids_are_scoped_to_the_same_instance(self):
+        session = get_db()
+        connections = [
+            models.PluginConnection(
+                installation_id=1,
+                owner_type="user",
+                owner_id=owner,
+                role="scope-test-%d" % owner,
+                name="t",
+                config=config,
+                scopes=[],
+            )
+            for owner, config in (
+                (1, {"endpoint": "https://brs.example.org/"}),
+                (2, {"endpoint": "https://brs.example.org"}),
+                (3, {"endpoint": "https://other.example.org"}),
+            )
+        ]
+        session.add_all(connections)
+        session.flush()
+        root = models.Annotation(reader_id=1, book_id=BID_EPUB, client_id="scoped", annotation_type="note", is_private=False)
+        session.add(root)
+        session.flush()
+        session.add(
+            models.AnnotationSource(
+                annotation_id=root.id,
+                source_name="brs",
+                source_connection_id=str(connections[0].id),
+                source_annotation_id="remote-on-main",
+            )
+        )
+        session.commit()
+        try:
+            service = AnnotationSyncService()
+            # 同一连接、指向同一实例的其他读者连接都能复用副本 id；另一个实例上没有副本。
+            self.assertEqual(service._remote_id(root.id, "brs", str(connections[0].id)), "remote-on-main")
+            self.assertEqual(service._remote_id(root.id, "brs", str(connections[1].id)), "remote-on-main")
+            self.assertIsNone(service._remote_id(root.id, "brs", str(connections[2].id)))
+        finally:
+            session.query(models.AnnotationSource).filter_by(annotation_id=root.id).delete()
+            for connection in connections:
+                session.delete(connection)
+            session.commit()
+
+    def test_comment_made_private_during_an_external_write_is_retracted(self):
+        deleted = []
+
+        def slow_writer(annotation, source):
+            # 写入途中读者把评论改为私有（与改私有接口相同：置私有并解除映射），此时映射还没有外部 id。
+            session = get_db()
+            session.get(models.Annotation, annotation["id"]).is_private = True
+            session.query(models.AnnotationSource).filter_by(annotation_id=annotation["id"]).delete()
+            session.commit()
+            return {"source_annotation_id": "remote-late"}
+
+        AnnotationSyncService.register_writer("brs-like", slow_writer)
+        original = AnnotationSyncService._delete_states
+        AnnotationSyncService._delete_states = lambda service, runtime, states: deleted.extend(states)
+        try:
+            annotation = self._post_local(client_id="racy", is_private=False, content="途中改私有")["annotation"]
+        finally:
+            AnnotationSyncService._delete_states = original
+        self.assertEqual([state["source_annotation_id"] for state in deleted], ["remote-late"])
+        session = get_db()
+        session.expire_all()
+        self.assertEqual(session.query(models.AnnotationSource).filter_by(annotation_id=annotation["id"]).count(), 0)
 
     def test_public_annotation_discovers_typed_writer_and_excludes_its_source(self):
         calls = []

@@ -63,8 +63,20 @@ class AnnotationSyncService(AsyncService):
             self.session.add(source)
         return source
 
-    def _remote_id(self, annotation_id, source_name, source_connection_id):
-        """某条记录在同一来源中的外部 id；优先同一连接，其次同一来源的任一连接。"""
+    def _instance_key(self, source_connection_id):
+        """同一来源下的实例身份：配置了 endpoint 的连接按 endpoint 区分，没有 endpoint 的视为同一实例。"""
+        try:
+            connection = self.session.get(PluginConnection, int(source_connection_id))
+        except (TypeError, ValueError):
+            connection = None
+        config = (connection.config if connection else None) or {}
+        return str(config.get("endpoint") or "").strip().rstrip("/").lower()
+
+    def _remote_source(self, annotation_id, source_name, source_connection_id):
+        """某条记录在同一来源、同一实例中的副本；优先同一连接，其次指向同一实例的其他连接。
+
+        每位读者的连接可以指向不同实例，别的实例上的 id 不能拿来请求当前连接。
+        """
         sources = (
             self.session.query(AnnotationSource)
             .filter(
@@ -72,11 +84,34 @@ class AnnotationSyncService(AsyncService):
                 AnnotationSource.source_name == source_name,
                 AnnotationSource.source_annotation_id.isnot(None),
             )
+            .order_by(AnnotationSource.id)
             .all()
         )
-        preferred = [item for item in sources if item.source_connection_id == source_connection_id]
-        source = (preferred or sources or [None])[0]
+        source_connection_id = str(source_connection_id or "")
+        for item in sources:
+            if item.source_connection_id == source_connection_id:
+                return item
+        instance = self._instance_key(source_connection_id)
+        for item in sources:
+            if self._instance_key(item.source_connection_id) == instance:
+                return item
+        return None
+
+    def _remote_id(self, annotation_id, source_name, source_connection_id):
+        source = self._remote_source(annotation_id, source_name, source_connection_id)
         return source.source_annotation_id if source else None
+
+    def _withdrawn(self, annotation_id, source_id):
+        """外部写入期间，本站记录是否已被删除、改为私有，或副本映射已被解除。"""
+        self.session.expire_all()
+        annotation = self.session.query(Annotation).filter(Annotation.id == annotation_id).first()
+        if annotation is None or annotation.is_private:
+            return True
+        if annotation.root_id:
+            root = self.session.query(Annotation).filter(Annotation.id == annotation.root_id).first()
+            if root is None or root.is_private:
+                return True
+        return self.session.query(AnnotationSource).filter(AnnotationSource.id == source_id).first() is None
 
     def _typed_writers(self, annotation, registry, settings):
         runtime = PluginRuntime(self.session, settings, registry=registry)
@@ -167,10 +202,32 @@ class AnnotationSyncService(AsyncService):
                     "remote_reply_to_id": remote_reply_to_id or remote_root_id,
                 }
 
+            source_id = source.id
+            previous_remote_id = source.source_annotation_id
             try:
                 result = writer(data, source.to_api_dict()) or {}
                 if not isinstance(result, dict):
                     raise TypeError("annotation source writer must return a dict or None")
+                if self._withdrawn(annotation.id, source_id):
+                    # 写入途中本站已删除或改为私有：刚写出去的副本立即撤回，不再保留映射。
+                    # 其余来源也不再扇出；之后重新公开时会重新入队。
+                    remote_id = result.get("source_annotation_id") or previous_remote_id
+                    leftover = self.session.query(AnnotationSource).filter(AnnotationSource.id == source_id).first()
+                    if leftover is not None:
+                        self.session.delete(leftover)
+                        self.session.commit()
+                    if remote_id:
+                        self._delete_states(
+                            self._runtime(registry, settings),
+                            [
+                                {
+                                    "source_name": source_name,
+                                    "source_connection_id": source_connection_id,
+                                    "source_annotation_id": remote_id,
+                                }
+                            ],
+                        )
+                    return
                 for field in (
                     "source_annotation_id",
                     "source_run_id",
@@ -204,7 +261,9 @@ class AnnotationSyncService(AsyncService):
 
         只处理插件连接写入的副本；来源未实现 delete_annotation 或调用失败时只记录日志，不影响本站。
         """
-        runtime = self._runtime(registry, settings)
+        self._delete_states(self._runtime(registry, settings), sources)
+
+    def _delete_states(self, runtime, sources):
         for state in sources or []:
             try:
                 connection = self.session.get(PluginConnection, int(state.get("source_connection_id")))
@@ -234,15 +293,7 @@ class AnnotationSyncService(AsyncService):
         runtime = self._runtime(registry, settings)
         for connection in runtime.connections_for("annotations.push", user_id=reader_id):
             source_name = source_name_for(self.session, connection)
-            source = (
-                self.session.query(AnnotationSource)
-                .filter(
-                    AnnotationSource.annotation_id == annotation.id,
-                    AnnotationSource.source_name == source_name,
-                    AnnotationSource.source_annotation_id.isnot(None),
-                )
-                .first()
-            )
+            source = self._remote_source(annotation.id, source_name, str(connection.id))
             if source is None:
                 logging.info("annotation %s not synced to %s yet, vote skipped", annotation.id, source_name)
                 continue

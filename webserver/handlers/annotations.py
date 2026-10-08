@@ -401,6 +401,12 @@ class BookAnnotations(AnnotationHandlerMixin, BaseHandler):
                 .first()
             )
 
+        if annotation is not None:
+            # 幂等更新不能改变记录的回复关系：client_id 已属于顶层记录或其他主评论下的回复时拒绝。
+            expected = (reply_root.id, *reply_link) if reply_root is not None else (None, None, None)
+            if (annotation.root_id, annotation.reply_to_id, annotation.thread_id) != expected:
+                return {"err": "annotation.id_conflict", "msg": _("笔记幂等标识已被其他记录占用")}
+
         created = annotation is None
         now = datetime.datetime.now()
         if created:
@@ -599,7 +605,12 @@ class BookAnnotationItem(AnnotationHandlerMixin, BaseHandler):
             if remote:
                 AnnotationSyncService().delete_remote(remote)
             elif not annotation.is_private and self._is_publicly_visible(annotation):
-                AnnotationSyncService().sync_annotation(annotation.id)
+                service = AnnotationSyncService()
+                service.sync_annotation(annotation.id)
+                if not was_public and annotation.root_id is None:
+                    # 重新公开：改私有时回复的映射已解除，主评论之后按创建顺序重新同步其下回复。
+                    for reply in sorted(self._descendants(annotation), key=lambda item: item.id):
+                        service.sync_annotation(reply.id)
         return {
             "err": "ok",
             "annotation": self._reader_items([annotation], keep_sources=True)[0],
@@ -735,6 +746,8 @@ class AnnotationCollection(AnnotationHandlerMixin, BaseHandler):
         query = self._query()
         if query is None:
             return {"err": "params.invalid", "msg": _("书籍参数错误")}
+        # 与单书笔记列表一致：回复只在阅读器的评论详情里出现。
+        query = query.filter(Annotation.root_id.is_(None))
         annotations = query.order_by(Annotation.book_id, Annotation.id).all()
         annotations = [item for item in annotations if self.can_view_book(item.book_id)]
         return {"err": "ok", "annotations": [self._annotation_dict(item) for item in annotations]}
@@ -769,7 +782,12 @@ class AnnotationExport(AnnotationCollection):
         if query is None:
             return {"err": "params.invalid", "msg": _("书籍参数错误")}
         annotations = query.order_by(Annotation.book_id, Annotation.id).all()
-        annotations = [self._annotation_dict(item) for item in annotations if self.can_view_book(item.book_id)]
+        # 回复跟随主评论的可见性：主评论改为私有后，回复作者也不能再导出。
+        annotations = [
+            self._annotation_dict(item)
+            for item in annotations
+            if self.can_view_book(item.book_id) and (item.root_id is None or self._is_visible(item))
+        ]
         return {
             "err": "ok",
             "export": {
