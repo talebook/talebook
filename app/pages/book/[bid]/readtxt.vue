@@ -348,16 +348,20 @@ const init = () => {
                 name.value = rsp.data.name;
                 getNovelContent(0);
             } else {
-                wait.value = parseInt(rsp.data.wait);
-                let queLen = parseInt(rsp.data.que);
+                wait.value = Math.max(1, Math.ceil(Number(rsp.data.wait) || 0));
+                const queLen = Number(rsp.data.que) || 0;
                 name.value = rsp.data.name;
                 if (queLen > 0) {
                     tip.title = t('book.inQueue');
                     tip.content = t('book.queueMessage', { count: queLen });
-                    return;
+                } else {
+                    tip.title = t('book.parsing');
+                    tip.content = t('book.parsingMessage', { seconds: wait.value });
                 }
+                if (intvl) clearInterval(intvl);
                 intvl = setInterval(() => {
                     wait.value--;
+                    tip.title = t('book.parsing');
                     tip.content = t('book.parsingMessage', { seconds: wait.value });
                     if (wait.value <= 0) {
                         clearInterval(intvl);
