@@ -49,7 +49,7 @@ Pinia 按领域拆分 store。`stores/main.ts`（`useMainStore`）承载站点�
 
 ### 国际化
 
-使用 `@nuxtjs/i18n` 懒加载，语言文件在 `i18n/locales/zh-CN.json` 和 `en-US.json`。默认及回退语言均为 `zh-CN`。
+使用 `@nuxtjs/i18n` 懒加载，语言文件在 `i18n/locales/zh-CN.json` 、`en-US.json` 和 `ru-RU.json`。默认及回退语言均为 `zh-CN`。
 
 **注意**：执行 `npm run generate`（SPA 静态构建）时，`_i18n/` 语言文件不会自动输出到 `dist/`，需额外处理，否则 i18n key 会在页面上直接显示为原始字符串。
 
