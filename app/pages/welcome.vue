@@ -25,6 +25,7 @@
                     >
                         <template #activator="{ props }">
                             <v-btn
+                                :aria-label="t('book.language')"
                                 v-bind="props"
                                 icon
                                 variant="text"

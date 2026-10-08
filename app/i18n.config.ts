@@ -1,5 +1,6 @@
 // i18n.config.ts
 import enUSMessages from './i18n/locales/en-US.json'
+import ruRUMessages from './i18n/locales/ru-RU.json'
 import zhCNMessages from './i18n/locales/zh-CN.json'
 
 const zhCNDateTimeFormats = {
@@ -35,6 +36,14 @@ const enUSDateTimeFormats = {
   }
 }
 
+const ruRUDateTimeFormats = {
+  short: { year: 'numeric', month: 'short', day: 'numeric' },
+  long: {
+    year: 'numeric', month: 'long', day: 'numeric', weekday: 'long',
+    hour: 'numeric', minute: 'numeric', hour12: false
+  }
+}
+
 const zhCNNumberFormats = {
   currency: {
     style: 'currency',
@@ -59,7 +68,8 @@ export default defineI18nConfig(() => ({
   messages: {
     zh: zhCNMessages,
     'zh-CN': zhCNMessages,
-    'en-US': enUSMessages
+    'en-US': enUSMessages,
+    'ru-RU': ruRUMessages
   },
   
   // 日期时间格式化
@@ -67,12 +77,14 @@ export default defineI18nConfig(() => ({
     zh: zhCNDateTimeFormats,
     'zh-CN': zhCNDateTimeFormats,
     'en-US': enUSDateTimeFormats,
+    'ru-RU': ruRUDateTimeFormats,
   },
   
   // 数字格式化
   numberFormats: {
     zh: zhCNNumberFormats,
     'zh-CN': zhCNNumberFormats,
-    'en-US': enUSNumberFormats
+    'en-US': enUSNumberFormats,
+    'ru-RU': { currency: { style: 'currency', currency: 'RUB' } }
   }
 }))
