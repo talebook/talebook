@@ -281,7 +281,7 @@
                                 <span class="mx-3">{{ $t('network.page', { n: explorePage }) }}</span>
                                 <v-btn
                                     variant="text"
-                                    :disabled="exploreLoading"
+                                    :disabled="exploreLoading || !exploreHasMore"
                                     @click="changeExplorePage(explorePage + 1)"
                                 >
                                     {{ $t('network.nextPage') }}
@@ -344,6 +344,7 @@ const exploreCategoryUrl = ref('');
 const exploreBooks = ref([]);
 const explorePage = ref(1);
 const exploreLoading = ref(false);
+const exploreHasMore = ref(true);
 
 // 手选模式下供 autocomplete 过滤选择（2000+ 源由 autocomplete 内置虚拟滚动处理）
 const sourceItems = computed(() => sources.value.map((s) => ({ value: s.source_key || s.id, title: s.name })));
@@ -354,12 +355,20 @@ const emptyStateText = computed(() => {
     return store.user.is_admin ? t('network.noConfiguredSourcesAdmin') : t('network.noConfiguredSourcesUser');
 });
 
+const cardComments = (book) => {
+    const text = [book.author, book.intro].filter(Boolean).join(' · ');
+    // BookCards renders comments as HTML; comic-source metadata is plain text.
+    if (book.media_type !== 'comic') return text;
+    const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
+    return text.replace(/[&<>"']/g, character => entities[character]);
+};
+
 const toCards = (group) => {
     return (group.books || []).map((b) => ({
         id: b.book_url,
         title: b.name,
         img: b.cover_url,
-        comments: [b.author, b.intro].filter(Boolean).join(' · '),
+        comments: cardComments(b),
         href: `/network/book?source_id=${group.source_id}&book_url=${encodeURIComponent(b.book_url)}`,
     }));
 };
@@ -369,7 +378,7 @@ const toExploreCards = (books) => {
         id: b.book_url,
         title: b.name,
         img: b.cover_url,
-        comments: [b.author, b.intro].filter(Boolean).join(' · '),
+        comments: cardComments(b),
         href: `/network/book?source_id=${exploreSourceId.value}&book_url=${encodeURIComponent(b.book_url)}`,
     }));
 };
@@ -504,6 +513,7 @@ const loadCategories = async () => {
     exploreCategoryUrl.value = '';
     exploreBooks.value = [];
     explorePage.value = 1;
+    exploreHasMore.value = true;
     if (!exploreSourceId.value) return;
     const { $backend } = useNuxtApp();
     const rsp = await $backend(`/book-sources/categories?source_id=${exploreSourceId.value}`);
@@ -520,6 +530,7 @@ const fetchExplore = async (page) => {
         if (rsp.err === 'ok') {
             exploreBooks.value = rsp.books || [];
             explorePage.value = page;
+            exploreHasMore.value = rsp.has_more !== false;
         } else if ($alert) {
             $alert('error', rsp.msg || rsp.err);
         }

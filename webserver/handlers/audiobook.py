@@ -47,6 +47,7 @@ from webserver.services.audiobook import (
     AudiobookStorage,
     ScriptValidationError,
     VoicebookProcess,
+    audiobook_job_generation,
     audiobook_job_plan,
     confirm_audiobook_job_plan,
     create_audiobook_job_plan,
@@ -136,6 +137,7 @@ def _job_dict(job, book=None, include_book=False, edition=None):
         "error_message": job.error_message,
         "data": data,
         "plan": audiobook_job_plan(job),
+        "generation": audiobook_job_generation(job),
         "created_at": job.create_time.isoformat() if job.create_time else None,
         "updated_at": job.update_time.isoformat() if job.update_time else None,
         "script_available": bool(edition and edition.script_path),
@@ -375,8 +377,7 @@ class AudiobookDetail(BaseHandler):
         active_jobs_cancelled = 0
         for job in jobs:
             if job.status in ACTIVE_JOB_STATUSES:
-                request_cancel(storage, job)
-                active_jobs_cancelled += 1
+                active_jobs_cancelled += int(request_cancel(storage, job))
 
         deleted = {
             "editions": len(edition_ids),
@@ -615,28 +616,48 @@ class AudiobookJobAction(BaseHandler):
         action = body.get("action")
         storage = AudiobookStorage()
         if action == "cancel":
-            if job.status == "queued":
-                job.status = "cancelled"
-                job.phase = "CANCELLED"
-                job.finished_at = utcnow()
-            elif job.status in {"inspecting", "awaiting_review", "generating", "finalizing"}:
-                request_cancel(storage, job)
-            else:
+            if job.status not in ACTIVE_JOB_STATUSES or not request_cancel(storage, job):
                 return {"err": "state.invalid", "msg": _("当前状态不能取消")}
+            # request_cancel holds the job write lock until this transaction ends.
+            self.session.query(AudiobookJob).filter(AudiobookJob.id == job.id, AudiobookJob.status == "queued").update(
+                {
+                    AudiobookJob.status: "cancelled",
+                    AudiobookJob.phase: "CANCELLED",
+                    AudiobookJob.progress: 0.0,
+                    AudiobookJob.finished_at: utcnow(),
+                },
+                synchronize_session="fetch",
+            )
         elif action == "retry":
             if job.status not in {"failed", "cancelled"}:
                 return {"err": "state.invalid", "msg": _("只有失败或已取消任务可以重试")}
-            reset_for_retry(storage, job)
+            if not reset_for_retry(storage, job):
+                return {"err": "state.invalid", "msg": _("任务状态已改变，请刷新后重试")}
         elif action == "priority" and self.is_admin():
             job.priority = max(-100, min(100, int(body.get("priority", 0))))
             job.update_time = utcnow()
         else:
             return {"err": "params.invalid", "msg": _("任务操作无效")}
         self.session.commit()
+        self.session.refresh(job)
         return {"err": "ok", "job": _job_dict(job)}
 
 
 class AudiobookWorkspace(BaseHandler):
+    def _reserve_review(self, job):
+        from webserver.services.audiobook import AudiobookLeaseLost
+
+        try:
+            AudiobookScheduler._write_worker_job(
+                self.session,
+                job,
+                AudiobookScheduler._job_write_conditions(job),
+                {AudiobookJob.update_time: utcnow()},
+            )
+        except AudiobookLeaseLost:
+            return False
+        return True
+
     def _job(self, job_id):
         job = self.session.get(AudiobookJob, int(job_id))
         if not job or (not self.is_admin() and job.creator_id != self.user_id()):
@@ -670,6 +691,8 @@ class AudiobookWorkspace(BaseHandler):
         if job.status != "awaiting_review":
             return {"err": "state.invalid", "msg": _("任务当前不在审查阶段")}
         body = _json_body(self)
+        if not self._reserve_review(job):
+            return {"err": "state.invalid", "msg": _("任务状态已改变，请刷新后重试")}
         try:
             if body.get("kind") == "characters":
                 workspace = save_script_roles(path, body.get("characters"), body.get("revision"))
@@ -706,6 +729,8 @@ class AudiobookConfirm(BaseHandler):
             body = _json_body(self)
         except ValueError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
+        if not AudiobookWorkspace._reserve_review(self, job):
+            return {"err": "state.invalid", "msg": _("任务状态已改变，请刷新后重试")}
         data = dict(job.data or {})
         revision = dict(data.get("revision") or {})
         if revision:

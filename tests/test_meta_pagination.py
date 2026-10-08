@@ -97,11 +97,10 @@ class TestMetaPagination(test_main.TestApp):
 
     def test_format_endpoint_uses_the_same_page_cap(self):
         cache = test_main._app.settings["legacy"].new_api
-        with (
-            mock.patch.object(cache, "all_book_ids", return_value=[1]),
-            mock.patch.object(cache, "formats", return_value=[f"FORMAT{i:04d}" for i in range(1001)]),
-        ):
+        rows = [(f"FORMAT{i:04d}", 1) for i in range(1001)]
+        with mock.patch.object(cache.backend.conn, "get", return_value=rows) as query:
             result = self.json("/api/format?show=all&page=2&page_size=1000")
+        query.assert_called_once_with("SELECT format, count(*) FROM data GROUP BY format")
         self.assertEqual(result["total"], 1001)
         self.assertEqual(len(result["items"]), 1)
         self.assertEqual(result["items"][0]["name"], "FORMAT1000")

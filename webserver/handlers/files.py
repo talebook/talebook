@@ -189,5 +189,9 @@ def routes():
         (r"/get/progress/([0-9]+)", ProgressHandler),
         (r"/get/extract/([0-9]+)/(.*)", EpubReader),
         (r"/get/(.*)/(.*)", ImageHandler),
+        # Docker links this directory to the persistent custom logo directory.
+        # A separate static root keeps its files accessible without permitting
+        # arbitrary symlinks outside either the frontend or logo directory.
+        (r"/logo/(.*)", web.StaticFileHandler, {"path": os.path.join(CONF["html_path"], "logo")}),
         (r"/(.*)", web.StaticFileHandler, static_config),
     ]
