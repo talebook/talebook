@@ -340,15 +340,15 @@
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>后端单元 / 接口</td><td><code>pytest tests/test_annotations.py</code></td><td>查看范围、分页不重不漏、计数、回复可见性、级联删除、投票唯一、私有不外泄、整书评论</td><td class="pending">待验证</td></tr>
-                  <tr><td>同步</td><td><code>pytest tests/test_annotations.py</code>（同步用例）</td><td>更新不重复新增、回复带主评论远端 id、删除与投票推送、私有不外发</td><td class="pending">待验证</td></tr>
-                  <tr><td>阅读页</td><td>本地启动 Talebook，打开 <code>/read/&lt;id&gt;?reader=candle</code></td><td>登录读者可写评论、回复、赞踩；游客只见登录提示；听书可用</td><td class="pending">待验证</td></tr>
-                  <tr><td>质量门禁</td><td><code>make check-design</code>、<code>make check-spec</code>、<code>make lint-py</code></td><td>全部通过</td><td class="pending">待验证</td></tr>
+                  <tr><td>后端单元 / 接口</td><td><code>pytest tests/test_annotations.py</code></td><td>查看范围、分页不重不漏、计数、回复可见性、级联删除、投票唯一、私有不外泄、整书评论</td><td>通过：在 <code>talebook/test</code> 镜像（补装 quickjs、txt2epub-next、langdetect、ebooklib）中，<code>test_annotations</code>、<code>test_enrichment_connectors</code>、<code>test_audiobook</code>、<code>test_plugin_contract</code>、<code>test_plugin_runtime</code> 共 122 项通过（变基到 a37fa667 后）</td></tr>
+                  <tr><td>同步</td><td><code>pytest tests/test_annotations.py</code>（同步用例）</td><td>更新不重复新增、回复带主评论远端 id、删除与投票推送、私有不外发</td><td>通过：含回复同步携带远端 id、主评论未同步时回复记为失败、改私有解除映射，以及 BRS 更新 / 回复 / 删除 / 投票请求用例</td></tr>
+                  <tr><td>阅读页</td><td>本地启动 Talebook，打开 <code>/read/&lt;id&gt;?reader=candle</code></td><td>登录读者可写评论、回复、赞踩；游客只见登录提示；听书可用</td><td>通过（听书除外）：在测试镜像中按测试配置启动 Talebook，用 Playwright（402×874）打开 <code>/read/1?reader=candle</code>。登录读者：写评论、正文标记、段尾气泡、点赞、详情页回复、返回后回复数同步、「我的」、删除（连同回复）、服务端确认已删除、刷新后可用，共 10 项通过，无页面错误。游客：显示「登录后查看评论」，「去登录」跳转 <code>/login?next=%2Fread%2F1%3Freader%3Dcandle</code>。听书：测试书库没有已发布的有声版本，未在页面上验证，仅由 <code>test_audiobook</code> 校验注入的回调与接口路径</td></tr>
+                  <tr><td>质量门禁</td><td><code>make check-design</code>、<code>make check-spec</code>、<code>make lint-py</code></td><td>全部通过</td><td><code>check-spec</code> 25 篇通过；<code>ruff check</code> 与 <code>ruff format --check ./webserver</code> 通过；<code>check-design</code> 仅报「WIP 不能合并」（预期，转 ACTIVE 后复查）</td></tr>
                   <tr><td>界面审查</td><td><code>interface-review</code>（full）</td><td>无 HIGH / MEDIUM</td><td class="pending">待验证</td></tr>
                 </tbody>
               </table>
             </div>
-            <div class="callout warn"><strong>WIP 阶段说明：</strong>以上均未执行。</div>
+            <div class="callout warn"><strong>WIP 阶段说明：</strong>阅读页实测与界面审查尚未完成。全量 <code>pytest tests</code> 在同一镜像中与 master 基线对比：master 基线 10 项失败（漫画 RAR、扫描导入、Calibre 备份，均为镜像缺依赖），本分支（变基到 a37fa667）17 项失败，在同一镜像中最新 master 对应文件同样失败（新增的 7 项为有声书进度 v2、Tornado 启动与静态文件用例），未发现本次改动引入的失败。</div>
           </section>
 
           <section id="decisions" class="card">
