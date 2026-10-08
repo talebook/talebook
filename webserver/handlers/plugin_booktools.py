@@ -1,9 +1,10 @@
-"""内置文本工具的 HTTP 编排（正文查找替换 / 繁简转换 / TXT 编码修复）。
+"""书籍工具（integrations.tool）的统一 HTTP 编排。
 
-三个工具均为 builtin capability 插件（provider 与纯处理核心位于
-webserver/plugins/tool/{text_replace,zh_converter,txt_fixer}/），并由
-webserver/plugins/register.py 汇总注册；本模块负责书籍定位、权限校验、临时文件编排、
-写回入库与审计。
+所有书籍工具共用 ``/api/plugins/<plugin_key>/tool``、``/tool/preview``、``/tool/run``
+三条路由，本模块按 plugin_key 分发，只负责书籍定位、权限校验、临时文件编排、写回入库
+与审计；取哪种格式、接受哪些参数、允许的写回方式、新书后缀与元数据同步都由
+provider 按 ``TransformProvider`` 契约自述（内置工具见 ``webserver/plugins/tool/base.py``）。新增工具只需在
+``webserver/plugins/register.py`` 注册 provider，不再新增 handler 或路由。
 """
 
 import logging
@@ -14,7 +15,7 @@ import tempfile
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.handlers.plugins_common import body as _body
-from webserver.plugins.runtime import ToolInput
+from webserver.plugins.runtime import ToolInput, TransformProvider
 from webserver.services.booktools import (
     get_format_path,
     import_as_new_book,
@@ -76,16 +77,18 @@ def _book_option(book):
     }
 
 
-def _tool_runtime(handler, manage_route):
-    """按声明式 UI 入口选择 typed transform，不在 handler 硬编码插件身份。"""
+def _tool_runtime(handler, plugin_key):
+    """按 plugin_key 定位已启用的书籍工具连接，handler 不硬编码任何插件身份。"""
     settings = loader.get_settings()
     ensure_builtin_installations(handler.session, handler.user_id(), settings)
     runtime = PluginRuntime(handler.session, settings)
     for connection in runtime.connections_for(TRANSFORM_CAPABILITY, handler.user_id()):
-        provider = runtime.registry.get(runtime.plugin_key_of(connection))
-        if (provider.manifest.get("ui") or {}).get("manage_route") == manage_route:
-            return runtime, connection
-    raise BookToolsError("正文工具未启用")
+        if runtime.plugin_key_of(connection) == plugin_key:
+            provider = runtime.registry.get(plugin_key)
+            if not isinstance(provider, TransformProvider):
+                break
+            return runtime, connection, provider
+    raise BookToolsError("书籍工具不存在或未启用：%s" % plugin_key)
 
 
 def _restore_backup(db, book_id, fmt, state):
@@ -161,414 +164,91 @@ class AdminBookToolActions(BaseHandler):
             return _tool_error(exc)
 
 
-class UserTextReplacePreview(BaseHandler):
-    @js
-    @auth
-    def post(self):
-        req = _body(self)
-        try:
-            book_id = _tool_book_id(req)
-            pattern = str(req.get("pattern") or "")
-            replacement = str(req.get("replacement") or "")
-            use_regex = bool(req.get("use_regex"))
-            book = _tool_resolve_book(self, book_id)
-            fmt = pick_format(book, candidates=("TXT", "EPUB"))
-            if fmt is None:
-                raise BookToolsError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")
-            src = get_format_path(self.db, book_id, fmt)
-            runtime, connection = _tool_runtime(self, "/plugins/text-replace")
-            result = runtime.read(
-                connection,
-                "preview",
-                ToolInput.from_dict(
-                    {
-                        "path": src,
-                        "format": fmt,
-                        "pattern": pattern,
-                        "replacement": replacement,
-                        "use_regex": use_regex,
-                    }
-                ),
-                required_scopes=("books.read",),
-                requested_by=self.user_id(),
-            ).to_dict()
-            result["err"] = "ok"
-            result["book_id"] = book_id
-            return result
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
+def _tool_params(req):
+    params = req.get("params", {})
+    if params is None:
+        return {}
+    if not isinstance(params, dict):
+        raise BookToolsError("参数错误：params 必须是对象")
+    return params
 
 
-class UserTextReplaceRun(BaseHandler):
-    @js
-    @is_admin
-    def post(self):
-        req = _body(self)
-        work_dir = None
-        try:
-            book_id = _tool_book_id(req)
-            pattern = str(req.get("pattern") or "")
-            replacement = str(req.get("replacement") or "")
-            use_regex = bool(req.get("use_regex"))
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in ("new", "overwrite"):
-                raise BookToolsError("参数错误：output_mode 必须为 new 或 overwrite")
-            book = _tool_resolve_book(self, book_id)
-            title = book.get("title") or "Unknown"
-            fmt = pick_format(book, candidates=("TXT", "EPUB"))
-            if fmt is None:
-                raise BookToolsError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")
-            src = get_format_path(self.db, book_id, fmt)
-
-            work_dir = _tool_workdir()
-            runtime, connection = _tool_runtime(self, "/plugins/text-replace")
-            rollback_state = {}
-
-            def finalize(output):
-                value = output.to_dict()
-                rsp = {"err": "ok", **value, "output_mode": output_mode}
-                if output_mode == "overwrite":
-                    rollback_state["backup_path"] = overwrite_format(
-                        self.db,
-                        book_id,
-                        fmt,
-                        value["path"],
-                        backup_dir=_tool_backup_dir(),
-                        backup_state=rollback_state,
-                    )
-                    rsp["book_id"] = book_id
-                else:
-                    suffix = str(req.get("suffix") or "").strip() or "（正文替换版）"
-                    rsp["book_id"] = import_as_new_book(
-                        self.db, self.session, book_id, value["path"], title_suffix=suffix, collector_id=self.user_id()
-                    )
-                rsp["backup_path"] = rollback_state.get("backup_path") or ""
-                return rsp
-
-            rsp = runtime.write(
-                connection,
-                "apply",
-                ToolInput.from_dict(
-                    {
-                        "path": src,
-                        "format": fmt,
-                        "pattern": pattern,
-                        "replacement": replacement,
-                        "use_regex": use_regex,
-                    }
-                ),
-                work_dir,
-                required_scopes=("books.write",),
-                requested_by=self.user_id(),
-                finalize=finalize,
-                rollback=lambda: _restore_backup(self.db, book_id, fmt, rollback_state),
-                audit_data={"book_id": book_id, "format": fmt, "output_mode": output_mode, "pattern": pattern},
-            )
-            logging.info(
-                "[booktools] text-replace done: %s book=%s hits=%d mode=%s [uid:%s]",
-                fmt,
-                title,
-                rsp["matches"],
-                output_mode,
-                self.user_id(),
-            )
-            return rsp
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
+def _tool_source(handler, provider, book_id):
+    """按插件声明的格式优先级挑出输入文件。"""
+    book = _tool_resolve_book(handler, book_id)
+    fmt = pick_format(book, candidates=provider.input_formats)
+    if fmt is None:
+        raise BookToolsError(
+            "该书籍没有 %s 格式，无法使用「%s」" % (" / ".join(provider.input_formats), provider.manifest["name"])
+        )
+    return book, fmt, get_format_path(handler.db, book_id, fmt)
 
 
-class UserTxtFixerAnalyze(BaseHandler):
-    @js
-    @auth
-    def post(self):
-        req = _body(self)
-        try:
-            book_id = _tool_book_id(req)
-            book = _tool_resolve_book(self, book_id)
-            fmts = [f.upper() for f in (book.get("available_formats") or [])]
-            if "TXT" not in fmts:
-                raise BookToolsError("该书籍没有 TXT 格式，无法执行检测")
-            src = get_format_path(self.db, book_id, "TXT")
-            runtime, connection = _tool_runtime(self, "/plugins/txt-fixer")
-            report = runtime.read(
-                connection,
-                "preview",
-                ToolInput.from_dict({"path": src, "format": "TXT"}),
-                required_scopes=("books.read",),
-                requested_by=self.user_id(),
-            ).to_dict()
-            report["err"] = "ok"
-            report["book_id"] = book_id
-            return report
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
+def _tool_input(provider, params, book, fmt, src):
+    return ToolInput.from_dict({**provider.tool_input(params, book), "path": src, "format": fmt})
 
 
-class UserTxtFixerRun(BaseHandler):
-    @js
-    @is_admin
-    def post(self):
-        req = _body(self)
-        work_dir = None
-        try:
-            book_id = _tool_book_id(req)
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in ("new", "overwrite"):
-                raise BookToolsError("参数错误：output_mode 必须为 new 或 overwrite")
-            book = _tool_resolve_book(self, book_id)
-            title = book.get("title") or "Unknown"
-            fmts = [f.upper() for f in (book.get("available_formats") or [])]
-            if "TXT" not in fmts:
-                raise BookToolsError("该书籍没有 TXT 格式，无法执行修复")
-            src = get_format_path(self.db, book_id, "TXT")
-
-            work_dir = _tool_workdir()
-            runtime, connection = _tool_runtime(self, "/plugins/txt-fixer")
-            rollback_state = {}
-
-            def finalize(output):
-                value = output.to_dict()
-                rsp = {"err": "ok", **value, "output_mode": output_mode}
-                if output_mode == "overwrite":
-                    rollback_state["backup_path"] = overwrite_format(
-                        self.db,
-                        book_id,
-                        "TXT",
-                        value["path"],
-                        backup_dir=_tool_backup_dir(),
-                        backup_state=rollback_state,
-                    )
-                    rsp["book_id"] = book_id
-                else:
-                    rsp["book_id"] = import_as_new_book(
-                        self.db,
-                        self.session,
-                        book_id,
-                        value["path"],
-                        title_suffix="（编码修复版）",
-                        collector_id=self.user_id(),
-                    )
-                rsp["backup_path"] = rollback_state.get("backup_path") or ""
-                return rsp
-
-            rsp = runtime.write(
-                connection,
-                "apply",
-                ToolInput.from_dict({"path": src, "format": "TXT"}),
-                work_dir,
-                required_scopes=("books.write",),
-                requested_by=self.user_id(),
-                finalize=finalize,
-                rollback=lambda: _restore_backup(self.db, book_id, "TXT", rollback_state),
-                audit_data={"book_id": book_id, "format": "TXT", "output_mode": output_mode},
-            )
-            logging.info(
-                "[booktools] txt-fixer done: book=%s enc=%s mode=%s [uid:%s]",
-                title,
-                rsp.get("encoding"),
-                output_mode,
-                self.user_id(),
-            )
-            return rsp
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
-
-
-# 另存为新书时的标题后缀
-ZH_NEW_BOOK_SUFFIX = {"zh": "（简体版）", "zht": "（繁體版）"}
-
-
-def _zh_sync_book_meta(db, book_id, lang, title=None, authors=None):
-    """替换模式下同步库内标题/作者/语言（不加后缀），保持与转换后文件一致。
+def _sync_book_meta(db, book_id, updates):
+    """覆盖写回后同步库内标题/作者/语言（不加后缀），保持与处理后文件一致。
 
     封面不受影响：set_metadata 只会更新提供的封面、从不删除现有封面。
     """
+    if not updates:
+        return
     try:
         mi = db.get_metadata(book_id, index_is_id=True)
-        if title:
-            mi.title = title
+        if updates.get("title"):
+            mi.title = updates["title"]
             mi.title_sort = None
-        if authors:
-            mi.authors = list(authors)
+        if updates.get("authors"):
+            mi.authors = list(updates["authors"])
             mi.author_sort = None
-        mi.languages = [lang]
+        if updates.get("language"):
+            mi.languages = [updates["language"]]
         db.set_metadata(book_id, mi, force_changes=True)
     except Exception as err:
         logging.warning("[booktools] Failed to update metadata for book_id=%d: %s", book_id, err)
 
 
-class UserZhConverterRun(BaseHandler):
+class BookTool(BaseHandler):
+    """书籍工具描述：支持格式、写回方式与插件自述的选项（预设、方向等）。"""
+
     @js
-    @is_admin
-    def post(self):
-        req = _body(self)
-        work_dir = None
+    @auth
+    def get(self, plugin_key):
         try:
-            book_id = _tool_book_id(req)
-            direction = str(req.get("direction") or "")
-            use_a5 = bool(req.get("use_a5"))
-            convert_title = bool(req.get("convert_title"))
-            backup = bool(req.get("backup"))
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in ("new", "replace"):
-                raise BookToolsError("参数错误：output_mode 必须为 new 或 replace")
-
-            book = _tool_resolve_book(self, book_id)
-            title = book.get("title") or "Unknown"
-            # 繁简转换优先处理 EPUB（保留目录结构），无 EPUB 时退回 TXT
-            fmt = pick_format(book, candidates=("EPUB", "TXT"))
-            if fmt is None:
-                raise BookToolsError("该书籍没有 EPUB / TXT 格式，无法转换")
-            src = get_format_path(self.db, book_id, fmt)
-
-            work_dir = _tool_workdir()
-            runtime, connection = _tool_runtime(self, "/plugins/zh-converter")
-            rollback_state = {}
-
-            def finalize(output):
-                value = output.to_dict()
-                lang = value["language"]
-                rsp = {"err": "ok", **value, "output_mode": output_mode}
-                backup_dir = _tool_backup_dir() if backup else None
-                if output_mode == "replace":
-                    rollback_state["backup_path"] = overwrite_format(
-                        self.db,
-                        book_id,
-                        fmt,
-                        value["path"],
-                        backup_dir=backup_dir or _tool_backup_dir(),
-                        backup_state=rollback_state,
-                    )
-                    _zh_sync_book_meta(
-                        self.db,
-                        book_id,
-                        lang,
-                        value.get("converted_title"),
-                        value.get("converted_authors"),
-                    )
-                    rsp["book_id"] = book_id
-                else:
-                    rsp["book_id"] = import_as_new_book(
-                        self.db,
-                        self.session,
-                        book_id,
-                        value["path"],
-                        title_suffix=ZH_NEW_BOOK_SUFFIX.get(lang, ""),
-                        language=lang,
-                        title_override=value.get("converted_title"),
-                        authors_override=value.get("converted_authors"),
-                        collector_id=self.user_id(),
-                    )
-                rsp["backup_path"] = rollback_state.get("backup_path") or ""
-                return rsp
-
-            rsp = runtime.write(
-                connection,
-                "apply",
-                ToolInput.from_dict(
-                    {
-                        "path": src,
-                        "format": fmt,
-                        "direction": direction,
-                        "use_a5": use_a5,
-                        "convert_title": convert_title,
-                        "title": title,
-                        "authors": book.get("authors") or [],
-                    }
-                ),
-                work_dir,
-                required_scopes=("books.write",),
-                requested_by=self.user_id(),
-                finalize=finalize,
-                rollback=lambda: _restore_backup(self.db, book_id, fmt, rollback_state),
-                audit_data={"book_id": book_id, "format": fmt, "direction": direction, "output_mode": output_mode},
-            )
-            logging.info(
-                "[booktools] zh-converter done: %s book=%s direction=%s mode=%s [uid:%s]",
-                fmt,
-                title,
-                direction,
-                output_mode,
-                self.user_id(),
-            )
-            return rsp
+            _runtime, _connection, provider = _tool_runtime(self, plugin_key)
+            return {
+                "err": "ok",
+                "plugin_key": plugin_key,
+                "name": provider.manifest["name"],
+                "formats": list(provider.input_formats),
+                "output_modes": list(provider.output_modes),
+                "options": provider.describe(),
+            }
         except (BookToolsError, RuntimeError) as exc:
             return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
 
 
-EPUB_BEAUTIFY_ROUTE = "/plugins/epub-beautify"
-EPUB_BEAUTIFY_SUFFIX = "（美化版）"
-
-
-class UserEpubBeautifyPresets(BaseHandler):
-    """无书籍依赖的预设/目录形式元数据，供工具页初始化渲染。"""
+class BookToolPreview(BaseHandler):
+    """只读预览：读者可用，但只能处理自己可见的书。"""
 
     @js
     @auth
-    def get(self):
-        from webserver.plugins.tool.epub_beautify.provider import PROVIDER
-
-        return {"err": "ok", **PROVIDER.describe()}
-
-
-def _epub_beautify_input(req, src):
-    """把请求体归一化为 provider 输入（只做形状转换，参数合法性由 provider 校验）。"""
-    return {
-        "path": src,
-        "format": "EPUB",
-        "preset": str(req.get("preset") or ""),
-        "toc_style": str(req.get("toc_style") or "elegant"),
-        "use_system_fonts": req.get("use_system_fonts", True),
-        "font_overrides": req.get("font_overrides"),
-        "toc_depth": req.get("toc_depth"),
-        "cleanup": req.get("cleanup"),
-        "palette_overrides": req.get("palette_overrides"),
-        "page_tint": req.get("page_tint"),
-        "bg_texture": str(req.get("bg_texture") or ""),
-        "dialogue": bool(req.get("dialogue")),
-        "title_split": bool(req.get("title_split")),
-        "toc_columns": bool(req.get("toc_columns")),
-        "para_mode": req.get("para_mode"),
-        "para_indent": req.get("para_indent"),
-        "para_gap": req.get("para_gap"),
-        "notes": bool(req.get("notes")),
-        "note_mark": str(req.get("note_mark") or "orig"),
-    }
-
-
-def _epub_beautify_source(handler, book_id):
-    book = _tool_resolve_book(handler, book_id)
-    fmts = [fmt.upper() for fmt in (book.get("available_formats") or [])]
-    if "EPUB" not in fmts:
-        raise BookToolsError("该书籍没有 EPUB 格式，无法美化")
-    return book, get_format_path(handler.db, book_id, "EPUB")
-
-
-class UserEpubBeautifyPreview(BaseHandler):
-    @js
-    @auth
-    def post(self):
+    def post(self, plugin_key):
         req = _body(self)
         try:
             book_id = _tool_book_id(req)
-            _book, src = _epub_beautify_source(self, book_id)
-            runtime, connection = _tool_runtime(self, EPUB_BEAUTIFY_ROUTE)
+            params = _tool_params(req)
+            runtime, connection, provider = _tool_runtime(self, plugin_key)
+            book, fmt, src = _tool_source(self, provider, book_id)
             result = runtime.read(
                 connection,
                 "preview",
-                ToolInput.from_dict({"path": src, "format": "EPUB"}),
+                _tool_input(provider, params, book, fmt, src),
                 required_scopes=("books.read",),
                 requested_by=self.user_id(),
-                timeout=120,
+                timeout=provider.preview_timeout,
             ).to_dict()
             result["err"] = "ok"
             result["book_id"] = book_id
@@ -577,59 +257,81 @@ class UserEpubBeautifyPreview(BaseHandler):
             return _tool_error(exc)
 
 
-class UserEpubBeautifyRun(BaseHandler):
-    """美化并生成新书；原书零改动，故无覆盖写回与回滚。"""
+class BookToolRun(BaseHandler):
+    """执行并写回书库：另存为新书或覆盖原书格式（可回滚），统一留下 PluginRun 审计。"""
 
     @js
     @is_admin
-    def post(self):
+    def post(self, plugin_key):
         req = _body(self)
         work_dir = None
         try:
             book_id = _tool_book_id(req)
-            book, src = _epub_beautify_source(self, book_id)
+            params = _tool_params(req)
+            runtime, connection, provider = _tool_runtime(self, plugin_key)
+            output_mode = req.get("output_mode") or "new"
+            if output_mode not in provider.output_modes:
+                raise BookToolsError("参数错误：output_mode 必须为 %s" % " 或 ".join(provider.output_modes))
+            book, fmt, src = _tool_source(self, provider, book_id)
             title = book.get("title") or "Unknown"
+            tool_input = _tool_input(provider, params, book, fmt, src)
             work_dir = _tool_workdir()
-            runtime, connection = _tool_runtime(self, EPUB_BEAUTIFY_ROUTE)
+            rollback_state = {}
 
             def finalize(output):
                 value = output.to_dict()
-                suffix = str(req.get("suffix") or "").strip() or EPUB_BEAUTIFY_SUFFIX
-                return {
-                    "err": "ok",
-                    "path": value["path"],
-                    "format": "EPUB",
-                    "preset": value.get("preset"),
-                    "stats": value.get("stats"),
-                    "output_mode": "new",
-                    "book_id": import_as_new_book(
+                updates = provider.book_updates(value)
+                rsp = {"err": "ok", **value, "output_mode": output_mode}
+                if output_mode == "overwrite":
+                    rollback_state["backup_path"] = overwrite_format(
+                        self.db,
+                        book_id,
+                        fmt,
+                        value["path"],
+                        backup_dir=_tool_backup_dir(),
+                        backup_state=rollback_state,
+                    )
+                    _sync_book_meta(self.db, book_id, updates)
+                    rsp["book_id"] = book_id
+                else:
+                    suffix = str(req.get("suffix") or "").strip() or provider.new_book_title_suffix(value)
+                    rsp["book_id"] = import_as_new_book(
                         self.db,
                         self.session,
                         book_id,
                         value["path"],
                         title_suffix=suffix,
+                        language=updates.get("language"),
+                        title_override=updates.get("title"),
+                        authors_override=updates.get("authors"),
                         collector_id=self.user_id(),
-                    ),
-                }
+                    )
+                rsp["backup_path"] = rollback_state.get("backup_path") or ""
+                return rsp
 
             rsp = runtime.write(
                 connection,
                 "apply",
-                ToolInput.from_dict(_epub_beautify_input(req, src)),
+                tool_input,
                 work_dir,
                 required_scopes=("books.write",),
                 requested_by=self.user_id(),
-                timeout=600,
+                timeout=provider.apply_timeout,
                 finalize=finalize,
-                audit_data={"book_id": book_id, "format": "EPUB", "preset": req.get("preset"), "output_mode": "new"},
+                rollback=lambda: _restore_backup(self.db, book_id, fmt, rollback_state),
+                audit_data={
+                    **provider.audit_fields(tool_input.to_dict()),
+                    "book_id": book_id,
+                    "format": fmt,
+                    "output_mode": output_mode,
+                },
             )
-            stats = rsp.get("stats") or {}
             logging.info(
-                "[booktools] epub-beautify done: book=%s preset=%s headers=%s toc=%s new_book=%s [uid:%s]",
+                "[booktools] %s done: %s book=%s mode=%s result_book=%s [uid:%s]",
+                plugin_key,
+                fmt,
                 title,
-                rsp.get("preset"),
-                stats.get("marked_headers"),
-                stats.get("toc_generated"),
+                output_mode,
                 rsp.get("book_id"),
                 self.user_id(),
             )
@@ -642,15 +344,11 @@ class UserEpubBeautifyRun(BaseHandler):
 
 
 def routes():
+    # 所有书籍工具共用这三条按 plugin_key 分发的路由，新增工具只需注册 provider。
     return [
         (r"/api/plugins/tools/book-actions", AdminBookToolActions),
         (r"/api/plugins/tools/books", UserBookToolsBooks),
-        (r"/api/plugins/tools/text-replace/preview", UserTextReplacePreview),
-        (r"/api/plugins/tools/text-replace/run", UserTextReplaceRun),
-        (r"/api/plugins/tools/txt-fixer/analyze", UserTxtFixerAnalyze),
-        (r"/api/plugins/tools/txt-fixer/run", UserTxtFixerRun),
-        (r"/api/plugins/tools/zh-converter/run", UserZhConverterRun),
-        (r"/api/plugins/tools/epub-beautify/presets", UserEpubBeautifyPresets),
-        (r"/api/plugins/tools/epub-beautify/preview", UserEpubBeautifyPreview),
-        (r"/api/plugins/tools/epub-beautify/run", UserEpubBeautifyRun),
+        (r"/api/plugins/([a-z0-9.-]+)/tool", BookTool),
+        (r"/api/plugins/([a-z0-9.-]+)/tool/preview", BookToolPreview),
+        (r"/api/plugins/([a-z0-9.-]+)/tool/run", BookToolRun),
     ]

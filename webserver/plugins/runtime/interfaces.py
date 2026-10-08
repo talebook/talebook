@@ -108,8 +108,30 @@ class SourceProvider(Protocol):
 
 @runtime_checkable
 class TransformProvider(Protocol):
+    """书籍工具：统一经 /api/plugins/<plugin_key>/tool[/preview|/run] 暴露，不再各自注册路由。"""
+
     supported_formats: frozenset
     supports_auto_trigger: bool
+    input_formats: tuple
+    output_modes: tuple
+    preview_timeout: float | None
+    apply_timeout: float | None
+
+    def describe(self) -> dict[str, Any]: ...
+
+    """无书籍依赖的选项元数据（预设、方向等）。"""
+
+    def tool_input(self, params: dict[str, Any], book: dict[str, Any]) -> dict[str, Any]: ...
+
+    """把客户端 params 收敛为白名单输入；path/format 由平台注入。"""
+
+    def audit_fields(self, tool_input: dict[str, Any]) -> dict[str, Any]: ...
+
+    def book_updates(self, output: dict[str, Any]) -> dict[str, Any]: ...
+
+    """写回后同步到书库的 title / authors / language。"""
+
+    def new_book_title_suffix(self, output: dict[str, Any]) -> str: ...
 
     def preview(self, src: ToolInput, context: dict[str, Any]) -> ToolReport: ...
 

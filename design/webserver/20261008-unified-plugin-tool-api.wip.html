@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="书籍工具改为按插件 ID 分发的统一接口，新增插件不再新增 handler 与路由。" />
+    <link rel="icon" href="data:," />
+    <title>插件统一 RESTful 接口 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
+      <header class="hero">
+        <h1>书籍工具改为按插件 ID 分发的统一接口</h1>
+        <p class="sub">四个书籍工具各自在 handler 里注册专属路由，每加一个工具就要新增 handler 类和接口。本方案把它们收敛为 <code>/api/plugins/&lt;plugin_key&gt;/tool</code>、<code>/tool/preview</code>、<code>/tool/run</code> 三条通用路由，工具差异全部由插件自述。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip wip">状态：WIP</span>
+          <span class="chip">创建日期：2026-10-08</span>
+          <span class="chip">所属模块：webserver</span>
+          <span class="chip">影响范围：webserver/handlers/plugin_booktools.py、webserver/plugins/tool/、app/pages/plugins/、spec/插件/</span>
+          <span class="chip">需求来源：Rex 在项目对话中的原话</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“优化一下 talebook 项目的插件系统：当前每个插件都要修改handler暴露独立的api接口，这不合理，应该是有统一的restfull的api，不要每新增插件都新增api”</div>
+            <p>插件平台的连接、五种动作、运行记录和额外功能已经是按插件 ID 或连接 ID 分发的通用接口；真正“每个插件一套接口”的是书籍工具（<code>integrations.tool</code>）：正文查找替换、TXT 编码修复、繁简转换、EPUB 美化各自有 2 到 3 条专属路由和对应 handler 类，handler 里硬编码了每个工具的参数、格式优先级、写回方式和新书后缀。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul><li>所有书籍工具共用三条按 plugin_key 分发的路由，路由表中不出现任何工具名。</li><li>handler 不认识具体工具：格式优先级、参数白名单、写回方式、新书后缀、元数据同步、超时、审计摘要都由 provider 自述。</li><li>新增书籍工具只需实现 <code>TransformProvider</code> 并在 <code>register.py</code> 注册，不改 handler、不加路由。</li><li>保持权限不变：预览要求登录且逐书校验可见性，执行仅管理员并留下 PluginRun 审计，覆盖写回可回滚。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不改动平台既有通用接口（连接、五动作、运行记录、<code>/features/</code> 逃生舱、管理端按能力的测试接口）。</li><li>不改动网络书库与 Venera 漫画接口：它们按书源能力分发，属于书源领域，不是“每插件一套”。</li><li>不保留旧路由别名：前后端同仓同版本发布，保留别名等于保留“每插件一套接口”。</li><li>不改变工具页的界面与交互。</li></ul></article>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>每个工具都有专属路由</td><td><code>plugin_booktools.py routes()</code>：text-replace/preview、run；txt-fixer/analyze、run；zh-converter/run；epub-beautify/presets、preview、run</td><td>新增工具必须新增 handler 与路由</td></tr>
+                  <tr><td>handler 硬编码工具差异</td><td><code>UserZhConverterRun</code> 内的方向、语言后缀与元数据同步；<code>_epub_beautify_input</code> 的 17 个字段</td><td>工具语义泄漏到 HTTP 层</td></tr>
+                  <tr><td>写回方式命名不一致</td><td>繁简转换用 <code>replace</code>，其余工具用 <code>overwrite</code></td><td>统一为 <code>new</code> / <code>overwrite</code>，由 provider 声明可用集合</td></tr>
+                  <tr><td>工具选择靠前端路由</td><td><code>_tool_runtime(handler, manage_route)</code> 用 <code>ui.manage_route</code> 反查 provider</td><td>改为直接用 plugin_key 定位已启用连接</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>HTTP 层只保留平台职责（定位插件、校验书籍可见性、挑选输入文件、临时目录、备份与回滚、入库、审计），工具语义下沉到 <code>TransformProvider</code> 契约。所有工具经同一组路由按 plugin_key 分发；未知插件、非工具插件、未启用、无可用格式、写回方式不被允许都返回统一的 <code>booktools.failed</code>。</div>
+
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Input</span><b>/api/plugins/&lt;key&gt;/tool/run</b><p>请求体 <code>{book_id, output_mode, suffix, params}</code></p></article>
+              <article class="step"><span class="label">Guard</span><b>定位与校验</b><p>已启用的 integrations.tool 连接；管理员；书籍可见；output_mode 属于 provider.output_modes</p></article>
+              <article class="step"><span class="label">Core</span><b>provider 自述</b><p>input_formats 挑文件，tool_input 白名单收敛 params，apply 生成结果</p></article>
+              <article class="step"><span class="label">Output</span><b>写回与审计</b><p>覆盖时备份并按 book_updates 同步元数据；另存时用 new_book_title_suffix 入库；PluginRun 记录 audit_fields</p></article>
+            </div>
+
+            <h3>接口</h3>
+            <div class="table-wrap" role="region" aria-label="接口" tabindex="0">
+              <table>
+                <thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr><td>GET</td><td><code>/api/plugins/&lt;key&gt;/tool</code></td><td>登录</td><td>返回 <code>formats</code>、<code>output_modes</code>、<code>options</code>（provider.describe()）</td></tr>
+                  <tr><td>POST</td><td><code>/api/plugins/&lt;key&gt;/tool/preview</code></td><td>登录 + 书籍可见</td><td>只读预览，替代原 preview / analyze</td></tr>
+                  <tr><td>POST</td><td><code>/api/plugins/&lt;key&gt;/tool/run</code></td><td>管理员</td><td>执行并写回，替代原各工具 run</td></tr>
+                  <tr><td>GET</td><td><code>/api/plugins/tools/books</code>、<code>/book-actions</code></td><td>不变</td><td>本来就是工具无关的通用接口，保留</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>路由形态</td><td><code>/api/plugins/&lt;key&gt;/tool[/preview|/run]</code></td><td>与既有 <code>/api/plugins/&lt;key&gt;/features/&lt;action&gt;</code> 同构；单数名词，符合仓库 RESTful 约定</td><td><code>/api/book/&lt;id&gt;/tool/&lt;key&gt;</code>：描述接口与书无关，拆两处反而不统一</td></tr>
+                  <tr><td>参数位置</td><td>工具参数放 <code>params</code>，平台字段在顶层</td><td>与 <code>/features/</code> 一致；平台字段与插件字段不会撞名</td><td>扁平请求体：无法区分平台字段与插件字段</td></tr>
+                  <tr><td>工具差异归属</td><td>扩展 <code>TransformProvider</code> 协议，内置工具由 <code>TextTransformPlugin</code> 提供默认实现</td><td>契约校验在加载期就能发现缺失方法</td><td>在 handler 里按 plugin_key 分支</td></tr>
+                  <tr><td>兼容策略</td><td>删除旧路由，前端同步迁移</td><td>前后端同版本发布；保留别名与诉求相悖</td><td>旧路由转发：仍需为每个工具维护一条路由</td></tr>
+                  <tr><td>写回方式命名</td><td>统一 <code>new</code> / <code>overwrite</code></td><td>繁简转换的 <code>replace</code> 与其余工具语义相同</td><td>同时接受 replace：同一语义两个名字</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <pre aria-label="示例请求"><code>POST /api/plugins/talebook.tool.zh-converter/tool/run
+{"book_id": 12, "output_mode": "overwrite",
+ "params": {"direction": "t2s", "use_a5": true, "convert_title": true}}</code></pre>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p>后端：<code>webserver/handlers/plugin_booktools.py</code>、<code>webserver/plugins/runtime/interfaces.py</code>、<code>webserver/plugins/tool/</code> 四个 provider 与基类。前端：<code>app/pages/plugins/</code> 四个工具页、<code>app/utils/book-tools.ts</code>、mock server。文档：<code>spec/插件/插件平台.md</code>（新增「统一接口」规则与 7.2 接口）、<code>正文查找替换.md</code>、<code>TXT编码修复.md</code>、<code>繁简转换.md</code>、<code>EPUB美化.md</code>（7.2 接口），<code>document/PluginGuide.md</code>。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>工具页界面与交互、权限模型、PluginRun 审计、覆盖写回的备份与回滚、数据库结构、插件 manifest 字段集合。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>外部脚本直接调用旧的 <code>/api/plugins/tools/&lt;tool&gt;/*</code> 会失效 → 发布说明列出新旧路由对照。繁简转换另存新书时现在也接受客户端 <code>suffix</code>，与其余工具一致；为空时仍按语言使用「（简体版）/（繁體版）」。</div>
+            <div class="callout"><strong>回滚：</strong>整体回退本次提交即可，无数据迁移与配置变更。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>后端单元 / HTTP</td><td><code>pytest tests/test_texttools.py tests/test_epub_beautify_plugin.py</code></td><td>原有用例迁到新路由后全部通过；新增路由不含工具名、描述、未知插件、非工具插件、params 类型、无可用格式、写回方式限制、新书后缀与元数据、覆盖同步元数据</td><td class="pending">待验证</td></tr>
+                  <tr><td>后端全量</td><td><code>make pytest</code></td><td>与本改动相关的用例全部通过</td><td class="pending">待验证</td></tr>
+                  <tr><td>前端单测</td><td><code>npx vitest run test/utils/book-tools.spec.ts</code></td><td><code>bookToolUrl</code> 生成统一路径</td><td class="pending">待验证</td></tr>
+                  <tr><td>E2E</td><td><code>npx playwright test test/e2e/plugins.spec.ts</code></td><td>正文查找替换预览经新路由并携带 params</td><td class="pending">待验证</td></tr>
+                  <tr><td>实际渲染</td><td>Docker 后端 + Nuxt dev：四个工具页</td><td>选项加载、预览与执行正常</td><td class="pending">待验证</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review full</code></td><td>无 HIGH / MEDIUM</td><td class="pending">待验证</td></tr>
+                  <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>npm run lint</code>、<code>make check-design</code>、<code>make check-spec</code></td><td>全部通过</td><td class="pending">待验证</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-10-08：</strong>需求未说明范围，默认只收敛“每插件一套接口”的书籍工具；平台其余接口已按插件 ID / 连接 ID / 能力分发，不在范围内。用户未参与 grill，以上默认值在 PR 中说明，可按反馈调整。</li>
+              <li><strong>2026-10-08：</strong>繁简转换页面上的「保留备份」勾选框此前后端就不读取（写回原书始终备份），本次维持界面不变，只是不再随请求发送。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
+      <footer>Talebook internal design · webserver · WIP · 2026-10-08</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

@@ -100,8 +100,8 @@ TXT编码修复是**检测 TXT 电子书的字符编码并把它修复为 UTF-8 
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/plugins/tools/txt-fixer/analyze` | 分析编码 |
-| POST | `/api/plugins/tools/txt-fixer/run` | 执行修复 |
+| POST | `/api/plugins/<key>/tool/preview` | 分析编码，`<key>` 为本插件 ID |
+| POST | `/api/plugins/<key>/tool/run` | 执行修复 |
 | GET | `/api/plugins/tools/books` | 可处理的书籍列表 |
 
 ### 7.3 关键定义

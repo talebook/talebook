@@ -30,23 +30,23 @@
 
             <v-checkbox v-model="useA5" :label="t('bookTools.zhConverter.useA5')" density="compact" hide-details :disabled="!isA5Direction" :hint="!isA5Direction ? t('bookTools.zhConverter.a5Hint') : ''" persistent-hint class="mt-2" />
             <v-checkbox v-model="convertTitle" :label="t('bookTools.zhConverter.convertTitle')" density="compact" hide-details class="mt-0" />
-            <v-checkbox v-model="backup" v-if="outputMode === 'replace'" :label="t('bookTools.zhConverter.backup')" density="compact" hide-details class="mt-0" />
+            <v-checkbox v-model="backup" v-if="outputMode === 'overwrite'" :label="t('bookTools.zhConverter.backup')" density="compact" hide-details class="mt-0" />
 
             <v-divider class="my-4" />
 
             <v-radio-group v-model="outputMode" inline density="compact" hide-details>
                 <v-radio value="new" :label="t('bookTools.common.newBook')" />
-                <v-radio value="replace" :label="t('bookTools.common.overwrite')" />
+                <v-radio value="overwrite" :label="t('bookTools.common.overwrite')" />
             </v-radio-group>
 
             <v-btn
-                :color="outputMode === 'replace' ? 'error' : 'primary'"
+                :color="outputMode === 'overwrite' ? 'error' : 'primary'"
                 class="mt-3"
                 :loading="busy === 'run'"
                 :disabled="!bookId || !direction"
                 @click="doRun"
             >
-                {{ t(outputMode === 'replace' ? 'bookTools.common.overwriteAction' : 'bookTools.common.saveNewAction') }}
+                {{ t(outputMode === 'overwrite' ? 'bookTools.common.overwriteAction' : 'bookTools.common.saveNewAction') }}
             </v-btn>
 
             <v-alert v-if="error" type="error" variant="tonal" closable class="mt-4" @click:close="error = ''">{{ error }}</v-alert>
@@ -59,7 +59,7 @@
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
-import { confirmDestructiveBookWrite } from '@/utils/book-tools';
+import { bookToolUrl, confirmDestructiveBookWrite } from '@/utils/book-tools';
 import { useBookToolSelection } from '@/composables/useBookToolSelection';
 
 const { t } = useI18n();
@@ -90,16 +90,20 @@ watch(bookId, () => { error.value = ''; success.value = ''; });
 
 async function doRun() {
     if (!confirmDestructiveBookWrite(
-        outputMode.value === 'replace',
+        outputMode.value === 'overwrite',
         t('bookTools.common.overwriteConfirm', { title: selectedBook.value?.title || '' }),
     )) return;
     error.value = '';
     success.value = '';
     busy.value = 'run';
     try {
-        const rsp = await $backend('/plugins/tools/zh-converter/run', {
+        const rsp = await $backend(bookToolUrl('talebook.tool.zh-converter', 'run'), {
             method: 'POST',
-            body: JSON.stringify({ book_id: bookId.value, direction: direction.value, use_a5: useA5.value, convert_title: convertTitle.value, output_mode: outputMode.value, backup: backup.value }),
+            body: JSON.stringify({
+                book_id: bookId.value,
+                output_mode: outputMode.value,
+                params: { direction: direction.value, use_a5: useA5.value, convert_title: convertTitle.value },
+            }),
         });
         if (rsp.err === 'ok') {
             const isNew = rsp.output_mode === 'new';

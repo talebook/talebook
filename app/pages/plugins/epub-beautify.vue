@@ -120,6 +120,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import { useBookToolSelection } from '@/composables/useBookToolSelection';
+import { bookToolUrl } from '@/utils/book-tools';
 
 const { t, locale } = useI18n();
 const { $backend } = useNuxtApp();
@@ -128,6 +129,7 @@ useMainStore().setNavbar(true);
 
 const { bookId, bookOptions, bookQuery, booksLoading, selectedBook, onBookSearch } = useBookToolSelection({ formats: ['EPUB'] });
 
+const PLUGIN_KEY = 'talebook.tool.epub-beautify';
 const presets = ref([]);
 const tocStyles = ref([]);
 const textures = ref([]);
@@ -250,11 +252,12 @@ function buildPayload() {
 
 async function loadOptions() {
     try {
-        const rsp = await $backend('/plugins/tools/epub-beautify/presets');
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY));
         if (rsp.err === 'ok') {
-            presets.value = rsp.presets || [];
-            tocStyles.value = rsp.toc_styles || [];
-            textures.value = rsp.textures || [];
+            const options = rsp.options || {};
+            presets.value = options.presets || [];
+            tocStyles.value = options.toc_styles || [];
+            textures.value = options.textures || [];
             if (!presets.value.some(item => item.id === preset.value) && presets.value.length) {
                 preset.value = presets.value[0].id;
             }
@@ -270,7 +273,7 @@ async function doPreview() {
     previewResult.value = null;
     busy.value = 'preview';
     try {
-        const rsp = await $backend('/plugins/tools/epub-beautify/preview', {
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'preview'), {
             method: 'POST',
             body: JSON.stringify({ book_id: bookId.value }),
         });
@@ -288,9 +291,9 @@ async function doRun() {
     success.value = '';
     busy.value = 'run';
     try {
-        const rsp = await $backend('/plugins/tools/epub-beautify/run', {
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'run'), {
             method: 'POST',
-            body: JSON.stringify({ book_id: bookId.value, suffix: suffix.value, ...buildPayload() }),
+            body: JSON.stringify({ book_id: bookId.value, suffix: suffix.value, params: buildPayload() }),
         });
         if (rsp.err === 'ok') {
             success.value = t('bookTools.epubBeautify.successNew', {
