@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="书籍工具改为按插件 ID 分发的统一接口，新增插件不再新增 handler 与路由。" />
     <link rel="icon" href="data:," />
-    <title>插件统一 RESTful 接口 · WIP</title>
+    <title>插件统一 RESTful 接口 · ACTIVE</title>
     <style>
       :root {
         color-scheme: light;
@@ -202,7 +202,7 @@
         <h1>书籍工具改为按插件 ID 分发的统一接口</h1>
         <p class="sub">四个书籍工具各自在 handler 里注册专属路由，每加一个工具就要新增 handler 类和接口。本方案把它们收敛为 <code>/api/plugins/&lt;plugin_key&gt;/tool</code>、<code>/tool/preview</code>、<code>/tool/run</code> 三条通用路由，工具差异全部由插件自述。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip wip">状态：WIP</span>
+          <span class="chip active">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-10-08</span>
           <span class="chip">所属模块：webserver</span>
           <span class="chip">影响范围：webserver/handlers/plugin_booktools.py、webserver/plugins/tool/、app/pages/plugins/、spec/插件/</span>
@@ -300,13 +300,13 @@
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>后端单元 / HTTP</td><td><code>pytest tests/test_texttools.py tests/test_epub_beautify_plugin.py</code></td><td>原有用例迁到新路由后全部通过；新增路由不含工具名、描述、未知插件、非工具插件、params 类型、无可用格式、写回方式限制、新书后缀与元数据、覆盖同步元数据</td><td class="pending">待验证</td></tr>
-                  <tr><td>后端全量</td><td><code>make pytest</code></td><td>与本改动相关的用例全部通过</td><td class="pending">待验证</td></tr>
-                  <tr><td>前端单测</td><td><code>npx vitest run test/utils/book-tools.spec.ts</code></td><td><code>bookToolUrl</code> 生成统一路径</td><td class="pending">待验证</td></tr>
-                  <tr><td>E2E</td><td><code>npx playwright test test/e2e/plugins.spec.ts</code></td><td>正文查找替换预览经新路由并携带 params</td><td class="pending">待验证</td></tr>
-                  <tr><td>实际渲染</td><td>Docker 后端 + Nuxt dev：四个工具页</td><td>选项加载、预览与执行正常</td><td class="pending">待验证</td></tr>
-                  <tr><td>界面审查</td><td><code>interface-review full</code></td><td>无 HIGH / MEDIUM</td><td class="pending">待验证</td></tr>
-                  <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>npm run lint</code>、<code>make check-design</code>、<code>make check-spec</code></td><td>全部通过</td><td class="pending">待验证</td></tr>
+                  <tr><td>后端单元 / HTTP</td><td><code>pytest tests/test_texttools.py tests/test_epub_beautify_plugin.py tests/test_plugin_contract.py tests/test_check_spec.py</code>（<code>talebook/talebook-base</code> 容器）</td><td>原有用例迁到新路由后通过；新增 10 个用例覆盖路由不含工具名、描述、未知插件、非工具插件、params 类型、无可用格式、写回方式限制、新书后缀与语言、覆盖同步元数据</td><td>通过：111 passed</td></tr>
+                  <tr><td>后端全量</td><td><code>pytest tests</code></td><td>与本改动相关的用例全部通过</td><td>1939 passed；<code>test_application_upgrade.py</code>、<code>test_upgrade_release.py</code>、<code>test_audiobook_progress_v2.py</code> 共 8 failed + 36 errors，在基线提交上同样复现（容器拿不到 voicebook 依赖与升级源），与本改动无关；CI 中以完整环境复核</td></tr>
+                  <tr><td>前端单测</td><td><code>npx vitest run test/utils/book-tools.spec.ts</code></td><td><code>bookToolUrl</code> 生成统一路径</td><td>通过：3 passed</td></tr>
+                  <tr><td>E2E</td><td><code>npx playwright test test/e2e/plugins.spec.ts test/e2e/book-detail.spec.ts</code>（mock 校验预览请求必须携带 <code>params.pattern</code>）</td><td>工具页、书籍详情工具菜单与插件中心不回归</td><td>通过：50 passed</td></tr>
+                  <tr><td>实际渲染</td><td>Docker 后端 <code>talebook/talebook:latest</code> 挂载本分支 <code>webserver/</code>，Nuxt dev 连接 <code>http://127.0.0.1:8080</code>，Chromium 1280×900 浅色主题、zh-CN</td><td>正文查找替换预览命中 81 处并高亮；EPUB 美化经 <code>/tool</code> 加载 12 套预设并完成检测；繁简转换另存新书成功；页面布局与改动前一致</td><td>通过；curl 另验 TXT 编码修复对纯 EPUB 书返回明确错误、EPUB 美化写回原书被拒、运行记录为 succeeded</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review full</code>：当前分支相对 <code>master</code> 的全部变更（1 个提交 + 未提交的方案状态更新），展开到 4 个工具页与书籍详情工具菜单</td><td>无 HIGH / MEDIUM</td><td>通过：无 Introduced / Regression 问题。1 条 LOW · Pre-existing：繁简转换的「保留备份」勾选框后端从未读取（写回原书始终备份），本次不改界面，记为后续事项</td></tr>
+                  <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>npm run lint</code>、<code>make check-spec</code>、<code>make check-design</code></td><td>全部通过</td><td>通过（<code>npm run lint</code> 0 errors，567 条均为既有 warning）</td></tr>
                 </tbody>
               </table>
             </div>
@@ -324,7 +324,7 @@
       </div>
 
       <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
-      <footer>Talebook internal design · webserver · WIP · 2026-10-08</footer>
+      <footer>Talebook internal design · webserver · ACTIVE · 2026-10-08</footer>
     </div>
     <script>
       (() => {
