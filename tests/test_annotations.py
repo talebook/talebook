@@ -83,9 +83,11 @@ class TestAnnotationAuthentication(TestApp):
     def test_guest_reader_gets_no_reader_identity(self):
         rsp = self.fetch("/read/%d?reader=candle" % BID_EPUB)
         body = rsp.body.decode("utf-8")
-        self.assertIn("const READER = null", body)
+        self.assertIn("let READER = null", body)
         # 游客读取评论列表时以 need_login 拒绝，阅读器显示登录提示。
         self.assertIn("code: 'need_login'", body)
+        # 登录在新窗口进行，不离开当前阅读位置。
+        self.assertIn("window.open(", body)
 
 
 class TestAnnotations(TestWithUserLogin):
@@ -168,7 +170,7 @@ class TestAnnotations(TestWithUserLogin):
         # 阅读器自带完整的评论界面，宿主只注入回调。
         self.assertIn("annotation_callbacks: annotationCallbacks", body)
         self.assertIn("audiobook_callbacks: audiobookCallbacks", body)
-        self.assertRegex(body, r'const READER = \{"id": 1,')
+        self.assertRegex(body, r'let READER = \{"id": 1,')
         for removed in ("talebook-selection-toolbar", "annotation-shell", "legacyCommunityResponse", "server: window.location.origin"):
             self.assertNotIn(removed, body)
         self.assertRegex(body, r"candle-reader\.es\.js\?v=[0-9a-f]{12}|candle-reader\.es\.js\?v=dev")

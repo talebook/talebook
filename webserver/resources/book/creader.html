@@ -23,7 +23,7 @@
     // 回调契约见 candle-reader 的 DESIGN.md。
     const API = "{{RES}}/api"
     const BOOK_API = API + "/book/{{ book.id }}"
-    const READER = {{ reader_user_json }}
+    let READER = {{ reader_user_json }}
     const AUDIOBOOK_EDITION_ID = {% if audiobook_edition_id %}{{ audiobook_edition_id }}{% else %}null{% endif %}
 
     // 评论只对登录读者开放：游客读取列表时以 need_login 拒绝，阅读器显示「登录后查看评论」。
@@ -41,6 +41,21 @@
       if (data.err === 'user.need_login') throw needLogin()
       if (!accept.includes(data.err)) throw new Error(data.msg || data.err || '请求失败')
       return data
+    }
+
+    // 轮询登录态，直到登录成功或读者关掉登录窗口。
+    async function waitForLogin(popup) {
+      while (true) {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        try {
+          const data = await (await fetch(`${API}/user/info`, { credentials: 'same-origin' })).json()
+          const user = data.user || {}
+          if (data.err === 'ok' && user.is_login) {
+            return { id: user.username, nickname: user.nickname || user.username, avatar: user.avatar || '' }
+          }
+        } catch (error) { /* 网络抖动时继续等待 */ }
+        if (popup.closed) return null
+      }
     }
 
     function query(params) {
@@ -65,8 +80,16 @@
       async user() {
         return READER
       },
+      // 在新窗口登录，不离开当前阅读位置；登录完成后关闭登录窗口，阅读器随即刷新评论。
       async login() {
-        window.location.href = "{{BASE_PATH}}/login?next=" + encodeURIComponent(window.location.pathname + window.location.search)
+        const popup = window.open("{{BASE_PATH}}/login?next=" + encodeURIComponent("{{BASE_PATH}}/"), 'talebook-login')
+        if (!popup) {
+          // 浏览器拦截了弹窗时退回到当前页跳转。
+          window.location.href = "{{BASE_PATH}}/login?next=" + encodeURIComponent(window.location.pathname + window.location.search)
+          return
+        }
+        READER = await waitForLogin(popup)
+        if (READER && !popup.closed) popup.close()
       },
       // 正文标记：当前读者在本章的划线与评论。
       async load({ chapter }) {
