@@ -1,4 +1,5 @@
 import json
+import os
 import urllib.parse
 from pathlib import Path
 from unittest import mock
@@ -159,11 +160,22 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(revoked.code, 403)
 
     def test_resource_change_updates_bootstrap_revision(self):
-        initial = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
-        changed_stat = mock.Mock(st_mtime_ns=9999999999000000000, st_size=initial["book"]["id"] + 123)
-        with mock.patch("webserver.handlers.book.os.stat", return_value=changed_stat):
-            changed = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
+        initial = self.json("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
+        epub_path = self._app.settings["legacy"].format_abspath(BID_EPUB, "EPUB", index_is_id=True)
+        real_stat = os.stat
+        original_stat = real_stat(epub_path)
+        changed_stat = os.stat_result(original_stat, {"st_mtime_ns": original_stat.st_mtime_ns + 1_000_000_000})
+
+        def stat_with_changed_epub(path, *args, **kwargs):
+            if path == epub_path:
+                return changed_stat
+            # 保留其他路径的真实状态，避免误判升级维护标记等无关文件。
+            return real_stat(path, *args, **kwargs)
+
+        with mock.patch("webserver.handlers.book.os.stat", side_effect=stat_with_changed_epub):
+            changed = self.json("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
         self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
+        self.assertNotEqual(initial["resource"]["url"], changed["resource"]["url"])
 
     def test_stale_resource_revision_is_rejected(self):
         bootstrap = json.loads(self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB).body)
