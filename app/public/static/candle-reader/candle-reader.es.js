@@ -18427,9 +18427,9 @@ const f1 = X({
     },
     read_public_preference: function() {
       try {
-        return localStorage.getItem(rc) === "true";
+        return localStorage.getItem(rc) !== "false";
       } catch {
-        return !1;
+        return !0;
       }
     },
     save_annotation: async function(e, t, n) {
@@ -19948,7 +19948,7 @@ function F1(e, t, n, o, i, r) {
     _: 1
   }, 8, ["theme"]);
 }
-const L1 = /* @__PURE__ */ Un(v1, [["render", F1], ["__scopeId", "data-v-fee1592b"]]), B1 = {
+const L1 = /* @__PURE__ */ Un(v1, [["render", F1], ["__scopeId", "data-v-f8107397"]]), B1 = {
   name: "CandleReader",
   computed: {},
   mounted: function() {
