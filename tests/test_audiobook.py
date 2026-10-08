@@ -396,8 +396,11 @@ class TestAudiobookAPI(AudiobookFixture, test_main.TestWithAdminUser):
         self.assertEqual(response.code, 200)
         page = response.body.decode("utf-8")
         self.assertIn(f"book_id: {test_main.BID_EPUB}", page)
-        self.assertIn(f"audiobook_edition_id: {edition_id}", page)
-        self.assertIn(f'"/api/audio/{edition_id}"', page)
+        # 听书经阅读器的 audiobook_callbacks 调用有声书接口，阅读器本身不直接请求。
+        self.assertIn(f"const AUDIOBOOK_EDITION_ID = {edition_id}", page)
+        self.assertIn("audiobook_callbacks: audiobookCallbacks", page)
+        self.assertIn("`${API}/audio/${AUDIOBOOK_EDITION_ID}`", page)
+        self.assertIn("`${API}/audio-session/${session_id}`", page)
 
     def test_voice_preview_accepts_qwen_voice_id_with_spaces(self):
         preview = AudiobookStorage().root / "qwen-preview.mp3"

@@ -3,6 +3,8 @@
 import asyncio
 import concurrent.futures
 import datetime
+import functools
+import hashlib
 import html
 import json
 import logging
@@ -1733,7 +1735,35 @@ class BookUploadComplete(BookUploadBase):
         return self.import_uploaded_book(fpath, fmt)
 
 
+@functools.lru_cache(maxsize=1)
+def candle_reader_version():
+    """阅读器静态资源的缓存版本号：取打包产物内容的摘要，换了产物就换版本，避免浏览器沿用旧阅读器。"""
+    candidates = [
+        os.path.join(CONF.get("static_path") or "", "static/candle-reader/candle-reader.es.js"),
+        os.path.join(os.path.dirname(__file__), "../../app/public/static/candle-reader/candle-reader.es.js"),
+    ]
+    for path in candidates:
+        try:
+            with open(path, "rb") as f:
+                return hashlib.sha256(f.read()).hexdigest()[:12]
+        except OSError:
+            continue
+    return "dev"
+
+
 class BookRead(BaseHandler):
+    def _reader_user_json(self):
+        """阅读页的当前读者，交给阅读器的 user 回调；游客为 null。转义 < 防止提前结束脚本。"""
+        user = self.current_user
+        if not user:
+            return "null"
+        data = {
+            "id": user.id,
+            "nickname": str(getattr(user, "name", "") or getattr(user, "username", "") or ""),
+            "avatar": str(getattr(user, "avatar", "") or ""),
+        }
+        return json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")
+
     def render_epub(self, book, is_ready, audiobook_edition=None, viewer=None):
         return self.html_page(
             "book/" + (viewer or CONF["EPUB_VIEWER"]),
@@ -1742,6 +1772,8 @@ class BookRead(BaseHandler):
                 "epub_dir": "/get/extract/%s" % book["id"],
                 "is_ready": is_ready,
                 "CANDLE_READER_SERVER": CONF["CANDLE_READER_SERVER"],
+                "CANDLE_READER_VERSION": candle_reader_version(),
+                "reader_user_json": self._reader_user_json(),
                 "audiobook_edition_id": audiobook_edition.id if audiobook_edition else None,
             },
         )

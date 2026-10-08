@@ -196,6 +196,71 @@ def test_brs_push_annotation_logs_in_resolves_the_book_and_writes_the_public_not
     assert calls[2][2]["json"]["content"] == "这是我的公开笔记"
 
 
+def _brs_recorder(calls):
+    def transport(method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if url.endswith("/api/review/book"):
+            return {"err": "ok", "data": {"id": "remote-book"}}
+        return {"err": "ok", "data": {"reviewId": "remote-new", "updateTime": "2026-10-07 12:00:00"}}
+
+    return transport
+
+
+_BRS_CONTEXT = {
+    "secrets": {"email": "reader@example.com", "password": "private"},
+    "config": {"endpoint": "https://brs.example", "book_map": {"remote-book": "11"}},
+}
+
+
+def test_brs_push_updates_an_existing_copy_instead_of_adding_a_duplicate():
+    calls = []
+    provider = BRSProvider(transport=_brs_recorder(calls))
+    item = PluginAnnotation.from_dict({"id": 7, "book_id": 11, "annotation_type": "note", "content": "改过的评论"})
+
+    receipt = provider.push_annotation(item, SourceState.from_dict({"source_annotation_id": "remote-7"}), _BRS_CONTEXT)
+
+    assert receipt.source_annotation_id == "remote-7"
+    assert [call[:2] for call in calls] == [
+        ("POST", "https://brs.example/api/user/sign_in"),
+        ("POST", "https://brs.example/api/review/update"),
+    ]
+    assert calls[1][2]["json"] == {"review_id": "remote-7", "content": "改过的评论"}
+
+
+def test_brs_push_reply_and_book_comment_carry_thread_and_kind():
+    calls = []
+    provider = BRSProvider(transport=_brs_recorder(calls))
+    reply = PluginAnnotation.from_dict(
+        {"id": 9, "book_id": 11, "annotation_type": "note", "content": "回复", "remote_root_id": "r-1", "remote_reply_to_id": "r-2"}
+    )
+    provider.push_annotation(reply, SourceState.from_dict({}), _BRS_CONTEXT)
+    payload = calls[-1][2]["json"]
+    assert (payload["root_id"], payload["quote_id"], payload["kind"], payload["book_id"]) == ("r-1", "r-2", "note", "remote-book")
+
+    book = PluginAnnotation.from_dict({"id": 10, "book_id": 11, "annotation_type": "book_comment", "content": "整书评论"})
+    provider.push_annotation(book, SourceState.from_dict({}), _BRS_CONTEXT)
+    payload = calls[-1][2]["json"]
+    assert payload["kind"] == "book_comment"
+    assert "root_id" not in payload
+
+
+def test_brs_delete_and_vote_use_the_remote_copy_id():
+    calls = []
+    provider = BRSProvider(transport=_brs_recorder(calls))
+    provider.delete_annotation(SourceState.from_dict({"source_annotation_id": "remote-7"}), _BRS_CONTEXT)
+    provider.push_vote(SourceState.from_dict({"source_annotation_id": "remote-7"}), -1, _BRS_CONTEXT)
+    assert [call[:2] for call in calls if "sign_in" not in call[1]] == [
+        ("POST", "https://brs.example/api/review/delete"),
+        ("POST", "https://brs.example/api/review/vote"),
+    ]
+    assert calls[1][2]["json"] == {"review_id": "remote-7"}
+    assert calls[3][2]["json"] == {"review_id": "remote-7", "value": -1}
+    # 没有外部副本时不发请求。
+    before = len(calls)
+    provider.delete_annotation(SourceState.from_dict({}), _BRS_CONTEXT)
+    assert len(calls) == before
+
+
 def test_field_decisions_never_silently_replace_locked_or_nonempty_values():
     decisions = {
         item["field"]: item
