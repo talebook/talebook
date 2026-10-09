@@ -203,12 +203,18 @@
 
         <div class="content-area">
             <v-container>
+                <div
+                    role="status"
+                    class="reader-status"
+                >
+                    {{ announcement }}
+                </div>
                 <v-card
                     v-if="!inited"
                     variant="outlined"
                     width="300"
                     max-width="100%"
-                    role="status"
+                    class="prepare-card"
                     style="margin: 0 auto"
                 >
                     <v-card-title ref="tipTitle">
@@ -277,7 +283,7 @@
 import { withBasePath } from '@/utils/base-path';
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import AppFooter from '~/components/AppFooter.vue';
 import AnnotationPanel from '~/components/AnnotationPanel.vue';
@@ -308,6 +314,7 @@ const annotationsSidebar = ref(false);
 const content = ref([]);
 const inited = ref(false);
 const wait = ref(0);
+const announcement = ref('');
 const name = ref(null);
 const novelContent = ref('');
 const selected = ref(-1);
@@ -334,12 +341,14 @@ const showError = (message) => {
     stopWaiting();
     tip.title = t('messages.error');
     tip.content = message || t('book.prepareError');
+    announcement.value = tip.content;
     loading.value = false;
 };
 
 const openReadyBook = (data) => {
     stopWaiting();
     inited.value = true;
+    announcement.value = t('book.prepared');
     content.value = data.content;
     name.value = data.name;
     getNovelContent(0);
@@ -348,6 +357,7 @@ const openReadyBook = (data) => {
 const showPreparing = () => {
     tip.title = t('book.preparing');
     tip.content = t('book.preparingMessage');
+    announcement.value = tip.content;
 };
 
 // Schedule only after the previous request settles, including slow responses.
@@ -390,13 +400,21 @@ const dispose = () => {
     stopWaiting();
     requests.abort();
 };
-// Route transitions can keep the old page mounted after navigation has begun.
-onBeforeRouteLeave(dispose);
-onUnmounted(dispose);
+// Confirm departure before cleanup: guards or lazy route loading can fail.
+// afterEach runs before an outgoing page's transition has finished unmounting.
+const readerPath = route.path;
+const stopWatchingRoute = router.afterEach((to, from, failure) => {
+    if (!failure && from.path === readerPath && to.path !== readerPath) dispose();
+});
+onUnmounted(() => {
+    stopWatchingRoute();
+    dispose();
+});
 
 const init = async () => {
     if (disposed) return;
     loading.value = true;
+    announcement.value = t('book.preparing');
     try {
         const rsp = await $backend(`/book/txt/init?id=${bookid}&test=0`, { signal: requests.signal });
         if (disposed) return;
@@ -413,6 +431,9 @@ const init = async () => {
         wait.value = Number.isFinite(estimate) ? Math.max(0, Math.ceil(estimate)) : 0;
         const queLen = Number(rsp.data.que) || 0;
         name.value = rsp.data.name;
+        announcement.value = queLen > 0
+            ? t('book.initialQueueMessage', { count: queLen })
+            : t('book.preparing');
         const updateTip = () => {
             if (wait.value <= 0) {
                 clearInterval(countdown);
@@ -497,6 +518,18 @@ const locateTxtAnnotation = (annotation) => {
 </script>
 
 <style scoped>
+.reader-status {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 #txt-main {
     background-color: #f5f5f5;
     min-height: 100vh;

@@ -132,6 +132,7 @@
     "previousChapter": "上一章",
     "nextChapter": "下一章",
     "contentError": "获取正文失败！",
+    "prepared": "目录已就绪，正在打开正文。",
     "preparing": "准备阅读",
     "preparingEstimate": "首次阅读，正在准备目录，预计还需 {seconds} 秒。完成后会自动打开。",
     "preparingMessage": "仍在准备目录，完成后会自动打开。你可以继续等待或离开此页。",

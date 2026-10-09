@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { Router } from 'vue-router';
 
 const ready = {
     err: 'ok', msg: '已解析',
@@ -26,7 +27,7 @@ async function mockReader(page: Page, wait = 30, que = 2) {
 async function openReader(page: Page, waitForPrepared = true) {
     await page.clock.install();
     await page.goto('/book/2/readtxt');
-    await expect(page.locator('.content-area [role="status"]')).toBeVisible();
+    await expect(page.locator('.content-area .prepare-card')).toBeVisible();
     if (waitForPrepared) await expect(page.locator('.v-toolbar-title')).toContainText('排队测试');
 }
 
@@ -45,10 +46,10 @@ test.beforeEach(async ({ request }) => {
 test('keeps polling beyond the estimate and opens exactly once when ready', async ({ page }) => {
     const calls = await mockReader(page, 30, 2);
     await openReader(page);
-    await expect(page.getByText('入队时前方有 2 个等待任务')).toBeVisible();
+    await expect(page.locator('.prepare-card').getByText('入队时前方有 2 个等待任务')).toBeVisible();
     await page.screenshot({ path: 'test/e2e/screenshots/20261009-txt-queued.png', fullPage: true });
     for (let i = 0; i < 28; i++) await tickAndPoll(page, calls);
-    await expect(page.getByText('仍在准备目录')).toBeVisible();
+    await expect(page.locator('.prepare-card').getByText('仍在准备目录')).toBeVisible();
     await expect(page.getByText('解析超时')).toHaveCount(0);
     await page.screenshot({ path: 'test/e2e/screenshots/20261009-txt-waiting.png', fullPage: true });
     await page.route('**/api/book/txt/init?*test=1', route => {
@@ -70,7 +71,7 @@ for (const wait of [0, 1]) {
         const calls = await mockReader(page, wait, 0);
         await openReader(page);
         await tickAndPoll(page, calls);
-        await expect(page.getByText('仍在准备目录')).toBeVisible();
+        await expect(page.locator('.prepare-card').getByText('仍在准备目录')).toBeVisible();
         await page.route('**/api/book/txt/init?*test=1', route => route.fulfill({ json: ready }));
         await page.clock.runFor(5000);
         await expect(page.locator('.novel-content')).toContainText('等待结束后的正文');
@@ -134,7 +135,8 @@ test('explicit readiness errors stop polling and show the reason', async ({ page
     });
     await openReader(page);
     await tickAndPoll(page, calls);
-    await expect(page.getByText('非txt书籍')).toBeVisible();
+    await expect(page.locator('.prepare-card').getByText('非txt书籍')).toBeVisible();
+    await expect(page.locator('.reader-status')).toHaveText('非txt书籍');
     await page.clock.runFor(20000);
     expect(calls.polls).toBe(1);
 });
@@ -152,10 +154,10 @@ test('narrow dark waiting state fits the viewport', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await mockReader(page, 0);
     await page.goto('/book/2/readtxt');
-    await expect(page.getByText('仍在准备目录')).toBeVisible();
+    await expect(page.locator('.prepare-card').getByText('仍在准备目录')).toBeVisible();
     await page.locator('.v-app-bar button').nth(1).click();
     await expect(page.locator('#txt-main')).toHaveClass(/v-theme--dark/);
-    const box = await page.locator('.content-area [role="status"]').boundingBox();
+    const box = await page.locator('.content-area .prepare-card').boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(320);
     await page.screenshot({ path: 'test/e2e/screenshots/20261009-txt-mobile-dark.png', fullPage: true });
@@ -182,7 +184,7 @@ test('network failure stops readiness polling without an unhandled rejection', a
     });
     await openReader(page);
     await tickAndPoll(page, calls);
-    await expect(page.getByText('无法获取阅读内容')).toBeVisible();
+    await expect(page.locator('.prepare-card').getByText('无法获取阅读内容')).toBeVisible();
     await page.clock.runFor(20000);
     expect(calls.polls).toBe(1);
     expect(errors).toEqual([]);
@@ -197,13 +199,77 @@ for (const [locale, message] of [
         await page.setViewportSize({ width: 640, height: 900 });
         await mockReader(page, 0);
         await page.goto('/book/2/readtxt');
-        await expect(page.getByText(message, { exact: false })).toBeVisible();
+        await expect(page.locator('.prepare-card').getByText(message, { exact: false })).toBeVisible();
         await page.evaluate(() => { document.body.style.zoom = '2'; });
-        const card = page.locator('.content-area [role="status"]');
+        const card = page.locator('.content-area .prepare-card');
         const box = await card.boundingBox();
         expect(box!.x).toBeGreaterThanOrEqual(0);
         expect(box!.x + box!.width).toBeLessThanOrEqual(640);
         await expect(card).not.toContainText('book.preparing');
         await page.screenshot({ path: test.info().outputPath(`${locale}-zoom.png`), fullPage: true });
+    });
+}
+
+
+test('live status changes by phase without repeating the visible countdown', async ({ page }) => {
+    const calls = await mockReader(page, 30, 0);
+    await openReader(page);
+    const status = page.locator('.reader-status');
+    await expect(status).toHaveText('准备阅读');
+    await expect(page.locator('.prepare-card')).toContainText('预计还需');
+    await page.evaluate(() => {
+        const status = document.querySelector('.reader-status')!;
+        status.setAttribute('data-changes', '0');
+        new MutationObserver(() => {
+            status.setAttribute('data-changes', String(Number(status.getAttribute('data-changes')) + 1));
+        }).observe(status, { childList: true, characterData: true, subtree: true });
+    });
+    for (let i = 0; i < 3; i++) await tickAndPoll(page, calls);
+    await expect(status).toHaveAttribute('data-changes', '0');
+    for (let i = 0; i < 3; i++) await tickAndPoll(page, calls);
+    await expect(status).toContainText('仍在准备目录');
+    await expect(status).toHaveAttribute('data-changes', '1');
+    await page.route('**/api/book/txt/init?*test=1', route => route.fulfill({ json: ready }));
+    await page.clock.runFor(5000);
+    await expect(page.locator('.novel-content')).toContainText('等待结束后的正文');
+    await expect(status).toHaveText('目录已就绪，正在打开正文。');
+});
+
+for (const failure of ['cancel', 'error']) {
+    test(`navigation ${failure} keeps the current reader polling`, async ({ page }) => {
+        const calls = await mockReader(page, 0);
+        let started = false;
+        let release!: () => void;
+        const pending = new Promise<void>(resolve => { release = resolve; });
+        await page.route('**/api/book/txt/init?*test=1', async route => {
+            started = true;
+            await pending;
+            await route.fulfill({ json: ready });
+        });
+        await openReader(page);
+        await page.clock.runFor(5000);
+        await expect.poll(() => started).toBe(true);
+        await page.evaluate(async failure => {
+            const root = document.querySelector('#__nuxt') as Element & {
+                __vue_app__: { config: { globalProperties: { $router: Router } } };
+            };
+            const router = root.__vue_app__.config.globalProperties.$router;
+            const stopGuard = router.beforeResolve(() => {
+                if (failure === 'cancel') return false;
+                throw new Error('Simulated lazy navigation failure');
+            });
+            try {
+                await router.push('/login');
+            } catch {
+                // A rejected navigation must leave the current reader usable.
+            } finally {
+                stopGuard();
+            }
+        }, failure);
+        await expect(page).toHaveURL(/\/book\/2\/readtxt$/);
+        release();
+        await expect(page.locator('.novel-content')).toContainText('等待结束后的正文');
+        expect(calls.initial).toBe(1);
+        expect(calls.chapters).toBe(1);
     });
 }
