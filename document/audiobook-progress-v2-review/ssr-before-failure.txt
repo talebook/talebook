@@ -1,0 +1,55 @@
+[WebServer] [h3] "toNodeHandler" export from h3 is deprecated. Please import "toNodeHandler" from "h3/node".
+[WebServer] (node:2205342) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:2205351) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer]
+[WebServer]  ERROR  (node:2205366) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use node --trace-warnings ... to show where the warning was created)
+[WebServer]
+[WebServer] (node:2205469) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:2205468) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer]
+[WebServer]  WARN  Browserslist: browsers data (caniuse-lite) is 9 months old. Please run:
+[WebServer]   npx update-browserslist-db@latest
+[WebServer]   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[WebServer]
+
+Running 1 test using 1 worker
+
+(node:2205553) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2205553) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 test/e2e/audiobook-progress-v2.spec.ts:143:1 › SSR confirmed counts survive the first browser poll failing and recover (10.4s)
+
+
+  1) test/e2e/audiobook-progress-v2.spec.ts:143:1 › SSR confirmed counts survive the first browser poll failing and recover
+
+    Error: expect(locator).toContainText(expected) failed
+
+    Locator: getByTestId('generation-api-error')
+    Expected substring: "连接中断"
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toContainText" with timeout 5000ms
+      - waiting for getByTestId('generation-api-error')
+
+
+      160 |     await expect(page.getByText('模拟 SSR 首次客户端轮询断连', { exact: true })).toBeVisible();
+      161 |     expect(browserPolls).toBeGreaterThan(0);
+    > 162 |     await expect(page.getByTestId('generation-api-error')).toContainText('连接中断');
+          |                                                            ^
+      163 |     await expect(page.getByTestId('generation-count')).toContainText('3/12');
+      164 |     await capture(page, 'ssr-first-poll-retained');
+      165 |     disconnected = false;
+        at /home/ubuntu/multica_workspaces/workspace-6453418d5c2f/task-f06cd9a7acfe/workdir/talebook/app/test/e2e/audiobook-progress-v2.spec.ts:162:60
+
+    Error Context: test-results/audiobook-progress-v2-SSR--7688e-er-poll-failing-and-recover/error-context.md
+
+  1 failed
+    test/e2e/audiobook-progress-v2.spec.ts:143:1 › SSR confirmed counts survive the first browser poll failing and recover

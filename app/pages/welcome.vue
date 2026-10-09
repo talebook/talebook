@@ -25,6 +25,7 @@
                     >
                         <template #activator="{ props }">
                             <v-btn
+                                :aria-label="t('book.language')"
                                 v-bind="props"
                                 icon
                                 variant="text"
@@ -126,6 +127,7 @@
 </template>
 
 <script setup>
+import { appendCaptchaData } from '~/utils/captcha';
 import { ref, watch, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
@@ -260,16 +262,7 @@ const welcome_login = async () => {
 
     // 添加验证码参数
     if (captchaEnabled.value && captchaData.value) {
-        if (captchaData.value.provider === 'image') {
-            // 图形验证码
-            data.append('captcha_code', captchaData.value.captcha_code);
-        } else {
-            // 极验验证码
-            data.append('lot_number', captchaData.value.lot_number);
-            data.append('captcha_output', captchaData.value.captcha_output);
-            data.append('pass_token', captchaData.value.pass_token);
-            data.append('gen_time', captchaData.value.gen_time);
-        }
+        appendCaptchaData(data, captchaData.value);
     }
     
     try {

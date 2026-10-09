@@ -52,6 +52,29 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
         await expect(page.getByLabel('每本有声书保留的历史版本数')).toHaveValue('3');
     });
 
+    test('下载验证开关旁说明 OPDS 客户端的下载限制', async ({ page }) => {
+        await page.goto('/admin/settings');
+        await expect(page.locator('.loading-page')).toBeHidden();
+
+        const captcha = page.locator('#sec-captchaSettings');
+        const errorDialog = page.getByRole('dialog', { name: '' });
+        if (await errorDialog.isVisible()) {
+            await errorDialog.getByRole('button', { name: '关闭' }).click();
+        }
+        await page.locator('.settings-nav-item', { hasText: '人机验证设置' }).click();
+        await captcha.locator('.v-select .v-field').click();
+        await page.getByRole('option', { name: '图形验证码 (无需配置)' }).click();
+
+        const download = captcha.getByRole('checkbox', { name: '下载书籍时验证' });
+        const hint = captcha.getByText('开启后，无法完成人机验证的 OPDS 客户端仍可浏览书库，但无法下载书籍。');
+        await expect(download).toBeVisible();
+        await expect(hint).toBeVisible();
+
+        await page.setViewportSize({ width: 320, height: 700 });
+        await expect(hint).toBeVisible();
+        expect(await hint.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    });
+
     test('旧网络书库展示开关不再隐藏聚合入口', async ({ page }) => {
         await page.goto('/admin/settings');
         await expect(page.locator('.loading-page')).toBeHidden();

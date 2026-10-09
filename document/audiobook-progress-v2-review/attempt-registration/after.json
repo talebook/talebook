@@ -1,0 +1,79 @@
+{
+  "lease_owner": "replacement-worker",
+  "attempt_id": "bf0d8378-6032-49bd-8534-3ce8d8384784",
+  "seq": 1,
+  "completed": 0,
+  "data_after_old_commit": {
+    "inspected": true,
+    "revision": {
+      "source_edition_id": 1,
+      "scope": "chapter",
+      "chapter_number": 1,
+      "structural_changed": false
+    },
+    "plan": {
+      "version": 1,
+      "chapters": [],
+      "phases": {
+        "queue": {
+          "started_at": "2026-10-03T04:25:26.596515"
+        },
+        "generate": {
+          "started_at": "2026-10-03T04:25:26.815543"
+        }
+      },
+      "last_active_phase": "generate",
+      "review_status": "pending"
+    },
+    "voicebook_invocation": {
+      "version": 2,
+      "task_id": "talebook-job-1",
+      "attempt_id": "bf0d8378-6032-49bd-8534-3ce8d8384784",
+      "started_at": "2026-10-02T20:25:26.815528+00:00",
+      "last_received_at": "2026-10-02T20:25:26.822413+00:00"
+    },
+    "generation": {
+      "schema": "voicebook-progress.v2",
+      "unit": "speech_segment",
+      "status": "running",
+      "stage": "synthesizing",
+      "total": 4,
+      "completed": 0,
+      "active": 0,
+      "retrying": 0,
+      "failed": 0,
+      "cancelled": 0,
+      "pending": 4,
+      "queued": 0,
+      "active_requests": 0,
+      "concurrency": 1,
+      "retries": 0,
+      "cache_hits": 0,
+      "chapters_total": 1,
+      "chapters_completed": 0,
+      "requests_started": 0,
+      "updated_at": "2026-10-02T20:25:26.821473+00:00",
+      "wait_seconds": 0,
+      "waiting": null
+    },
+    "last_event": {
+      "schema": "voicebook-progress.v2",
+      "seq": 1,
+      "event": "heartbeat",
+      "at": "2026-10-02T20:25:26.821473+00:00",
+      "task_id": "talebook-job-1",
+      "attempt_id": "bf0d8378-6032-49bd-8534-3ce8d8384784"
+    }
+  },
+  "previous_attempt_before_registration": "6e2b5d14-150b-4e53-a14b-3b5c43c606ce",
+  "new_attempt_before_old_commit": "bf0d8378-6032-49bd-8534-3ce8d8384784",
+  "interleaving_executed": true,
+  "stale_registration_overwrote_new_attempt": false,
+  "replacement_heartbeat_accepted": true,
+  "old_call_stopped": [
+    {
+      "type": "AudiobookLeaseLost",
+      "message": "\u6709\u58f0\u4e66\u4efb\u52a1\u5199\u5165\u7ade\u4e89\u5931\u8d25\uff0c\u5df2\u505c\u6b62\u65e7\u8c03\u7528"
+    }
+  ]
+}

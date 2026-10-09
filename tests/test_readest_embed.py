@@ -2,7 +2,6 @@ import json
 import os
 import urllib.parse
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest import mock
 
 from tests.test_main import (
@@ -161,25 +160,20 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(revoked.code, 403)
 
     def test_resource_change_updates_bootstrap_revision(self):
-        db = self.get_app().settings["legacy"]
-        source = Path(db.format_abspath(BID_EPUB, "EPUB", index_is_id=True))
-        get_book = BaseHandler.get_book
-        with TemporaryDirectory() as directory:
-            resource = Path(directory) / "book.epub"
-            resource.write_bytes(source.read_bytes())
+        initial = self.json("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
+        epub_path = self._app.settings["legacy"].format_abspath(BID_EPUB, "EPUB", index_is_id=True)
+        real_stat = os.stat
+        original_stat = real_stat(epub_path)
+        changed_stat = os.stat_result(original_stat, {"st_mtime_ns": original_stat.st_mtime_ns + 1_000_000_000})
 
-            def isolated_book(handler, *args, **kwargs):
-                book = get_book(handler, *args, **kwargs)
-                if book and book["id"] == BID_EPUB:
-                    return {**book, "fmt_epub": str(resource)}
-                return book
+        def stat_with_changed_epub(path, *args, **kwargs):
+            if path == epub_path:
+                return changed_stat
+            # 保留其他路径的真实状态，避免误判升级维护标记等无关文件。
+            return real_stat(path, *args, **kwargs)
 
-            with mock.patch.object(BaseHandler, "get_book", autospec=True, side_effect=isolated_book):
-                url = "/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB
-                initial = self.json(url)
-                stat = resource.stat()
-                os.utime(resource, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))
-                changed = self.json(url)
+        with mock.patch("webserver.handlers.book.os.stat", side_effect=stat_with_changed_epub):
+            changed = self.json("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
         self.assertNotEqual(initial["book"]["revision"], changed["book"]["revision"])
         self.assertNotEqual(initial["resource"]["url"], changed["resource"]["url"])
 

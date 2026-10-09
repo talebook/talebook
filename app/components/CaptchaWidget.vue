@@ -4,13 +4,23 @@
         <div
             v-if="error"
             class="captcha-error mb-2"
+            role="alert"
         >
             <v-alert
                 type="error"
+                variant="tonal"
                 class="ma-2"
             >
-                {{ error }}
+                <span class="on-surface">
+                    {{ error }}
+                </span>
             </v-alert>
+            <v-btn
+                variant="text"
+                @click="initialize"
+            >
+                {{ t('captcha.refresh') }}
+            </v-btn>
         </div>
         <div
             v-if="loading"
@@ -32,7 +42,7 @@
         />
         <!-- 极验验证码 -->
         <div
-            v-else-if="config && config.provider === 'geetest'"
+            v-else-if="config && ['geetest', 'turnstile'].includes(config.provider)"
             :id="containerId"
             class="captcha-box"
         />
@@ -40,15 +50,18 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { useNuxtApp } from 'nuxt/app';
+import { ref, nextTick, onMounted, onUnmounted } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { loadTurnstileSDK } from '~/utils/captcha';
 import ImageCaptchaWidget from './ImageCaptchaWidget.vue';
 
 const { t } = useI18n();
 const { $backend } = useNuxtApp();
 
 const props = defineProps({
-    // 验证场景: 'register', 'login', 'welcome', 'reset'
+    // 验证场景: register, login, welcome, reset, download, read
+    configuration: { type: Object, default: null },
     scene: {
         type: String,
         required: true
@@ -66,11 +79,8 @@ const imageCaptchaRef = ref(null);
 
 // 极验实例
 let geetestInstance = null;
-
-// 生成唯一ID
-const generateId = () => {
-    return `captcha-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-};
+let turnstileId = null;
+let disposed = false;
 
 // 加载极验SDK
 const loadGeetestSDK = () => {
@@ -94,11 +104,13 @@ const initGeetest = async () => {
     try {
         await loadGeetestSDK();
 
+        if (disposed) return;
         window.initGeetest4({
             captchaId: config.value.captchaId,
             product: 'popup',
             language: 'zho'
         }, (gt) => {
+            if (disposed) { gt.destroy(); return; }
             geetestInstance = gt;
 
             gt.appendTo(`#${containerId}`)
@@ -126,6 +138,24 @@ const initGeetest = async () => {
     }
 };
 
+const initTurnstile = async () => {
+    await loadTurnstileSDK();
+    if (disposed) return;
+    turnstileId = window.turnstile.render(`#${containerId}`, {
+        sitekey: config.value.siteKey,
+        action: props.scene,
+        theme: 'auto',
+        size: 'compact',
+        callback: (token) => {
+            error.value = '';
+            emit('verify', { provider: 'turnstile', turnstile_token: token });
+        },
+        'expired-callback': () => onImageError(t('captcha.expired')),
+        'error-callback': () => onImageError(t('captcha.verifyFailed')),
+        'timeout-callback': () => onImageError(t('captcha.verifyFailed')),
+    });
+};
+
 // 图形验证码验证成功
 const onImageVerify = (data) => {
     error.value = '';
@@ -134,12 +164,13 @@ const onImageVerify = (data) => {
 
 // 图形验证码错误
 const onImageError = (msg) => {
-    error.value = msg;
+    if (msg) error.value = msg;
     emit('error', msg);
 };
 
 // 获取验证码配置
 const fetchConfig = async () => {
+    if (props.configuration) { config.value = props.configuration; return true; }
     try {
         const rsp = await $backend('/captcha/config');
         if (rsp.err === 'ok' && rsp.config && rsp.config.enabled) {
@@ -158,6 +189,8 @@ const reset = () => {
     error.value = '';
     if (config.value && config.value.provider === 'image' && imageCaptchaRef.value) {
         imageCaptchaRef.value.reset();
+    } else if (turnstileId !== null && window.turnstile) {
+        window.turnstile.reset(turnstileId);
     } else if (geetestInstance) {
         geetestInstance.reset();
     }
@@ -174,23 +207,35 @@ defineExpose({
     showError
 });
 
-onMounted(async () => {
+const initialize = async () => {
     loading.value = true;
     error.value = '';
-
+    emit('error', '');
+    if (turnstileId !== null && window.turnstile) {
+        window.turnstile.remove(turnstileId);
+        turnstileId = null;
+    }
+    if (geetestInstance) { geetestInstance.destroy(); geetestInstance = null; }
     const enabled = await fetchConfig();
-    if (enabled && config.value.provider === 'geetest') {
-        await initGeetest();
-    }
-
+    if (disposed) return;
     loading.value = false;
+    await nextTick();
+    try {
+        if (!enabled) throw new Error(t('captcha.loadFailed'));
+        if (config.value.provider === 'geetest') await initGeetest();
+        if (config.value.provider === 'turnstile') await initTurnstile();
+    } catch {
+        onImageError(t('captcha.loadFailed'));
+    }
+};
+
+onMounted(initialize);
+onUnmounted(() => {
+    disposed = true;
+    if (geetestInstance) geetestInstance.destroy();
+    if (turnstileId !== null && window.turnstile) window.turnstile.remove(turnstileId);
 });
 
-onUnmounted(() => {
-    if (geetestInstance) {
-        geetestInstance.destroy();
-    }
-});
 </script>
 
 <style scoped>
@@ -219,6 +264,13 @@ onUnmounted(() => {
 
 :deep(.geetest_captcha) {
     margin: 0 auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :deep(.v-progress-circular svg),
+    :deep(.v-progress-circular__overlay) {
+        animation: none !important;
+    }
 }
 </style>
 

@@ -1,0 +1,207 @@
+{
+  "revision": "9cb3633be8fd1bb8f7b9ef782ceabd11a84a05a3",
+  "tree": "dce48634349c8992e953943e67f92d3889ca726f",
+  "expected_tree": "dce48634349c8992e953943e67f92d3889ca726f",
+  "files": [
+    {
+      "file": "app/pages/audios/create.vue",
+      "blob": "328e822c76eb5a3961ef6c658793207cc123f037",
+      "bytes": 28354
+    },
+    {
+      "file": "app/playwright.audiobook-progress.config.ts",
+      "blob": "3c91f351c8f3c7521f80e990331500930b1f6369",
+      "bytes": 811
+    },
+    {
+      "file": "app/test-results/.last-run.json",
+      "blob": "cbcc1fbac11a74b608b2b3edc3a2ffd6ab639cb2",
+      "bytes": 45
+    },
+    {
+      "file": "app/test/e2e/audiobook-create-formats.spec.ts",
+      "blob": "b30c9d6dc3b21458be9b8cb963d9dfeef473bf38",
+      "bytes": 3856
+    },
+    {
+      "file": "app/test/e2e/audiobook-offline.spec.ts",
+      "blob": "6e64cb4a2af47b03ab4973137c01cb9e968ac33b",
+      "bytes": 6542
+    },
+    {
+      "file": "design/webserver/20261003-audiobook-progress-v2.wip.html",
+      "blob": "7b8d133b41ff4cba575107ffc1165cebf8ae8b4d",
+      "bytes": 3398124
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/README.md",
+      "blob": "4d6230fcaa7519dfd8ff9c0012c0b0f41112c19f",
+      "bytes": 8898
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/advanced-real-cli-playback.png",
+      "blob": "f8cc9aa88b3c37b7c1cdcd9303e49e4eb255b120",
+      "bytes": 344440
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/after.json",
+      "blob": "41386810878a8726d16d293cf6de5050c7d49320",
+      "bytes": 2272
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/baseline-failures.json",
+      "blob": "55e459630330c4c46082da9695832abe4571ffc1",
+      "bytes": 1604
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/before.json",
+      "blob": "7d40ba76ed03090ab9a3e98800649a46603d95a4",
+      "bytes": 1177
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/candidate-source-verification.json",
+      "blob": "6a8003110630a3fba53d81d8362dd2e0405476cb",
+      "bytes": 521
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/invocation-probe.py",
+      "blob": "8c7eb07838b93e66f4834e0ad084c459b7be3ebb",
+      "bytes": 1860
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/original-before.json",
+      "blob": "8ac78f5ddceb08e5d2025ca2ff5f76401f74da7c",
+      "bytes": 1267
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/provenance.json",
+      "blob": "c2451de9b41aaf5e2c2f2911fb3eba0f31fa27a2",
+      "bytes": 313
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/qa-original-invocation-boundary.py",
+      "blob": "175e74840f88d2ec0bab32df7f603562f57ec75a",
+      "bytes": 6983
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/qa-wizard-baseline.json",
+      "blob": "5b68e3fd967298d85723aa2c1a9b7956bbdce2d6",
+      "bytes": 1077
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/qa-wizard-before.png",
+      "blob": "b55f65bdec1f7490dab8220bed38e8f0410a68b2",
+      "bytes": 155694
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/quick-real-cli-playback.png",
+      "blob": "44d0314c2ecbbd70e8a66632e3076b45a2e0ce09",
+      "bytes": 344605
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/real-cli-generation-workflows.json",
+      "blob": "e127990db17b98cc27ac6bfd519a6ac68be17ce4",
+      "bytes": 191159
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/real-cli-recovery-workflows.json",
+      "blob": "b8a4a87ea06ca0a638f8bd9bc29c8efa4fc29fa3",
+      "bytes": 244017
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/real-cli-waiting-workflows.json",
+      "blob": "05a8c66eb84a06b04e20c9fa977c6c6a684e67a1",
+      "bytes": 535704
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/real-edge-cooldown-mobile-dark.png",
+      "blob": "dd3e5b5ecac0590354b992e3f99ec26da904b070",
+      "bytes": 398736
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/wizard-epub.png",
+      "blob": "062224ef890d91f8f7af8ddc14e629445519cc31",
+      "bytes": 177758
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/attempt-registration/wizard-txt.png",
+      "blob": "fe2bda49b59760dc5235ac1e37eed919b2c42b8a",
+      "bytes": 192575
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/offline-advanced-playback.png",
+      "blob": "d6f3d39f873b8d2effad2910cea64a78f4611d2d",
+      "bytes": 245608
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/offline-page-cancelled.png",
+      "blob": "e66edc617467845c90b3e387139881d43f591920",
+      "bytes": 230785
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/offline-quick-playback.png",
+      "blob": "dd77b336187aba401b304a3631985d7a660bf1c6",
+      "bytes": 266443
+    },
+    {
+      "file": "document/audiobook-progress-v2-review/offline-workflows.json",
+      "blob": "b54b2a4965d397173b8a2fb8d36bcb42bab4d37d",
+      "bytes": 3270
+    },
+    {
+      "file": "document/screenshots/audiobook-progress-v2/desktop-dark-rate-limit.png",
+      "blob": "e20a4708b3c8ec007f3fa45a319850e8d460f941",
+      "bytes": 75718
+    },
+    {
+      "file": "document/screenshots/audiobook-progress-v2/desktop-finalizing.png",
+      "blob": "97c7290183d6ea6f5d3d4ac35dfd472f8eff788d",
+      "bytes": 61355
+    },
+    {
+      "file": "document/screenshots/audiobook-progress-v2/desktop-generating.png",
+      "blob": "8bf34e708c03a59167fe34be012eb412a2b0d9a0",
+      "bytes": 55850
+    },
+    {
+      "file": "document/screenshots/audiobook-progress-v2/mobile-dark-cooldown.png",
+      "blob": "caff0df93b925935ad8fa9fc97d7662dd28dee1a",
+      "bytes": 63838
+    },
+    {
+      "file": "document/screenshots/audiobook-progress-v2/ssr-first-poll-retained.png",
+      "blob": "55e56f546834ba0dce50d2ad8958766dee5ba1b5",
+      "bytes": 64036
+    },
+    {
+      "file": "tests/test_audiobook.py",
+      "blob": "be21730e724e5d5cb044f580046c1f039b2119cc",
+      "bytes": 39550
+    },
+    {
+      "file": "tests/test_audiobook_progress_v2.py",
+      "blob": "ea30dad0bcf0337e909a73a59303bf58715efa62",
+      "bytes": 14898
+    },
+    {
+      "file": "tests/test_audiobook_reliability.py",
+      "blob": "c4b40f3b74c32bce2e62c1ad6b98107126eed4d5",
+      "bytes": 27356
+    },
+    {
+      "file": "tests/test_audiobook_transactions.py",
+      "blob": "5de2b13447e98398236bad180843251953ad7db4",
+      "bytes": 22819
+    },
+    {
+      "file": "webserver/handlers/audiobook.py",
+      "blob": "c183d17950b14acb4d87eb719c7336996e32d7c7",
+      "bytes": 72604
+    },
+    {
+      "file": "webserver/services/audiobook.py",
+      "blob": "c86ede99117572dcd44da8a892b1e0f7c4452626",
+      "bytes": 75899
+    }
+  ]
+}

@@ -44,6 +44,18 @@ class TestAnnotationModelsAndMigration(unittest.TestCase):
         self.assertIn("uq_annotation_source_connection", source_constraints)
         self.assertIn("uq_annotation_source_identity", source_constraints)
 
+    def test_upgrade_adds_indexes_for_reply_columns(self):
+        engine = create_engine("sqlite://")
+        models.Base.metadata.create_all(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql("DROP INDEX ix_annotations_root_id")
+            conn.exec_driver_sql("DROP INDEX ix_annotations_thread_id")
+
+        self.assertTrue(compare_and_migrate(engine))
+
+        indexes = {item["name"] for item in inspect(engine).get_indexes("annotations")}
+        self.assertTrue({"ix_annotations_root_id", "ix_annotations_thread_id"} <= indexes)
+
     def test_source_identity_is_unique_across_authoritative_annotations(self):
         engine = create_engine("sqlite://")
         models.Base.metadata.create_all(engine)
@@ -80,9 +92,14 @@ class TestAnnotationAuthentication(TestApp):
         d = self.json("/api/book/%d/annotations" % BID_EPUB)
         self.assertEqual(d["err"], "user.need_login")
 
-    def test_guest_reader_does_not_render_private_annotation_panel(self):
-        rsp = self.fetch("/read/%d" % BID_EPUB)
-        self.assertNotIn('/book/%d/annotations?reader=1' % BID_EPUB, rsp.body.decode("utf-8"))
+    def test_guest_reader_gets_no_reader_identity(self):
+        rsp = self.fetch("/read/%d?reader=candle" % BID_EPUB)
+        body = rsp.body.decode("utf-8")
+        self.assertIn("let READER = null", body)
+        # 游客读取评论列表时以 need_login 拒绝，阅读器显示登录提示。
+        self.assertIn("code: 'need_login'", body)
+        # 登录在新窗口进行，不离开当前阅读位置。
+        self.assertIn("window.open(", body)
 
 
 class TestAnnotations(TestWithUserLogin):
@@ -105,6 +122,9 @@ class TestAnnotations(TestWithUserLogin):
             for (annotation_id,) in session.query(models.Annotation.id).filter(models.Annotation.book_id == BID_EPUB).all()
         ]
         if annotation_ids:
+            session.query(models.AnnotationVote).filter(models.AnnotationVote.annotation_id.in_(annotation_ids)).delete(
+                synchronize_session=False
+            )
             session.query(models.PluginSourceRecord).filter(
                 models.PluginSourceRecord.entity_type == "annotation",
                 models.PluginSourceRecord.entity_id.in_([str(value) for value in annotation_ids]),
@@ -156,34 +176,194 @@ class TestAnnotations(TestWithUserLogin):
             body=json.dumps(data),
         )
 
-    def test_reader_hosts_the_authenticated_annotation_panel(self):
-        rsp = self.fetch("/read/%d" % BID_EPUB)
+    def test_reader_page_injects_hooks_and_no_host_drawn_annotation_ui(self):
+        rsp = self.fetch("/read/%d?reader=candle" % BID_EPUB)
         body = rsp.body.decode("utf-8")
-        self.assertIn('/book/%d/annotations?reader=1' % BID_EPUB, body)
-        self.assertIn("talebook:annotation-locate", body)
-        self.assertIn('aria-hidden="true"', body)
-        self.assertIn("shell.inert = !open", body)
+        # 阅读器自带完整的评论界面，宿主只注入回调。
+        self.assertIn("annotation_callbacks: annotationCallbacks", body)
+        self.assertIn("audiobook_callbacks: audiobookCallbacks", body)
+        self.assertRegex(body, r'let READER = \{"id": 1,')
+        for removed in ("talebook-selection-toolbar", "annotation-shell", "legacyCommunityResponse", "server: window.location.origin"):
+            self.assertNotIn(removed, body)
+        self.assertRegex(body, r"candle-reader\.es\.js\?v=[0-9a-f]{12}|candle-reader\.es\.js\?v=dev")
 
-    def test_reader_hosts_local_selection_actions_and_chapter_annotation_rendering(self):
-        rsp = self.fetch("/read/%d" % BID_EPUB)
-        body = rsp.body.decode("utf-8")
-        self.assertIn('id="talebook-selection-toolbar"', body)
-        self.assertIn('data-action="highlight"', body)
-        self.assertIn('data-action="note"', body)
-        self.assertIn("rendition.off('selected', proxy.on_select_content)", body)
-        self.assertIn("/api/book/%d/annotations" % BID_EPUB, body)
-        self.assertIn("rendition.annotations.highlight", body)
-        self.assertIn("current_toc_title", body)
-        self.assertIn("server: window.location.origin", body)
-        self.assertIn("legacyCommunityResponse", body)
-        self.assertIn("clientId: clientId()", body)
-        self.assertIn("client_id: passage.clientId", body)
-        self.assertIn("if (!selectedPassage || annotationSaveInFlight) return", body)
-        save_start = body.index("async function saveAnnotation")
-        self.assertLess(
-            body.index("hideSelectionToolbar();", save_start),
-            body.index("await fetch", save_start),
+    # ---- 阅读器的查看范围、分页、回复与投票 ----
+
+    def _comment(self, client_id, reader=1, **fields):
+        session = get_db()
+        values = {
+            "reader_id": reader,
+            "book_id": BID_EPUB,
+            "client_id": client_id,
+            "annotation_type": "note",
+            "is_private": False,
+            "chapter": "第一章",
+            "cfi": "epubcfi(/6/4!/4/2)",
+            "content": client_id,
+            "author_name": "读者%d" % reader,
+        }
+        values.update(fields)
+        item = models.Annotation(**values)
+        session.add(item)
+        session.commit()
+        return item.id
+
+    def _view(self, view, **params):
+        query = "&".join("%s=%s" % (key, value) for key, value in {"view": view, **params}.items())
+        return self.json("/api/book/%d/annotations?%s" % (BID_EPUB, query))
+
+    def test_reader_views_filter_scope_and_put_my_comments_first_across_pages(self):
+        import datetime
+
+        base = datetime.datetime(2026, 1, 1)
+        for index in range(5):
+            self._comment("other-%d" % index, reader=2, create_time=base + datetime.timedelta(minutes=10 + index))
+        mine = self._comment("mine-old", create_time=base)
+        self._comment("private-mine", is_private=True, content="私密")
+        self._comment("private-other", reader=2, is_private=True, content="别人的私密")
+        self._comment("book", reader=2, annotation_type="book_comment", chapter="", cfi=None)
+        self._comment("other-chapter", reader=2, chapter="第二章")
+        self._comment("legacy", reader=2, annotation_type="chapter_comment", cfi=None)
+        self._comment("highlight", annotation_type="highlight", is_private=True)
+
+        first = self._view("chapter", chapter="第一章", limit=3)
+        self.assertEqual(first["err"], "ok")
+        self.assertTrue(first["has_more"])
+        # 自己的评论即使最旧，也排在全量结果的最前面，而不是只在某一页内靠前。
+        self.assertEqual(first["items"][0]["id"], mine)
+        self.assertTrue(first["items"][0]["is_mine"])
+        items, page = list(first["items"]), first
+        while page["has_more"]:
+            page = self._view("chapter", chapter="第一章", limit=3, cursor=page["next_cursor"])
+            items += page["items"]
+        ids = [item["id"] for item in items]
+        # 跨页不重不漏。
+        self.assertEqual(len(ids), len(set(ids)))
+        contents = {item["content"] for item in items}
+        # 章节范围：含旧章评，不含私密、整书评论、别的章节和划线。
+        self.assertIn("legacy", contents)
+        for excluded in ("私密", "别人的私密", "book", "other-chapter", "highlight"):
+            self.assertNotIn(excluded, contents)
+        self.assertEqual(len(ids), 7)
+
+        book = self._view("book", limit=50)
+        self.assertIn("book", {item["content"] for item in book["items"]})
+        self.assertNotIn("highlight", {item["content"] for item in book["items"]})
+
+        paragraph = self._view("paragraph", chapter="第一章", paragraph_cfi="epubcfi(/6/4!/4/2)")
+        self.assertNotIn("legacy", {item["content"] for item in paragraph["items"]})
+
+        my = self._view("mine", limit=50)
+        self.assertEqual({item["content"] for item in my["items"]}, {"mine-old", "私密", "highlight"})
+        self.assertEqual(self._view("everyone")["err"], "params.invalid")
+
+    def test_summary_counts_public_top_level_notes_per_paragraph(self):
+        root = self._comment("a", reader=2)
+        self._comment("b", reader=2)
+        self._comment("c", reader=2, cfi="epubcfi(/6/4!/4/8)")
+        self._comment("private", is_private=True)
+        self._comment("reply", reader=2, root_id=root, cfi=None)
+        d = self.json("/api/book/%d/annotations/summary?chapter=第一章" % BID_EPUB)
+        counts = {item["paragraph_cfi"]: item["count"] for item in d["items"]}
+        self.assertEqual(counts, {"epubcfi(/6/4!/4/2)": 2, "epubcfi(/6/4!/4/8)": 1})
+
+    def _reply(self, root, content, reply_to=None, client_id=None):
+        return self.json(
+            "/api/book/%d/annotations" % BID_EPUB,
+            method="POST",
+            body=json.dumps(
+                {"client_id": client_id or content, "root_id": root, "reply_to_id": reply_to, "content": content, "chapter": "伪造", "cfi": "伪造"}
+            ),
         )
+
+    def test_replies_are_threaded_follow_root_and_hidden_when_root_is_private(self):
+        root = self._comment("root", reader=2)
+        first = self._reply(root, "第一层")
+        self.assertEqual(first["err"], "ok")
+        reply = first["annotation"]
+        self.assertEqual((reply["root_id"], reply["thread_id"], reply["is_private"]), (root, None, False))
+        # 位置与章节跟随主评论，不信任客户端。
+        self.assertEqual((reply["chapter"], reply["cfi"]), ("第一章", None))
+        self.user.return_value = 2
+        second = self._reply(root, "第二层", reply_to=reply["id"])["annotation"]
+        self.assertEqual(second["thread_id"], reply["id"])
+        third = self._reply(root, "第三层", reply_to=second["id"])["annotation"]
+        self.assertEqual(third["thread_id"], reply["id"])
+
+        replies = self.json("/api/book/%d/annotations/%d/replies" % (BID_EPUB, root))
+        self.assertEqual([item["content"] for item in replies["items"]], ["第一层", "第二层", "第三层"])
+        self.assertEqual(replies["items"][1]["reply_to_name"], reply["author_name"])
+        self.assertEqual(self._view("chapter", chapter="第一章")["items"][0]["reply_count"], 3)
+        # 回复不进入顶层列表，也不计入笔记列表。
+        self.assertEqual(len(self._view("chapter", chapter="第一章")["items"]), 1)
+
+        # 主评论改为私密：回复只有主评论作者可见，其他人（包括回复作者）读不到也不能再回复或投票。
+        self.assertEqual(
+            self.json("/api/book/%d/annotations/%d" % (BID_EPUB, root), method="PUT", body=json.dumps({"is_private": True}))["err"],
+            "ok",
+        )
+        self.user.return_value = 1
+        self.assertEqual(self.json("/api/book/%d/annotations/%d/replies" % (BID_EPUB, root))["err"], "annotation.not_found")
+        self.assertEqual(self._reply(root, "再回复")["err"], "annotation.not_found")
+        self.assertEqual(
+            self.json("/api/book/%d/annotations/%d/vote" % (BID_EPUB, reply["id"]), method="PUT", body=json.dumps({"value": 1}))["err"],
+            "annotation.not_found",
+        )
+        self.user.return_value = 2
+        self.assertEqual(len(self.json("/api/book/%d/annotations/%d/replies" % (BID_EPUB, root))["items"]), 3)
+
+    def test_votes_are_one_per_reader_and_switchable(self):
+        target = self._comment("target", reader=2)
+        url = "/api/book/%d/annotations/%d/vote" % (BID_EPUB, target)
+        d = self.json(url, method="PUT", body=json.dumps({"value": 1}))
+        self.assertEqual((d["like_count"], d["dislike_count"], d["user_vote"]), (1, 0, 1))
+        d = self.json(url, method="PUT", body=json.dumps({"value": -1}))
+        self.assertEqual((d["like_count"], d["dislike_count"], d["user_vote"]), (0, 1, -1))
+        self.user.return_value = 2
+        d = self.json(url, method="PUT", body=json.dumps({"value": -1}))
+        self.assertEqual((d["dislike_count"], d["user_vote"]), (2, -1))
+        self.user.return_value = 1
+        d = self.json(url, method="PUT", body=json.dumps({"value": 0}))
+        self.assertEqual((d["like_count"], d["dislike_count"], d["user_vote"]), (0, 1, 0))
+        self.assertEqual(self.json(url, method="PUT", body=json.dumps({"value": 5}))["err"], "params.invalid")
+        private = self._comment("private", is_private=True)
+        d = self.json("/api/book/%d/annotations/%d/vote" % (BID_EPUB, private), method="PUT", body=json.dumps({"value": 1}))
+        self.assertEqual(d["err"], "annotation.not_found")
+
+    def test_delete_cascades_replies_and_votes_only_for_the_author(self):
+        root = self._comment("root")
+        self.user.return_value = 2
+        first = self._reply(root, "第一层")["annotation"]
+        nested = self._reply(root, "第二层", reply_to=first["id"])["annotation"]
+        other_first = self._reply(root, "另一条第一层")["annotation"]
+        self.json("/api/book/%d/annotations/%d/vote" % (BID_EPUB, root), method="PUT", body=json.dumps({"value": 1}))
+        # 只能删自己的；删第一层回复连同其下回复。
+        self.assertEqual(self.json("/api/book/%d/annotations/%d" % (BID_EPUB, root), method="DELETE")["err"], "annotation.not_found")
+        d = self.json("/api/book/%d/annotations/%d" % (BID_EPUB, first["id"]), method="DELETE")
+        self.assertEqual(d["deleted"], 2)
+        session = get_db()
+        self.assertIsNone(session.get(models.Annotation, nested["id"]))
+        self.assertIsNotNone(session.get(models.Annotation, other_first["id"]))
+        # 主评论作者删除主评论：其下他人的回复与投票一并删除。
+        self.user.return_value = 1
+        d = self.json("/api/book/%d/annotations/%d" % (BID_EPUB, root), method="DELETE")
+        self.assertEqual(d["deleted"], 2)
+        session.expire_all()
+        self.assertEqual(session.query(models.Annotation).filter(models.Annotation.book_id == BID_EPUB).count(), 0)
+        self.assertEqual(session.query(models.AnnotationVote).filter(models.AnnotationVote.annotation_id == root).count(), 0)
+
+    def test_book_comment_type_and_range_cfi_are_saved(self):
+        d = self._post_local(client_id="book-1", annotation_type="book_comment", is_private=False, cfi="epubcfi(/6/2!/4)", chapter="")
+        self.assertEqual(d["err"], "ok")
+        self.assertTrue(d["annotation"]["is_mine"])
+        d = self._post_local(client_id="note-1", cfi="epubcfi(/6/4!/4/6)", range_cfi="epubcfi(/6/4!/4/2,/1:1,/1:9)")
+        self.assertEqual(d["annotation"]["range_cfi"], "epubcfi(/6/4!/4/2,/1:1,/1:9)")
+        self.assertEqual(d["annotation"]["cfi"], "epubcfi(/6/4!/4/6)")
+        # 修改只改传入的字段。
+        d = self.json(
+            "/api/book/%d/annotations/%d" % (BID_EPUB, d["annotation"]["id"]), method="PUT", body=json.dumps({"content": "改过"})
+        )
+        self.assertEqual((d["annotation"]["content"], d["annotation"]["range_cfi"]), ("改过", "epubcfi(/6/4!/4/2,/1:1,/1:9)"))
 
     def test_source_upsert_is_idempotent_and_uses_prefixed_source_fields(self):
         first = self._post_source()
@@ -489,6 +669,162 @@ class TestAnnotations(TestWithUserLogin):
         self.assertEqual(sources["calibre"].source_annotation_id, "calibre-1")
         self.assertEqual(sources["weread"].source_sync_status, "failed")
         self.assertIn("remote unavailable", sources["weread"].source_sync_error)
+
+    def test_reply_sync_carries_remote_parent_ids_and_waits_for_the_root(self):
+        received = []
+
+        def writer(annotation, source):
+            received.append(annotation)
+            if annotation.get("content") == "同步失败的主评论":
+                raise RuntimeError("remote down")
+            return {"source_annotation_id": "remote-%s" % annotation["id"]}
+
+        AnnotationSyncService.register_writer("brs-like", writer)
+        root = self._post_local(client_id="root", is_private=False, content="主评论")["annotation"]
+        reply = self._reply(root["id"], "回复")["annotation"]
+        nested = self._reply(root["id"], "回复的回复", reply_to=reply["id"])["annotation"]
+        by_id = {item["id"]: item for item in received}
+        self.assertEqual(by_id[reply["id"]]["remote_root_id"], "remote-%s" % root["id"])
+        self.assertEqual(by_id[reply["id"]]["remote_reply_to_id"], "remote-%s" % root["id"])
+        self.assertEqual(by_id[nested["id"]]["remote_reply_to_id"], "remote-%s" % reply["id"])
+
+        # 主评论没同步过去时，回复记为同步失败，不会作为顶层评论外发。
+        failed_root = self._post_local(client_id="failed-root", is_private=False, content="同步失败的主评论")["annotation"]
+        orphan = self._reply(failed_root["id"], "等待主评论")["annotation"]
+        source = get_db().query(models.AnnotationSource).filter_by(annotation_id=orphan["id"], source_name="brs-like").one()
+        self.assertEqual(source.source_sync_status, "failed")
+        self.assertIn("主评论尚未同步", source.source_sync_error)
+        self.assertNotIn(orphan["id"], {item["id"] for item in received})
+
+    def test_making_a_public_comment_private_detaches_external_copies(self):
+        AnnotationSyncService.register_writer("brs-like", lambda annotation, source: {"source_annotation_id": "remote-%s" % annotation["id"]})
+        root = self._post_local(client_id="root", is_private=False, content="主评论")["annotation"]
+        self._reply(root["id"], "回复")
+        session = get_db()
+        brs_like = session.query(models.AnnotationSource).filter_by(source_name="brs-like")
+        self.assertEqual(brs_like.count(), 2)
+        d = self.json("/api/book/%d/annotations/%d" % (BID_EPUB, root["id"]), method="PUT", body=json.dumps({"is_private": True}))
+        self.assertEqual(d["err"], "ok")
+        session.expire_all()
+        # 私有内容永不外发：主评论与其回复的外部映射都已解除，之后重新公开会作为新记录同步。
+        self.assertEqual(brs_like.count(), 0)
+
+    def test_idempotent_upsert_cannot_change_the_reply_relationship(self):
+        root = self._comment("root", reader=2)
+        other_root = self._comment("other-root", reader=2)
+        top = self._post_local(client_id="taken", is_private=True, content="私密笔记")["annotation"]
+        # client_id 已属于一条顶层私密笔记：不能借回复把它挂到别人评论下并改为公开。
+        self.assertEqual(self._reply(root, "回复", client_id="taken")["err"], "annotation.id_conflict")
+        reply = self._reply(root, "回复", client_id="reply-1")["annotation"]
+        # client_id 已属于另一条主评论下的回复，也不能被挪走。
+        self.assertEqual(self._reply(other_root, "挪走", client_id="reply-1")["err"], "annotation.id_conflict")
+        self.assertEqual(self._post_local(client_id="reply-1", content="改成顶层")["err"], "annotation.id_conflict")
+        session = get_db()
+        session.expire_all()
+        self.assertTrue(session.get(models.Annotation, top["id"]).is_private)
+        self.assertEqual(session.get(models.Annotation, reply["id"]).root_id, root)
+        # 同一回复关系下的幂等更新照常生效。
+        again = self._reply(root, "回复（修改）", client_id="reply-1")
+        self.assertEqual((again["err"], again["annotation"]["id"]), ("ok", reply["id"]))
+
+    def test_reopening_a_root_resyncs_its_replies(self):
+        AnnotationSyncService.register_writer(
+            "brs-like", lambda annotation, source: {"source_annotation_id": "remote-%s" % annotation["id"]}
+        )
+        root = self._post_local(client_id="root", is_private=False, content="主评论")["annotation"]
+        reply = self._reply(root["id"], "回复")["annotation"]
+        url = "/api/book/%d/annotations/%d" % (BID_EPUB, root["id"])
+        self.json(url, method="PUT", body=json.dumps({"is_private": True}))
+        self.json(url, method="PUT", body=json.dumps({"is_private": False}))
+        session = get_db()
+        session.expire_all()
+        synced = {
+            source.annotation_id: source.source_sync_status
+            for source in session.query(models.AnnotationSource).filter_by(source_name="brs-like")
+        }
+        self.assertEqual(synced, {root["id"]: "synced", reply["id"]: "synced"})
+
+    def test_collection_endpoints_hide_replies_under_a_private_root(self):
+        root = self._comment("root", reader=2)
+        reply = self._reply(root, "我的回复")["annotation"]
+        own = self._post_local(client_id="own", content="我的笔记")["annotation"]
+        listed = [item["id"] for item in self.json("/api/annotations?book_id=%d" % BID_EPUB)["annotations"]]
+        self.assertEqual(listed, [own["id"]])
+        exported = [item["id"] for item in self.json("/api/annotations/export?book_id=%d" % BID_EPUB)["export"]["annotations"]]
+        self.assertEqual(sorted(exported), sorted([own["id"], reply["id"]]))
+
+        session = get_db()
+        session.get(models.Annotation, root).is_private = True
+        session.commit()
+        exported = [item["id"] for item in self.json("/api/annotations/export?book_id=%d" % BID_EPUB)["export"]["annotations"]]
+        self.assertEqual(exported, [own["id"]])
+
+    def test_remote_parent_ids_are_scoped_to_the_same_instance(self):
+        session = get_db()
+        connections = [
+            models.PluginConnection(
+                installation_id=1,
+                owner_type="user",
+                owner_id=owner,
+                role="scope-test-%d" % owner,
+                name="t",
+                config=config,
+                scopes=[],
+            )
+            for owner, config in (
+                (1, {"endpoint": "https://brs.example.org/"}),
+                (2, {"endpoint": "https://brs.example.org"}),
+                (3, {"endpoint": "https://other.example.org"}),
+            )
+        ]
+        session.add_all(connections)
+        session.flush()
+        root = models.Annotation(reader_id=1, book_id=BID_EPUB, client_id="scoped", annotation_type="note", is_private=False)
+        session.add(root)
+        session.flush()
+        session.add(
+            models.AnnotationSource(
+                annotation_id=root.id,
+                source_name="brs",
+                source_connection_id=str(connections[0].id),
+                source_annotation_id="remote-on-main",
+            )
+        )
+        session.commit()
+        try:
+            service = AnnotationSyncService()
+            # 同一连接、指向同一实例的其他读者连接都能复用副本 id；另一个实例上没有副本。
+            self.assertEqual(service._remote_id(root.id, "brs", str(connections[0].id)), "remote-on-main")
+            self.assertEqual(service._remote_id(root.id, "brs", str(connections[1].id)), "remote-on-main")
+            self.assertIsNone(service._remote_id(root.id, "brs", str(connections[2].id)))
+        finally:
+            session.query(models.AnnotationSource).filter_by(annotation_id=root.id).delete()
+            for connection in connections:
+                session.delete(connection)
+            session.commit()
+
+    def test_comment_made_private_during_an_external_write_is_retracted(self):
+        deleted = []
+
+        def slow_writer(annotation, source):
+            # 写入途中读者把评论改为私有（与改私有接口相同：置私有并解除映射），此时映射还没有外部 id。
+            session = get_db()
+            session.get(models.Annotation, annotation["id"]).is_private = True
+            session.query(models.AnnotationSource).filter_by(annotation_id=annotation["id"]).delete()
+            session.commit()
+            return {"source_annotation_id": "remote-late"}
+
+        AnnotationSyncService.register_writer("brs-like", slow_writer)
+        original = AnnotationSyncService._delete_states
+        AnnotationSyncService._delete_states = lambda service, runtime, states: deleted.extend(states)
+        try:
+            annotation = self._post_local(client_id="racy", is_private=False, content="途中改私有")["annotation"]
+        finally:
+            AnnotationSyncService._delete_states = original
+        self.assertEqual([state["source_annotation_id"] for state in deleted], ["remote-late"])
+        session = get_db()
+        session.expire_all()
+        self.assertEqual(session.query(models.AnnotationSource).filter_by(annotation_id=annotation["id"]).count(), 0)
 
     def test_public_annotation_discovers_typed_writer_and_excludes_its_source(self):
         calls = []

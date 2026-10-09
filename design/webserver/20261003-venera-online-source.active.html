@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TB-236：在 Talebook 在线书库运行受支持的 Venera 源脚本。" />
+    <link rel="icon" href="data:," />
+    <title>在线书库接入 Venera 漫画源 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><div class="page"><header class="hero"><h1>在线书库接入 Venera 漫画源</h1><p class="sub">复用书源插件底座与 Komga Reader，让读者浏览、搜索并阅读真实在线漫画。</p><div class="chips"><span class="chip active">状态：ACTIVE</span><span class="chip">创建日期：2026-10-03</span><span class="chip">所属模块：webserver</span><span class="chip">需求来源：TB-236</span></div></header><main id="main-content">
+<section class="card"><h2>原始诉求</h2><p>开发者希望 Talebook 可以连接 Venera，接入 Talebook 的在线书库；至少一个实际源完成端到端验证。旧方向 PR #1073 未合并，已关闭。</p></section>
+<section class="card"><h2>目标与边界</h2><p>首版支持官方配置仓库的 MangaDex 1.2.0 脚本，固定提交 d8a71168a83a6797482a5be9c000989dabf21c08 与 SHA-256。验证成功后才开放该预设。公开阅读不需要源账号；论坛 WebView 登录、收藏、评论、DRM、任意第三方源及任意脚本上传不在兼容范围。配置可选择语言、图像质量和超时。</p></section>
+<section class="card"><h2>现状与证据</h2><p>官方 doc/comic_source.md 和 assets/init.js 定义 ComicSource、fetch、ComicDetails 与 Map 章节。官方无头模式没有供 Talebook 调用的漫画 HTTP 服务。MangaDex API 已返回真实 HTTP 200。Talebook SourceProvider 已提供搜索、浏览、详情、目录及正文接口；漫画 Reader 接收页面 manifest。</p><p>仓库与本机技能目录未找到 grill 技能，远端 talebook/skills 亦无该技能；按下面决策表自行逐项核实设计，现有任务已授权选用代表性源。</p></section>
+<section class="card"><h2>决策核对与方案</h2><div class="table-wrap"><table><thead><tr><th>问题</th><th>决策</th><th>依据</th></tr></thead><tbody>
+<tr><td>源的真实接入机制</td><td>运行固定版本官方 JS，映射 SourceProvider</td><td>源是客户端扩展脚本，无统一服务端接口</td></tr>
+<tr><td>隔离与网络</td><td>独立 QuickJS 子进程；JS 无 Python/文件/环境访问；CPU、内存、栈、作业、请求数和墙钟限制；HTTP 仅由宿主执行</td><td>复用 quickjs 依赖，禁止将脚本交给 Node 或 Python eval</td></tr>
+<tr><td>供应链与凭据</td><td>固定 SHA-256，首次从固定 GitHub URL 获取后缓存；不运行自动更新；固定公共 HTTPS 域名与 GET；不传入 Talebook 或源凭据</td><td>被验证的 MangaDex 公开阅读不需要源账号</td></tr>
+<tr><td>章节与页序</td><td>按脚本 Map 的卷/语言分组和条目插入顺序展开；页面顺序严格沿用 images 数组</td><td>不对字符串章节号另做排序，保留翻译版本</td></tr>
+<tr><td>阅读与图片</td><td>同站登录保护的图片代理、用户绑定短期签名；读取页面后交给现有 Komga Reader；不自动保存到本地</td><td>不暴露上游鉴权，不扩大已有下载协议</td></tr>
+<tr><td>故障反馈</td><td>源不兼容、网络失败、访问被拒绝、速率限制、空章节、超时明确反馈；阅读页面可重试</td><td>不以空列表掩盖源故障</td></tr>
+</tbody></table></div></section>
+<section class="card"><h2>影响范围</h2><p>webserver/plugins/source、network_library handler、新漫画 reader host、app 在线书库入口和详情页、tests 与 app/test。规格涉及 spec/插件/Venera.md、spec/网络书库.md、spec/插件/外部书库源.md 和 spec/索引.md。无库表迁移。</p></section>
+<section class="card"><h2>验证中发现的问题与修正</h2><p>实际 MangaDex 页面使用独立公共 *.mangadex.network 节点，已纳入指定路径和 HTTPS 443 策略。图片网络读取移至无数据库 session 的 worker，权限检查留在请求线程；补充账号激活及撤销 network.read 的覆盖。实际浏览器发现 html_page 会用账号通知覆盖 messages，宿主文案已改为 reader_messages，并补模板回归测试。预览环境复用了共享 node_modules，Vite allowlist 使用临时层配置，未写入产品配置。临时管理员初始化补齐创建时间。</p></section>
+<section class="card"><h2>界面审查修正</h2><p>入口和详情沿用 Vuetify 与主题 token。配置字段补 zh/en 文案，搜索标签改为在线书籍。Venera 在已保存连接旁提供测试连接，调用平台现有 test action 并跳转执行记录；单次操作 loading 防重复。漫画元数据进入 BookCards 前按纯文本转义，避免上游介绍被解释为 HTML；其他源保持原有格式。</p></section>
+<section class="card"><h2>测试结果</h2><p class="verified">相关后端回归 141 项全部通过；最终新增接口复验 9 项通过；Playwright 状态测试 4 项通过；Python lint 与前端 lint 通过，前端仍有 566 条现存警告。无新增依赖与库表迁移。</p>
+<pre><code>make lint-py
+pytest -q tests/test_venera_source.py tests/test_network_comic.py tests/test_book_source_plugins.py tests/test_plugin_contract.py tests/test_network_library.py tests/test_network_save.py tests/test_comic_reader.py tests/test_comic_media_api.py tests/test_comic_reader_host.py
+playwright test test/e2e/venera.spec.ts
+npm run lint
+node app/test/venera-live.mjs .local-e2e/access.json document/screenshots/tb-236</code></pre>
+<p>实际源验证时间 2026-10-03T06:49:31.263Z，真实 Calibre / Talebook / Nuxt，无书源 API mock。MangaDex 浏览 20 本、搜索 Pepper 返回 9 本；薄花少女 30 个分组章节，首章 51 页。封面 200 image/jpeg（35,810 字节）、首两页 200 image/png（63,915 与 2,993,743 字节），浏览器实际解码并键盘翻页。真实界面完成浏览、手选搜索、从结果进入详情、配置保存与 test action succeeded，以及桌面、320px 手机阅读和退出返回。</p>
+<p>完整 make pytest：1816 passed / 40 skipped / 13 failed。全部 13 失败在未修改 db5744b 基线相同容器中复现：4 项 AUDIOBOOK_MIN_FREE_GB 磁盘余量限制；6 项容器无 Git；2 项既有 epub-beautify 插件规格归属遗漏；1 项既有 Readest revision 测试的 os.stat mock。基线定向检查另有一项因部分导出未包含静态部署配置而失败，不属于完整工作树结果。make check-spec 仍报告既有 epub-beautify 归属问题，本次 Venera 规格无新增错误。</p>
+<p>截图与真实源 JSON 放在 document/screenshots/tb-236；复验说明在 document/Venera.zh_CN.md。临时账号元数据和连接 role 使用平台内置常量初始化，验证凭据未进入仓库。</p></section>
+<section class="card"><h2>Interface Review · Scope and Coverage</h2>
+<p>显式应用仓库 interface-review 与 better-interface，模式 full。Nuxt 4 / Vue 3 / Vuetify；沿用主题 token 与现有密度。参考 AGENTS.md、CLAUDE.md、design/TEMPLATE.html，以及 accessibility/layout/writing/typography/colors/ui 六个 owning skills。</p>
+<div class="table-wrap"><table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>
+<tr><td>Target / Base / Head</td><td>当前分支全部本地变更；origin/master 与 HEAD 均为 db5744b13e245414762bafc6219c6056fcb33837，agent/talebook/7a20ed483dd1 的未提交实现</td></tr>
+<tr><td>Commits / Files</td><td>0 个已提交变更；45 个未提交文件；排除 15 个 PNG 二进制后 30 个源码/规格/方案/复验文件</td></tr>
+<tr><td>Surfaces expanded</td><td>RoutePageToolbar、BookCards、PluginCapabilityTester、现有 Komga Reader bundle/样式与本地漫画宿主。共享组件另 16 处无变更调用页未展开；无共享 token 或组件本体改动。</td></tr>
+<tr><td>Excluded</td><td>截图二进制不参与 diff 代码审查，已用实际图像检查；运行时 .local-e2e、浏览器与共享 node_modules 不进入分支。</td></tr>
+</tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Domain</th><th>Evidence inspected</th><th>Result</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>原生章节链接/按钮、Enter 与箭头翻页、具名配置与重试、focus-visible、关闭返回、错误 live region、320px</td><td>Clear；新配置按钮补显式 2px focus ring</td></tr>
+<tr><td>Layout</td><td>桌面、320px 明暗入口和配置、长分组标题、Reader toolbar 与页码、空/错误状态</td><td>Clear；窄屏工具栏改为纵向分组，说明恢复横排；无水平溢出</td></tr>
+<tr><td>Writing</td><td>管理入口、配置字段、搜索文案、无章节、故障重试、源兼容边界与 zh/en catalogue</td><td>Clear；搜索改为在线书籍，补配置标签与宿主文案翻译</td></tr>
+<tr><td>Typography</td><td>真实漫画简介、卷/语言混合章节、手机长文本、标题截断与详情可达</td><td>Clear；章节可换行，沿用 16px 正文与平台标题层级</td></tr>
+<tr><td>Colors</td><td>浏览器计算实际前景/背景并合成透明度；light/dark 新入口和章节</td><td>Clear；新入口 16.07:1 / 18.73:1，章节 4.60:1 / 18.73:1；暗色原 primary 4.07:1 已修复</td></tr>
+<tr><td>UI</td><td>Vuetify 配置保存与 test action、disabled/加载/错误/重试；Reader 样式及减少动态 media query</td><td>Clear；保留现有 Reader、图标和交互，未添加新动画</td></tr>
+</tbody></table></div></section>
+<section class="card"><h2>Interface Review · Findings</h2><p class="verified">No actionable interface findings in this change. 首轮发现的新入口 focus、暗色文字对比度（HIGH），窄屏说明被挤成竖排及配置技术字段标签（MEDIUM）均已修复，并对全部分支变更重新执行 full 审查。新增无目录、错误重试与 metadata 文本路径有浏览器状态测试。</p></section>
+<section class="card"><h2>Interface Review · Considered but Rejected</h2><div class="table-wrap"><table><thead><tr><th>Location</th><th>Candidate</th><th>Rejected because</th></tr></thead><tbody>
+<tr><td>Reader 宿主</td><td>另写一个漫画阅读器</td><td>现有 manifest 接口满足页序、键盘、手机及退出；另写 UI 会增加维护成本</td></tr>
+<tr><td>app/pages/network/book.vue</td><td>隐藏重复语言版本的章节</td><td>卷与语言分组属于源的有效信息，隐藏会丢失选择</td></tr>
+<tr><td>Venera 配置字段</td><td>改造全部插件的 enum 展示系统</td><td>当前标准语言/分级代码足够明确，已补具名标签；平台整体改造超出本源需求</td></tr>
+</tbody></table></div></section>
+<section class="card"><h2>Interface Review · Pre-existing</h2><p>网络分类 v-chip 可由键盘操作，但默认渲染为无 button role 的 span；属于既有 app/pages/network/index.vue 分类控件，未由本次变更引入，不纳入本次 verdict。原管理书源按钮仍继承 Vuetify focus 样式；本次新增漫画按钮使用明确 outline。</p></section>
+<section class="card"><h2>Interface Review · Verification</h2><p>版本范围：git remote show origin（默认 master）、git merge-base origin/master HEAD、git rev-list --count origin/master..HEAD（0）、git diff --name-status origin/master...HEAD（空）、git diff --name-status HEAD、git ls-files --others --exclude-standard、git diff --check。读取每个 + 与 − hunk 及新增文件；本审查没有 fetch、checkout、stash 或 worktree 写入。</p>
+<p>已验证：Playwright 4 项状态测试；真实源完整浏览器流程；明暗 320px 入口/配置、桌面与手机 Reader；键盘进入、翻页及返回；真实合成文字对比度与可见 focus。章节由原 click-only anchor 改为 comic 的真实 href 与 novel 原生 button，保留原功能且补键盘语义；原管理书源入口仍存在。源码检查 Reader 已有 prefers-reduced-motion 规则，无新增自动运动。</p>
+<p>Not verified：环境没有 ChromeDevTools MCP，使用官方 Chromium 145 + Playwright 完成实际渲染与截图替代；未做实体手机/辅助阅读器测试，未穷举所有自定义主题。上游节点和内容后续变动仍需 QA 复核。</p></section>
+<section class="card"><h2>QA 反馈修正方案</h2><p>PR #1074 尚未合并和独立生效，同一工作继续更新唯一方案。QA 指出生产代理缺失阅读器入口，以及宿主抛出 HTTP 异常使官方脚本可选统计请求的降级失效。</p><p>为 SPA、SSR 和开发 Nginx 配置补充精确 location = /read-online-comic，保留后端 no-store；子路径仍按既有外层代理去前缀契约。宿主将允许请求的网络与上游失败通过 IPC 拒绝对应 JS Promise，携带无敏感内容的请求标识。脚本可捕获可选失败；未处理失败回传标识，由宿主保留原有明确错误类型。网络策略、大小、次数和整体时间限制仍由宿主强制终止，不允许脚本吞掉。</p><p>影响范围追加 conf/nginx 三种配置、部署与源宿主回归、生产规则验证工具及 spec/插件/Venera.md。</p></section>
+<section class="card"><h2>生产代理验证补充</h2><p>实际代理测试发现 BaseHandler.html_page 会将宿主已设置的 no-store 覆盖为 max-age=0。仅在在线漫画宿主渲染后恢复 no-store，补充 HTTP 断言；不改变其他页面的缓存策略。生产验证使用真实 Nginx 配置、真实后端与公开 Reader 静态资源，静态首页标记仅用于判别 SPA fallback，不宣称重新构建和验收整个 SPA。</p></section>
+<section class="card"><h2>QA 修复测试结果</h2><p class="verified">扩展相关回归 192 passed；随后阅读器缓存头修正后的最终定向回归 49 passed，包含 10 项 IPC 故障与边界、6 项真实 Nginx 根路径/子路径部署回归。Python lint 与复验脚本 ruff 通过，前端 lint 0 errors / 566 个既有 warnings，浏览器脚本 node --check 通过。</p><pre>docker run --rm --tmpfs /tmp:size=160m --entrypoint sh -v "$PWD:/workspace" -w /workspace tb234-final-test-env:latest -c 'make lint-py &amp;&amp; python3 -m pytest -q tests/test_network_comic.py tests/test_venera_source.py tests/test_venera_deployment.py'
+python3 -m scripts.venera_optional_statistics
+python3 -m scripts.venera_proxy_live --backend-port 8081 --prefix /team/books --access-file .local-e2e/fix-prefix-access.json --browser-file .local-e2e/fix-prefix-browser.json --output document/screenshots/tb-236/proxy-prefix
+cd app &amp;&amp; CHROMIUM_EXECUTABLE=../.browser/chrome-headless-shell-linux64/chrome-headless-shell node test/venera-proxy.mjs ../.local-e2e/fix-prefix-browser.json</pre><p>复验工具在同一测试镜像中通过 --network host 访问真实上游，临时后端使用 scripts/venera_live_server.py、TALEBOOK_BASE_PATH=/team/books 及独立临时 Calibre 书库；根路径以相同命令去掉 prefix，后端端口 8080。前端未修改，本轮未重跑前轮 4 项状态用例或全量 pytest；前轮和独立 QA 的既有失败证据仍适用，本轮不宣称全量通过。</p><p>2026-10-03 07:24–07:27 UTC：根路径与 /team/books 均经实际生产 Nginx location 返回 Reader HTML，HTTP 200 / no-store，无 SPA fallback；《薄花少女》30 章、51 页，前两张图片 63,915 / 2,993,743 bytes。真实浏览器解码、键盘翻到 2/51、320px 无溢出，退出分别到 /network/book 与 /team/books/network/book。截图与报告在 document/screenshots/tb-236/proxy-root/ 和 proxy-prefix/ 。</p><p>官方固定脚本仅对可选统计请求注入 503，统计之前 3 次上游请求真实成功（含固定脚本获取，2 次为漫画/章节 API），详情与 30 章仍返回；独立必需请求注入 503 明确报 provider_error。报告位于 document/screenshots/tb-236/optional-statistics-report.json 。所有临时进程收集完成，临时认证文件删除。</p></section>
+<section class="card"><h2>Interface Review · Full 复核</h2><div class="table-wrap"><table><tr><th>字段</th><th>范围</th></tr><tr><td>Target / Base / Head</td><td>branch，origin/master db5744b13e245414762bafc6219c6056fcb33837；HEAD cf5db3f470316fbb6c664a0d1ece917f7ec34fea 加本轮全部未提交修改。GitHub API 确认 master 与本地一致，无 fetch 或 checkout。</td></tr><tr><td>Commits / Files</td><td>1 个已提交变更；审查时 26 个未提交路径（包括同一方案的改名）；折叠改名后 60 个文件，排除 19 个 PNG 后 41 个源码/规格/方案/证据文件。</td></tr><tr><td>Consumers</td><td>扩展 RoutePageToolbar、BookCards、PluginCapabilityTester、现有 Reader 及在线漫画宿主五个消费者；16 个其他共享组件调用页未展开。生产根路径与子路径均进入同一 Reader 消费者。</td></tr></table></div><p>重新阅读相对默认分支的全部前端/文案/宿主 diff 两侧及所有后端与部署改动，应用既有六个 owning skills 和参考材料；本轮不修改 Vue、主题 token 或阅读器 bundle。</p><div class="table-wrap"><table><tr><th>Domain</th><th>证据</th><th>结果</th></tr><tr><td>Accessibility</td><td>入口/配置/章节原生控件与名称，focus-visible；本轮实际 Reader 键盘翻页、退出，前轮空/失败/重试截图与状态用例</td><td>Clear</td></tr><tr><td>Layout</td><td>手机工具栏、详情换行、Reader 320px；生产根/子路径截图无裁剪或横向溢出</td><td>Clear</td></tr><tr><td>Writing</td><td>中英文配置与错误文案、显式只读边界、统计可选降级；无新增产品文案</td><td>Clear</td></tr><tr><td>Typography</td><td>沿用 Vuetify、system-ui、长章节换行；本轮阅读器文字和页数实际渲染</td><td>Clear</td></tr><tr><td>Colors</td><td>前轮真实亮/暗主题对比值及截图，源码未改变；本轮 Reader 深色静态资源正常加载</td><td>Clear</td></tr><tr><td>UI</td><td>配置 loading、防重复提交、空章节禁用、重试；本轮生产 Reader 正常页序与退出路径</td><td>Clear</td></tr></table></div><p>No actionable interface findings in this change. QA 的路由与 IPC 正确性问题由代码回归和实际代理证据单独验证，不将它们替代界面评审。</p><p>Considered but rejected：不在本轮重做共享 Reader 的既有英文控件；不把统计降级显示为阻断警告，官方脚本允许省略该信息，必需失败仍有明确反馈；不扩大到其他书源或共享主题调整。</p><p>Pre-existing：沿用前轮列出的类别芯片语义与现有管理源按钮焦点表现，不属于本轮新增控件。Verification：git merge-base origin/master HEAD、git rev-list --count origin/master..HEAD、git diff origin/master -- app/pages app/nuxt.config.ts app/i18n webserver/resources/book/online-comic-reader.html webserver/handlers/network_library.py、git diff --check；gh pr view 1074、gh api git/ref/heads/master 和 PR comments 均只读；无 .git 写入。实际渲染使用当前实现的隔离临时容器，不改变正在审查的源码。</p><p>Not verified：ChromeDevTools MCP 不可用，使用 Playwright + 官方 Chromium 145；未重新构建整个生产 SPA、未访问既有线上部署、未测实体手机/辅助阅读器和所有自定义主题。本轮生产修正只需阅读宿主与静态 Reader 资源，未宣称完整 SPA 重建验收。</p></section>
+<section class="card"><h2>Interface Review · Verdict</h2><p class="verified">Approve</p><p>本地修复验证完成；事项按 Mika 要求保持 in_progress，独立 QA 复验通过前不合并。</p></section>
+<section class="card"><h2>CI 阻断修复与回归</h2><p>开发者要求解决 PR #1074 的全部 CI 阻断，包括前轮标为既有的问题。b1cfcfb 的实际 CI 为 1851 passed / 40 skipped / 3 failed；领域校验另报同一插件归属遗漏。本轮仅补齐已实现插件的规格与修正不改变业务行为的测试，按仓库流程豁免新 WIP；在唯一现有方案中补充验证记录。无产品接口、权限、部署、前端或兼容性变化，沿用已完成的 full 界面审查与实际源证据。</p><div class="table-wrap"><table><tr><th>根因</th><th>修复与保留的约束</th></tr><tr><td>talebook.tool.epub-beautify 已注册并有专属页面，却缺少插件规格，阻断 check-spec 和两项仓库规格测试</td><td>新增 spec/插件/EPUB美化.md 并收录索引；记录当前分析、管理员生成新书与原书不覆盖的实际契约。规格校验器和缺失插件归属的负向测试保持有效。</td></tr><tr><td>Readest 测试替换共享 os.stat，导致维护标记 MAINTENANCE.exists() 误报为真，BaseHandler.prepare 返回 503</td><td>修改真实 EPUB 时间戳并在 finally 恢复；保留修订号变化断言，新增两次 HTTP 200、资源 URL 变化、旧地址 409、新地址 Range 206 与 ZIP 头断言。产品维护检查不变。</td></tr></table></div><p class="verified">本地完整 make pytest：1854 passed / 40 个原有 skipped / 0 failed，覆盖率 74%，耗时 152.81 秒。定向 Readest、规格和 EPUB 插件回归 60 passed；make lint-py-fix、make lint-py、变更测试的 ruff check/format 均通过；make check-spec 25 份通过，make check-design 166 份通过。没有新增跳过标记或放宽断言，前轮的 13 项失败不再作为本轮交付例外。</p><pre>docker run --rm --tmpfs /tmp:size=700m --tmpfs /workspace/tests/library/audiobooks:size=8g --entrypoint sh -v /usr/bin/git:/usr/bin/git:ro -v /usr/lib/git-core:/usr/lib/git-core:ro -v "$PWD:/workspace" -w /workspace tb234-final-test-env:latest -c 'git --version &amp;&amp; df -h tests/library/audiobooks &amp;&amp; make pytest'
+docker run --rm --tmpfs /tmp:size=700m --entrypoint python3 -v "$PWD:/workspace" -w /workspace tb234-final-test-env:latest -m pytest -q tests/test_readest_embed.py tests/test_check_spec.py tests/test_epub_beautify_plugin.py
+docker run --rm --entrypoint sh -v "$PWD:/workspace" -w /workspace tb234-final-test-env:latest -c 'make lint-py-fix &amp;&amp; make lint-py &amp;&amp; ruff check tests/test_readest_embed.py &amp;&amp; ruff format --check tests/test_readest_embed.py'
+make check-spec
+make check-design</pre><p>本地镜像无 Git、宿主磁盘不足 5 GiB，因此只读提供 Git 2.43.0 和独立容量充足的测试音频文件系统；低磁盘拒绝测试仍实际通过，产品 AUDIOBOOK_MIN_FREE_GB 未修改。新提交发布后，按本轮授权使用一次前台 gh pr checks --watch 收集实际 CI；远端结果与完整 SHA 在 PR 和事项回复中交付，事项保持 in_progress，不合并。</p></section>
+</main><footer>Talebook · TB-236</footer></div></body></html>

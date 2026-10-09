@@ -97,6 +97,19 @@ settings = {
     "AUDIOBOOK_BACKUP_RETENTION": 3,
     "AUDIOBOOK_RUNNER_ENABLED": True,
     "VOICEBOOK_COMMAND": "voicebook-tool",
+    "AUDIOBOOK_PROGRESS_STALE_SECONDS": 15,
+    "VOICEBOOK_EDGE_CONCURRENCY": 1,
+    "VOICEBOOK_QWEN_CONCURRENCY": 2,
+    # Empty means AUDIOBOOK_PATH/rate-limits/edge-budget.sqlite3, shared by every worker.
+    "VOICEBOOK_EDGE_BUDGET_PATH": "",
+    "VOICEBOOK_EDGE_MAX_CONCURRENCY": 1,
+    "VOICEBOOK_EDGE_INTERVAL": 5,
+    "VOICEBOOK_MAX_RETRIES": 2,
+    "VOICEBOOK_RETRY_BACKOFF": 1,
+    "VOICEBOOK_MAX_WAIT_SECONDS": 300,
+    "VOICEBOOK_EDGE_COOLDOWN_SECONDS": 30,
+    "VOICEBOOK_EDGE_REQUEST_LIMIT": 0,
+    "VOICEBOOK_EDGE_WINDOW_SECONDS": 3600,
     "PODCAST_ENABLED": True,
     "PODCAST_IP_RETENTION_DAYS": 90,
     "PODCAST_TRUSTED_PROXIES": [],
@@ -206,11 +219,15 @@ settings = {
     ],
 
     # 人机验证配置
-    'CAPTCHA_PROVIDER': '',  # 验证提供商，可选值: 'geetest' 或空字符串表示不启用
+    'CAPTCHA_PROVIDER': '',  # 验证提供商，可选值: 'image', 'geetest', 'turnstile' 或空字符串表示不启用
     'CAPTCHA_ENABLE_FOR_REGISTER': False,  # 注册界面启用认证
     'CAPTCHA_ENABLE_FOR_LOGIN': False,     # 登录页面启用认证
     'CAPTCHA_ENABLE_FOR_WELCOME': False,   # 私人图书馆界面启用认证
     'CAPTCHA_ENABLE_FOR_RESET': False,     # 重置密码页面启用认证
+    'CAPTCHA_ENABLE_FOR_DOWNLOAD': False,  # 下载书籍启用认证
+    'CAPTCHA_ENABLE_FOR_READ': False,      # 在线阅读启用认证
+    'TURNSTILE_SITE_KEY': '',             # Cloudflare Turnstile 公钥
+    'TURNSTILE_SECRET_KEY': '',           # Cloudflare Turnstile 私钥
     'GEETEST_CAPTCHA_ID': '',              # 极验 Captcha ID (公钥)
     'GEETEST_CAPTCHA_KEY': '',             # 极验 Captcha Key (私钥)
 
