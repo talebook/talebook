@@ -15419,8 +15419,8 @@ const J0 = X({
     },
     isCurrentChapter: function(e) {
       if (!this.currentChapter) return !1;
-      const t = (o) => o ? o.split("#")[0] : "", n = t(this.currentChapter.href), i = t(e.href);
-      return n === i;
+      const t = (o) => o ? o.split("#")[0] : "", n = this.currentChapter.href || "", i = e.href || "";
+      return n.includes("#") && i.includes("#") ? n === i : t(n) === t(i);
     },
     scrollToCurrentChapter: function() {
       this.currentChapter && setTimeout(() => {
@@ -15496,7 +15496,7 @@ function Q0(e, t, n, i, o, r) {
     _: 1
   }, 8, ["onClick:select"]);
 }
-const bm = /* @__PURE__ */ Un(Z0, [["render", Q0], ["__scopeId", "data-v-f081fe9b"]]), rl = Symbol.for("vuetify:v-slider");
+const bm = /* @__PURE__ */ Un(Z0, [["render", Q0], ["__scopeId", "data-v-68670265"]]), rl = Symbol.for("vuetify:v-slider");
 function ew(e, t, n) {
   const i = n === "vertical", o = t.getBoundingClientRect(), r = "touches" in e ? e.touches[0] : e;
   return i ? r.clientY - (o.top + o.height / 2) : r.clientX - (o.left + o.width / 2);
@@ -18989,11 +18989,11 @@ const f1 = X({
         const o = this.find_toc(t, i);
         if (o) {
           this.current_toc_title = o.label, this.current_toc = o;
-          const r = [{ contents: i, toc: o }], s = e.end && n.find((c) => String(e.end).includes(c.cfiBase)), a = s && this.find_toc(new ePub.CFI(e.end), s);
-          a && a.label !== o.label && r.push({ contents: s, toc: a }), this.visible_tocs = Oc(r);
-          const l = r.map((c) => c.toc.label).join(`
+          const r = e.end && n.find((c) => String(e.end).includes(c.cfiBase)), s = r && this.find_toc(new ePub.CFI(e.end), r);
+          this.visible_tocs = Oc(this.tocs_between({ contents: i, toc: o }, s && { contents: r, toc: s }, n));
+          const a = this.visible_tocs, l = a.map((c) => c.toc.label).join(`
 `);
-          this.last_toc_label !== l && (r.forEach((c) => this.load_comments_summary(c.contents, c.toc)), this.load_chapter_annotations(this.visible_chapters()), this.last_toc_label = l);
+          this.last_toc_label !== l && (a.forEach((c) => this.load_comments_summary(c.contents, c.toc)), this.load_chapter_annotations(this.visible_chapters()), this.last_toc_label = l);
         }
       } catch (t) {
         console.error("Error in on_location_changed:", t);
@@ -19069,22 +19069,43 @@ const f1 = X({
           i && n.parentElement && this.fit_comment_icon(i, n, n.parentElement);
         });
     },
-    // 当前页上出现的章节（页首一章，跨章时再加页尾一章）。
+    // 目录中从页首章节到页尾章节（含两端）的每一章，配上它所在的正文文档；没有渲染出来的跳过。
+    tocs_between: function(e, t, n) {
+      const i = [e];
+      if (!t || t.toc === e.toc) return i;
+      const o = [], r = (l) => l.forEach((c) => {
+        var u;
+        o.push(c), (u = c.subitems) != null && u.length && r(c.subitems);
+      });
+      r(this.toc_items || []);
+      const s = o.indexOf(e.toc), a = o.indexOf(t.toc);
+      if (s >= 0 && a > s)
+        for (const l of o.slice(s + 1, a)) {
+          const c = String(l.href || "").split("#")[0], u = n.find((d) => {
+            var m;
+            return ((m = this.book.spine.get(d.sectionIndex)) == null ? void 0 : m.href) === c;
+          });
+          u && i.push({ contents: u, toc: l });
+        }
+      return i.push(t), i;
+    },
+    // 当前页上出现的章节。
     visible_chapters: function() {
       const t = (this.visible_tocs.length ? this.visible_tocs.map((n) => n.toc) : [this.current_toc]).map((n) => String((n == null ? void 0 : n.label) || "").trim()).filter(Boolean);
       return t.length ? [...new Set(t)] : [this.comment_chapter];
     },
     refresh_comment_icons: function() {
       if (this.comments_request++, !this.rendition) return;
-      for (const t of this.rendition.getContents())
-        t.document.querySelectorAll(".comment-anchor, .comment-icon").forEach((n) => n.remove());
+      for (const n of this.rendition.getContents())
+        n.document.querySelectorAll(".comment-anchor, .comment-icon").forEach((i) => i.remove());
       if (!this.comments_enabled) return;
-      const e = this.visible_tocs.length ? this.visible_tocs : [{ toc: this.current_toc }];
-      for (const { toc: t } of e) {
-        if (!(t != null && t.elem)) continue;
-        delete t.load_time;
-        const n = this.rendition.getContents().find((i) => i.document === t.elem.ownerDocument);
-        n && this.load_comments_summary(n, t);
+      const e = this.visible_tocs.length ? this.visible_tocs : [{ toc: this.current_toc }], t = this.rendition.getContents();
+      for (const n of e) {
+        const i = n.toc;
+        if (!i) continue;
+        delete i.load_time;
+        const o = t.includes(n.contents) ? n.contents : i.elem && t.find((r) => r.document === i.elem.ownerDocument);
+        o && this.load_comments_summary(o, i);
       }
     },
     retryLoad: function() {
@@ -19242,7 +19263,7 @@ const f1 = X({
     last_toc_label: "",
     // 上一次的可见章节标题，用于检测章节变化
     visible_tocs: [],
-    // 当前页上出现的章节及其正文文档
+    // 当前屏上出现的章节及其正文文档
     toolbar_left: -999,
     toolbar_top: 0,
     is_debug_signal: !1,
@@ -19963,7 +19984,7 @@ function F1(e, t, n, i, o, r) {
     _: 1
   }, 8, ["theme"]);
 }
-const L1 = /* @__PURE__ */ Un(v1, [["render", F1], ["__scopeId", "data-v-1a90a66b"]]), B1 = {
+const L1 = /* @__PURE__ */ Un(v1, [["render", F1], ["__scopeId", "data-v-0aecfd96"]]), B1 = {
   name: "CandleReader",
   computed: {},
   mounted: function() {
