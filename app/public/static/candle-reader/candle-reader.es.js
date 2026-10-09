@@ -20140,7 +20140,7 @@ function q1(e, t, n, i, o, r) {
     _: 1
   }, 8, ["theme"]);
 }
-const K1 = /* @__PURE__ */ Nn(C1, [["render", q1], ["__scopeId", "data-v-3910835e"]]), G1 = {
+const K1 = /* @__PURE__ */ Nn(C1, [["render", q1], ["__scopeId", "data-v-9ec969d0"]]), G1 = {
   name: "CandleReader",
   computed: {},
   mounted: function() {
