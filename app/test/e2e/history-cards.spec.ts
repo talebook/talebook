@@ -1,0 +1,87 @@
+import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const directory = path.dirname(fileURLToPath(import.meta.url));
+const indexData = JSON.parse(fs.readFileSync(path.join(directory, 'mocks/api_index.json'), 'utf8'));
+const mockApiUrl = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
+const summary = '这是一段很长的书籍简介，用来检查标题下方的文字是否有左右留白，以及简介是否最多显示两行。'.repeat(4);
+const books = indexData.random_books.slice(0, 2).map((book, position) => ({
+    ...book,
+    title: position === 0 ? '长书名与阅读记录：手机和桌面都应最多显示两行完整布局'.repeat(2) : 'AnUnbrokenEnglishTitleAboutBooksAndReadingRecords'.repeat(2),
+    comments: `<p>${summary}</p><script>hidden-script-content</script>`,
+}));
+
+test.describe('Reading history card text', () => {
+    test.beforeEach(async ({ request }) => {
+        await request.post(`${mockApiUrl}/_test/reset`, {
+            data: {
+                readingBooks: books,
+                finishedBooks: books,
+                history: { read_history: books, push_history: books, visit_history: books },
+            },
+        });
+    });
+
+    for (const theme of ['light', 'dark']) {
+        for (const width of [320, 1280]) {
+            test(`keeps titles and summaries in two lines at ${width}px in ${theme} theme`, async ({ page }) => {
+                await page.setViewportSize({ width, height: 900 });
+                await page.context().addCookies([{ name: 'theme', value: theme, url: 'http://127.0.0.1:9000' }]);
+                await page.goto('/user/history');
+                await expect(page.locator(`.v-application.v-theme--${theme}`)).toBeVisible();
+
+                for (const tab of [/^在读/, /^已读完/, /^阅读记录/]) {
+                    await page.locator('button[role="tab"]').filter({ hasText: tab }).click();
+                    const cards = page.locator('[data-testid="book-cover-card"]:visible');
+                    await expect(cards).toHaveCount(tab.source === '^阅读记录' ? 6 : 2);
+                    for (const card of await cards.all()) {
+                        const title = card.getByTestId('book-card-title');
+                        const description = card.getByTestId('book-card-summary');
+                        await expect(description).toHaveText(summary);
+                        await expect(card).toHaveAccessibleName(await title.textContent() || '');
+                        for (const text of [title, description]) {
+                            await expect(text).toHaveCSS('-webkit-line-clamp', '2');
+                            const box = await text.boundingBox();
+                            const cardBox = await card.boundingBox();
+                            expect(box!.x - cardBox!.x).toBeCloseTo(12, 1);
+                            expect(cardBox!.x + cardBox!.width - box!.x - box!.width).toBeCloseTo(12, 1);
+                            expect(box!.height).toBeCloseTo(await text.evaluate(element => parseFloat(getComputedStyle(element).lineHeight) * 2), 1);
+                            expect(await text.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+                        }
+                        const titleBox = await title.boundingBox();
+                        const descriptionBox = await description.boundingBox();
+                        expect(descriptionBox!.y).toBeGreaterThan(titleBox!.y + titleBox!.height);
+                        expect(await description.evaluate(element => getComputedStyle(element).color))
+                            .not.toBe(await title.evaluate(element => getComputedStyle(element).color));
+                        await expect(card.locator('script')).toHaveCount(0);
+                    }
+                    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+                }
+            });
+        }
+    }
+
+    test('shows a localized placeholder when the introduction is missing', async ({ page, request }) => {
+        await request.post(`${mockApiUrl}/_test/reset`, {
+            data: { readingBooks: [{ ...books[0], comments: '' }] },
+        });
+        await page.goto('/user/history');
+        await expect(page.getByTestId('book-card-summary').first()).toHaveText('暂无简介');
+    });
+
+    test('opens a reading card by keyboard with visible focus', async ({ page }) => {
+        await page.goto('/user/history');
+        const card = page.locator('[data-testid="book-cover-card"]:visible').first();
+        await expect(card).toBeVisible();
+        await card.focus();
+        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.press('Tab');
+        await expect(card).toBeFocused();
+        await expect(card).toHaveCSS('outline-width', '2px');
+        const href = await card.getAttribute('href');
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(new RegExp(`${href}$`));
+    });
+});

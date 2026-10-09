@@ -46,49 +46,53 @@ test.describe('Shelf', () => {
         await page.goto('/user/shelf');
         await expect(page.getByText(book.title).first()).toBeVisible();
         await expect(page.locator(`a[href="/book/${book.id}"]`).first()).toBeVisible();
+        await expect(page.getByTestId('book-card-title').first()).toHaveCSS('-webkit-line-clamp', '2');
+        await expect(page.getByTestId('book-card-text').first()).toHaveCSS('padding-left', '12px');
+        await expect(page.getByTestId('book-card-summary')).toHaveCount(0);
     });
 
     test('restores shelf state after reloading book detail', async ({ page, request }) => {
         await page.goto(`/book/${book.id}`);
         await expect(page.getByText(book.title).first()).toBeVisible({ timeout: 15_000 });
 
-        const addButton = page.getByRole('button', { name: '加入书架' }).last();
+        const addButton = page.getByTestId('metadata-reading-option-wanted');
         await expect(addButton).toBeVisible();
         const shelfResponse = page.waitForResponse(resp => resp.url().includes(`/api/book/${book.id}/shelf`) && resp.request().method() === 'POST');
         await addButton.evaluate((el: HTMLElement) => el.click());
         await shelfResponse;
 
-        await expect(page.getByRole('button', { name: '移除书架' }).first()).toBeVisible();
+        await expect(page.getByTestId('metadata-shelf-action')).toBeVisible();
+        await expect(addButton).toHaveAttribute('aria-pressed', 'true');
         const rsp = await request.get(`${mockApiUrl}/api/shelf`);
         const data = await rsp.json();
         expect(data.books.some((item: { id: number }) => item.id === book.id)).toBe(true);
 
         await page.reload();
-        await expect(page.getByRole('button', { name: '移除书架' }).first()).toBeVisible();
+        await expect(page.getByTestId('metadata-shelf-action')).toBeVisible();
+        await expect(page.getByTestId('metadata-reading-option-wanted')).toHaveAttribute('aria-pressed', 'true');
     });
 
     test('restores reading state after reload and keeps books independent', async ({ page }) => {
         await page.goto(`/book/${book.id}`);
         await expect(page.getByText(book.title).first()).toBeVisible({ timeout: 15_000 });
 
-        const setReadingButton = page.getByRole('button', { name: '设为在读' }).last();
+        const setReadingButton = page.getByTestId('metadata-reading-option-reading');
         await expect(setReadingButton).toBeVisible();
         const readingResponse = page.waitForResponse(resp => resp.url().includes(`/api/book/${book.id}/readstate`) && resp.request().method() === 'POST');
         await setReadingButton.evaluate((el: HTMLElement) => el.click());
         await readingResponse;
 
-        await expect(page.getByRole('button', { name: '标记读完' })).toBeVisible();
-        await expect(page.getByText('在读', { exact: true }).last()).toBeVisible();
+        await expect(setReadingButton).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.getByTestId('metadata-reading-option-finished')).toHaveAttribute('aria-pressed', 'false');
 
         await page.reload();
-        await expect(page.getByRole('button', { name: '标记读完' })).toBeVisible();
-        await expect(page.getByText('在读', { exact: true }).last()).toBeVisible();
-        await expect(page.getByText('已阅读不足一天')).toBeVisible();
+        await expect(page.getByTestId('metadata-reading-option-reading')).toHaveAttribute('aria-pressed', 'true');
+        await expect(page.getByTestId('metadata-reading-option-finished')).toHaveAttribute('aria-pressed', 'false');
 
         await navigateWithinApp(page, '/book/2');
         await expect(page).toHaveURL(/\/book\/2$/);
         await expect(page.getByText(books[1].title).first()).toBeVisible();
-        await expect(page.getByRole('button', { name: '设为在读' })).toBeVisible();
-        await expect(page.getByText('在读', { exact: true })).toHaveCount(0);
+        await expect(page.getByTestId('metadata-reading-option-reading')).toHaveAttribute('aria-pressed', 'false');
+        await expect(page.getByTestId('metadata-shelf-action')).toHaveCount(0);
     });
 });

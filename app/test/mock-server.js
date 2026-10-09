@@ -19,6 +19,9 @@ let demoMode = false;
 let showNetworkLibrary = true;
 let networkSourceState = 'ready';
 let indexOverride = null;
+let readingBooksOverride = null;
+let finishedBooksOverride = null;
+let historyOverride = null;
 let users = [];
 let saveStarted = false;
 let saveStatusPolls = 0;
@@ -175,6 +178,9 @@ router.post('/_test/reset', eventHandler(async (event) => {
   showNetworkLibrary = body?.showNetworkLibrary !== false;
   networkSourceState = body?.networkSourceState || 'ready';
   indexOverride = body?.indexData || null;
+  readingBooksOverride = body?.readingBooks ?? null;
+  finishedBooksOverride = body?.finishedBooks ?? null;
+  historyOverride = body?.history ?? null;
   console.log('[Mock] isInstalled set to:', isInstalled);
   users = [];
   saveStarted = false;
@@ -884,6 +890,7 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
     is_admin: isLoggedIn,
     nickname: isLoggedIn ? 'Admin' : '',
     avatar: '',
+    extra: historyOverride || {},
     kindle_email: isLoggedIn ? 'test@kindle.com' : ''
   }
 })));
@@ -1339,6 +1346,7 @@ router.get('/api/hot', eventHandler(() => {
 }));
 
 const getFinishedBooks = () => {
+  if (finishedBooksOverride) return finishedBooksOverride;
   const books = readJson('books.json') || [];
   return books.slice(0, 1).map(book => ({
     ...book,
@@ -1353,8 +1361,8 @@ router.get('/api/read-done', eventHandler(() => {
 
 router.get('/api/reading', eventHandler(() => ({
   err: 'ok',
-  total: 0,
-  books: [],
+  total: readingBooksOverride?.length || 0,
+  books: readingBooksOverride || [],
 })));
 
 // Search

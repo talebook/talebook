@@ -503,12 +503,13 @@ class UserInfo(BaseHandler):
                 for k, v in user.extra.items():
                     if k.endswith("_history"):
                         ids = [b["id"] for b in v][:24]
-                        books = self.db.get_data_as_dict(ids=ids)
-                        show = set([b["id"] for b in books])
+                        books = self.get_books(ids=ids)
+                        visible_books = {b["id"]: b for b in books}
                         n = []
                         for b in v:
-                            if b["id"] not in show:
+                            if b["id"] not in visible_books:
                                 continue
+                            b = dict(b, comments=visible_books[b["id"]].get("comments") or "")
                             b["img"] = self.cdn_url + "/get/cover/%(id)s.jpg?t=%(timestamp)s" % b
                             b["href"] = "/book/%(id)s" % b
                             n.append(b)

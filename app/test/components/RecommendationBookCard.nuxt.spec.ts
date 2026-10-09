@@ -23,10 +23,10 @@ describe('RecommendationBookCard.vue', () => {
         const title = '三体：地球往事';
         const wrapper = render({ id: 3, title, img: '/get/cover/3.jpg' });
 
-        expect(wrapper.get('[data-testid="recommendation-title"]').text()).toBe(title);
+        expect(wrapper.get('[data-testid="book-card-title"]').text()).toBe(title);
         expect(wrapper.attributes('aria-label')).toBe(title);
-        expect(wrapper.get('[data-testid="recommendation-title"]').attributes('title')).toBe(title);
-        expect(wrapper.text()).toBe(title);
+        expect(wrapper.get('[data-testid="book-card-title"]').attributes('title')).toBe(title);
+        expect(wrapper.find('.v-card-title').exists()).toBe(false);
         expect(wrapper.getComponent({ name: 'VCard' }).props('to')).toBe('/book/3');
         expect(wrapper.getComponent({ name: 'VImg' }).props('src')).toBe('/get/cover/3.jpg');
         expect(wrapper.getComponent({ name: 'VImg' }).attributes('aria-hidden')).toBe('true');
@@ -42,9 +42,9 @@ describe('RecommendationBookCard.vue', () => {
         const title = '返回首页后更新的长书名：读者仍能获取完整内容';
         await wrapper.setProps({ book: { id: 2, title } });
 
-        expect(wrapper.get('[data-testid="recommendation-title"]').text()).toBe(title);
+        expect(wrapper.get('[data-testid="book-card-title"]').text()).toBe(title);
         expect(wrapper.attributes('aria-label')).toBe(title);
-        expect(wrapper.get('[data-testid="recommendation-title"]').attributes('title')).toBe(title);
+        expect(wrapper.get('[data-testid="book-card-title"]').attributes('title')).toBe(title);
         expect(wrapper.getComponent({ name: 'VCard' }).props('to')).toBe('/book/2');
     });
 
@@ -52,9 +52,9 @@ describe('RecommendationBookCard.vue', () => {
         const title = '<em>书名 & 原始文本</em>';
         const wrapper = render({ id: 1, title, state: { read_state: 2 } });
 
-        expect(wrapper.get('[data-testid="recommendation-title"]').text()).toBe(title);
+        expect(wrapper.get('[data-testid="book-card-title"]').text()).toBe(title);
         expect(wrapper.find('em').exists()).toBe(false);
         expect(wrapper.get('.recommendation-cover .book-read-badge').exists()).toBe(true);
-        expect(wrapper.find('.recommendation-title-area .book-read-badge').exists()).toBe(false);
+        expect(wrapper.find('.book-card-text .book-read-badge').exists()).toBe(false);
     });
 });

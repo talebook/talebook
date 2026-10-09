@@ -19,21 +19,13 @@
             />
             <BookReadBadge :read-state="book.state?.read_state" />
         </div>
-        <div class="recommendation-title-area text-body-2">
-            <div
-                class="recommendation-title"
-                data-testid="recommendation-title"
-                :title="book.title"
-                dir="auto"
-            >
-                {{ book.title }}
-            </div>
-        </div>
+        <BookCardText :book="book" />
     </v-card>
 </template>
 
 <script setup>
 import BookReadBadge from '@/components/BookReadBadge.vue';
+import BookCardText from '@/components/BookCardText.vue';
 
 defineProps({
     book: {
@@ -50,19 +42,5 @@ defineProps({
 }
 .recommendation-cover {
     position: relative;
-}
-.recommendation-title-area {
-    padding-block: 8px;
-    padding-inline: 4px;
-}
-.recommendation-title {
-    display: -webkit-box;
-    min-block-size: 3em;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    line-height: 1.5;
-    text-align: start;
 }
 </style>

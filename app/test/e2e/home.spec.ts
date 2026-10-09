@@ -83,15 +83,24 @@ test.describe('Homepage', () => {
                 await expect(page.locator(`.v-application.v-theme--${theme}`)).toBeVisible();
                 for (const [index, title] of titles.entries()) {
                     const card = cards.nth(index);
-                    await expect(card.getByTestId('recommendation-title')).toHaveText(title);
-                    await expect(card.getByTestId('recommendation-title')).toHaveAttribute('title', title);
+                    await expect(card.getByTestId('book-card-title')).toHaveText(title);
+                    await expect(card.getByTestId('book-card-title')).toHaveAttribute('title', title);
                     await expect(card).toHaveAccessibleName(title);
                     const coverBox = await card.getByTestId('recommendation-cover').boundingBox();
-                    const titleBox = await card.getByTestId('recommendation-title').boundingBox();
+                    const titleBox = await card.getByTestId('book-card-title').boundingBox();
                     const cardBox = await card.boundingBox();
                     expect(coverBox!.width).toBeCloseTo(cardBox!.width, 1);
                     expect(coverBox!.width / coverBox!.height).toBeCloseTo(11 / 15, 2);
                     expect(titleBox!.y).toBeGreaterThan(coverBox!.y + coverBox!.height);
+                    const summary = card.getByTestId('book-card-summary');
+                    await expect(summary).toBeVisible();
+                    await expect(summary).toHaveCSS('-webkit-line-clamp', '2');
+                    const summaryBox = await summary.boundingBox();
+                    expect(titleBox!.x - cardBox!.x).toBeCloseTo(12, 1);
+                    expect(cardBox!.x + cardBox!.width - titleBox!.x - titleBox!.width).toBeCloseTo(12, 1);
+                    expect(summaryBox!.y).toBeGreaterThan(titleBox!.y + titleBox!.height);
+                    expect(await summary.evaluate(element => getComputedStyle(element).color))
+                        .not.toBe(await card.getByTestId('book-card-title').evaluate(element => getComputedStyle(element).color));
                     expect(cardBox!.height).toBeGreaterThan(coverBox!.height + titleBox!.height);
                     expect(cardBox!.x).toBeGreaterThanOrEqual(0);
                     expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(width);
@@ -107,7 +116,7 @@ test.describe('Homepage', () => {
                 }
                 const heights = await cards.evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().height)));
                 expect(new Set(heights).size).toBe(1);
-                const longTitle = cards.nth(1).getByTestId('recommendation-title');
+                const longTitle = cards.nth(1).getByTestId('book-card-title');
                 await expect(longTitle).toHaveCSS('-webkit-line-clamp', '2');
                 expect(await longTitle.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
                 expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
@@ -152,7 +161,7 @@ test.describe('Homepage', () => {
     test('keeps recommendation titles readable with doubled text size', async ({ page }) => {
         await page.setViewportSize({ width: 320, height: 900 });
         await page.goto('/');
-        const title = page.getByTestId('recommendation-title').first();
+        const title = page.getByTestId('book-card-title').first();
         await expect(title).toBeVisible();
         const normalFontSize = await title.evaluate(element => parseFloat(getComputedStyle(element).fontSize));
         await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });

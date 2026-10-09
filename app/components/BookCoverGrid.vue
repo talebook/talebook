@@ -12,27 +12,34 @@
             :cols="cols"
             :sm="sm"
             :md="md"
+            :lg="lg"
         >
             <v-card
                 :to="book.href || '/book/' + book.id"
-                class="ma-1"
+                :aria-label="book.title"
+                class="book-cover-card ma-1"
+                data-testid="book-cover-card"
             >
                 <v-img
                     :src="book.img"
                     :aspect-ratio="11 / 15"
+                    alt=""
+                    aria-hidden="true"
+                    data-testid="book-cover-image"
                 />
-                <v-card-subtitle
+                <BookCardText
                     v-if="showTitle"
-                    class="text-truncate px-1"
-                >
-                    {{ book.title }}
-                </v-card-subtitle>
+                    :book="book"
+                    :show-summary="showSummary"
+                />
             </v-card>
         </v-col>
     </v-row>
 </template>
 
 <script setup>
+import BookCardText from '@/components/BookCardText.vue';
+
 defineProps({
     books: {
         type: Array,
@@ -58,9 +65,24 @@ defineProps({
         type: [String, Number],
         default: undefined,
     },
+    lg: {
+        type: [String, Number],
+        default: undefined,
+    },
     showTitle: {
+        type: Boolean,
+        default: false,
+    },
+    showSummary: {
         type: Boolean,
         default: false,
     },
 });
 </script>
+
+<style scoped>
+.book-cover-card:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+</style>
