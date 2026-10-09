@@ -63,8 +63,8 @@ test.describe('Homepage', () => {
     });
 
     for (const theme of ['light', 'dark']) {
-        for (const width of [320, 1280, 1920]) {
-            test(`shows titles below unchanged recommendation covers at ${width}px in ${theme} theme`, async ({ page, request }) => {
+        for (const width of [320, 600, 768, 960, 1280, 1920, 2560]) {
+            test(`shows readable recommendation cards at ${width}px in ${theme} theme`, async ({ page, request }) => {
                 const titles = [
                     '三体',
                     '这是一本书名很长的推荐书籍：封面下面应该显示两行书名并保留完整名称',
@@ -95,13 +95,15 @@ test.describe('Homepage', () => {
                     expect(cardBox!.height).toBeGreaterThan(coverBox!.height + titleBox!.height);
                     expect(cardBox!.x).toBeGreaterThanOrEqual(0);
                     expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(width);
-                    const expectedWidth = await card.evaluate(element => {
-                        const column = element.parentElement!;
-                        const style = getComputedStyle(column);
-                        return column.getBoundingClientRect().width - parseFloat(style.paddingLeft)
-                            - parseFloat(style.paddingRight) - 8;
-                    });
-                    expect(cardBox!.width).toBeCloseTo(expectedWidth, 1);
+                    expect(cardBox!.width).toBeGreaterThanOrEqual(width === 320 ? 120 : 160);
+                    expect(cardBox!.width).toBeLessThanOrEqual(260);
+                }
+                const firstBox = await cards.nth(0).boundingBox();
+                const secondBox = await cards.nth(1).boundingBox();
+                const thirdBox = await cards.nth(2).boundingBox();
+                expect(secondBox!.y).toBeCloseTo(firstBox!.y, 1);
+                if (width === 320) {
+                    expect(thirdBox!.y).toBeGreaterThan(firstBox!.y + firstBox!.height);
                 }
                 const heights = await cards.evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().height)));
                 expect(new Set(heights).size).toBe(1);
@@ -111,6 +113,25 @@ test.describe('Homepage', () => {
                 expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
             });
         }
+    }
+
+    for (const width of [320, 1280, 1920]) {
+        test(`keeps a single recommendation at normal card width at ${width}px`, async ({ page, request }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/');
+            const cards = page.getByTestId('recommendation-book-card');
+            await expect(cards.first()).toBeVisible();
+            const normalBox = await cards.first().boundingBox();
+            await request.post(`${mockApiUrl}/_test/reset`, {
+                data: { indexData: { ...apiIndex, random_books: apiIndex.random_books.slice(0, 1) } }
+            });
+            await page.reload();
+            await expect(cards).toHaveCount(1);
+            await expect(cards.first()).toBeVisible();
+            const singleBox = await cards.first().boundingBox();
+            expect(singleBox!.width).toBeCloseTo(normalBox!.width, 1);
+            expect(singleBox!.x).toBeCloseTo(normalBox!.x, 1);
+        });
     }
 
     test('opens a recommendation by keyboard with a visible focus indicator', async ({ page }) => {
@@ -230,6 +251,7 @@ test.describe('Homepage', () => {
             has: page.getByTestId('book-cover'),
         }).first();
         await expect(cardWithCover).toBeVisible();
+        await cardWithCover.scrollIntoViewIfNeeded();
 
         const cardBox = await cardWithCover.boundingBox();
         const coverBox = await cardWithCover.getByTestId('book-cover').boundingBox();

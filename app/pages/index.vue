@@ -7,16 +7,18 @@
                 </p>
             </v-col>
             <v-col
-                v-for="(book,idx) in get_random_books"
-                :key="'rec'+idx+book.id"
-                cols="6"
-                xs="6"
-                sm="4"
-                md="2"
-                lg="1"
-                class="book-card"
+                v-if="get_random_books.length"
+                cols="12"
             >
-                <RecommendationBookCard :book="book" />
+                <div class="recommendation-grid">
+                    <div
+                        v-for="(book,idx) in get_random_books"
+                        :key="'rec'+idx+book.id"
+                        class="book-card"
+                    >
+                        <RecommendationBookCard :book="book" />
+                    </div>
+                </div>
             </v-col>
             <!-- 空状态提示 -->
             <v-col
@@ -160,5 +162,19 @@ const new_books = computed(() => indexData.value?.new_books || []);
 .title {
     font-size: 1.25rem;
     font-weight: 500;
+}
+</style>
+
+<style scoped>
+.recommendation-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+@media (min-width: 600px) {
+    .recommendation-grid {
+        grid-template-columns: repeat(auto-fill, minmax(min(176px, 100%), 1fr));
+    }
 }
 </style>
