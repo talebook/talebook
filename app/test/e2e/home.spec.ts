@@ -62,6 +62,94 @@ test.describe('Homepage', () => {
             .toEqual(books.map(book => `/book/${book.id}`));
     });
 
+    for (const theme of ['light', 'dark']) {
+        for (const width of [320, 1280, 1920]) {
+            test(`shows titles below unchanged recommendation covers at ${width}px in ${theme} theme`, async ({ page, request }) => {
+                const titles = [
+                    '三体',
+                    '这是一本书名很长的推荐书籍：封面下面应该显示两行书名并保留完整名称',
+                    'AnUnbrokenEnglishBookTitleThatMustWrapWithoutWideningTheRecommendationCard',
+                ];
+                const books = titles.map((title, index) => ({ ...apiIndex.random_books[index], title }));
+                await request.post(`${mockApiUrl}/_test/reset`, {
+                    data: { indexData: { ...apiIndex, random_books: books } }
+                });
+                await page.setViewportSize({ width, height: 900 });
+                await page.context().addCookies([{ name: 'theme', value: theme, url: 'http://127.0.0.1:9000' }]);
+                await page.goto('/');
+
+                const cards = page.getByTestId('recommendation-book-card');
+                await expect(cards).toHaveCount(books.length);
+                await expect(page.locator(`.v-application.v-theme--${theme}`)).toBeVisible();
+                for (const [index, title] of titles.entries()) {
+                    const card = cards.nth(index);
+                    await expect(card.getByTestId('recommendation-title')).toHaveText(title);
+                    await expect(card.getByTestId('recommendation-title')).toHaveAttribute('title', title);
+                    await expect(card).toHaveAccessibleName(title);
+                    const coverBox = await card.getByTestId('recommendation-cover').boundingBox();
+                    const titleBox = await card.getByTestId('recommendation-title').boundingBox();
+                    const cardBox = await card.boundingBox();
+                    expect(coverBox!.width).toBeCloseTo(cardBox!.width, 1);
+                    expect(coverBox!.width / coverBox!.height).toBeCloseTo(11 / 15, 2);
+                    expect(titleBox!.y).toBeGreaterThan(coverBox!.y + coverBox!.height);
+                    expect(cardBox!.height).toBeGreaterThan(coverBox!.height + titleBox!.height);
+                    expect(cardBox!.x).toBeGreaterThanOrEqual(0);
+                    expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(width);
+                    const expectedWidth = await card.evaluate(element => {
+                        const column = element.parentElement!;
+                        const style = getComputedStyle(column);
+                        return column.getBoundingClientRect().width - parseFloat(style.paddingLeft)
+                            - parseFloat(style.paddingRight) - 8;
+                    });
+                    expect(cardBox!.width).toBeCloseTo(expectedWidth, 1);
+                }
+                const heights = await cards.evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().height)));
+                expect(new Set(heights).size).toBe(1);
+                const longTitle = cards.nth(1).getByTestId('recommendation-title');
+                await expect(longTitle).toHaveCSS('-webkit-line-clamp', '2');
+                expect(await longTitle.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);
+                expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+            });
+        }
+    }
+
+    test('opens a recommendation by keyboard with a visible focus indicator', async ({ page }) => {
+        await page.goto('/');
+        const card = page.getByTestId('recommendation-book-card').first();
+        await expect(card).toBeVisible();
+        await card.focus();
+        await page.keyboard.press('Shift+Tab');
+        await page.keyboard.press('Tab');
+        await expect(card).toBeFocused();
+        await expect(card).toHaveCSS('outline-style', 'solid');
+        await expect(card).toHaveCSS('outline-width', '2px');
+        const href = await card.getAttribute('href');
+        await page.keyboard.press('Enter');
+        await expect(page).toHaveURL(new RegExp(`${href}$`));
+    });
+
+    test('keeps recommendation titles readable with doubled text size', async ({ page }) => {
+        await page.setViewportSize({ width: 320, height: 900 });
+        await page.goto('/');
+        const title = page.getByTestId('recommendation-title').first();
+        await expect(title).toBeVisible();
+        const normalFontSize = await title.evaluate(element => parseFloat(getComputedStyle(element).fontSize));
+        await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+        const resized = await title.evaluate(element => ({
+            fontSize: parseFloat(getComputedStyle(element).fontSize),
+            height: element.getBoundingClientRect().height,
+            lineHeight: parseFloat(getComputedStyle(element).lineHeight),
+            width: element.getBoundingClientRect().width,
+        }));
+        expect(resized.fontSize).toBeCloseTo(normalFontSize * 2, 1);
+        expect(resized.height).toBeGreaterThanOrEqual(resized.lineHeight * 2);
+        expect(resized.width).toBeGreaterThan(0);
+        const card = page.getByTestId('recommendation-book-card').first();
+        const href = await card.getAttribute('href');
+        await card.click();
+        await expect(page).toHaveURL(new RegExp(`${href}$`));
+    });
+
     test('distinguishes no unread recommendations from an empty library', async ({ page, request }) => {
         await request.post(`${mockApiUrl}/_test/reset`, {
             data: { indexData: { ...apiIndex, random_books: [], visible_books_count: 30 } }
