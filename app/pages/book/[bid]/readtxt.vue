@@ -207,6 +207,8 @@
                     v-if="!inited"
                     variant="outlined"
                     width="300"
+                    max-width="100%"
+                    role="status"
                     style="margin: 0 auto"
                 >
                     <v-card-title ref="tipTitle">
@@ -275,7 +277,7 @@
 import { withBasePath } from '@/utils/base-path';
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import AppFooter from '~/components/AppFooter.vue';
 import AnnotationPanel from '~/components/AnnotationPanel.vue';
@@ -316,105 +318,161 @@ const tip = reactive({
     content: t('messages.parsingContent')
 });
 
-let intvl = null;
+let countdown = null;
+let pollTimer = null;
+let disposed = false;
+const requests = new AbortController();
+
+const stopWaiting = () => {
+    clearInterval(countdown);
+    clearTimeout(pollTimer);
+    countdown = null;
+    pollTimer = null;
+};
+
+const showError = (message) => {
+    stopWaiting();
+    tip.title = t('messages.error');
+    tip.content = message || t('book.prepareError');
+    loading.value = false;
+};
+
+const openReadyBook = (data) => {
+    stopWaiting();
+    inited.value = true;
+    content.value = data.content;
+    name.value = data.name;
+    getNovelContent(0);
+};
+
+const showPreparing = () => {
+    tip.title = t('book.preparing');
+    tip.content = t('book.preparingMessage');
+};
+
+// Schedule only after the previous request settles, including slow responses.
+const schedulePoll = () => {
+    if (!disposed && !inited.value) pollTimer = setTimeout(pollReady, 5000);
+};
+
+const pollReady = async () => {
+    if (disposed) return;
+    try {
+        const rsp = await $backend(`/book/txt/init?id=${bookid}&test=1`, { signal: requests.signal });
+        if (disposed) return;
+        if (rsp.err !== 'ok') {
+            showError(rsp.msg);
+            return;
+        }
+        if (rsp.msg === '已解析') {
+            openReadyBook(rsp.data);
+            return;
+        }
+        schedulePoll();
+    } catch (error) {
+        if (!disposed) showError();
+    }
+};
 
 onMounted(() => {
     mainStore.setNavbar(false);
     // 获取用户信息
-    $backend('/user/info').then((rsp) => {
-        if (rsp.err === 'ok') {
+    $backend('/user/info', { signal: requests.signal }).then((rsp) => {
+        if (!disposed && rsp.err === 'ok') {
             mainStore.login(rsp);
         }
-    });
+    }).catch(() => {});
     openPreferredReader();
 });
 
-onUnmounted(() => {
-    if (intvl) clearInterval(intvl);
-});
+const dispose = () => {
+    disposed = true;
+    stopWaiting();
+    requests.abort();
+};
+// Route transitions can keep the old page mounted after navigation has begun.
+onBeforeRouteLeave(dispose);
+onUnmounted(dispose);
 
-const init = () => {
+const init = async () => {
+    if (disposed) return;
     loading.value = true;
-    $backend(`/book/txt/init?id=${bookid}&test=0`)
-        .then(rsp => {
-            if (rsp.err !== 'ok') {
-                tip.title = t('messages.error');
-                tip.content = rsp.msg;
-                return;
-            }
-            if (rsp.msg === '已解析') {
-                inited.value = true;
-                content.value = rsp.data.content;
-                name.value = rsp.data.name;
-                getNovelContent(0);
+    try {
+        const rsp = await $backend(`/book/txt/init?id=${bookid}&test=0`, { signal: requests.signal });
+        if (disposed) return;
+        if (rsp.err !== 'ok') {
+            showError(rsp.msg);
+            return;
+        }
+        if (rsp.msg === '已解析') {
+            openReadyBook(rsp.data);
+            return;
+        }
+        loading.value = false;
+        const estimate = Number(rsp.data.wait);
+        wait.value = Number.isFinite(estimate) ? Math.max(0, Math.ceil(estimate)) : 0;
+        const queLen = Number(rsp.data.que) || 0;
+        name.value = rsp.data.name;
+        const updateTip = () => {
+            if (wait.value <= 0) {
+                clearInterval(countdown);
+                countdown = null;
+                showPreparing();
+            } else if (queLen > 0) {
+                tip.title = t('book.inQueue');
+                tip.content = t('book.initialQueueMessage', { count: queLen });
             } else {
-                wait.value = Math.max(1, Math.ceil(Number(rsp.data.wait) || 0));
-                const queLen = Number(rsp.data.que) || 0;
-                name.value = rsp.data.name;
-                if (queLen > 0) {
-                    tip.title = t('book.inQueue');
-                    tip.content = t('book.queueMessage', { count: queLen });
-                } else {
-                    tip.title = t('book.parsing');
-                    tip.content = t('book.parsingMessage', { seconds: wait.value });
-                }
-                if (intvl) clearInterval(intvl);
-                intvl = setInterval(() => {
-                    wait.value--;
-                    tip.title = t('book.parsing');
-                    tip.content = t('book.parsingMessage', { seconds: wait.value });
-                    if (wait.value <= 0) {
-                        clearInterval(intvl);
-                        tip.content = t('book.timeoutMessage');
-                        tip.title = t('book.parseTimeout');
-                        return;
-                    }
-                    if (wait.value % 5 !== 0) return;
-                    $backend(`/book/txt/init?id=${bookid}&test=1`,)
-                        .then(res => {
-                            if (res.err === 'ok' && res.msg === '已解析') {
-                                inited.value = true;
-                                content.value = res.data.content;
-                                name.value = res.data.name;
-                                getNovelContent(0);
-                                clearInterval(intvl);
-                            }
-                        });
-                }, 1000);
+                tip.title = t('book.preparing');
+                tip.content = t('book.preparingEstimate', { seconds: wait.value });
             }
-        }).finally(() => {
-            loading.value = false;
-        });
+        };
+        updateTip();
+        if (wait.value > 0) {
+            countdown = setInterval(() => {
+                wait.value = Math.max(0, wait.value - 1);
+                updateTip();
+            }, 1000);
+        }
+        schedulePoll();
+    } catch (error) {
+        if (!disposed) showError();
+    }
 };
 
 const openPreferredReader = async () => {
     try {
-        const rsp = await $backend(`/book/${bookid}`);
+        const rsp = await $backend(`/book/${bookid}`, { signal: requests.signal });
+        if (disposed) return;
         const formats = rsp.book?.files?.map(file => String(file.format).toLowerCase()) || [];
         if (rsp.err === 'ok' && formats.includes('epub')) {
             window.location.replace(withBasePath(`/read/${bookid}`));
             return;
         }
     } catch (e) {
+        if (disposed) return;
         console.error(e);
     }
     init();
 };
 
 const getNovelContent = (i) => {
-    if (selected.value === i) return;
+    if (disposed || selected.value === i) return;
     selected.value = i;
     const {title, start, end} = {...content.value[i]};
     loading.value = true;
     // console.log(title, start, end)
-    $backend(`/read/txt?id=${bookid}&start=${start}&end=${end}`)
+    $backend(`/read/txt?id=${bookid}&start=${start}&end=${end}`, { signal: requests.signal })
         .then(res => {
+            if (disposed) return;
             if (res.err !== 'ok') {
                 novelContent.value = t('book.contentError') + res.msg;
                 return;
             }
             novelContent.value = `<h3>${title}</h3><br>${res.content}`;
+        }).catch(() => {
+            if (!disposed) novelContent.value = t('book.prepareError');
         }).finally(() => {
+            if (disposed) return;
             loading.value = false;
             if (process.client) {
                 window.scrollTo({ top: 0, behavior: 'smooth' });

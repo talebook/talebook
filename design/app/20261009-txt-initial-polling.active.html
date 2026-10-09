@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="修复 PR #1077 / issue #1067 的 TXT 冷启动与排队轮询。" />
+    <link rel="icon" href="data:," />
+    <title>TXT 首次初始化与持续排队轮询 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page" id="main-content">
+<header class="hero"><h1>TXT 首次初始化与持续排队轮询</h1><p class="sub">创建：2026-10-09 · 主责：app · 状态：ACTIVE</p><p>需求来源：<a href="https://github.com/talebook/talebook/pull/1077">PR #1077</a> / <a href="https://github.com/talebook/talebook/issues/1067">issue #1067</a></p></header>
+<section class="card"><h2>原始诉求</h2><p>修复服务冷启动时空队列异常，以及排队后轮询提前结束导致首次打开 TXT 卡住的问题。补前后端回归、跨模块设计记录与界面验收。只修改原 PR 分支，不合并、不部署、不关闭 issue。</p></section>
+<section class="card"><h2>目标与边界</h2><p>首次请求能够入队；预估耗时结束后仍串行查询直到就绪；就绪后只初始化一次；离开页面清理计时器、取消请求且忽略迟到响应。保持接口字段、EPUB 优先规则、解析服务与权限不变。解析器没有任务失败状态，永久失败时仍可能持续等待，这是现有协议限制，不在本次扩展任务系统。</p></section>
+<section class="card"><h2>编码前书面设计决策审查（grill 替代）</h2><p>仓库要求编码前逐项澄清设计决策；环境及 checkout 没有 grill 技能。按本次追加授权采用书面审查，不声称调用该技能。</p><div class="table-wrap"><table><thead><tr><th>问题</th><th>决定与依据</th><th>假设与反证</th></tr></thead><tbody>
+<tr><td>冷启动如何取队列长度？</td><td>保留入队前快照，None 视作零，再调用现有注册服务。</td><td>get_queue 在未注册时返回 None；已有队列 qsize 不包含运行中任务，只是快照，不作为期限。</td></tr>
+<tr><td>预估秒数能否终止轮询？</td><td>不能。服务未给排队或执行状态，wait 仅作提示，归零改为仍在准备提示。</td><td>30 秒小文件可能在大任务后排队超过 120 秒；靠增大上限不能解决。</td></tr>
+<tr><td>如何避免慢请求重叠？</td><td>每次 readiness 请求完成后才安排下次 5 秒 setTimeout。</td><td>不能用 setInterval 直接发请求；慢请求必须有测试验证最大并发为一。</td></tr>
+<tr><td>如何处理离开、错误和缓存？</td><td>路由离开和销毁时取消请求和两个定时器，检查 disposed；缓存就绪直接加载；显式错误或请求失败显示错误并停止。</td><td>AbortController 不保证所有异步后续消失，故仍检查 disposed；覆盖初始、轮询、书籍格式查询迟到响应。</td></tr>
+<tr><td>是否添加队列状态 API 或调整解析器？</td><td>否，已有 readiness 协议足够；避免权限、数据结构及产品范围扩展。</td><td>无法区分仍排队与正在解析，超时后用中性准备文案，不能虚报失败。</td></tr>
+</tbody></table></div></section>
+<section class="card"><h2>方案</h2><p>验证迭代：浏览器回归发现路由已到登录页但过渡仍保留旧组件时，onUnmounted 尚未触发，迟到 readiness 会请求正文。据此更新决策：清理提前至 onBeforeRouteLeave，并保留 onUnmounted 兜底；同一用例必须由失败变通过。</p><div class="flow"><div class="step"><b>首次打开</b><p>检查格式优先级，TXT 初始化 test=0；空队列按零处理。</p></div><div class="step"><b>等待</b><p>显示入队快照或预估时间；5 秒后 test=1，响应后再调度。</p></div><div class="step"><b>超过预估</b><p>归零不停止，提示仍在准备，继续串行查询。</p></div><div class="step"><b>终态</b><p>就绪只加载一次；错误或离开页面清理计时器与请求。</p></div></div></section>
+<section class="card"><h2>影响范围与风险</h2><p>app/pages/book/[bid]/readtxt.vue、三种语言目录、app/test/、webserver/handlers/book.py、tests/test_txt.py、spec/阅读器.md。只更新 TXT 准备行为规格。无权限、安全、迁移或部署变更。截图和 mock 浏览器测试仅为隔离验收，不是连接真实书库的完整功能验证。</p></section>
+<section class="card" id="tests"><h2>测试结果</h2><div class="table-wrap"><table><thead><tr><th>验证</th><th>命令 / 场景</th><th>实际结果</th></tr></thead><tbody>
+<tr><td>后端专项</td><td>docker exec pr1077-tests pytest tests/test_txt.py -v</td><td>8 passed；冷启动使用真实注册和入队路径，仅隔离 worker 消费；已有队列、30/120 秒边界、readiness、缓存。</td></tr>
+<tr><td>后端全量</td><td>docker exec pr1077-tests make pytest</td><td>1943 passed，40 skipped，276 warnings；180.55 秒。容器采用 CI 同款 talebook/talebook-base:latest，make init 后安装 git、ffmpeg。</td></tr>
+<tr><td>后端格式</td><td>make lint-py-fix；make lint-py；ruff check tests/test_txt.py；ruff format --check tests/test_txt.py（均在同一容器）</td><td>通过；191 个后端文件无需格式更改。</td></tr>
+<tr><td>前端静态检查</td><td>cd app &amp;&amp; npm run lint；npm run build</td><td>lint 0 errors / 566 既有 warnings；Nuxt 生产构建通过。最后一次路由清理修改后再次执行，两项均通过。</td></tr>
+<tr><td>设计门禁</td><td>make check-design</td><td>169 篇通过；本方案已转为 ACTIVE。</td></tr>
+<tr><td>规格</td><td>make check-spec</td><td>25 篇通过。</td></tr>
+<tr><td>浏览器</td><td>cd app &amp;&amp; PLAYWRIGHT_BROWSERS_PATH=/tmp/pr1077-browsers npx playwright test -c playwright.library.config.ts</td><td class="verified">22 passed / 30.4 秒，其中 14 项 TXT 回归全部通过；覆盖 140 秒排队、零秒、慢请求、迟到响应、离开清理、网络错误、缓存、320px 深色、英俄文 200% 布局。纳入已有 library-browser CI，不修改 workflow。</td></tr>
+</tbody></table></div><h3>失败记录与处理</h3><ul><li>首次依赖安装因容器缺少宿主 CA 校验失败；只读挂载宿主 CA，并显式使用 PIP_CERT，未关闭证书校验。</li><li>首轮全量测试 1937 passed、40 skipped、6 failed；六项均是发行脚本测试缺少 git。安装 CI 同款依赖 git 后全量重跑通过。</li><li>冷启动测试最初替换全局 Thread.start 误阻断 HTTP resolver；改为仅隔离 AsyncService.loop，测试真实注册/入队路径，通过。</li><li>浏览器早期失败包含构建未完成、status 选择器匹配侧栏、图标和空标题定位；已缩小定位和使用真实路由链接。一次迟到响应测试暴露了真实的路由过渡窗口，已增加 onBeforeRouteLeave，最终同一离页用例与整组 22 项均已通过。</li></ul><p>Chrome DevTools MCP 当前没有可调用工具；计划用 Playwright Chromium 实际页面渲染、截图和浏览器断言作替代，明确保留工具验证缺口。没有手动保留 Nuxt dev server，不提供 mock 体验地址。</p></section>
+<section class="card"><h2>interface-review full：Scope and Coverage</h2>
+<p>使用 checkout 中的 interface-review → better-interface，逐项加载 better-accessibility、better-layout、better-writing、better-typography、better-colors、better-ui。读取根 AGENTS.md、app/CLAUDE.md、webserver/CLAUDE.md、spec/阅读器.md；按 Vue 3 / Nuxt 4 / Vuetify 既有规范审查。</p>
+<div class="table-wrap"><table><tbody>
+<tr><th>Target</th><td>full branch，含原 PR 已提交内容及本次全部未提交内容</td></tr>
+<tr><th>Base ref</th><td>origin/master = 72bc9175f905aa02eda0c042de55dd233bdc80e0；merge-base = 96995228f37a8823d9e45bbc772f0bb44ce8be67</td></tr>
+<tr><th>Head ref</th><td>d2cb122ec513141ad5ad923370c38d6061c70b72 + 本次工作区；相对 merge-base 共 2 个已提交 commit</td></tr>
+<tr><th>Files in scope</th><td>15 个改动文件，其中 11 个文本文件；4 张截图作为渲染证据，不作代码审查。test-results/、构建产物、node_modules 排除。</td></tr>
+<tr><th>Surfaces expanded</th><td>TXT 阅读页准备卡片、目录和正文；直接消费者仅此页。扩展读取 blank layout、backend 请求封装与 ExtractService；没有额外消费者因数量上限被排除。</td></tr>
+</tbody></table></div>
+<div class="table-wrap"><table><thead><tr><th>Domain</th><th>Evidence inspected</th><th>Result</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>准备卡片 role=status；状态由文字表达；离页使用真实路由链接；不新增交互控件</td><td>Clear（变更范围）；屏幕阅读器实际播报未验证</td></tr>
+<tr><td>Layout</td><td>1280px 浅色；320px 深色；英俄文 640px、CSS zoom=2 等效内容宽度 320px；卡片 max-width 及边界断言</td><td>Clear；新卡片不溢出，长文案换行</td></tr>
+<tr><td>Writing</td><td>中英俄新增文案、入队快照提示、预估归零和错误提示；对照被删除的超时刷新要求</td><td>Clear；没有把未知解析状态误报为超时失败，自动打开行为明确</td></tr>
+<tr><td>Typography</td><td>三语言卡片真实截图、Vuetify 标题和正文层级、200% 内容布局</td><td>Clear；新文案完整可读，无截断</td></tr>
+<tr><td>Colors</td><td>浅色和深色卡片截图与既有继承样式</td><td>Not reviewed: no color changes in scope；外观沿用既有配色，未声称完整 WCAG 合规审计</td></tr>
+<tr><td>UI</td><td>等待、就绪、错误、缓存状态；原有卡片外观和正文布局</td><td>Clear；没有新增动画、装饰或控制层级</td></tr>
+</tbody></table></div>
+<h3>Findings</h3><p>No actionable interface findings in this change. 没有遗留 Introduced / Regression HIGH、MEDIUM 或 LOW 问题。</p>
+<h3>Considered but Rejected</h3><div class="table-wrap"><table><thead><tr><th>Location</th><th>Candidate</th><th>Rejected because</th></tr></thead><tbody>
+<tr><td>readtxt.vue 的队列提示</td><td>持续显示实时队列位置</td><td>现有 API 仅给入队快照；明确快照语义，不能编造后台状态。</td></tr>
+<tr><td>readtxt.vue 的零秒状态</td><td>保留解析超时红色失败提示</td><td>预估时间不含排队；错误提示会误导用户刷新，改为中性持续准备提示。</td></tr>
+<tr><td>准备卡片外观</td><td>添加进度条和新动画</td><td>没有可靠百分比数据，原有边框与状态文字足以说明流程。</td></tr>
+</tbody></table></div>
+<h3>Pre-existing（不属于本次变更）</h3><p>原工具栏的图标按钮命名及点击标题键盘支持不足；英俄文在 200% CSS 缩放时原登录按钮文字被截断。这些代码与 merge-base 一致，未由本次引入；不扩展本 PR 修复范围，不计入 change-scoped verdict。</p>
+<h3>Verification</h3><ul><li>git merge-base origin/master HEAD → 96995228；git rev-list --count origin/master..HEAD → 2；git diff --name-status $(git merge-base origin/master HEAD)、git diff HEAD 和 git ls-files --others --exclude-standard 覆盖已提交与未提交。阅读所有新增和删除 hunk，未移除已有语义、焦点、主题或动效保护。</li><li>准备阶段 fetch 了 master 和原 PR 分支，并显式 switch 到用户要求的原分支；此为修复工作，不是审查过程的 checkout。interface-review 本身只读，未 fetch、未改写 refs、未 checkout、未创建 worktree。</li><li>浏览器验证由 Playwright 自动管理短生命周期 mock 和生产构建服务，22 项通过并自动停止服务。截图：app/test/e2e/screenshots/20261009-txt-{queued,waiting,ready,mobile-dark}.png。逐张查看排队、超过估计、正文与移动深色截图；英俄文缩放截图保留在测试产物。</li></ul>
+<h3>未运行与剩余风险</h3><p>Chrome DevTools MCP 当前没有可调用工具；已用 Playwright Chromium 真正渲染页面、断言、截图替代，未声称执行该 MCP。未做连接真实书库的手动端到端体验、真实屏幕阅读器播报或浏览器原生 200% 缩放；CSS zoom=2 仅验证内容布局。没有对外提供 mock 体验地址，没有启动常驻 Nuxt dev server。40 项后端跳过保留 pytest 实际结果，不计作通过。远程 CI 与最新评审状态在 PR 中继续跟进。</p>
+<h3>Verdict</h3><p class="verified">Approve</p></section></main></body></html>
