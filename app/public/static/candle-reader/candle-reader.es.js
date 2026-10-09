@@ -8887,7 +8887,7 @@ function vb(e, t, n, o, i, r) {
     ])) : qe("", !0)
   ], 10, nb);
 }
-const Gr = /* @__PURE__ */ Un(tb, [["render", vb], ["__scopeId", "data-v-f95d3d1e"]]), Wn = X({
+const Gr = /* @__PURE__ */ Un(tb, [["render", vb], ["__scopeId", "data-v-5f68b203"]]), Wn = X({
   border: [Boolean, Number, String]
 }, "border");
 function qn(e) {
@@ -10201,7 +10201,7 @@ function Wb(e, t, n, o, i, r) {
     ]))
   ], 40, Lb);
 }
-const Af = /* @__PURE__ */ Un(Fb, [["render", Wb], ["__scopeId", "data-v-305808c0"]]), qb = "candle-reader:annotations:v1:", Kb = 20, _s = { id: "local", nickname: "我", avatar: "" }, Gb = ["load", "save"];
+const Af = /* @__PURE__ */ Un(Fb, [["render", Wb], ["__scopeId", "data-v-7beb3f61"]]), qb = "candle-reader:annotations:v1:", Kb = 20, _s = { id: "local", nickname: "我", avatar: "" }, Gb = ["load", "save"];
 function Ru(e) {
   return e.client_id || e.id;
 }
@@ -14074,7 +14074,7 @@ function x0(e, t, n, o, i, r) {
     }, 8, ["modelValue", "persistent"])
   ], 64);
 }
-const sm = /* @__PURE__ */ Un(l0, [["render", x0], ["__scopeId", "data-v-103a914b"]]), N0 = X({
+const sm = /* @__PURE__ */ Un(l0, [["render", x0], ["__scopeId", "data-v-938e8fa2"]]), N0 = X({
   color: String,
   inset: Boolean,
   length: [Number, String],
