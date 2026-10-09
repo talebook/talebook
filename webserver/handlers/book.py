@@ -2043,10 +2043,13 @@ class BookTxtInit(BaseHandler):
         if test_ready != "0":
             return {"err": "ok", "msg": "未解析完成"}
 
-        # 若未解析则计算预计等待时间，至少2分钟
-        wait = min(120, os.path.getsize(fpath) / (1024 * 1024) * 15)
-        ExtractService().parse_txt_content(bid, fpath)
-        que_len = ExtractService().get_queue("parse_txt_content").qsize()
+        # 仅估计当前文件的解析耗时，不包含排队时间，也不是轮询截止时间
+        wait = min(120, max(30, os.path.getsize(fpath) / (1024 * 1024) * 15))
+        extract_service = ExtractService()
+        # 入队前计算排在当前任务前面的数量
+        queue = extract_service.get_queue("parse_txt_content")
+        que_len = queue.qsize() if queue is not None else 0
+        extract_service.parse_txt_content(bid, fpath)
         return {
             "err": "ok",
             "msg": "已加入队列",

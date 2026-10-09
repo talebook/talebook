@@ -3,7 +3,7 @@ import base from './playwright.config';
 
 // Own both services so local runs and CI exercise the same production build.
 export default defineConfig(base, {
-    testMatch: ['library.spec.ts', 'metadata-api.spec.ts'],
+    testMatch: ['library.spec.ts', 'metadata-api.spec.ts', 'txt-initial-polling.spec.ts'],
     use: { baseURL: 'http://127.0.0.1:9000' },
     reporter: [['list'], ['junit', { outputFile: 'test-results/library.xml' }]],
     webServer: [
