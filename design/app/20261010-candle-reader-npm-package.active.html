@@ -241,7 +241,7 @@
 
           <section id="design" class="card">
             <h2>4. 方案</h2>
-            <div class="callout good"><strong>方案结论：</strong>版本由 <code>app/package.json</code> 精确锁定，<code>app/modules/candle-reader/</code> 这个 Nuxt 本地模块在每次 Nuxt 启动（prepare、dev、build、generate）时，把 <code>node_modules/@talebook/candle-reader/dist/</code> 拷到 <code>app/public/static/candle-reader/</code> ，并写入 <code>.npm-version</code> 标记；版本相同则跳过。目标目录加入 <code>app/.gitignore</code> 。</div>
+            <div class="callout good"><strong>方案结论：</strong>版本由 <code>app/package.json</code> 精确锁定，<code>app/modules/candle-reader/</code> 这个 Nuxt 本地模块在每次 Nuxt 启动（prepare、dev、build、generate）时，把 <code>node_modules/@talebook/candle-reader/dist/</code> 拷到 <code>app/public/static/candle-reader/</code> ，并写入 <code>.npm-version</code> 标记；只有标记版本相同且目录内文件与包内 <code>dist/</code> 逐字节一致时才跳过，否则整目录重拷。目标目录加入 <code>app/.gitignore</code> 。</div>
 
             <div class="flow" aria-label="核心处理流程">
               <article class="step"><span class="label">Release</span><b>candle-reader 打 tag</b><p><code>v26.10.09</code> 触发 release.yml，经 Trusted Publishing 发布 <code>26.10.9</code></p></article>
@@ -286,7 +286,7 @@ CANDLE_READER_SKIP_SYNC=1 API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>单元</td><td><code>npx vitest run test/utils/candle-reader-sync.spec.ts</code></td><td>首次拷贝并写版本标记；同版本跳过；换版本时清掉旧文件；SKIP 变量保留本地产物；缺包报错；package.json 精确锁版本、目录已忽略</td><td>通过：5 passed</td></tr>
+                  <tr><td>单元</td><td><code>npx vitest run test/utils/candle-reader-sync.spec.ts</code></td><td>首次拷贝并写版本标记；内容一致时跳过；多出文件、文件被改或换版本时重拷；SKIP 变量保留本地产物；缺包报错；package.json 精确锁版本、目录已忽略</td><td>通过：6 passed</td></tr>
                   <tr><td>构建</td><td><code>npm run build-spa</code>（先删除 <code>public/static/candle-reader/</code> ）</td><td>日志出现同步提示，<code>.output/public/static/candle-reader/</code> 含完整产物与 <code>.npm-version</code></td><td>通过：exit 0，日志含「[candle-reader] 已从 npm 包同步」，输出目录含 26.10.9 标记</td></tr>
                   <tr><td>产物一致性</td><td><code>npm pack</code> 后逐一 <code>cmp</code> 原有 20 个文件</td><td>全部相同</td><td>通过：20 个文件全部相同；包内另有构建残留 demo.html、out.png（发布者本地 dist 未清理，见风险）</td></tr>
                   <tr><td>后端</td><td><code>pytest tests/test_annotations.py tests/test_readest_embed.py</code></td><td>阅读页仍引用 candle-reader，版本号格式不变</td><td>通过：52 passed（talebook-base 镜像内运行）</td></tr>
@@ -295,6 +295,7 @@ CANDLE_READER_SKIP_SYNC=1 API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000
               </table>
             </div>
             <div class="callout"><strong>界面审查豁免：</strong>本次不是新功能或用户可感知变化，阅读器文件与原先逐字节一致，无界面影响，未执行 <code>interface-review</code> 和浏览器渲染验收。剩余风险是构建环境的 npm 可达性，已由缺包报错覆盖。Docker 全量镜像构建未在云端环境执行：沙箱禁止访问 lockfile 中部分 npmmirror 地址，由 CI 的 Docker 构建覆盖。</div>
+            <div class="callout"><strong>Workflow 验证：</strong>本次只删除 <code>update-candle-reader.yml</code> ，没有修改任何仍存在的 workflow，因此没有可用 <code>act</code> 执行的目标。<code>.github/dependabot.yml</code> 是 Dependabot 配置，不是 Actions workflow。受影响的是 <code>ci.yml</code> 与 <code>build.yml</code> 里的 Nuxt 构建（现在依赖 npm 包与本地模块），由本 PR 的真实 GitHub Actions 运行验收。candle-reader 仓库的 <code>trigger-candle-reader.yml</code> 仍会向 talebook 发 <code>update-candle-reader</code> 事件，接收方已删除，事件会被忽略，后续在 candle-reader 侧删除。</div>
           </section>
 
           <section id="decisions" class="card">
@@ -303,6 +304,7 @@ CANDLE_READER_SKIP_SYNC=1 API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000
               <li><strong>2026-10-09：</strong>不采用 submodule，改为 npm 包；candle-reader 侧改动见 talebook/candle-reader#21。</li>
               <li><strong>2026-10-09：</strong>版本号使用日期版本，tag <code>vYY.MM.DD</code> ，npm 版本去掉前导零（semver 不允许）。</li>
               <li><strong>2026-10-10：</strong>同步放在 Nuxt 本地模块而不是 postinstall：Docker 的 <code>npm ci</code> 阶段尚未复制源码。</li>
+              <li><strong>2026-10-10：</strong>评审指出只比版本号会让本地联调或手工改动残留在目录里、被 <code>COPY app/</code> 带进本地 Docker 构建；改为同时逐字节比对文件内容。</li>
             </ol>
           </section>
         </main>

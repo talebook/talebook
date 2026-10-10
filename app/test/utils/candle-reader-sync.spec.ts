@@ -37,11 +37,13 @@ describe('candle reader npm sync', () => {
         expect(readFileSync(join(target, VERSION_MARKER), 'utf8').trim()).toBe('26.10.9');
     });
 
-    it('skips an up-to-date copy and replaces stale files when the version changes', () => {
+    it('skips an identical copy and restores the package when files or the version change', () => {
         installFakePackage(root, '26.10.9');
         syncCandleReader(root, {});
         writeFileSync(join(root, TARGET_DIR, 'stale.js'), 'old');
 
+        expect(syncCandleReader(root, {})).toBe('copied');
+        expect(existsSync(join(root, TARGET_DIR, 'stale.js'))).toBe(false);
         expect(syncCandleReader(root, {})).toBe('up-to-date');
 
         installFakePackage(root, '26.10.10', 'export class Reader { v2 = true }');
@@ -57,6 +59,15 @@ describe('candle reader npm sync', () => {
 
         expect(syncCandleReader(root, { CANDLE_READER_SKIP_SYNC: '1' })).toBe('skipped');
         expect(readFileSync(join(root, TARGET_DIR, 'candle-reader.es.js'), 'utf8')).toBe('local build');
+    });
+
+    it('restores the locked package over a local build that kept the version marker', () => {
+        installFakePackage(root, '26.10.9');
+        syncCandleReader(root, {});
+        writeFileSync(join(root, TARGET_DIR, 'candle-reader.es.js'), 'local build');
+
+        expect(syncCandleReader(root, {})).toBe('copied');
+        expect(readFileSync(join(root, TARGET_DIR, 'candle-reader.es.js'), 'utf8')).toBe('export class Reader {}');
     });
 
     it('fails with an install hint when the package is missing', () => {

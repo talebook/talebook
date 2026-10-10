@@ -1,9 +1,9 @@
-import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join, relative } from 'node:path'
 
 export const PACKAGE_NAME = '@talebook/candle-reader'
 export const TARGET_DIR = 'public/static/candle-reader'
-// 记录当前目录来自哪个 npm 版本，版本一致时跳过拷贝，避免每次启动都重写静态目录
+// 记录当前目录来自哪个 npm 版本，便于排查；是否需要重新拷贝以文件内容为准
 export const VERSION_MARKER = '.npm-version'
 
 export type SyncResult = 'copied' | 'up-to-date' | 'skipped'
@@ -27,7 +27,7 @@ export function syncCandleReader(appRoot: string, env: Record<string, string | u
     const version = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')).version as string
 
     const marker = join(target, VERSION_MARKER)
-    if (existsSync(marker) && readFileSync(marker, 'utf8').trim() === version) {
+    if (existsSync(marker) && readFileSync(marker, 'utf8').trim() === version && sameFiles(dist, target)) {
         return 'up-to-date'
     }
 
@@ -35,4 +35,21 @@ export function syncCandleReader(appRoot: string, env: Record<string, string | u
     cpSync(dist, target, { recursive: true })
     writeFileSync(marker, `${version}\n`)
     return 'copied'
+}
+
+function listFiles(root: string): string[] {
+    return readdirSync(root, { recursive: true, withFileTypes: true })
+        .filter(entry => entry.isFile())
+        .map(entry => relative(root, join(entry.parentPath, entry.name)))
+        .sort()
+}
+
+// 目标目录可能被本地联调（CANDLE_READER_SKIP_SYNC）或手工改动过，只比版本号会把这些改动带进构建
+function sameFiles(dist: string, target: string): boolean {
+    const expected = listFiles(dist)
+    const actual = listFiles(target).filter(file => file !== VERSION_MARKER)
+    if (expected.length !== actual.length || expected.some((file, i) => file !== actual[i])) {
+        return false
+    }
+    return expected.every(file => readFileSync(join(dist, file)).equals(readFileSync(join(target, file))))
 }
