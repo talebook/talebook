@@ -9,7 +9,6 @@ import html
 import json
 import logging
 import os
-import random
 import re
 import shutil
 import time
@@ -74,6 +73,7 @@ from webserver.services.media_analysis import (
     merge_media_type,
 )
 from webserver.services.plugin_runtime import REGISTRY, PluginRuntime, PluginRuntimeError, ensure_runtime_installations
+from webserver.services.recommendations import recent_book_ids, recommend_book_ids
 
 
 # 调用方按能力找插件，不认识任何具体 plugin_key。
@@ -128,8 +128,11 @@ class Index(BaseHandler):
         setting_recent_count = CONF.get("MAIN_PAGE_RECENT_COUNT", 12)
 
         # 允许通过 URL 参数覆盖配置（用于兼容旧接口），但不超过配置值
-        cnt_random = min(int(self.get_argument("random", setting_random_count)), setting_random_count)
-        cnt_recent = min(int(self.get_argument("recent", setting_recent_count)), 200)
+        try:
+            cnt_random = max(0, min(int(self.get_argument("random", setting_random_count)), setting_random_count))
+            cnt_recent = max(0, min(int(self.get_argument("recent", setting_recent_count)), 200))
+        except ValueError:
+            return {"err": "params.invalid", "msg": _("参数错误")}
 
         # nav = "index"
         # title = _(u"全部书籍")
@@ -142,20 +145,21 @@ class Index(BaseHandler):
             ids = [book_id for book_id in ids if book_id not in private_book_ids]
 
         if ids:
-            # 如果配置为 0，则不显示随机推荐
+            # 保留旧接口字段名，但推荐按个人兴趣与书库质量排序。
             if cnt_random > 0:
-                random_ids = random.sample(ids, min(cnt_random, len(ids)))
-                random_books = [b for b in self.get_books(ids=random_ids, check_permission=False)]
-                random_books.sort(key=lambda x: x["id"], reverse=True)
+                recommended_ids = recommend_book_ids(self.cache, self.session, self.user_id(), ids, cnt_random)
+                order = {bid: index for index, bid in enumerate(recommended_ids)}
+                random_books = self.get_books(ids=recommended_ids, check_permission=False) if recommended_ids else []
+                random_books.sort(key=lambda book: order[book["id"]])
 
-            ids.sort(reverse=True)
-            # 确保不会尝试从空列表中取样
-            sample_ids = ids[0:100] if len(ids) > 100 else ids
-            new_ids = random.sample(sample_ids, min(cnt_recent, len(sample_ids)))
-            new_books = [b for b in self.get_books(ids=new_ids, check_permission=False)]
-            new_books.sort(key=lambda x: x["id"], reverse=True)
+            new_ids = recent_book_ids(self.cache, ids, cnt_recent)
+            order = {bid: index for index, bid in enumerate(new_ids)}
+            new_books = self.get_books(ids=new_ids, check_permission=False) if new_ids else []
+            new_books.sort(key=lambda book: order[book["id"]])
 
         return {
+            "visible_books_count": len(ids),
+            "recommendations_enabled": cnt_random > 0,
             "random_books_count": len(random_books),
             "new_books_count": len(new_books),
             "random_books": self.attach_reading_states([self.fmt(b) for b in random_books]),

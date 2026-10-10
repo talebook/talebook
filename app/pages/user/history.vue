@@ -21,6 +21,9 @@
                     :books="readingBooks"
                     :empty-text="t('user.readingRecord.noCurrentlyReading')"
                     key-prefix="reading"
+                    adaptive
+                    show-title
+                    show-summary
                 />
             </v-tabs-window-item>
 
@@ -29,6 +32,9 @@
                     :books="finishedBooks"
                     :empty-text="t('user.readingRecord.noFinishedReading')"
                     key-prefix="finished"
+                    adaptive
+                    show-title
+                    show-summary
                 />
             </v-tabs-window-item>
 
@@ -54,6 +60,9 @@
                             :books="item.books"
                             :empty-text="t('user.history.noRecords')"
                             :key-prefix="'history-' + item.name"
+                            adaptive
+                            show-title
+                            show-summary
                         />
                     </div>
                 </template>

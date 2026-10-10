@@ -18,11 +18,13 @@
     "@mdi/js": "^7.4.47",
     "@nuxtjs/i18n": "^10.2.3",
     "@pinia/nuxt": "^0.11.3",
+    "entities": "^7.0.1",
     "marked": "^15.0.0",
     "node-forge": "^1.3.3",
     "nuxt": "^4.3.0",
     "pinia": "^3.0.4",
     "sass": "^1.97.3",
+    "ultrahtml": "^1.6.0",
     "vue": "^3.5.27",
     "vue-router": "^4.6.4",
     "vuetify-nuxt-module": "^0.19.3"

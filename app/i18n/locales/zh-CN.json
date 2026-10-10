@@ -612,6 +612,8 @@
     "willSendFormat": "将发送 {format} 格式"
   },
   "index": {
+    "noUnreadRecommendations": "暂无未读书籍推荐",
+    "noUnreadRecommendationsHint": "可以浏览书库，或在书籍详情中更新阅读状态",
     "newReleases": "新书推荐",
     "browseByCategory": "分类浏览"
   },
@@ -1025,7 +1027,7 @@
         "trashCalibreSize": "Calibre 回收站占用空间",
         "trashUploadSize": "上传临时目录占用空间",
         "trashUnknown": "未知",
-        "mainPageRandomCount": "首页 - 随机推荐图书数量（为 0 时隐藏）",
+        "mainPageRandomCount": "首页 - 推荐图书数量（为 0 时隐藏）",
         "mainPageRecentCount": "首页 - 新书推荐显示数量",
         "defaultPageSize": "书籍列表中分页大小",
         "currentVersion": "当前版本",

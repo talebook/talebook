@@ -607,6 +607,8 @@
     "willSendFormat": "Will send {format} format"
   },
   "index": {
+    "noUnreadRecommendations": "No unread recommendations available",
+    "noUnreadRecommendationsHint": "Browse the library or update your reading status on a book's details page",
     "newReleases": "New Releases",
     "browseByCategory": "Browse by Category"
   },
@@ -1005,7 +1007,7 @@
         "trashCalibreSize": "Calibre Trash Size",
         "trashUploadSize": "Upload Temp Directory Size",
         "trashUnknown": "Unknown",
-        "mainPageRandomCount": "Random Books Count (0 to hide)",
+        "mainPageRandomCount": "Recommended Books Count (0 to hide)",
         "mainPageRecentCount": "New Books Count",
         "defaultPageSize": "Book List Page Size",
         "currentVersion": "Current Version",

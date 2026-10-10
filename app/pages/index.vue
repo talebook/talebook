@@ -1,33 +1,24 @@
 <template>
     <div>
-        <v-row>
+        <v-row v-if="indexData?.recommendations_enabled !== false">
             <v-col cols="12">
                 <p class="ma-0 title">
                     {{ t('navigation.recommended') }}
                 </p>
             </v-col>
             <v-col
-                v-for="(book,idx) in get_random_books"
-                :key="'rec'+idx+book.id"
-                cols="6"
-                xs="6"
-                sm="4"
-                md="2"
-                lg="1"
-                class="book-card"
+                v-if="get_random_books.length"
+                cols="12"
             >
-                <v-card
-                    :to="book.href"
-                    class="ma-1"
-                    style="position: relative;"
-                >
-                    <v-img
-                        :src="book.img"
-                        :aspect-ratio="11/15"
-                        cover
-                    />
-                    <BookReadBadge :read-state="book.state?.read_state" />
-                </v-card>
+                <div class="recommendation-grid">
+                    <div
+                        v-for="(book,idx) in get_random_books"
+                        :key="'rec'+idx+book.id"
+                        class="book-card"
+                    >
+                        <RecommendationBookCard :book="book" />
+                    </div>
+                </div>
             </v-col>
             <!-- 空状态提示 -->
             <v-col
@@ -42,10 +33,10 @@
                         mdi-book-open-variant
                     </v-icon>
                     <h3 class="text-h6 grey--text">
-                        {{ t('library.noBooks') }}
+                        {{ t(indexData?.visible_books_count ? 'index.noUnreadRecommendations' : 'library.noBooks') }}
                     </h3>
                     <p class="text-caption grey--text">
-                        {{ t('library.addBooksFirst') }}
+                        {{ t(indexData?.visible_books_count ? 'index.noUnreadRecommendationsHint' : 'library.addBooksFirst') }}
                     </p>
                 </v-card>
             </v-col>
@@ -105,7 +96,7 @@ import { computed, onMounted } from 'vue';
 import { useAsyncData, useNuxtApp, useRoute } from 'nuxt/app';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
-import BookReadBadge from '@/components/BookReadBadge.vue';
+import RecommendationBookCard from '@/components/RecommendationBookCard.vue';
 
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
@@ -121,9 +112,11 @@ onMounted(() => {
     }
 });
 
-// 修复: 直接使用 useAsyncData 不添加 await
-const { data: indexData, pending: indexPending } = useAsyncData('index', () =>
-    $backend('/index')
+// 每次返回首页都按当前账号和阅读状态重新计算推荐。
+const { data: indexData, pending: indexPending } = useAsyncData(
+    'index',
+    () => $backend('/index'),
+    { getCachedData: () => undefined }
 );
 
 store.setNavbar(true);
@@ -169,5 +162,19 @@ const new_books = computed(() => indexData.value?.new_books || []);
 .title {
     font-size: 1.25rem;
     font-weight: 500;
+}
+</style>
+
+<style scoped>
+.recommendation-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+@media (min-width: 600px) {
+    .recommendation-grid {
+        grid-template-columns: repeat(auto-fill, minmax(min(176px, 100%), 1fr));
+    }
 }
 </style>
