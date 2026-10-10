@@ -377,10 +377,29 @@ class ReviewProvider(Protocol):
 class TransformProvider(Protocol):
     supported_formats: frozenset
     supports_auto_trigger: bool
+    input_formats: tuple            # 书籍有多种格式时的挑选顺序，如 ("EPUB", "TXT")
+    output_modes: tuple             # "new" 另存为新书 / "overwrite" 写回原书
+    preview_timeout: float | None
+    apply_timeout: float | None
 
+    def describe(self) -> dict: ...                       # 预设、方向等无书籍依赖的选项
+    def tool_input(self, params, book) -> dict: ...       # 白名单收敛客户端 params
+    def audit_fields(self, tool_input) -> dict: ...       # 写进运行记录的参数摘要
+    def book_updates(self, output) -> dict: ...           # 写回后同步的 title/authors/language
+    def new_book_title_suffix(self, output) -> str: ...
     def preview(self, src: ToolInput, context) -> ToolReport: ...
     def apply(self, src: ToolInput, out_dir: str, context) -> ToolOutput: ...
 ```
+
+内置工具继承 `webserver/plugins/tool/base.py` 的 `TextTransformPlugin` 即可获得上述默认实现。所有书籍工具共用三条按插件 ID 分发的接口，**新增工具不新增 Handler 或路由**：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/plugins/<plugin_key>/tool` | 描述：`formats`、`output_modes`、`options`（即 `describe()`） |
+| POST | `/api/plugins/<plugin_key>/tool/preview` | 读者可用，只读；请求体 `{"book_id", "params"}` |
+| POST | `/api/plugins/<plugin_key>/tool/run` | 仅管理员；请求体 `{"book_id", "output_mode", "suffix", "params"}`，留下 PluginRun 审计 |
+
+平台负责书籍可见性校验、按 `input_formats` 挑选文件、临时目录、写回原书的备份与回滚、另存为新书和审计；插件只处理 `params` 中自己认识的字段。
 
 书籍工具的长期入口在书籍详情页“书籍管理”菜单，由已启用 Capability 动态生成。插件中心只负责启停与全局策略；既有工作台可作为全局配置或兼容入口，但不要把手工执行当成插件中心的核心交互。
 
@@ -540,7 +559,7 @@ enabled installation
 
 ### 7.3 通用 API 与专用 API
 
-通用插件 API 适合 definition、activation、connection、run 和 manifest 这类平台对象。复杂插件的工作台可以提供专用 API，但必须遵守同一套认证、owner、启停与 Capability 规则。
+通用插件 API 适合 definition、activation、connection、run 和 manifest 这类平台对象。按 Capability 形成稳定契约的操作（例如书籍工具的 `/api/plugins/<plugin_key>/tool*`）一律走按插件 ID 分发的通用接口；尚未标准化的额外能力走 `/api/plugins/<plugin_key>/features/<action>` 逃生舱。不要为单个插件注册专属路由。
 
 不要为了一个插件新建只属于它的顶层 Handler 文件，再让公共 Handler 硬编码转发。优先将协议实现收进具体插件目录，由稳定的服务层或路由装配调用。
 

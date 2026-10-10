@@ -89,9 +89,9 @@ EPUB美化是**调整书库中 EPUB 的目录、章节标题与正文排版，�
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/plugins/tools/books` | 可处理的书籍列表 |
-| GET | `/api/plugins/tools/epub-beautify/presets` | 预设、目录形式与背景纹理 |
-| POST | `/api/plugins/tools/epub-beautify/preview` | 分析原书 |
-| POST | `/api/plugins/tools/epub-beautify/run` | 生成美化版并入库 |
+| GET | `/api/plugins/<key>/tool` | 预设、目录形式与背景纹理，`<key>` 为本插件 ID |
+| POST | `/api/plugins/<key>/tool/preview` | 分析原书 |
+| POST | `/api/plugins/<key>/tool/run` | 生成美化版并入库 |
 
 ### 7.3 关键定义
 

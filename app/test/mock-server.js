@@ -1689,12 +1689,17 @@ router.get('/api/plugins/tools/books', eventHandler(() => ({
   books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
 })));
 
-router.post('/api/plugins/tools/text-replace/preview', eventHandler(() => ({
-  err: 'ok',
-  matches: 1,
-  truncated: false,
-  samples: [{ pre: '开始', match: '测试', post: '结束' }],
-})));
+router.post('/api/plugins/talebook.tool.text-replace/tool/preview', eventHandler(async (event) => {
+  // 统一书籍工具接口：工具参数放在 params 里，平台字段（book_id）在顶层。
+  const body = await readBody(event);
+  if (!body?.book_id || !body?.params?.pattern) return { err: 'booktools.failed', msg: 'params.pattern is required' };
+  return {
+    err: 'ok',
+    matches: 1,
+    truncated: false,
+    samples: [{ pre: '开始', match: body.params.pattern, post: '结束' }],
+  };
+}));
 
 router.get('/api/plugins/tools/book-actions', eventHandler((event) => {
   const bookId = Number(getQuery(event).book_id || 0);

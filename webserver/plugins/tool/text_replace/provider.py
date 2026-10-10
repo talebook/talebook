@@ -30,7 +30,20 @@ class TextReplaceTransformPlugin(TextTransformPlugin):
                 },
             ),
             {"EPUB", "TXT"},
+            input_formats=("TXT", "EPUB"),
         )
+
+    new_book_suffix = "（正文替换版）"
+
+    def tool_input(self, params, book):
+        return {
+            "pattern": str(params.get("pattern") or ""),
+            "replacement": str(params.get("replacement") or ""),
+            "use_regex": bool(params.get("use_regex")),
+        }
+
+    def audit_fields(self, tool_input):
+        return {"pattern": tool_input.get("pattern", "")}
 
     def preview(self, src, context):
         path, fmt = self._path(src, self.supported_formats)
