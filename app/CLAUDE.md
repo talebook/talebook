@@ -47,6 +47,10 @@ Pinia 按领域拆分 store。`stores/main.ts`（`useMainStore`）承载站点�
 - `stores/theme.ts` — 明/暗主题及 cookie 持久化。
 - `stores/audiobook.ts` — 有声书播放器、播放队列与本地恢复状态。
 
+### 内置阅读器 candle-reader
+
+阅读器产物来自 npm 包 `@talebook/candle-reader`（版本在 `package.json` 精确锁定），不提交进仓库。`modules/candle-reader/` 在每次 Nuxt 启动时把包内 `dist/` 同步到 `public/static/candle-reader/`（已 gitignore），版本未变则跳过。联调本地阅读器时，在 candle-reader 里 `make dist install` 后用 `CANDLE_READER_SKIP_SYNC=1` 启动 Nuxt，避免被锁定版本覆盖。
+
 ### 国际化
 
 使用 `@nuxtjs/i18n` 懒加载，语言文件在 `i18n/locales/zh-CN.json` 、`en-US.json` 和 `ru-RU.json`。默认及回退语言均为 `zh-CN`。

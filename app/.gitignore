@@ -22,3 +22,6 @@ logs
 .env
 .env.*
 !.env.example
+
+# candle-reader 阅读器产物由 npm 包 @talebook/candle-reader 同步生成（modules/candle-reader）
+/public/static/candle-reader/

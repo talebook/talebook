@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="candle-reader 阅读器产物改由 npm 包 @talebook/candle-reader 引入，不再提交进 talebook 仓库。" />
+    <link rel="icon" href="data:," />
+    <title>阅读器产物改用 npm 包引入 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#evidence"><span class="rail-index">03</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">04</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">05</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">06</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">07</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <h1>阅读器产物改用 npm 包引入，不再提交进仓库</h1>
+        <p class="sub">内置 EPUB 阅读器 candle-reader 的打包产物原先直接提交在 <code>app/public/static/candle-reader/</code> ，每次升级或联调同步都会在 git 历史里留下一份。改为 talebook 在 <code>app/package.json</code> 锁定 npm 包 <code>@talebook/candle-reader</code> 的版本，构建时由 Nuxt 本地模块把产物同步到原来的静态目录。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-10-10</span>
+          <span class="chip">所属模块：app</span>
+          <span class="chip">影响范围：app 构建、Docker 前端构建阶段、.github 自动化；不涉及 spec/</span>
+          <span class="chip">需求来源：项目对话（Rex）</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“调整一下 candle-reader 和 talebook 的版本集成方案，改成 submodule 会不会更好？节省 git 仓库空间？”</div>
+            <p>评估后不采用 submodule：candle-reader 仓库不提交 dist，submodule 只能拿到源码，talebook 构建要多一段 vite build；递归克隆还会带上约 27 MB 的 .git 和 23 MB 的演示 epub；不带 <code>--recursive</code> 克隆或下载 ZIP 会得到空的阅读器目录。用户确认改为发布 npm 包，版本号使用日期版本（tag <code>v26.10.09</code> ，npm 版本 <code>26.10.9</code> ）。candle-reader 侧的发布流程已在 talebook/candle-reader#21 合并，<code>26.10.9</code> 已发布到 npmjs。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul><li>阅读器产物不再进入 talebook 的 git 历史，升级只改 <code>package.json</code> 与 <code>package-lock.json</code> 中的版本号。</li><li>Nuxt dev、SSR 构建、SPA 构建与 Docker 镜像中，<code>/static/candle-reader/</code> 下的文件与锁定版本完全一致。</li><li>后端 <code>candle_reader_version()</code> 、<code>creader.html</code> 、Nginx 的静态路径都不变。</li><li>新版本由 Dependabot 自动提升级 PR。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不重写历史，已提交的约 5.5 MB 产物保留在历史里。</li><li>不改变阅读器功能、界面或回调契约。</li><li>komga-reader 等其他内置静态产物不在本次范围。</li><li>阅读器 style.css 内联图标字体（gzip 后约 3.5 MB）的体积问题另行处理。</li></ul></article>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>3. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>产物直接提交在仓库</td><td><code>.github/workflows/update-candle-reader.yml</code> 下载 release 的 dist.zip 后 <code>git add -f</code> 提 PR；联调时 <code>make install</code> 直接拷入并提交</td><td>每次同步都新增一份产物，2026-10-09 一天就有 9 次同步提交</td></tr>
+                  <tr><td>历史占用</td><td>完整克隆 2493 个提交，pack 236 MB；candle-reader 相关 123 个对象压缩后约 5.5 MB</td><td>历史体积不大，但会随同步频率持续增长</td></tr>
+                  <tr><td>npm 包内容与仓库现有产物一致</td><td><code>npm pack @talebook/candle-reader@26.10.9</code> 后与 HEAD 中 20 个文件逐一 <code>cmp</code></td><td>20 个文件逐字节相同，切换不改变线上阅读器</td></tr>
+                  <tr><td>后端版本号与文件内容绑定</td><td><code>webserver/handlers/book.py</code> 的 <code>candle_reader_version()</code> 对 <code>candle-reader.es.js</code> 取 sha256</td><td>静态路径不变即可，后端无需修改</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>4. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>版本由 <code>app/package.json</code> 精确锁定，<code>app/modules/candle-reader/</code> 这个 Nuxt 本地模块在每次 Nuxt 启动（prepare、dev、build、generate）时，把 <code>node_modules/@talebook/candle-reader/dist/</code> 拷到 <code>app/public/static/candle-reader/</code> ，并写入 <code>.npm-version</code> 标记；版本相同则跳过。目标目录加入 <code>app/.gitignore</code> 。</div>
+
+            <div class="flow" aria-label="核心处理流程">
+              <article class="step"><span class="label">Release</span><b>candle-reader 打 tag</b><p><code>v26.10.09</code> 触发 release.yml，经 Trusted Publishing 发布 <code>26.10.9</code></p></article>
+              <article class="step"><span class="label">Upgrade</span><b>Dependabot 提 PR</b><p>只跟踪 <code>@talebook/candle-reader</code> ，改 package.json 与 lock</p></article>
+              <article class="step"><span class="label">Install</span><b>npm ci</b><p>按 lock 安装锁定版本到 node_modules</p></article>
+              <article class="step"><span class="label">Sync</span><b>Nuxt 模块拷贝</b><p>dist/ 写入 public/static/candle-reader/，随构建输出进入镜像</p></article>
+            </div>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>引入方式</td><td>npm 包</td><td>Dockerfile 已有 <code>npm ci</code> 并支持 npmmirror；版本锁定与升级交给 lock 和 Dependabot</td><td>git submodule（需在 talebook 构建源码、克隆体验差）；构建时下载 release dist.zip（国内访问 GitHub 不稳定）</td></tr>
+                  <tr><td>同步时机</td><td>Nuxt 本地模块 setup</td><td>dev、build、generate 都会加载模块，覆盖 <code>npx nuxt dev</code> 这类不经过 npm script 的启动方式；Docker 中模块在 <code>COPY app/</code> 之后的构建步骤运行</td><td>postinstall（Docker 的 <code>npm ci</code> 阶段还没有复制源码）；prebuild/predev 钩子（<code>npx nuxt dev</code> 不触发）</td></tr>
+                  <tr><td>本地联调</td><td><code>CANDLE_READER_SKIP_SYNC=1</code> 时不覆盖</td><td>candle-reader 的 <code>make install</code> 拷进来的本地产物不会被下次启动冲掉</td><td>按文件时间判断新旧（不可靠）</td></tr>
+                  <tr><td>缺包时的表现</td><td>直接报错并提示执行 <code>npm ci</code></td><td>避免静默产出缺少阅读器的构建</td><td>静默跳过</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <pre aria-label="升级与联调命令"><code># 升级：通常由 Dependabot 提 PR，也可手动
+cd app && npm install --save-exact @talebook/candle-reader@26.10.10
+
+# 联调本地阅读器：在 candle-reader 中 make dist install 后
+CANDLE_READER_SKIP_SYNC=1 API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000 --host 127.0.0.1</code></pre>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>5. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>影响范围</h3><p>新增 <code>app/modules/candle-reader/</code> 、<code>app/test/utils/candle-reader-sync.spec.ts</code> 、<code>.github/dependabot.yml</code> ；修改 <code>app/package.json</code> 、<code>app/package-lock.json</code> 、<code>app/.gitignore</code> 、<code>CODE_WIKI.md</code> ；删除 <code>app/public/static/candle-reader/</code> 的 20 个已提交文件、<code>candle-reader-version.txt</code> 和 <code>.github/workflows/update-candle-reader.yml</code> 。产品行为不变（阅读器文件逐字节一致），因此不涉及 <code>spec/</code> 。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>静态访问路径 <code>/static/candle-reader/</code> 、<code>creader.html</code> 、后端缓存版本号算法、Nginx 配置、阅读器回调契约。</p></article>
+            </div>
+            <div class="callout danger"><strong>主要风险：</strong>26.10.9 是手动发布的，包内多了 <code>demo.html</code> 与 <code>out.png</code> 两个构建残留，会随之出现在 <code>/static/candle-reader/</code> 下；它们不被阅读器引用，之后由 CI 从干净构建发布的版本不会再带上。构建环境装不到 npm 包（registry 不可达）→ Nuxt 启动时模块报错、构建失败 → 失败信息明确指向 <code>npm ci</code> ；国内构建通过 <code>BUILD_COUNTRY=CN</code> 走 npmmirror，npmmirror 会自动从 npmjs 同步新版本。已有本地 checkout 的开发者在拉取后，原来的已提交文件会变为被忽略的未跟踪文件，下次 Nuxt 启动时自动替换为锁定版本。</div>
+            <div class="callout"><strong>回滚：</strong>revert 本 PR 即恢复已提交产物与旧的同步 workflow，无数据迁移。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>6. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>单元</td><td><code>npx vitest run test/utils/candle-reader-sync.spec.ts</code></td><td>首次拷贝并写版本标记；同版本跳过；换版本时清掉旧文件；SKIP 变量保留本地产物；缺包报错；package.json 精确锁版本、目录已忽略</td><td>通过：5 passed</td></tr>
+                  <tr><td>构建</td><td><code>npm run build-spa</code>（先删除 <code>public/static/candle-reader/</code> ）</td><td>日志出现同步提示，<code>.output/public/static/candle-reader/</code> 含完整产物与 <code>.npm-version</code></td><td>通过：exit 0，日志含「[candle-reader] 已从 npm 包同步」，输出目录含 26.10.9 标记</td></tr>
+                  <tr><td>产物一致性</td><td><code>npm pack</code> 后逐一 <code>cmp</code> 原有 20 个文件</td><td>全部相同</td><td>通过：20 个文件全部相同；包内另有构建残留 demo.html、out.png（发布者本地 dist 未清理，见风险）</td></tr>
+                  <tr><td>后端</td><td><code>pytest tests/test_annotations.py tests/test_readest_embed.py</code></td><td>阅读页仍引用 candle-reader，版本号格式不变</td><td>通过：52 passed（talebook-base 镜像内运行）</td></tr>
+                  <tr><td>质量门禁</td><td><code>npm run lint</code> 、<code>make check-design</code> 、<code>make check-spec</code></td><td>全部通过</td><td>通过：eslint 0 error（TS 文件不在 eslint 覆盖范围）；check-design、check-spec 通过</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>界面审查豁免：</strong>本次不是新功能或用户可感知变化，阅读器文件与原先逐字节一致，无界面影响，未执行 <code>interface-review</code> 和浏览器渲染验收。剩余风险是构建环境的 npm 可达性，已由缺包报错覆盖。Docker 全量镜像构建未在云端环境执行：沙箱禁止访问 lockfile 中部分 npmmirror 地址，由 CI 的 Docker 构建覆盖。</div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>7. 决策记录</h2>
+            <ol>
+              <li><strong>2026-10-09：</strong>不采用 submodule，改为 npm 包；candle-reader 侧改动见 talebook/candle-reader#21。</li>
+              <li><strong>2026-10-09：</strong>版本号使用日期版本，tag <code>vYY.MM.DD</code> ，npm 版本去掉前导零（semver 不允许）。</li>
+              <li><strong>2026-10-10：</strong>同步放在 Nuxt 本地模块而不是 postinstall：Docker 的 <code>npm ci</code> 阶段尚未复制源码。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <footer>Talebook internal design · app · ACTIVE · 2026-10-10</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>
