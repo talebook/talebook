@@ -70,7 +70,11 @@ test.describe('Homepage', () => {
                     '这是一本书名很长的推荐书籍：封面下面应该显示两行书名并保留完整名称',
                     'AnUnbrokenEnglishBookTitleThatMustWrapWithoutWideningTheRecommendationCard',
                 ];
-                const books = titles.map((title, index) => ({ ...apiIndex.random_books[index], title }));
+                const books = titles.map((title, index) => ({
+                    ...apiIndex.random_books[index],
+                    title,
+                    comments: index === 1 ? '这是一段需要截成两行的很长的书籍简介。'.repeat(8) : '简短简介。',
+                }));
                 await request.post(`${mockApiUrl}/_test/reset`, {
                     data: { indexData: { ...apiIndex, random_books: books } }
                 });
@@ -88,6 +92,8 @@ test.describe('Homepage', () => {
                     await expect(card).toHaveAccessibleName(title);
                     const coverBox = await card.getByTestId('recommendation-cover').boundingBox();
                     const titleBox = await card.getByTestId('book-card-title').boundingBox();
+                    const lineHeight = await card.getByTestId('book-card-title').evaluate(element => parseFloat(getComputedStyle(element).lineHeight));
+                    expect(titleBox!.height).toBeCloseTo(lineHeight * (index === 0 ? 1 : 2), 1);
                     const cardBox = await card.boundingBox();
                     expect(coverBox!.width).toBeCloseTo(cardBox!.width, 1);
                     expect(coverBox!.width / coverBox!.height).toBeCloseTo(11 / 15, 2);
@@ -96,6 +102,7 @@ test.describe('Homepage', () => {
                     await expect(summary).toBeVisible();
                     await expect(summary).toHaveCSS('-webkit-line-clamp', '2');
                     const summaryBox = await summary.boundingBox();
+                    expect(summaryBox!.height).toBeCloseTo(lineHeight * (index === 1 ? 2 : 1), 1);
                     expect(titleBox!.x - cardBox!.x).toBeCloseTo(12, 1);
                     expect(cardBox!.x + cardBox!.width - titleBox!.x - titleBox!.width).toBeCloseTo(12, 1);
                     expect(summaryBox!.y).toBeGreaterThan(titleBox!.y + titleBox!.height);
@@ -114,8 +121,7 @@ test.describe('Homepage', () => {
                 if (width === 320) {
                     expect(thirdBox!.y).toBeGreaterThan(firstBox!.y + firstBox!.height);
                 }
-                const heights = await cards.evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().height)));
-                expect(new Set(heights).size).toBe(1);
+                expect(secondBox!.height - firstBox!.height).toBeCloseTo(42, 1);
                 const longTitle = cards.nth(1).getByTestId('book-card-title');
                 await expect(longTitle).toHaveCSS('-webkit-line-clamp', '2');
                 expect(await longTitle.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true);

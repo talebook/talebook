@@ -21,10 +21,7 @@
                     :books="readingBooks"
                     :empty-text="t('user.readingRecord.noCurrentlyReading')"
                     key-prefix="reading"
-                    cols="6"
-                    sm="4"
-                    md="3"
-                    lg="2"
+                    adaptive
                     show-title
                     show-summary
                 />
@@ -35,10 +32,7 @@
                     :books="finishedBooks"
                     :empty-text="t('user.readingRecord.noFinishedReading')"
                     key-prefix="finished"
-                    cols="6"
-                    sm="4"
-                    md="3"
-                    lg="2"
+                    adaptive
                     show-title
                     show-summary
                 />
@@ -66,10 +60,7 @@
                             :books="item.books"
                             :empty-text="t('user.history.noRecords')"
                             :key-prefix="'history-' + item.name"
-                            cols="6"
-                            sm="4"
-                            md="3"
-                            lg="2"
+                            adaptive
                             show-title
                             show-summary
                         />

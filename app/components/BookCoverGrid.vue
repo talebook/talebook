@@ -5,10 +5,14 @@
     >
         {{ emptyText }}
     </div>
-    <v-row v-else>
+    <v-row
+        v-else
+        :class="{ 'book-cover-grid--adaptive': adaptive }"
+    >
         <v-col
             v-for="book in books"
             :key="keyPrefix + '-' + book.id"
+            class="book-cover-grid-item"
             :cols="cols"
             :sm="sm"
             :md="md"
@@ -77,10 +81,32 @@ defineProps({
         type: Boolean,
         default: false,
     },
+    adaptive: {
+        type: Boolean,
+        default: false,
+    },
 });
 </script>
 
 <style scoped>
+.book-cover-grid--adaptive {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    margin: 0;
+}
+.book-cover-grid--adaptive > .book-cover-grid-item {
+    min-width: 0;
+    flex: none;
+    width: 100%;
+    max-width: none;
+    padding: 0;
+}
+@media (min-width: 600px) {
+    .book-cover-grid--adaptive {
+        grid-template-columns: repeat(auto-fill, minmax(min(176px, 100%), 1fr));
+    }
+}
 .book-cover-card:focus-visible {
     outline: 2px solid currentColor;
     outline-offset: 2px;

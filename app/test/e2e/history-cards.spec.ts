@@ -25,7 +25,7 @@ test.describe('Reading history card text', () => {
     });
 
     for (const theme of ['light', 'dark']) {
-        for (const width of [320, 1280]) {
+        for (const width of [320, 600, 768, 960, 1280, 1920, 2560]) {
             test(`keeps titles and summaries in two lines at ${width}px in ${theme} theme`, async ({ page }) => {
                 await page.setViewportSize({ width, height: 900 });
                 await page.context().addCookies([{ name: 'theme', value: theme, url: 'http://127.0.0.1:9000' }]);
@@ -45,6 +45,10 @@ test.describe('Reading history card text', () => {
                             await expect(text).toHaveCSS('-webkit-line-clamp', '2');
                             const box = await text.boundingBox();
                             const cardBox = await card.boundingBox();
+                            expect(cardBox!.width).toBeGreaterThanOrEqual(width === 320 ? 120 : 160);
+                            expect(cardBox!.width).toBeLessThanOrEqual(260);
+                            expect(cardBox!.x).toBeGreaterThanOrEqual(0);
+                            expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(width);
                             expect(box!.x - cardBox!.x).toBeCloseTo(12, 1);
                             expect(cardBox!.x + cardBox!.width - box!.x - box!.width).toBeCloseTo(12, 1);
                             expect(box!.height).toBeCloseTo(await text.evaluate(element => parseFloat(getComputedStyle(element).lineHeight) * 2), 1);
@@ -61,6 +65,54 @@ test.describe('Reading history card text', () => {
                 }
             });
         }
+    }
+
+    for (const width of [320, 1280]) {
+        for (const theme of ['light', 'dark']) {
+            test(`uses only the actual text lines at ${width}px in ${theme} theme`, async ({ page, request }) => {
+                const readingBooks = [
+                    { ...books[0], title: '三体', comments: '科幻简介。' },
+                    { ...books[1], title: '三体', comments: summary },
+                    { ...indexData.random_books[2], title: books[0].title, comments: '科幻简介。' },
+                ];
+                await request.post(`${mockApiUrl}/_test/reset`, { data: { readingBooks } });
+                await page.setViewportSize({ width, height: 900 });
+                await page.context().addCookies([{ name: 'theme', value: theme, url: 'http://127.0.0.1:9000' }]);
+                await page.goto('/user/history');
+                const cards = page.locator('[data-testid="book-cover-card"]:visible');
+                await expect(cards).toHaveCount(3);
+                for (const [position, lines] of [[0, [1, 1]], [1, [1, 2]], [2, [2, 1]]] as const) {
+                    const card = cards.nth(position);
+                    const title = card.getByTestId('book-card-title');
+                    const description = card.getByTestId('book-card-summary');
+                    const lineHeight = await title.evaluate(element => parseFloat(getComputedStyle(element).lineHeight));
+                    const titleBox = await title.boundingBox();
+                    const descriptionBox = await description.boundingBox();
+                    expect(titleBox!.height).toBeCloseTo(lineHeight * lines[0], 1);
+                    expect(descriptionBox!.height).toBeCloseTo(lineHeight * lines[1], 1);
+                    expect(descriptionBox!.y - titleBox!.y - titleBox!.height).toBeCloseTo(4, 1);
+                }
+                const shortBox = await cards.nth(0).boundingBox();
+                const longBox = await cards.nth(1).boundingBox();
+                expect(longBox!.height - shortBox!.height).toBeCloseTo(21, 1);
+            });
+        }
+    }
+
+    for (const width of [320, 1280, 1920]) {
+        test(`keeps a single history card at the ordinary width at ${width}px`, async ({ page, request }) => {
+            await page.setViewportSize({ width, height: 900 });
+            await page.goto('/user/history');
+            const card = page.locator('[data-testid="book-cover-card"]:visible').first();
+            await expect(card).toBeVisible();
+            const ordinaryBox = await card.boundingBox();
+            await request.post(`${mockApiUrl}/_test/reset`, { data: { readingBooks: [books[0]] } });
+            await page.reload();
+            await expect(page.locator('[data-testid="book-cover-card"]:visible')).toHaveCount(1);
+            const singleBox = await card.boundingBox();
+            expect(singleBox!.width).toBeCloseTo(ordinaryBox!.width, 1);
+            expect(singleBox!.x).toBeCloseTo(ordinaryBox!.x, 1);
+        });
     }
 
     test('shows a localized placeholder when the introduction is missing', async ({ page, request }) => {

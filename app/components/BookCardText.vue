@@ -39,7 +39,6 @@ const summary = computed(() => bookSummary(props.book.comments));
 }
 .book-card-lines {
     display: -webkit-box;
-    min-block-size: 3em;
     overflow: hidden;
     overflow-wrap: anywhere;
     -webkit-line-clamp: 2;
