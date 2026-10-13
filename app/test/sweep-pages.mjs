@@ -1,93 +1,114 @@
-// 全站页面遍历：逐页访问，记录 HTTP 状态、控制台错误、页面错误。
+// 用真实浏览器遍历全部前端页面，收集控制台错误与页面异常。
 //
-// 目的：把界面上每个功能入口都实际打开一遍，找出「页面能开但功能坏了」的问题。
-import { chromium } from '@playwright/test';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+// 用法：node app/test/sweep-pages.mjs
+// 前置：Docker 后端在 8090，Nuxt dev server 在 3000。
 
-const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:3000';
-const output = path.resolve(process.argv[2] || '../document/screenshots/sweep');
+import { chromium } from 'playwright'
 
-// 需要登录才能访问的页面统一用管理员身份。
+const BASE = process.env.BASE || 'http://127.0.0.1:3000'
+const USER = process.env.E2E_USER || 'e2e_admin'
+const PASS = process.env.E2E_PASS || 'AdminPass123'
+
 const PAGES = [
-    // 公开页
-    '/', '/library', '/recent', '/hot', '/nav', '/search',
-    '/author', '/publisher', '/tag', '/series', '/rating', '/format',
-    '/opds-readme', '/webdav-readme', '/welcome',
-    // 书籍相关
-    '/book/1', '/book/1/edit', '/book/1/annotations', '/book/1/audios', '/book/1/verify',
-    // 我的
-    '/me', '/me/account', '/me/devices', '/me/history', '/me/plugins', '/me/private', '/me/shelf',
-    // 有声书
-    '/audios', '/audios/create', '/audio-jobs',
-    // 网络书源
-    '/network', '/library/network', '/library/local', '/library/apps',
-    // 插件
-    '/plugins', '/plugins/brs', '/plugins/legado', '/plugins/weread',
-    '/plugins/zh-converter', '/plugins/txt-fixer', '/plugins/text-replace', '/plugins/epub-beautify',
-    // 管理端
-    '/admin/books', '/admin/imports', '/admin/users', '/admin/trash', '/admin/logs',
-    '/admin/themes', '/admin/booksources',
-    '/admin/settings', '/admin/settings/general', '/admin/settings/plugins', '/admin/settings/themes',
-    '/admin/plugins', '/admin/plugins/runs',
-    // 其他
-    '/scopedbooks', '/user/detail', '/user/history', '/user/shelf',
-];
+  '/',
+  '/login',
+  '/recent',
+  '/hot',
+  '/search?query=%E7%BA%A2%E6%98%9F',
+  '/category',
+  '/category/author',
+  '/category/publisher',
+  '/category/tag',
+  '/category/series',
+  '/category/rating',
+  '/category/format',
+  '/author',
+  '/publisher',
+  '/tag',
+  '/series',
+  '/rating',
+  '/format',
+  '/book/7',
+  '/read/7',
+  '/admin/books',
+  '/admin/trash',
+  '/admin/imports',
+  '/admin/users',
+  '/admin/settings',
+  '/admin/logs',
+  '/admin/themes',
+  '/admin/booksources',
+  '/admin/plugins',
+  '/admin/plugins/runs',
+  '/audiobooks',
+  '/comics',
+  '/network',
+  '/favorites',
+  '/messages',
+  '/profile',
+  '/about',
+]
 
-const report = { pages: [], errors: [] };
-await fs.mkdir(output, { recursive: true });
+const IGNORE = [
+  'favicon',
+  'ERR_CONNECTION_REFUSED',
+  'upstream.unavailable',
+  'Failed to load resource: the server responded with a status of 502',
+  'review/me',
+  'review/book',
+  'review/summary',
+]
 
-const browser = await chromium.launch({ args: ['--no-sandbox'] });
-const context = await browser.newContext({ baseURL, locale: 'zh-CN', viewport: { width: 1440, height: 1000 } });
-const page = await context.newPage();
-
-let consoleErrors = [];
-let pageErrors = [];
-let failedRequests = [];
-page.on('console', (m) => { if (m.type() === 'error') consoleErrors.push(m.text().slice(0, 300)); });
-page.on('pageerror', (e) => pageErrors.push(e.message.slice(0, 300)));
-page.on('requestfailed', (r) => failedRequests.push(`${r.method()} ${r.url()} — ${r.failure()?.errorText}`));
-page.on('response', (r) => {
-    if (r.status() >= 400) failedRequests.push(`${r.status()} ${r.request().method()} ${r.url()}`);
-});
-
-try {
-    // 登录
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await page.getByLabel(/用户名|账号/).first().fill('e2e_admin');
-    await page.getByLabel(/密码/).first().fill('AdminPass123');
-    await page.getByRole('button', { name: /登录|登入/ }).first().click();
-    await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 30000 });
-    report.login = 'ok';
-
-    for (const p of PAGES) {
-        consoleErrors = []; pageErrors = []; failedRequests = [];
-        const entry = { path: p };
-        try {
-            const resp = await page.goto(p, { waitUntil: 'domcontentloaded', timeout: 20000 });
-            entry.status = resp ? resp.status() : null;
-            await page.waitForTimeout(1800);
-            const body = await page.locator('body').innerText().catch(() => '');
-            entry.textLen = body.length;
-            entry.textHead = body.slice(0, 150).replace(/\s+/g, ' ');
-            // 页面是否显示错误提示
-            entry.hasError = /失败|错误|异常|不存在|无权|error|Error/.test(body.slice(0, 800));
-            entry.consoleErrors = [...new Set(consoleErrors)];
-            entry.pageErrors = [...new Set(pageErrors)];
-            entry.failedRequests = [...new Set(failedRequests)].slice(0, 8);
-        } catch (e) {
-            entry.fatal = e.message.slice(0, 200);
-        }
-        report.pages.push(entry);
-        const flag = (entry.status && entry.status >= 400) || entry.fatal || entry.pageErrors?.length ? 'FAIL' : 'ok';
-        console.log(`[${flag}] ${p} status=${entry.status} len=${entry.textLen} errs=${entry.pageErrors?.length || 0}/${entry.consoleErrors?.length || 0}`);
-    }
-} catch (e) {
-    report.errors.push(`fatal: ${e.message}`);
-} finally {
-    await fs.writeFile(path.join(output, 'sweep-report.json'), JSON.stringify(report, null, 2));
-    const bad = report.pages.filter((p) => p.fatal || (p.status && p.status >= 400) || p.pageErrors?.length);
-    console.log(`\n=== 汇总：${report.pages.length} 页，${bad.length} 页有问题 ===`);
-    for (const b of bad) console.log(`  ${b.path}: status=${b.status} fatal=${b.fatal || '-'} pageErr=${b.pageErrors?.[0] || '-'}`);
-    await browser.close();
+function interesting(text) {
+  return !IGNORE.some((s) => text.includes(s))
 }
+
+const browser = await chromium.launch()
+const ctx = await browser.newContext()
+const page = await ctx.newPage()
+
+// 先登录，拿到会话。
+await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' })
+await page.fill('input[type="text"], input[name="username"]', USER).catch(() => {})
+await page.fill('input[type="password"]', PASS).catch(() => {})
+await page.click('button:has-text("登录")').catch(() => {})
+await page.waitForTimeout(2500)
+
+const results = []
+for (const path of PAGES) {
+  const errors = []
+  const onConsole = (m) => {
+    if (m.type() === 'error' && interesting(m.text())) errors.push(m.text().slice(0, 200))
+  }
+  const onPageError = (e) => errors.push('PAGEERROR: ' + String(e).slice(0, 200))
+  page.on('console', onConsole)
+  page.on('pageerror', onPageError)
+
+  let status = 0
+  try {
+    const resp = await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 20000 })
+    status = resp ? resp.status() : 0
+    await page.waitForTimeout(1200)
+  } catch (e) {
+    errors.push('NAV: ' + String(e).slice(0, 150))
+  }
+
+  page.off('console', onConsole)
+  page.off('pageerror', onPageError)
+
+  const body = await page.evaluate(() => document.body.innerText.replace(/\s+/g, ' ').slice(0, 160)).catch(() => '')
+  results.push({ path, status, errors, body })
+}
+
+await browser.close()
+
+let bad = 0
+for (const r of results) {
+  const flag = r.errors.length ? 'ERR' : 'OK '
+  if (r.errors.length) bad++
+  console.log(`${flag} ${String(r.status).padEnd(3)} ${r.path}`)
+  if (r.errors.length) {
+    for (const e of r.errors.slice(0, 3)) console.log(`      ${e}`)
+  }
+}
+console.log(`\n共 ${results.length} 页；有错误 ${bad} 页`)

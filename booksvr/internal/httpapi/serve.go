@@ -278,6 +278,15 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		Settings: opts.Settings,
 		Version:  opts.Version,
 		CDNURL:   opts.CDNURL,
+		// 首页「分类浏览」的计数来自 /api/user/info 的 sys 字段。
+		// 这些回调必须接线，否则全部返回 0（曾导致首页显示 0 本书籍）。
+		// 统计的是 Calibre 元数据库（books/authors/publishers/tags/series/data）。
+		CountBooks:      func() (int64, error) { return library.CountBooks(db) },
+		CountAuthors:    func() (int64, error) { return library.CountAuthors(db) },
+		CountPublishers: func() (int64, error) { return library.CountPublishers(db) },
+		CountTags:       func() (int64, error) { return library.CountTags(db) },
+		CountSeries:     func() (int64, error) { return library.CountSeries(db) },
+		CountFormats:    func() (int64, error) { return library.CountFormats(db) },
 	})...)
 	// MetaConfig.DB 是 Calibre 元数据库（authors / tags / publishers 等表）；
 	// UserDB 是 Talebook 自有库（author_aliases / book_aliases 等表）。
