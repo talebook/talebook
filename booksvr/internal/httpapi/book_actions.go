@@ -26,8 +26,12 @@ func BookFavoriteHandler(cfg BookConfig) HandlerFunc {
 }
 
 // BookShelfHandler 实现 /api/book/<id>/shelf。
+//
+// 请求体字段名是 "shelf"（与 Python 的 data.get("shelf", False) 一致），
+// 不是 "wants"。曾因字段名不匹配，点击「加入书架」永远写入 false，
+// 书架页面始终为空。
 func BookShelfHandler(cfg BookConfig) HandlerFunc {
-	return bookToggleHandler(cfg, "wants", func(cfg BookConfig, ctx *Context, bookID int64, on bool) error {
+	return bookToggleHandler(cfg, "shelf", func(cfg BookConfig, ctx *Context, bookID int64, on bool) error {
 		if cfg.SetShelf == nil {
 			return errNotWired
 		}

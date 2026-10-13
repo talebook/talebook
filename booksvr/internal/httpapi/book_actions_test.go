@@ -387,7 +387,10 @@ func TestBookShelfHandler(t *testing.T) {
 		got = wants
 		return nil
 	}
-	ctx := pluginCtx(t, f.DB, http.MethodPost, "/api/book/10/shelf", `{"wants":true}`, 1, false)
+	// 请求体字段名必须是 "shelf"，与前端 `JSON.stringify({ shelf })`
+	// 和 Python 的 data.get("shelf", False) 一致。
+	// 曾误用 "wants"，导致点击「加入书架」永远写入 false、书架页面为空。
+	ctx := pluginCtx(t, f.DB, http.MethodPost, "/api/book/10/shelf", `{"shelf":true}`, 1, false)
 	ctx.Params = []string{"10"}
 	resp, err := BookShelfHandler(f.Cfg)(ctx)
 	if err != nil {
@@ -395,6 +398,28 @@ func TestBookShelfHandler(t *testing.T) {
 	}
 	if resp["err"] != "ok" || !got {
 		t.Fatalf("resp = %+v got=%v", resp, got)
+	}
+}
+
+// TestBookShelfHandlerIgnoresWantsField 验证 "wants" 不是有效字段名。
+//
+// 前端只发 "shelf"；若 handler 读 "wants"，这里会得到 false。
+func TestBookShelfHandlerIgnoresWantsField(t *testing.T) {
+	f := newBookFixture(t)
+	insertBook(t, f.DB, 10, "三体")
+	bookSeedReader(t, f.DB, 1, "alice")
+	var got bool
+	f.Cfg.SetShelf = func(ctx *Context, bookID int64, wants bool) error {
+		got = wants
+		return nil
+	}
+	ctx := pluginCtx(t, f.DB, http.MethodPost, "/api/book/10/shelf", `{"wants":true}`, 1, false)
+	ctx.Params = []string{"10"}
+	if _, err := BookShelfHandler(f.Cfg)(ctx); err != nil {
+		t.Fatalf("handler 失败: %v", err)
+	}
+	if got {
+		t.Error("字段名应为 shelf，wants 不应被识别")
 	}
 }
 

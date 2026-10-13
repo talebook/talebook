@@ -411,7 +411,50 @@ func bookRenderList(cfg BookConfig, ctx *Context, ids []int64, title string, sor
 	if err != nil {
 		return nil, err
 	}
+
+	// stream=1 时返回 NDJSON：首行元信息，随后每行一本书。
+	// 前端 $backend_stream 按行解析，返回单个 JSON 对象会导致列表永远为空。
+	if ctx.Query("stream") == "1" {
+		if err := bookWriteNDJSON(ctx, title, count, values); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+
 	return map[string]any{"err": "ok", "title": title, "total": count, "books": values}, nil
+}
+
+// bookWriteNDJSON 复刻 Python 的 stream_book_list 输出格式。
+//
+// 首行是元信息 {"err":"ok","title":...,"total":N}，
+// 随后每行一本书的 JSON，Content-Type 为 application/x-ndjson。
+func bookWriteNDJSON(ctx *Context, title string, total int, books []map[string]any) error {
+	w := ctx.Writer
+	w.Header().Set("Content-Type", "application/x-ndjson")
+	w.Header().Set("Cache-Control", "max-age=0")
+	w.Header().Set("X-Accel-Buffering", "no")
+	// 与 Python 一致：回显请求的 Origin，允许携带凭据。
+	origin := ctx.Request.Header.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(map[string]any{"err": "ok", "title": title, "total": total}); err != nil {
+		return err
+	}
+	for _, b := range books {
+		if err := enc.Encode(b); err != nil {
+			return err
+		}
+	}
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+	return nil
 }
 
 // bookSlice 安全切片。
