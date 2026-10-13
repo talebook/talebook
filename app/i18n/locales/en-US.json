@@ -884,7 +884,16 @@
         "discardConfirm": "Your changes will not take effect after leaving. Discard changes?",
         "saveFailed": "Failed to save import settings. Please try again.",
         "saved": "Import settings saved",
-        "symlink": "Symlink"
+        "symlink": "Symlink",
+        "directoryList": "Import directories",
+        "directoryListHint": "Talebook scans these directories for ebook files. Keep at least one.",
+        "addDirectory": "Add directory",
+        "removeDirectory": "Remove this directory",
+        "directoryItemLabel": "Directory {index}",
+        "defaultDirectory": "Default import directory",
+        "defaultDirectoryHint": "Auto watch and quick import use this directory.",
+        "atLeastOneDirectory": "At least one import directory is required.",
+        "directoryOutsideRoots": "Directories must live under /data/."
       },
       "watch": {
         "off": "Off",

@@ -185,41 +185,39 @@ class TestRunBootstrap(unittest.TestCase):
         with open(os.path.join(self_check.STATUS_DIR, "status.json")) as f:
             return json.load(f)
 
-    def test_all_steps_ok_starts_tornado(self):
+    def test_all_steps_ok_starts_booksvr(self):
         checks = [("a", lambda: (True, None)), ("b", lambda: (True, None))]
-        start_tornado_fn = mock.Mock()
+        start_booksvr_fn = mock.Mock()
 
-        result = self_check.run_bootstrap(checks=checks, start_tornado_fn=start_tornado_fn)
+        result = self_check.run_bootstrap(checks=checks, start_booksvr_fn=start_booksvr_fn)
 
         self.assertTrue(result)
-        start_tornado_fn.assert_called_once()
+        start_booksvr_fn.assert_called_once()
         doc = self._status()
         self.assertEqual(doc["phase"], "ready")
         self.assertEqual([s["status"] for s in doc["steps"]], ["ok", "ok"])
 
-    def test_stops_at_first_failure_and_skips_tornado(self):
+    def test_stops_at_first_failure_and_skips_booksvr(self):
         second_check = mock.Mock(return_value=(True, None))
         checks = [
             ("a", lambda: (False, "permission_denied")),
             ("b", second_check),
         ]
-        start_tornado_fn = mock.Mock()
+        start_booksvr_fn = mock.Mock()
 
-        result = self_check.run_bootstrap(checks=checks, start_tornado_fn=start_tornado_fn)
+        result = self_check.run_bootstrap(checks=checks, start_booksvr_fn=start_booksvr_fn)
 
         self.assertFalse(result)
-        start_tornado_fn.assert_not_called()
+        start_booksvr_fn.assert_not_called()
         second_check.assert_not_called()
         doc = self._status()
         self.assertEqual(doc["phase"], "failed")
         self.assertEqual(doc["steps"][0], {"name": "a", "status": "failed", "code": "permission_denied"})
         self.assertEqual(doc["steps"][1]["status"], "pending")
 
-    @mock.patch("webserver.self_check.subprocess.run")
-    def test_start_tornado_uses_group_process_name(self, m_run):
-        # tornado 在 [group:talebook] 中，supervisorctl 必须用 group:program 形式的进程名
-        self_check.start_tornado()
-        m_run.assert_called_once_with(["supervisorctl", "start", "talebook:tornado"])
+    def test_tornado_is_retired(self):
+        # Tornado 已下线：self_check 不再有 start_tornado。
+        self.assertFalse(hasattr(self_check, "start_tornado"))
 
 
 if __name__ == "__main__":

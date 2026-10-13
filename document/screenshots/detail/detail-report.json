@@ -1,0 +1,235 @@
+{
+  "api": {
+    "status": 200,
+    "body": {
+      "book": {
+        "aliases": [],
+        "author": "佚名",
+        "author_sort": "佚名",
+        "author_url": "/author/佚名",
+        "authors": [
+          "佚名"
+        ],
+        "collector": "1",
+        "comments": "暂无简介",
+        "count_download": 0,
+        "count_visit": 0,
+        "files": [
+          {
+            "format": "EPUB",
+            "href": "/api/book/1.EPUB",
+            "online_readable": true,
+            "size": 0
+          },
+          {
+            "format": "MOBI",
+            "href": "/api/book/1.MOBI",
+            "online_readable": true,
+            "size": 8188933
+          }
+        ],
+        "fmt": [
+          "EPUB",
+          "MOBI"
+        ],
+        "fmt_epub": true,
+        "fmt_mobi": true,
+        "href": "/book/1",
+        "id": 1,
+        "img": "/get/cover/1.jpg?t=1791850212",
+        "is_owner": false,
+        "is_public": true,
+        "isbn": null,
+        "language": null,
+        "media_type": "ebook",
+        "media_type_locked": false,
+        "online_readable": true,
+        "pubdate": "Unknown",
+        "publisher": "Unknown",
+        "publisher_url": "/publisher/Unknown",
+        "rating": 0,
+        "scope": "public",
+        "series": null,
+        "state": {
+          "download": 0,
+          "favorite": 0,
+          "favorite_date": null,
+          "online_read": 0,
+          "read_date": null,
+          "read_state": 0,
+          "wants": 0,
+          "wants_date": null
+        },
+        "tag": "",
+        "tags": [],
+        "thumb": "/get/thumb_60x80/1.jpg?t=1791850212",
+        "timestamp": "2026-10-13",
+        "title": "【精排】红星照耀中国 （又名：西行漫记）"
+      },
+      "conversion_options": [
+        {
+          "source_format": "mobi",
+          "target_format": "epub",
+          "converter": "ebook-convert",
+          "available": false,
+          "reason": "target_exists"
+        },
+        {
+          "source_format": "epub",
+          "target_format": "azw3",
+          "converter": "ebook-convert",
+          "available": true,
+          "reason": ""
+        },
+        {
+          "source_format": "epub",
+          "target_format": "pdf",
+          "converter": "ebook-convert",
+          "available": true,
+          "reason": ""
+        }
+      ],
+      "err": "ok",
+      "kindle_sender": "",
+      "msg": ""
+    },
+    "coverStatus": 200,
+    "coverType": "image/jpeg",
+    "coverBytes": 0
+  },
+  "requests": [
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/index.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/api.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/app.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/component.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/context.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/hooks.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/_nuxt/node_modules/@vue/devtools-api/lib/esm/api/util.js?v=fe68b32f",
+      "ct": "text/javascript"
+    },
+    {
+      "status": 200,
+      "url": "/api/themes/active",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/user/messages",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/user/info",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/user/info",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/user/messages",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/get/cover/1.jpg?t=1791850212",
+      "ct": "image/jpeg"
+    },
+    {
+      "status": 200,
+      "url": "/api/plugins/tools/book-actions?book_id=1",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/book/1/readstate",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/user/devices",
+      "ct": "application/json; charset=UTF-8"
+    },
+    {
+      "status": 200,
+      "url": "/api/book/1/annotations",
+      "ct": "application/json; charset=UTF-8"
+    }
+  ],
+  "errors": [],
+  "renderedText": "搜索\n首页\n我的阅读\n书库浏览\n有声书\nBeta\n管理\n分类浏览\n分类导览\n出版社\n作者\n标签\n文件格式\n丛书\n评分\n热门\n最近\n【精排】红星照耀中国 （又名：西行漫记）\n作者\n佚名\n评分\n评分 0 / 10\n评分 1 / 10\n评分 2 / 10\n评分 3 / 10\n评分 4 / 10\n评分 5 / 10\n评分 6 / 10\n评分 7 / 10\n评分 8 / 10\n评分 9 / 10\n评分 10 / 10\n出版社\nUnknown\n出版日期\nUnknown\n格式\nEPUB · 0B\nMOBI · 7MB\n上传者\n1 @ 2026-10-13\n阅读状态\n想读\n在读\n已读\n标签\n电子书\n书籍操作\n阅读\n下载\n发送到设备\n有声书\n内容简介\n\n暂无简介\n\nGITHUB\n | \nDOCKER\n | \nPROJECT",
+  "detailRows": [
+    {
+      "label": "作者",
+      "value": "佚名"
+    },
+    {
+      "label": "评分",
+      "value": "评分 0 / 10评分 1 / 10评分 2 / 10评分 3 / 10评分 4 / 10评分 5 / 10评分 6 / 10评分 7 / 10评分 8 / 1"
+    },
+    {
+      "label": "出版社",
+      "value": "Unknown"
+    },
+    {
+      "label": "出版日期",
+      "value": "Unknown"
+    },
+    {
+      "label": "格式",
+      "value": "EPUB · 0BMOBI · 7MB"
+    },
+    {
+      "label": "上传者",
+      "value": "1 @ 2026-10-13"
+    },
+    {
+      "label": "阅读状态",
+      "value": "想读 在读 已读"
+    },
+    {
+      "label": "标签",
+      "value": "电子书"
+    }
+  ],
+  "coverImgs": [
+    {
+      "src": "https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif",
+      "natural": 0,
+      "complete": true
+    },
+    {
+      "src": "/get/cover/1.jpg?t=1791850212",
+      "natural": 0,
+      "complete": true
+    }
+  ]
+}

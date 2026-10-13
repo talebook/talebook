@@ -104,3 +104,13 @@ docker/seed/
 demo-data/
 node_modules
 mod
+
+# 智能体本地工作目录（临时验证产物、构建日志、截图、探针脚本）
+.qagent/
+.agents/
+
+# 本地端到端验证环境（含数据库、书库与提取产物）
+.local-e2e/
+
+# Go 后端交叉编译产物
+booksvr-linux-amd64

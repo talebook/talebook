@@ -22,7 +22,17 @@ COMIC_RAR_FORMATS = frozenset(("cbr", "rar"))
 COMIC_CONTAINER_FORMATS = COMIC_ZIP_FORMATS | COMIC_RAR_FORMATS
 EBOOK_MEDIA_FORMATS = frozenset(("azw", "azw3", "epub", "mobi", "pdf", "txt"))
 MANAGED_DOCUMENT_FORMATS = frozenset(("djvu", "uvz"))
-SUPPORTED_MEDIA_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS | MANAGED_DOCUMENT_FORMATS
+# 实施项 11.5：可导入但不可在线阅读的文档格式。
+#
+# 它们只做容器校验（确认文件真的是该格式），不做内容分类，
+# 也不进入 ONLINE_READ_FORMATS——在线阅读需要前端渲染器支持。
+OFFICE_DOCUMENT_FORMATS = frozenset(("docx",))
+XML_DOCUMENT_FORMATS = frozenset(("fb2",))
+HTML_ARCHIVE_FORMATS = frozenset(("htmlz",))
+DOWNLOAD_ONLY_FORMATS = OFFICE_DOCUMENT_FORMATS | XML_DOCUMENT_FORMATS | HTML_ARCHIVE_FORMATS
+SUPPORTED_MEDIA_FORMATS = (
+    EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS | MANAGED_DOCUMENT_FORMATS | DOWNLOAD_ONLY_FORMATS
+)
 ONLINE_READ_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS
 
 MAX_ARCHIVE_ENTRIES = 10000
@@ -30,6 +40,7 @@ MAX_ARCHIVE_FILE_BYTES = 1024 * 1024 * 1024
 MAX_ARCHIVE_UNCOMPRESSED_BYTES = 512 * 1024 * 1024
 MAX_ARCHIVE_ENTRY_BYTES = 128 * 1024 * 1024
 MAX_ARCHIVE_COMPRESSION_RATIO = 200
+MAX_DOCUMENT_XML_BYTES = 8 * 1024 * 1024
 MAX_EPUB_XML_BYTES = 2 * 1024 * 1024
 MAX_EPUB_XHTML_BYTES = 2 * 1024 * 1024
 MAX_EPUB_SPINE_ITEMS = 2000
@@ -519,6 +530,100 @@ def _analyze_managed_document(path, declared_format):
     return MediaAnalysis(declared_format, declared_format, mime_type, MEDIA_TYPE_UNKNOWN, "download_only_document")
 
 
+def _analyze_docx(path, declared_format):
+    """Validate an Office Open XML (DOCX) container without decoding its text.
+
+    A DOCX is a ZIP whose root holds ``[Content_Types].xml``. That file is the
+    discriminator against other ZIP-based formats (EPUB, CBZ, HTMLZ), which is
+    why a renamed EPUB is rejected here.
+    """
+    if not _read_signature(path, 4).startswith(b"PK"):
+        _invalid("format.mismatch", "文件内容不是有效的 DOCX ZIP 容器")
+    _preflight_zip_directory(path)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            names = {info.filename for info in archive.infolist()}
+            if "[Content_Types].xml" not in names:
+                _invalid("format.mismatch", "DOCX 缺少 [Content_Types].xml")
+            if not any(name.startswith("word/") for name in names):
+                _invalid("format.mismatch", "DOCX 缺少 word/ 目录")
+    except InvalidMediaError:
+        raise
+    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as err:
+        _invalid("archive.corrupt", "DOCX 容器已损坏：%s" % err)
+    return MediaAnalysis(
+        declared_format,
+        declared_format,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        MEDIA_TYPE_UNKNOWN,
+        "download_only_document",
+    )
+
+
+def _analyze_fb2(path, declared_format):
+    """Validate a FictionBook 2 XML document.
+
+    The root element must be ``FictionBook`` and it must carry a ``body``.
+    Entities are never resolved (``resolve_entities=False``), so an XXE payload
+    cannot read local files.
+    """
+    size = os.path.getsize(path)
+    if size > MAX_DOCUMENT_XML_BYTES:
+        _invalid("format.mismatch", "FB2 文件过大")
+    try:
+        with open(path, "rb") as fh:
+            data = fh.read(MAX_DOCUMENT_XML_BYTES + 1)
+    except OSError as err:
+        _invalid("media.unreadable", "无法读取 FB2 文件：%s" % err)
+    if len(data) > MAX_DOCUMENT_XML_BYTES:
+        _invalid("format.mismatch", "FB2 文件过大")
+
+    try:
+        root = _parse_xml(data, "FB2")
+    except InvalidMediaError:
+        # _parse_xml 报的是 epub.invalid_xml；对 FB2 统一成 format.mismatch。
+        _invalid("format.mismatch", "FB2 XML 不合法")
+
+    if _local_name(root.tag) != "FictionBook":
+        _invalid("format.mismatch", "FB2 根元素不是 FictionBook")
+    if not any(_local_name(child.tag) == "body" for child in root):
+        _invalid("format.mismatch", "FB2 缺少 body 元素")
+
+    return MediaAnalysis(
+        declared_format,
+        declared_format,
+        "application/fb2+xml",
+        MEDIA_TYPE_UNKNOWN,
+        "download_only_document",
+    )
+
+
+def _analyze_htmlz(path, declared_format):
+    """Validate an HTMLZ archive (a ZIP holding ``index.html``)."""
+    if not _read_signature(path, 4).startswith(b"PK"):
+        _invalid("format.mismatch", "文件内容不是有效的 HTMLZ ZIP 容器")
+    _preflight_zip_directory(path)
+    try:
+        with zipfile.ZipFile(path) as archive:
+            _infos, files = _zip_file_entries(archive)
+            if not files:
+                _invalid("archive.empty", "HTMLZ 容器为空")
+            names = {info.filename for info in files}
+            if "index.html" not in names:
+                _invalid("format.mismatch", "HTMLZ 缺少 index.html")
+    except InvalidMediaError:
+        raise
+    except (OSError, zipfile.BadZipFile, zipfile.LargeZipFile) as err:
+        _invalid("archive.corrupt", "HTMLZ 容器已损坏：%s" % err)
+    return MediaAnalysis(
+        declared_format,
+        declared_format,
+        "application/octet-stream",
+        MEDIA_TYPE_UNKNOWN,
+        "download_only_document",
+    )
+
+
 def analyze_media_file(path, declared_format):
     """Validate a file against its declared format and classify its content."""
     declared_format = (declared_format or "").lower().lstrip(".")
@@ -529,6 +634,12 @@ def analyze_media_file(path, declared_format):
 
     if declared_format in MANAGED_DOCUMENT_FORMATS:
         return _analyze_managed_document(path, declared_format)
+    if declared_format in OFFICE_DOCUMENT_FORMATS:
+        return _analyze_docx(path, declared_format)
+    if declared_format in XML_DOCUMENT_FORMATS:
+        return _analyze_fb2(path, declared_format)
+    if declared_format in HTML_ARCHIVE_FORMATS:
+        return _analyze_htmlz(path, declared_format)
     if declared_format in COMIC_ZIP_FORMATS:
         if not _read_signature(path, 4).startswith(b"PK"):
             _invalid("format.mismatch", "文件内容不是有效的 ZIP 容器")

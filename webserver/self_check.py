@@ -4,7 +4,7 @@
 
 以 root 身份作为 supervisor 的 bootstrap program 运行，在 nginx 已经起来之后
 逐项校验运行环境（数据目录权限、nginx 配置、数据库初始化/迁移/配置写入），每完成
-一步就把结果写入 status.json。任一步失败就停止后续步骤且不再拉起 tornado，但
+一步就把结果写入 status.json。任一步失败就停止后续步骤且不再拉起 booksvr，但
 nginx 不受影响，用户可以直接通过 /status.json、/status_page.html 看到诊断结果，
 不需要进入容器查看日志。
 
@@ -132,12 +132,66 @@ CHECKS = [
 ]
 
 
-def start_tornado():
-    # tornado 位于 [group:talebook] 中，supervisor 的进程名是 talebook:tornado
-    subprocess.run(["supervisorctl", "start", "talebook:tornado"])
+def read_cookie_secret():
+    """从 Talebook 配置体系读出 cookie_secret。
+
+    cookie_secret 不是环境变量，而是安装时写入 /data/books/settings/auto.py 的
+    Python dict 字面量（由 webserver/loader.py 的 import auto 加载）。booksvr
+    需要同一密钥才能解析 Tornado 的 secure cookie，因此在这里读出并转交。
+
+    本脚本以 /opt/talebook-upgrade/self_check.py 运行，`webserver` 不在 sys.path，
+    因此先把 SERVER_DIR 加进去再导入 loader；导入失败时回退到直接读 auto.py。
+
+    读不到时返回空串，由调用方决定是否跳过 booksvr。
+    """
+    try:
+        if SERVER_DIR not in sys.path:
+            sys.path.insert(0, SERVER_DIR)
+        from webserver import loader
+
+        secret = str(loader.get_settings().get("cookie_secret") or "")
+        if secret:
+            return secret
+    except Exception as exc:  # noqa: BLE001 - 自检不得因读取失败而中断
+        print("[self_check] 导入 webserver.loader 失败，回退读 auto.py: %s" % exc)
+
+    # 回退：直接解析 /data/books/settings/auto.py 的 settings dict。
+    try:
+        import ast
+
+        auto_path = os.path.join(DATA_DIR, "books", "settings", "auto.py")
+        with open(auto_path, encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, ast.Name) and target.id == "settings":
+                        values = ast.literal_eval(node.value)
+                        return str(values.get("cookie_secret") or "")
+    except Exception as exc:  # noqa: BLE001
+        print("[self_check] 读取 auto.py 失败: %s" % exc)
+    return ""
 
 
-def run_bootstrap(checks=CHECKS, start_tornado_fn=start_tornado):
+def start_booksvr(secret=None):
+    """拉起 booksvr（唯一对外 HTTP 后端，监听 8000）。
+
+    必须在 syncdb/migrate 之后调用：booksvr 打开数据库前，建表与迁移必须已完成。
+    密钥经环境变量传入，不写在命令行，避免 ps 泄露。
+    """
+    if secret is None:
+        secret = read_cookie_secret()
+    if not secret:
+        print("[self_check] 未取到 cookie_secret，跳过 booksvr")
+        return False
+
+    env = dict(os.environ)
+    env["BOOKSVR_COOKIE_SECRET"] = secret
+    subprocess.run(["supervisorctl", "start", "talebook:booksvr"], env=env)
+    return True
+
+
+def run_bootstrap(checks=CHECKS, start_booksvr_fn=start_booksvr):
     steps = [{"name": name, "status": "pending", "code": None} for name, _ in checks]
     write_status(steps, phase="starting")
 
@@ -152,9 +206,11 @@ def run_bootstrap(checks=CHECKS, start_tornado_fn=start_tornado):
             return False
         write_status(steps, phase="starting")
 
-    print("[self_check] all checks passed, starting tornado")
+    print("[self_check] all checks passed, starting booksvr")
     write_status(steps, phase="ready")
-    start_tornado_fn()
+    # booksvr 是唯一对外后端，本地服务全部 215 条 legacy 路由；
+    # 它需要 syncdb/migrate 已完成才能打开数据库。
+    start_booksvr_fn()
     return True
 
 

@@ -155,7 +155,8 @@ def health():
 
 
 def supervisor(action):
-    result = subprocess.run(["supervisorctl", action, "talebook:tornado"], capture_output=True, timeout=100)
+    # booksvr 是唯一对外后端（Tornado 已下线）。
+    result = subprocess.run(["supervisorctl", action, "talebook:booksvr"], capture_output=True, timeout=100)
     if result.returncode:
         raise UpgradeError("process")
 
@@ -677,7 +678,7 @@ class Executor:
                 self.save(phase="recovering", error=error)
                 try:
                     # A failed supervisor start may already have left the process stopped.
-                    subprocess.run(["supervisorctl", "stop", "talebook:tornado"], capture_output=True, timeout=100)
+                    subprocess.run(["supervisorctl", "stop", "talebook:booksvr"], capture_output=True, timeout=100)
                     switch(old_target)
                     atomic_json(ROOT / "active.json", previous)
                     atomic_json(ROOT / "pin.json", previous_pin)

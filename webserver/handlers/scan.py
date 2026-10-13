@@ -49,6 +49,56 @@ def _configured_allowed_roots():
     return normalized or [_normalize_path(SCAN_DIR_PREFIX)]
 
 
+def _is_within(path, prefix):
+    """判断 ``path`` 是否等于 ``prefix`` 或位于其下。
+
+    用 ``os.path.commonpath`` 而非字符串前缀，避免 ``/database`` 被误判为
+    ``/data`` 的子目录；同时正确处理 Windows 的盘符与大小写差异。
+    """
+    try:
+        return os.path.commonpath([path, prefix]) == prefix
+    except ValueError:
+        # 不同盘符（Windows）或类型不一致时 commonpath 会抛 ValueError。
+        return False
+
+
+def _sanitize_allowed_roots(raw_roots):
+    """把请求里的 ``import_allowed_roots`` 归一化成去重、有序的绝对路径列表。
+
+    安全约束（与 ``SCAN_DIR_PREFIX`` 一致）：每个根目录都必须落在 ``/data/``
+    之下，否则整个请求被拒绝——不能让管理员把扫描范围扩到系统目录。
+
+    返回 ``(roots, error)``；``error`` 非空时调用方应直接返回该错误。
+    """
+    if raw_roots is None:
+        return None, None
+    if isinstance(raw_roots, str):
+        raw_roots = [item.strip() for item in raw_roots.split(",") if item.strip()]
+    if not isinstance(raw_roots, (list, tuple)):
+        return None, {"err": "params.allowed_roots", "msg": _("目录列表格式不正确")}
+
+    prefix = _normalize_path(SCAN_DIR_PREFIX)
+    normalized = []
+    for root in raw_roots:
+        # 先剔除纯空白项：_normalize_path("   ") 会把它解析成当前工作目录，
+        # 那既不是用户意图，也可能绕过 /data/ 前缀检查。
+        if not str(root).strip():
+            continue
+        path = _normalize_path(root)
+        if not path:
+            continue
+        if not _is_within(path, prefix):
+            return None, {
+                "err": "params.allowed_roots",
+                "msg": _("目录必须位于 %s 之下") % SCAN_DIR_PREFIX,
+            }
+        if path not in normalized:
+            normalized.append(path)
+    if not normalized:
+        return None, {"err": "params.allowed_roots", "msg": _("至少需要一个导入目录")}
+    return normalized, None
+
+
 def _is_path_in_roots(path, roots=None):
     path = _normalize_path(path)
     if not path:
@@ -419,6 +469,10 @@ class ImportSettings(BaseHandler):
             auto_watch_enabled = auto_watch_enabled.lower() in ("1", "true", "yes", "on")
         auto_watch_enabled = bool(auto_watch_enabled)
 
+        allowed_roots, roots_error = _sanitize_allowed_roots(req.get("import_allowed_roots"))
+        if roots_error:
+            return roots_error
+
         directory_check = check_import_directory(path)
         if directory_check["status"] == "error":
             return {"err": "params.path", "msg": directory_check["msg"], "directory_check": directory_check}
@@ -434,6 +488,8 @@ class ImportSettings(BaseHandler):
         args["scan_upload_path"] = path
         args["import_mode"] = import_mode
         args["import_auto_watch_enabled"] = auto_watch_enabled
+        if allowed_roots is not None:
+            args["import_allowed_roots"] = allowed_roots
 
         from webserver.handlers.admin import SettingsSaverLogic
 

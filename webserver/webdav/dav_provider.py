@@ -12,6 +12,7 @@ from wsgidav.fs_dav_provider import FilesystemProvider
 
 from webserver import loader
 from webserver.i18n import _
+from webserver.services.format_keys import apply_format_keys
 
 
 CONF = loader.get_settings()
@@ -214,6 +215,16 @@ class BooksCollection(VirtualCollection):
                             fmt_path = self.provider.cache.format_abspath(book_id, fmt)
                             if fmt_path:
                                 item[f"fmt_{fmt_lower}"] = fmt_path
+
+                # WebDAV 不走 get_books()，需在此单独注入 book_formats 的路径。
+                # 未迁移的库没有该表，apply_format_keys 直接返回 0，
+                # 此时保留上面从 cache.format_abspath() 得到的 Calibre 原值。
+                if self.provider.get_session_func:
+                    session = self.provider.get_session_func()
+                    try:
+                        apply_format_keys(session, [item])
+                    finally:
+                        session.close()
 
                 selected_fmt = None
                 for f in SUPPORTED_FORMATS:

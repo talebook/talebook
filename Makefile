@@ -1,4 +1,4 @@
-.PHONY: all build test check-design check-spec
+.PHONY: all build test check-design check-spec build-go test-go lint-go
 
 VER = $(shell git branch --show-current | tr '/' '-')
 IMAGE = talebook/talebook:$(VER)
@@ -56,6 +56,15 @@ check-design:
 
 check-spec:
 	python3 scripts/check_spec.py
+
+build-go:
+	cd booksvr && go build -o bin/booksvr ./cmd/booksvr
+
+test-go:
+	cd booksvr && go test ./...
+
+lint-go:
+	cd booksvr && go vet ./...
 
 pytest:
 	pytest tests -v --cov=webserver --cov-report=term-missing

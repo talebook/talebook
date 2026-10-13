@@ -17,6 +17,13 @@
 !webserver/**
 !tests/
 !tests/**
+!booksvr/
+!booksvr/**
+
+# Go 存储层的本地构建产物与测试缓存不进镜像。
+booksvr/bin
+booksvr/**/*.test
+booksvr/**/*.out
 
 # Frontend development and test material is not needed by image builds.
 app/.env

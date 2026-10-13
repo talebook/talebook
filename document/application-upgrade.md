@@ -88,7 +88,7 @@ docker compose up -d talebook
 
 健康检查失败会尝试恢复上一应用。**应用回退不会自动恢复数据库**。所有备份包含独立 SQLite 文件及 `inventory.json` 哈希清单，目录位于 `/data/updates/backups/`，仅 root 可读。恢复数据库是独立运维操作：停止所有访问和写进程，保留当前库的副本，核实需要舍弃哪些备份之后的新数据，再使用 SQLite backup API 恢复到新路径并校验 `PRAGMA integrity_check`，确认后替换文件。绝不能在恢复服务、产生新数据后自动覆盖数据库。
 
-自动恢复失败会保持维护状态。先读取状态与日志，确认 Tornado 是否运行及 `/run/talebook-release/current` 的目标；使用 `supervisorctl stop talebook:tornado` 停止后选择已知安全的应用或更新镜像，再验证本地健康检查。人工处理恢复失败时不要删除 `active.json` 或数据库来“试一下”。维护状态文件只能在恢复确认后由部署管理员移除。外部数据库和跨 schema 回退需要单独制定恢复方案。
+自动恢复失败会保持维护状态。先读取状态与日志，确认 booksvr 是否运行及 `/run/talebook-release/current` 的目标；使用 `supervisorctl stop talebook:booksvr` 停止后选择已知安全的应用或更新镜像，再验证本地健康检查。人工处理恢复失败时不要删除 `active.json` 或数据库来“试一下”。维护状态文件只能在恢复确认后由部署管理员移除。外部数据库和跨 schema 回退需要单独制定恢复方案。
 
 ### 本地版本与数据库快照管理
 

@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>在 Go 里建完整数据访问层 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
+      <header class="hero">
+        <h1>在 Go 里建完整数据访问层：为搬 handler 铺路</h1>
+        <p class="sub">把 Calibre <code>LibraryDatabase</code> 的实测调用面（23 个方法）在 Go 里完整实现，作为阶段 6 逐条搬迁 215 条 handler 的基础设施。<b>本阶段不修改任何 Python 代码</b>——Python 注定要删，不给它做数据层优化。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip wip">状态：WIP</span>
+          <span class="chip">创建日期：2026-10-10</span>
+          <span class="chip">所属模块：booksvr</span>
+          <span class="chip">影响范围：booksvr/internal/library/、tests/</span>
+          <span class="chip">需求来源：用户原话「为什么还要python？」</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <!-- REQUIRED：保留用户原话或可追溯的原始需求，不要只写二次概括。 -->
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“我的目标从来都是替换 calibre，整个 talebook 的后端换成 go 的 booksvr 呀”<br />“我要你全改完，怎么还有215个反向代理给tornado呢？”<br />“<b>为什么还要python？</b>”</div>
+            <p>阶段 2 完成后，booksvr 已接管 8000 端口成为唯一对外后端，但 215 条路由仍反向代理回 Tornado。</p>
+            <p>本阶段最初被设计为「数据库层接管」——让 Python 换个方式读库。但用户一句「为什么还要python？」点破了前提错误：<b>Python 注定要删，给它做数据层优化是浪费。</b></p>
+            <p>修正后的定位：<b>在 Go 里把数据访问层建完整（读+写），作为搬 handler 的基础设施，不碰 Python。</b></p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul>
+                <li>Go 侧实现 Calibre <code>LibraryDatabase</code> 实测调用面的全部能力（读 17 + 写 4）。</li>
+                <li>搜索语法复刻 Calibre 查询语法（字段限定、比较符、布尔、括号）。</li>
+                <li>回收站改为 Go 直接读 <code>.caltrash</code> 目录。</li>
+                <li>字段元信息、封面、格式路径等辅助能力齐备。</li>
+                <li>与 Calibre 语义一致性的契约测试。</li>
+              </ul></article>
+              <article class="choice"><h3>非目标</h3><ul>
+                <li><b>不修改任何 Python 代码</b>（本次路线修正的核心）。</li>
+                <li>不实现 handler（属阶段 6）。</li>
+                <li>不实现元数据文件解析（属阶段 4）。</li>
+                <li>不实现元数据源插件（属阶段 5）。</li>
+                <li>不删除 Calibre 运行时（属阶段 7）。</li>
+              </ul></article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 能力矩阵</h2>
+            <p>本阶段是纯 Go 包新增，不接生产路径。下表列出实现的能力与其 Calibre 对应物。</p>
+            <div class="table-wrap" role="region" aria-label="能力矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>类别</th><th>Go 接口</th><th>Calibre 对应</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr><th scope="row">读</th><td><code>GetBooksData</code></td><td><code>get_data_as_dict</code></td><td>字段集合与 <code>SimpleBookFormatter</code> 一致</td></tr>
+                  <tr><th scope="row">读</th><td><code>GetBooksForCategory</code> / <code>GetCategories</code> / <code>GetItemID</code> / <code>GetItemNameMap</code></td><td><code>get_books_for_category</code> / <code>get_categories</code></td><td>6 个分类（authors/tags/publishers/series/ratings/languages）</td></tr>
+                  <tr><th scope="row">读</th><td><code>Search</code></td><td><code>search_getting_ids</code></td><td>字段/比较符/布尔/括号；非法语法报错</td></tr>
+                  <tr><th scope="row">读</th><td><code>AllBookIDs</code> / <code>HasID</code> / <code>BooksWithSameTitle</code> / <code>LastModified</code> / <code>FormatAbsPath</code> / <code>Sort</code> / <code>FieldFor</code></td><td>同名方法</td><td>语义一致；未知字段返回 nil 不报错</td></tr>
+                  <tr><th scope="row">读</th><td><code>FieldMetadata</code> / <code>AllFieldNames</code></td><td><code>field_metadata</code></td><td>内置字段 + <code>custom_columns</code></td></tr>
+                  <tr><th scope="row">读</th><td><code>Cover</code> / <code>CoverLastModified</code></td><td><code>cover</code> / <code>cover_last_modified</code></td><td>无封面返回 nil 不报错</td></tr>
+                  <tr><th scope="row">回收站</th><td><code>ListTrashEntries</code> / <code>RestoreTrashEntry</code> / <code>DeleteTrashEntry</code></td><td><code>list_trash_entries</code> / <code>move_book_from_trash</code> / <code>delete_trash_entry</code></td><td>直读 <code>.caltrash/b/&lt;id&gt;</code>；路径穿越防护</td></tr>
+                  <tr><th scope="row">写</th><td><code>ImportBook</code> / <code>DeleteBook</code> / <code>AddFormat</code> / <code>SetTags</code></td><td><code>import_book</code> / <code>delete_book</code> / <code>add_format</code> / <code>set_tags</code></td><td>事务内完成；关联表同步清理</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td><code>self.db</code> 调用面 23 个方法</td><td>实测：<code>get_data_as_dict</code>(12)、<code>get_metadata</code>(11)、<code>field_metadata</code>(8)、<code>get_books_for_category</code>(6)、<code>add_format</code>(5)…</td><td>读 17 + 写 4</td></tr>
+                  <tr><td>搜索语法实际只用 4 种</td><td><code>book.py:1197,1201,1205</code>（publisher/author/tag）、<code>opds.py:699</code>（search）</td><td>但用户要求复刻完整语法</td></tr>
+                  <tr><td>回收站目录结构</td><td><code>trash_manager.py</code> 的 <code>_book_trash_path</code>：<code>.caltrash/b/&lt;book_id&gt;</code></td><td>Go 可直读，无需 Calibre</td></tr>
+                  <tr><td>12 个 handler 文件不依赖 <code>self.db</code></td><td>实测：<code>theme.py</code>/<code>captcha.py</code>/<code>plugins.py</code> 等 12 个文件 <code>self.db</code> 用法为 0</td><td>它们是阶段 6 的第一批搬迁对象</td></tr>
+                  <tr><td>原阶段 3 计划前提错误</td><td>原计划让 Python「先切读后切写」</td><td>已作废（用户否决）</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <p>在 <code>booksvr/internal/library</code> 包内新增数据访问能力，<b>纯 Go 包，不引入 HTTP</b>——阶段 6 的 handler 是 Go 代码，直接调包即可。</p>
+            <pre><code>现状：  Python handler ──► self.db (Calibre) ──► SQLite
+阶段 3：Go library 包 ──► SQLite（读+写，完整能力）   ← 本阶段只做这个
+阶段 6：Go handler ──► Go library 包                  ← 逐条搬，搬完删 Python</code></pre>
+
+            <h3>5.1 搜索语法（分三步）</h3>
+            <ul>
+              <li><b>Step A（已完成）：</b>实测被调用的语法——<code>publisher:</code>/<code>author:</code>/<code>tag:</code>/<code>search:</code>/空查询/全文搜索。</li>
+              <li><b>Step B（已完成）：</b>补齐 <code>series:</code>/<code>rating:</code>/<code>format:</code>/<code>title:</code>、比较符（<code>:=</code>/<code>:&lt;</code>/<code>:&gt;</code>）、布尔（<code>and</code>/<code>or</code>/<code>not</code>）、括号分组。</li>
+              <li><b>Step C（已知缺口）：</b>正则（<code>~</code>）、虚拟书库、<code>custom_columns</code> 高级查询<b>未实现</b>，遇到时返回明确错误而非静默错误结果。</li>
+            </ul>
+            <p>实现方式：词法分析 → 递归下降解析 → SQL 生成。</p>
+
+            <h3>5.2 回收站</h3>
+            <p>直读 <code>&lt;library&gt;/.caltrash/b/&lt;book_id&gt;/</code>：列出时扫描目录 + 读 <code>books</code> 表补元数据；恢复时文件移回 <code>&lt;library&gt;/&lt;book.path&gt;/</code>；删除时移除目录。复刻 Calibre 的 <code>commonpath</code> 路径穿越防护。</p>
+
+            <h3>5.3 写接口</h3>
+            <p>全部在事务内完成：<code>ImportBook</code> 建 <code>books</code> 行 + 关联作者/出版社/标签/简介；<code>DeleteBook</code> 显式清理 9 张关联表（Calibre 无外键级联）；<code>AddFormat</code> 同时写 <code>book_formats</code> 与 Calibre 的 <code>data</code> 表；<code>SetTags</code> 替换标签关联。</p>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="table-wrap" role="region" aria-label="风险与缓解" tabindex="0">
+              <table>
+                <thead><tr><th>风险</th><th>影响</th><th>缓解</th></tr></thead>
+                <tbody>
+                  <tr><td>搜索语法复刻不完整</td><td>阶段 6 搬 handler 时行为不一致</td><td>分步实现 + 契约测试；Step C 缺口如实记录</td></tr>
+                  <tr><td>本机无 Calibre 无法真双跑</td><td>一致性未真实验证</td><td>用真实 fixture + Python 独立复算；真实双跑记录为未执行项</td></tr>
+                  <tr><td>写接口绕过 Calibre 导致数据不一致</td><td>书库损坏</td><td>本阶段不接生产路径，只做单元测试</td></tr>
+                  <tr><td>数据层能力不足</td><td>阶段 6 才发现缺接口</td><td>按实测调用面逐项覆盖</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>回滚</h3>
+            <p>本阶段<b>不接生产路径</b>（纯新增 Go 包），无需回滚——删掉新增文件即可。</p>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>Go 单元</td><td><code>cd booksvr &amp;&amp; go test ./...</code></td><td>6 包全绿</td><td class="ok">通过（6/6 包 ok）</td></tr>
+                  <tr><td>Go 静态</td><td><code>go vet ./... &amp;&amp; gofmt -l .</code></td><td>无输出</td><td class="ok">通过（均无输出）</td></tr>
+                  <tr><td>一致性契约</td><td><code>pytest tests/test_library_contract.py</code></td><td>全绿</td><td class="ok">通过（18 passed）</td></tr>
+                  <tr><td>回归</td><td><code>pytest tests/test_booksvr_contract.py tests/test_booksvr_serve_contract.py tests/test_deploy_config.py</code></td><td>全绿</td><td class="ok">通过</td></tr>
+                  <tr><td>质量门禁</td><td><code>check_design_docs.py</code>、<code>check_spec.py</code></td><td>均通过</td><td class="ok">通过</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout warn"><strong>未执行项与风险（如实记录）：</strong>
+            <ul>
+              <li><b>真实 Calibre 双跑未执行。</b>本机无 Calibre（<code>ModuleNotFoundError: No module named 'calibre'</code>），无法启动 Calibre 做逐条对比。替代方案：用真实 fixture（<code>tests/cases/metadata.db</code>，13 本书/15 作者/72 标签）+ Python 独立复算期望值。剩余风险：Calibre 的边界行为（如特殊字符、NULL 处理）未逐条比对。</li>
+              <li><b>搜索语法 Step C 未实现。</b>正则（<code>~</code>）、虚拟书库、<code>custom_columns</code> 高级查询未实现；遇到时返回明确错误。实测这 3 类语法在仓库中<b>无调用点</b>，风险可控。</li>
+            </ul>
+            </div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-10-10：</strong>用户追问「怎么还有215个反向代理给tornado」，确认推进方式为「按路线图阶段 3→7 依次做完」。</li>
+              <li><strong>2026-10-10：</strong>用户追问「<b>为什么还要python？</b>」，否决原阶段 3「让 Python 换个方式读库」的方案。原计划 <code>plans/2026-10-10-db-layer.md</code> 已删除。</li>
+              <li><strong>2026-10-10：</strong>阶段 3 重新定义为「在 Go 里建完整数据层，不碰 Python」。理由：Python 注定要删，给它做数据层优化是浪费。</li>
+              <li><strong>2026-10-10：</strong>搜索语法复刻分三步（Step A 实测子集 / Step B 补齐 / Step C 记录缺口），避免「声称完整复刻但实际未验证」。</li>
+              <li><strong>2026-10-10：</strong>回收站直读 <code>.caltrash/b/&lt;id&gt;</code>，不依赖 Calibre 的 cache API。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
+      <footer>Talebook internal design · booksvr · WIP · 2026-10-10</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

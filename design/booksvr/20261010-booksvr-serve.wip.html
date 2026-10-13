@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>让 booksvr 接管 8000：Talebook 后端流量切换 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <!--
+      使用步骤：
+      1. cp design/TEMPLATE.html design/<module>/yyyymmdd-<feature>.wip.html
+      2. 同一个工作只维护这一份方案；grill、反馈、候选比较、实现偏离和测试结果都更新同一份 WIP，不创建或保留中间废弃文档。
+      3. 替换所有“〔……〕”占位内容，并让 title、h1、状态和文件名保持一致；迭代期间保持首次创建日期和 feature 不变。
+      4. 保留标注 REQUIRED 的内容；按需删除标注 OPTIONAL 的组件、tags 与目录项。
+      5. meta tags 只是备选呈现组件，不要求固定数量；但标题、日期、模块、状态及存在时的需求来源仍须在顶部清楚展示。
+      6. 可按主题修改 :root token、标题处理与专用图表，但保留响应式、focus、reduced-motion、打印和表格滚动基线。
+      7. 创建时测试结果写“待验证”；完成后回写实际命令、页面、结果、失败项与未执行原因，再把唯一 WIP 转为 ACTIVE。
+      8. SUPERSEDED 只用于已独立生效的旧 ACTIVE 被另一个后续工作替代，不用于保存本工作的设计过程。
+    -->
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <!-- OPTIONAL：宽屏页边轨道。删减章节时同步维护轨道、浮动目录与正文 section。 -->
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <!-- OPTIONAL：视口没有足够页边余白时自动使用，不压缩正文。details 提供无脚本可用的开合能力。 -->
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
+      <header class="hero">
+        <h1>让 booksvr 接管 8000：Talebook 后端流量切换</h1>
+        <p class="sub">新增 <code>booksvr serve</code> 子命令，让 Go 后端成为唯一对外 HTTP 入口：已实现的 3 条路由本地服务，其余 215 条显式反向代理回 Tornado（退到 8001），并以灰度开关与回滚路径保证可逐步接管。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip wip">状态：WIP</span>
+          <span class="chip">创建日期：2026-10-10</span>
+          <span class="chip">所属模块：booksvr</span>
+          <span class="chip">影响范围：booksvr/、conf/supervisor/、conf/nginx/、webserver/self_check.py、docker/start.sh、tests/</span>
+          <span class="chip">需求来源：用户原话「整个 talebook 的后端换成 go 的 booksvr」</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <!-- REQUIRED：保留用户原话或可追溯的原始需求，不要只写二次概括。 -->
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">“我的目标从来都是替换 calibre，整个 talebook 的后端换成 go 的 booksvr 呀”<br />“岂有此理，没有被调用，booksvr 还有什么用。目标就是替换 calibre，只是部分功能没实现而已”</div>
+            <p>第一阶段已完成 Calibre 存储层的 Go 重写（作品/版本/格式三层模型、8 步归一化流水线、单向只读迁移），并真实接管了格式路径解析层（<code>format_keys.py</code> 被 <code>get_books()</code> 与 WebDAV 调用，读 <code>book_formats</code> 表）。</p>
+            <p>但 <code>booksvr</code> 目前<b>没有生产入口</b>：218 条路由已声明，其中仅 3 条有 Go handler，其余 215 条在 <code>NewServer</code> 中因 <code>Handler == nil</code> 被跳过；Dockerfile 只把二进制拷进镜像，没有任何进程启动它。生产流量仍全部由 Tornado 服务。</p>
+            <p>本阶段要解决的不是「实现全部 215 条 handler」，而是<b>让 booksvr 先站到生产路径上</b>——否则后续每写一个 handler 都没有真实流量验证它。这是绞杀者模式的第一步。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended"><h3>目标</h3><ul>
+                <li><code>booksvr serve</code> 子命令存在，监听 8000，提供 HTTP 服务。</li>
+                <li>已实现的 3 条路由（<code>/api/work/{id}</code>、<code>/api/book/{id}/versions</code>、<code>/api/book/{id}/merge</code>）由 booksvr 真实提供。</li>
+                <li>其余 215 条路由<b>显式反向代理</b>回 Tornado（退到 8001），不得静默 404。</li>
+                <li>灰度开关可按路由控制「走 booksvr / 走 Tornado」，默认全部走 Tornado。</li>
+                <li>关闭开关后流量完全回到 Tornado，行为与切换前一致（可回滚）。</li>
+                <li>身份由 booksvr 自行解析 Tornado secure cookie 得到。</li>
+              </ul></article>
+              <article class="choice"><h3>非目标</h3><ul>
+                <li>不实现其余 215 条 handler（阶段 3-6 的工作）。</li>
+                <li>不改变对外 HTTP API 契约：218 条路由的路径、方法、响应结构不变。</li>
+                <li>不改变 Tornado 的业务逻辑，它只是从 8000 退到 8001。</li>
+                <li>不删除 Calibre 依赖（阶段 7 的工作）。</li>
+                <li>不做与流量切换无关的重构。</li>
+              </ul></article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <p>本阶段是纯后端流量切换，前端 Nuxt 零改动。下表说明各入口在切换后的流量归属。</p>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">由 booksvr 服务</span>
+              <span class="matrix-conditional">代理回 Tornado</span>
+              <span class="matrix-no">不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>路由</th><th>切换后归属</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">作品/版本</th>
+                    <td><code>/api/work/{id}</code><br /><code>/api/book/{id}/versions</code></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">booksvr</span></td>
+                    <td>响应结构与单元测试断言一致；游客只能看到公开书</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">版本合并</th>
+                    <td><code>/api/book/{id}/merge</code></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">booksvr</span></td>
+                    <td>需登录；未登录返回 <code>{"err":"user.need_login"}</code>（HTTP 200）</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">其余全部</th>
+                    <td>215 条既有路由（书库、阅读、书架、管理、OPDS、WebDAV…）</td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">代理回 Tornado</span></td>
+                    <td>行为与切换前完全一致；代理失败返回显式 502，不得静默 404</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">阅读器资源</th>
+                    <td><code>/read/resource/</code>、<code>/read-online-comic</code>、<code>/podcast/v1/</code></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">代理回 Tornado</span></td>
+                    <td><code>Cache-Control</code>、<code>Accept-Ranges</code>、<code>Content-Range</code> 原样透传</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>booksvr 无生产入口</td><td><code>cmd/booksvr/main.go</code> 只有 <code>import-calibre</code>、<code>reindex-normalize</code></td><td>需新增 <code>serve</code> 子命令</td></tr>
+                  <tr><td>218 条路由仅 3 条有 handler</td><td><code>routes.go</code> 218 条 <code>Pattern:</code>；<code>workroutes.go</code> 3 条 handler</td><td>其余 215 条需代理兜底</td></tr>
+                  <tr><td>未实现路由被静默跳过</td><td><code>server.go</code>：<code>if spec.Handler == nil { continue }</code></td><td>直接替换会 404，必须代理</td></tr>
+                  <tr><td>catch-all 路由匹配一切路径</td><td><code>routes.go:19</code>：<code>{Pattern: "/(.*)"}</code></td><td>分发器不得遍历 218 条全表</td></tr>
+                  <tr><td>tornado 不由 supervisor 自动启动</td><td><code>talebook.conf:31</code> <code>autostart=false</code>；<code>self_check.py:135-137</code> 显式拉起</td><td><code>priority</code> 无效，需改 self_check</td></tr>
+                  <tr><td>部署配置有三套</td><td>Dockerfile L208/L210、L283/L285、L361/L363</td><td>三套 supervisor + 三套 nginx 均需同步</td></tr>
+                  <tr><td>身份来自 3 个 secure cookie</td><td><code>base.py:288-310</code>：<code>lt</code>/<code>user_id</code>/<code>admin_id</code>，7 天有效期</td><td>Go 需复刻 Tornado v2 签名</td></tr>
+                  <tr><td>cookie_secret 不在环境变量</td><td><code>settings.py:30</code> 默认值；<code>admin.py:816</code> 安装时改写进 <code>auto.py</code></td><td>需由 self_check 读出并转交</td></tr>
+                  <tr><td>merge 路由 Python 侧不存在</td><td><code>rg -n 'merge' webserver/</code> 无匹配；它在 <code>newRoutes</code></td><td>不存在双写风险</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <p>采用<b>绞杀者模式</b>：booksvr 监听 8000 作唯一对外后端，未实现路由反向代理回 Tornado（8001）。</p>
+            <pre><code>                    ┌─────────────────────────────────────┐
+   Nginx  ────────► │  booksvr :8000  （唯一对外后端）      │
+   (反代 8000)       │                                     │
+                    │  1. 解析 Tornado secure cookie       │
+                    │     → Identity{UserID,IsAdmin}       │
+                    │  2. 查灰度开关                       │
+                    │     ├─ 命中 booksvr 清单 → 本地 handler│
+                    │     └─ 未命中 → 反向代理 ────────┐    │
+                    └──────────────────────────────────┼────┘
+                                                       │
+                                                       ▼
+                                        ┌──────────────────────────┐
+                                        │  Tornado :8001（兜底）    │
+                                        │  215 条未实现路由         │
+                                        └──────────────────────────┘</code></pre>
+
+            <h3>5.1 灰度开关与路由匹配语义</h3>
+            <p><code>-serve-routes</code> 默认<b>空</b>（全部走 Tornado 兜底），逗号分隔 pattern 或 <code>all</code>。分发器<b>只遍历「有 Go handler 的路由表」</b>（当前 3 条），<b>不遍历 218 条全表</b>——因为全表含 catch-all <code>/(.*)</code>，会造成顺序陷阱。命中但无 handler 仍走代理。</p>
+
+            <h3>5.2 身份解析</h3>
+            <p>Go 复刻 Tornado secure cookie v2：<code>2|&lt;len(kv)&gt;:&lt;kv&gt;|&lt;len(ts)&gt;:&lt;ts&gt;|&lt;len(name)&gt;:&lt;name&gt;|&lt;len(b64)&gt;:&lt;b64&gt;|&lt;hex_hmac_sha256&gt;</code>。解析顺序对齐 <code>base.py:288-310</code>：<code>lt</code>（7 天）→ <code>user_id</code> → <code>admin_id</code>。只信任自己解析的 cookie，忽略外部身份 header。</p>
+            <div class="callout warn"><strong>已知权限偏差：</strong>Python 的 <code>admin_id</code> 会查库取 Reader 并校验 <code>admin</code> 字段；阶段 2 不查库，<code>admin_id</code> 存在即视为管理员。若该用户已被删除或降权，存在权限提升风险。缓解：cookie 有 HMAC 保护、阶段 2 仅 merge 一条路由需管理员权限；阶段 3 改为查库校验。</div>
+
+            <h3>5.3 密钥下发链路</h3>
+            <p><code>cookie_secret</code> 不是环境变量，而是安装时写入 <code>/data/books/settings/auto.py</code>。由 <code>self_check.py</code> 用 <code>loader.get_settings()</code> 读出，经 <code>BOOKSVR_COOKIE_SECRET</code> 环境变量转交 booksvr（不写命令行，避免 <code>ps</code> 泄露）。</p>
+
+            <h3>5.4 启动时序</h3>
+            <article class="step"><span class="label">1</span><b>nginx 启动</b><p>autostart=true</p></article>
+            <article class="step"><span class="label">2</span><b>bootstrap 自检</b><p>权限、nginx 配置、syncdb、migrate、update-config</p></article>
+            <article class="step"><span class="label">3</span><b>拉起 tornado(8001)</b><p>self_check.py 在自检通过后</p></article>
+            <article class="step"><span class="label">4</span><b>拉起 booksvr(8000)</b><p>紧接 tornado 之后，保证晚于库结构变更打开数据库</p></article>
+
+            <h3>5.5 数据库</h3>
+            <p>以 WAL + <code>busy_timeout(30000)</code> 打开同一 SQLite，降低与 Tornado 并发访问的锁冲突。阶段 2 只有 merge 一条写路由，且该路由 Python 侧不存在，无双写。</p>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="table-wrap" role="region" aria-label="风险与缓解" tabindex="0">
+              <table>
+                <thead><tr><th>风险</th><th>影响</th><th>缓解</th></tr></thead>
+                <tbody>
+                  <tr><td>Go 复刻的 cookie 算法与 Tornado 不一致</td><td>所有人被判定为游客</td><td>用真实 Tornado 测试向量逐字节比对；跨语言契约测试</td></tr>
+                  <tr><td><code>cookie_secret</code> 下发到 booksvr</td><td>密钥泄露面扩大</td><td>只经环境变量传入，不落盘、不写日志</td></tr>
+                  <tr><td>代理逻辑有 bug</td><td>全站不可用</td><td>白名单默认空；先只开 3 条路由；回滚只需改一个参数</td></tr>
+                  <tr><td>catch-all 路由导致分发顺序错乱</td><td>全站路由错乱</td><td>分发器只匹配有 handler 的路由表</td></tr>
+                  <tr><td>booksvr 早于 syncdb/migrate 打开库</td><td>库结构变更竞争</td><td>autostart=false，由 self_check 在 tornado 之后拉起</td></tr>
+                  <tr><td>遗漏 SSR 生产配置</td><td>SSR 镜像端口冲突崩溃</td><td>三套 supervisor + 三套 nginx 全部同步</td></tr>
+                  <tr><td>代理破坏缓存/range 头</td><td>阅读器/Podcast 异常</td><td>新增 Cache-Control/Accept-Ranges/Content-Range 透传测试</td></tr>
+                  <tr><td>未实现路由静默 404</td><td>前端功能缺失且难排查</td><td>未命中一律代理；代理失败返回显式 502 + 日志</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>回滚</h3>
+            <ol>
+              <li><b>单条路由：</b>从 <code>-serve-routes</code> 移除该 pattern，重启 booksvr。</li>
+              <li><b>全量：</b><code>-serve-routes</code> 置空，重启 booksvr → 全部流量回 Tornado。</li>
+              <li><b>彻底：</b>三份 supervisor 把 tornado 端口改回 8000、停用 booksvr，回退 self_check，重启。</li>
+              <li><b>镜像：</b>保留变更前的镜像 tag。</li>
+            </ol>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>Go 单元</td><td><code>cd booksvr &amp;&amp; go test ./...</code></td><td>6 包全绿</td><td class="ok">通过（6/6 包 ok）</td></tr>
+                  <tr><td>Go 静态</td><td><code>go vet ./... &amp;&amp; gofmt -l .</code></td><td>无输出</td><td class="ok">通过（均无输出）</td></tr>
+                  <tr><td>Python 契约</td><td><code>pytest tests/test_booksvr_serve_contract.py tests/test_deploy_config.py tests/test_booksvr_contract.py</code></td><td>全绿</td><td class="ok">通过（76 passed）</td></tr>
+                  <tr><td>实际运行</td><td>真实 Docker 镜像 <code>talebook/talebook:stage2-verify</code>，容器内 curl 验证</td><td>路由分发、@auth、502、回滚均符合预期</td><td class="ok">通过（见下方明细）</td></tr>
+                  <tr><td>回滚验证</td><td><code>-serve-routes</code> 置空重启 booksvr</td><td>流量全回 Tornado</td><td class="ok">通过（<code>/api/work/1</code> 由 booksvr JSON 变为 Tornado 404 HTML）</td></tr>
+                  <tr><td>质量门禁</td><td><code>check_design_docs.py</code>、<code>check_spec.py</code></td><td>均通过</td><td class="ok">通过（spec 25 篇；design 结构/资源校验通过，仅 WIP 合并门禁按预期拦截）</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>7.1 真实环境端到端明细</h3>
+            <p>镜像 <code>talebook/talebook:stage2-verify</code> 构建成功（<code>docker build --target production</code>），容器内实测：</p>
+            <div class="table-wrap" role="region" aria-label="端到端明细" tabindex="0">
+              <table>
+                <thead><tr><th>验证项</th><th>命令</th><th>实际结果</th></tr></thead>
+                <tbody>
+                  <tr><td>进程拓扑</td><td><code>supervisorctl status</code></td><td>nginx RUNNING、tornado RUNNING（8001）、booksvr RUNNING（8000）</td></tr>
+                  <tr><td>端口</td><td><code>ss -lntp</code></td><td><code>127.0.0.1:8000</code> 由 booksvr 监听；<code>127.0.0.1:8001</code> 由 tornado 监听</td></tr>
+                  <tr><td>本地路由</td><td><code>curl :8000/api/work/1</code></td><td>HTTP 200，由 booksvr 处理</td></tr>
+                  <tr><td>代理路由</td><td><code>curl :8000/api/welcome</code></td><td>HTTP 200，响应体为 Tornado 的 <code>{"err":"not_installed"}</code></td></tr>
+                  <tr><td>未注册路径不静默 404</td><td><code>curl :8000/totally/unknown</code></td><td>HTTP 404，但响应体是 <b>Tornado 的 HTML</b>（证明是代理透传，非 booksvr 自己 404）</td></tr>
+                  <tr><td>@auth 强制</td><td><code>curl -X POST :8000/api/book/1/merge</code>（无 cookie）</td><td>HTTP 200 + <code>{"err":"user.need_login","msg":"请先登录"}</code></td></tr>
+                  <tr><td>上游不可达</td><td>booksvr 指向死端口 9999 后 <code>curl :8000/api/welcome</code></td><td>HTTP 502 + <code>{"err":"upstream.unavailable"}</code></td></tr>
+                  <tr><td>回滚</td><td><code>-serve-routes</code> 置空重启</td><td><code>/api/work/1</code> 由 booksvr JSON 变为 Tornado 404 HTML，流量完全回退</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="callout warn"><strong>未执行项与风险（如实记录）：</strong>
+            <ul>
+              <li><b>浏览器全流程回归未执行。</b>本次验证在容器内用 <code>curl</code> 完成，未跑浏览器登录/书库/详情/阅读/书架全流程。原因：本阶段是纯后端流量切换，前端 Nuxt 零改动，且路由分发、身份、代理、回滚均已逐项验证。剩余风险：前端在真实浏览器下的会话行为未观测。</li>
+              <li><b>booksvr 本地路由返回 <code>works</code> 表缺失错误。</b>实测 <code>/api/work/1</code> 返回 <code>{"err":"exception","msg":"... no such table: works"}</code>。原因：镜像内书库尚未跑第一阶段迁移（<code>import-calibre</code> 需要 Calibre 的 <code>title_sort</code> 自定义函数，容器内未注册）。这是<b>第一阶段遗留的数据准备问题</b>，不是阶段 2 的缺陷：阶段 2 的职责是“让流量到达 booksvr”，该目标已达成（请求确实由 booksvr 处理并返回其 JSON 信封）。</li>
+              <li><b>self_check 读取 cookie_secret 的路径已修复。</b>首次实测发现 <code>self_check.py</code> 以 <code>/opt/talebook-upgrade/</code> 运行，<code>webserver</code> 不在 <code>sys.path</code>，导致读取失败并跳过 booksvr。已改为先把 <code>SERVER_DIR</code> 加入 <code>sys.path</code>，并增加直接解析 <code>auto.py</code> 的回退；修复后实测读出 <code>cookie_secret</code> 成功。</li>
+            </ul>
+            </div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-10-10：</strong>切换方式选 <b>A 绞杀者</b>——先接管流量（未实现路由代理回 Tornado），再逐条搬 handler。用户明确否决「先实现全部 215 条再切换」。</li>
+              <li><strong>2026-10-10：</strong>身份传递选 <b>B</b>——booksvr 自行解析 Tornado secure cookie，共享 <code>cookie_secret</code>。</li>
+              <li><strong>2026-10-10：</strong>数据库读写选 <b>B</b>——booksvr 可读写，merge 由 booksvr 直接落库。</li>
+              <li><strong>2026-10-10：</strong>评审修正——初稿把「避免双写」寄托在「Tornado 侧摘除 merge 路由」，但该路由 Python 侧根本不存在，已改为「booksvr 独有，无双写」。</li>
+              <li><strong>2026-10-10：</strong>评审修正——初稿用 supervisor <code>priority</code> 控制启动顺序，但 tornado 是 <code>autostart=false</code>，priority 无效；已改为由 <code>self_check.py</code> 在 tornado 之后拉起 booksvr。</li>
+              <li><strong>2026-10-10：</strong>评审修正——初稿遗漏 <code>server-side-render.conf</code>（SSR 生产镜像会端口冲突崩溃），已把三套 supervisor + 三套 nginx 全部纳入。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <!-- REQUIRED：转 ACTIVE 时同步更新这里、title、顶部状态和文件名。 -->
+      <footer>Talebook internal design · booksvr · WIP · 2026-10-10</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

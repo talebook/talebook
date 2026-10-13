@@ -22,6 +22,7 @@ from webserver.i18n import _, set_language
 # import social_tornado.handlers
 from webserver.models import Item, Message, Reader, ReadingState
 from webserver.services.external_index import is_external_index_format
+from webserver.services.format_keys import apply_format_keys
 
 
 messages = defaultdict(list)
@@ -606,6 +607,11 @@ class BaseHandler(PublicPathMixin, web.RequestHandler):
         _ts = time.time()
         books = self.db.get_data_as_dict(*args, **kwargs)
         logging.debug("[%5d ms] select books from library  (count = %d)" % (int(1000 * (time.time() - _ts)), len(books)))
+
+        # 格式路径的唯一来源：book_formats 表（booksvr 存储层）。
+        # 未迁移的库没有该表，apply_format_keys 会直接返回 0，
+        # 此时 fmt_<format> 保持 Calibre 原值，保证平滑过渡。
+        apply_format_keys(self.session, books)
 
         item = Item()
         empty_item = item.to_dict()

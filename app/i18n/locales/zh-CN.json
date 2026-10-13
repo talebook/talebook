@@ -904,7 +904,16 @@
         "discardConfirm": "离开后本次修改不会生效。是否放弃修改？",
         "saveFailed": "导入设置保存失败，请重试。",
         "saved": "导入设置已保存",
-        "symlink": "软链接"
+        "symlink": "软链接",
+        "directoryList": "导入目录",
+        "directoryListHint": "Talebook 会扫描这些目录中的电子书文件。至少保留一个。",
+        "addDirectory": "添加目录",
+        "removeDirectory": "删除此目录",
+        "directoryItemLabel": "目录 {index}",
+        "defaultDirectory": "默认导入目录",
+        "defaultDirectoryHint": "自动监控与快速导入使用该目录。",
+        "atLeastOneDirectory": "至少需要一个导入目录。",
+        "directoryOutsideRoots": "目录必须位于 /data/ 之下。"
       },
       "watch": {
         "off": "未开启",

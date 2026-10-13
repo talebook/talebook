@@ -1,0 +1,88 @@
+{
+  "steps": [
+    "登录成功"
+  ],
+  "errors": [],
+  "checks": {
+    "apiKeys": [
+      "book",
+      "conversion_options",
+      "err",
+      "kindle_sender",
+      "msg"
+    ],
+    "bookKeys": [
+      "aliases",
+      "author",
+      "author_sort",
+      "author_url",
+      "authors",
+      "collector",
+      "comments",
+      "count_download",
+      "count_visit",
+      "files",
+      "fmt",
+      "fmt_mobi",
+      "href",
+      "id",
+      "img",
+      "is_owner",
+      "is_public",
+      "isbn",
+      "language",
+      "media_type",
+      "media_type_locked",
+      "online_readable",
+      "pubdate",
+      "publisher",
+      "publisher_url",
+      "rating",
+      "scope",
+      "series",
+      "state",
+      "tag",
+      "tags",
+      "thumb",
+      "timestamp",
+      "title"
+    ],
+    "kindleSender": "",
+    "conversionOptions": [
+      {
+        "source_format": "mobi",
+        "target_format": "epub",
+        "converter": "ebook-convert",
+        "available": true,
+        "reason": ""
+      },
+      {
+        "source_format": "epub",
+        "target_format": "azw3",
+        "converter": "ebook-convert",
+        "available": false,
+        "reason": "source_missing"
+      },
+      {
+        "source_format": "mobi",
+        "target_format": "pdf",
+        "converter": "ebook-convert",
+        "available": true,
+        "reason": ""
+      }
+    ],
+    "aliases": [],
+    "scope": "public",
+    "mediaType": "ebook",
+    "authorSort": "佚名",
+    "thumb": "/get/thumb_60x80/1.jpg?t=1791824534",
+    "timestamp": "2026-10-12",
+    "authorUrl": "/author/佚名",
+    "readStatus": 200,
+    "readContentType": "application/json; charset=UTF-8",
+    "readBodyHead": "{\"book_id\":1,\"err\":\"ok\",\"formats\":[\"mobi\"],\"msg\":\"\",\"title\":\"【精排】红星照耀中国 （又名：西行漫记）\"}\n",
+    "readButtonHref": "/read/1",
+    "readerUrl": "http://127.0.0.1:3000/read/1",
+    "readerText": "{\"book_id\":1,\"err\":\"ok\",\"formats\":[\"mobi\"],\"msg\":\"\",\"title\":\"【精排】红星照耀中国 （又名：西行漫记）\"}\n"
+  }
+}

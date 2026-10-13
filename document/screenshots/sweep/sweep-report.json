@@ -1,0 +1,732 @@
+{
+  "pages": [
+    {
+      "path": "/",
+      "status": 200,
+      "textLen": 197,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 推荐 新书推荐 【精排】红星照耀中国 （又名：西行漫记） 暂无简介 分类浏览 分类导览 0 本书籍 作者 0 位作者 出版社 0 家出版社 标签 0 个标签 ",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_ABORTED",
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/library",
+      "status": 200,
+      "textLen": 227,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 浏览、筛选和管理已收藏到 Talebook 的本地书籍。 出版社： 全部 作者： 全部 佚名 标签： 全部 格式： 全部 EP",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/recent",
+      "status": 200,
+      "textLen": 127,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 新书推荐 【精排】红星照耀中国 （又名：西行漫记） 暂无简介 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/hot",
+      "status": 200,
+      "textLen": 119,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 热度榜单 本书库暂无藏书 请先添加书籍到书库 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/nav",
+      "status": 200,
+      "textLen": 117,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 其他 本书库暂无藏书 请先添加书籍到书库 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [
+        "Hydration completed but contains mismatches."
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/search",
+      "status": 200,
+      "textLen": 95,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/author",
+      "status": 200,
+      "textLen": 130,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 搜索全部作者 共 1 项 · 第 1 / 1 页 佚名 (1) GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/publisher",
+      "status": 200,
+      "textLen": 134,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 搜索全部出版社 共 0 项 · 第 1 / 1 页 没有匹配的全部出版社 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/tag",
+      "status": 200,
+      "textLen": 132,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 搜索全部标签 共 0 项 · 第 1 / 1 页 没有匹配的全部标签 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/series",
+      "status": 200,
+      "textLen": 132,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 搜索全部丛书 共 0 项 · 第 1 / 1 页 没有匹配的全部丛书 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/rating",
+      "status": 200,
+      "textLen": 132,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 搜索全部评分 共 0 项 · 第 1 / 1 页 没有匹配的全部评分 GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/format",
+      "status": 200,
+      "textLen": 142,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 搜索全部格式 共 2 项 · 第 1 / 1 页 EPUB (1) MOBI (1) GITHUB | DOCKER | PROJECT",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/opds-readme",
+      "status": 200,
+      "textLen": 1044,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 查看 Moke、OPDS 与 WebDAV 的访问地址和配置指引。 Moke 官方客户端 Talebook 官方跨平台阅读客",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/webdav-readme",
+      "status": 200,
+      "textLen": 1044,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 查看 Moke、OPDS 与 WebDAV 的访问地址和配置指引。 Moke 官方客户端 Talebook 官方跨平台阅读客",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/welcome",
+      "status": 200,
+      "textLen": 197,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 推荐 新书推荐 【精排】红星照耀中国 （又名：西行漫记） 暂无简介 分类浏览 分类导览 0 本书籍 作者 0 位作者 出版社 0 家出版社 标签 0 个标签 ",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/book/1",
+      "status": 200,
+      "textLen": 374,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 【精排】红星照耀中国 （又名：西行漫记） 作者 佚名 评分 评分 0 / 10 评分 1 / 10 评分 2 / 10 评分 3 / 10 评分 4 / 10 评分 5 ",
+      "hasError": false,
+      "consoleErrors": [
+        "Hydration completed but contains mismatches."
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/book/1/edit",
+      "status": 200,
+      "textLen": 329,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 编辑书籍信息 取消 保存 封面图片 选择封面图 支持 JPG、PNG、GIF 格式，大小不超过 5MB 上传封面 书名 评分 0 / 10 评分 1 / 10 评分 2 ",
+      "hasError": false,
+      "consoleErrors": [
+        "Hydration completed but contains mismatches."
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/book/1/annotations",
+      "status": 200,
+      "textLen": 45,
+      "textHead": "笔记与高亮 0 还没有笔记 从 Talebook 或外部阅读服务导入后，笔记会出现在这里。",
+      "hasError": false,
+      "consoleErrors": [
+        "Hydration completed but contains mismatches."
+      ],
+      "pageErrors": [],
+      "failedRequests": []
+    },
+    {
+      "path": "/book/1/audios",
+      "status": 200,
+      "textLen": 213,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 返回有声书架 AUDIO EDITION 【精排】红星照耀中国 （又名：西行漫记） Beta 佚名 生成有声书 查看制作任务 这本书还没有可收听版本 可使用 Ed",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/book/1/verify",
+      "status": 200,
+      "textLen": 34,
+      "textHead": "目录 夜晚 设置 评论 AI 发段评 从这里听 复制 反馈 (0%)",
+      "hasError": false,
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+        "API请求失败: TypeError: e.$alert is not a function\n    at http://127.0.0.1:3000/static/candle-reader/candle-reader.es.js:8652:38",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET http://127.0.0.1:3000/api/user/messages — net::ERR_ABORTED",
+        "GET http://127.0.0.1:3000/api/user/info — net::ERR_ABORTED",
+        "502 GET http://127.0.0.1:3000/api/review/me?count=true",
+        "404 GET http://127.0.0.1:3000/get/extract/1/META-INF/container.xml"
+      ]
+    },
+    {
+      "path": "/me",
+      "status": 200,
+      "textLen": 158,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看收藏到个人书架的书籍。 书架上还没有书，快去加入吧！ GITHUB | DOCKER | ",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/me/account",
+      "status": 200,
+      "textLen": 187,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 管理个人资料和登录密码。 头像 点击修改 用户名 e2e_admin 邮箱 密码 点击修改 昵称",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/me/devices",
+      "status": 200,
+      "textLen": 188,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 管理当前账号用于接收和推送书籍的阅读设备。 暂无已启用的设备插件，请联系管理员在插件管理中启用后再添加",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/me/history",
+      "status": 200,
+      "textLen": 177,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看正在阅读、已读书目与历史阅读记录。 在读 [0] 已读完 [0] 阅读记录 暂无在读的书籍 GI",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/me/plugins",
+      "status": 200,
+      "textLen": 175,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 管理当前账号使用的插件连接与账号绑定。 搜索可配置插件 管理员尚未开放需要个人配置的插件。 GITH",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/me/private",
+      "status": 200,
+      "textLen": 165,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看仅自己可见的私有书籍。 本书库暂无藏书 请先添加书籍到书库 1 GITHUB | DOC",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/me/shelf",
+      "status": 200,
+      "textLen": 158,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看收藏到个人书架的书籍。 书架上还没有书，快去加入吧！ GITHUB | DOCKER | ",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/audios",
+      "status": 200,
+      "textLen": 268,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 PRIVATE AUDIO LIBRARY 有声书中心 Beta 收听已发布的有声版本，或从本地 EPUB/TXT 书籍创建新的制作任务。 创建有声书 私人 PO",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/audios/create",
+      "status": 200,
+      "textLen": 270,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 返回有声书架 AUDIOBOOK CREATION 创建有声书 选择一本本地书籍，确认格式和权限后设置生成方式。创建成功后会进入对应制作任务。 BOOK SOUR",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/audio-jobs",
+      "status": 200,
+      "textLen": 269,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 PRODUCTION DESK 制作任务 Beta 这里保留每一次生成的真实状态，服务重启后任",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/network",
+      "status": 200,
+      "textLen": 218,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 搜索和浏览已启用书源插件提供的在线书籍。 配置漫画源 管理书源 搜索 浏览 搜索在线书籍 搜索 搜索范围： 近期可用 全部 手",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/library/network",
+      "status": 200,
+      "textLen": 218,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 搜索和浏览已启用书源插件提供的在线书籍。 配置漫画源 管理书源 搜索 浏览 搜索在线书籍 搜索 搜索范围： 近期可用 全部 手",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/library/local",
+      "status": 200,
+      "textLen": 227,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 浏览、筛选和管理已收藏到 Talebook 的本地书籍。 出版社： 全部 作者： 全部 佚名 标签： 全部 格式： 全部 EP",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/library/apps",
+      "status": 200,
+      "textLen": 1044,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 本地书库 网络书库 使用 App 访问 查看 Moke、OPDS 与 WebDAV 的访问地址和配置指引。 Moke 官方客户端 Talebook 官方跨平台阅读客",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins",
+      "status": 200,
+      "textLen": 175,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 管理当前账号使用的插件连接与账号绑定。 搜索可配置插件 管理员尚未开放需要个人配置的插件。 GITH",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/brs",
+      "status": 200,
+      "textLen": 326,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 BRS 章评账号 连接你的书评系统账号，将公开章评同步到 Talebook。 登录到书评系统 直接连接你的 BRS 服务器并验证个人账号。 BRS 服务器地址 例",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/legado",
+      "status": 200,
+      "textLen": 462,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 Legado 书源工作台 导入、启停、检测并测试兼容 Legado 的在线书源。 网络书库通过「书源」从第三方网站搜索、阅读并保存网络小说。在此导入、管理与检测书源；失效",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/weread",
+      "status": 200,
+      "textLen": 253,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 微信读书工作台 统一浏览微信读书的搜索、书架、统计、笔记、社区与推荐能力。 微信读书接口为只读：可读取和导入到 Talebook，但不能把修改写回微信读书。 微信读书 A",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/zh-converter",
+      "status": 200,
+      "textLen": 318,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 繁简转换 对书库书籍执行简体↔繁体中文转换（EPUB / TXT）。 支持 8 种转换方向；可选增强词表与标题转换。 选择书籍 输入关键词搜索书库（仅显示含 EPUB /",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/txt-fixer",
+      "status": 200,
+      "textLen": 284,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 TXT 编码修复 检测 TXT 电子书编码（含乱码反转恢复），修复为 UTF-8。 仅处理 TXT 格式；可选择写回原书或另存为新书。 选择书籍 输入关键词搜索书库（仅显",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/text-replace",
+      "status": 200,
+      "textLen": 311,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 正文查找替换 对书籍的 EPUB / TXT 正文执行查找替换（支持正则）。 可选择写回原书或另存为新书；原书内容仅在写回模式下会被修改。 选择书籍 输入关键词搜索书库（",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/plugins/epub-beautify",
+      "status": 200,
+      "textLen": 411,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 EPUB 美化 美化 EPUB 的目录、章节名与字体排版（12 套预设 × 4 种目录形式）。 仅处理 EPUB 格式；美化结果始终另存为新书，原书零改动。 选择书籍 输",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/books",
+      "status": 200,
+      "textLen": 337,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 图书管理 Beta 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/imports",
+      "status": 200,
+      "textLen": 425,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 导入图书 Beta 导入设置 目录： /data/books/imports/todo 模式：复制",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/users",
+      "status": 200,
+      "textLen": 360,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 用户管理 新用户默认权限 访客权限 添加用户 ID 用户名 昵称 Email 注册平台 注册",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/trash",
+      "status": 200,
+      "textLen": 264,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 回收站管理 占用空间：0 B 这里显示普通书籍删除后进入的 Calibre 回收站。恢复会重建书库记",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/logs",
+      "status": 200,
+      "textLen": 170,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统日志 显示最近行数 500 信息 警告 错误 刷新 下载日志 暂无日志内容 GITHUB |",
+      "hasError": true,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/themes",
+      "status": 200,
+      "textLen": 556,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 选择和启用 Talebook 的界面主题。 默认主题 已激活 Ta",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/booksources",
+      "status": 200,
+      "textLen": 462,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 Legado 书源工作台 导入、启停、检测并测试兼容 Legado 的在线书源。 网络书库通过「书源」从第三方网站搜索、阅读并保存网络小说。在此导入、管理与检测书源；失效",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/settings",
+      "status": 200,
+      "textLen": 1755,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 管理当前 Talebook 实例的全局设置。 保存配置 站点 基础",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [
+        "Cannot read properties of undefined (reading 'forEach')"
+      ],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/settings/general",
+      "status": 200,
+      "textLen": 1755,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 管理当前 Talebook 实例的全局设置。 保存配置 站点 基础",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [
+        "Cannot read properties of undefined (reading 'forEach')"
+      ],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/settings/plugins",
+      "status": 200,
+      "textLen": 255,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 控制本实例可用的内置插件，并维护全局设置。个人账号、密钥与设备由各用",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/settings/themes",
+      "status": 200,
+      "textLen": 556,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 选择和启用 Talebook 的界面主题。 默认主题 已激活 Ta",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/plugins",
+      "status": 200,
+      "textLen": 255,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 控制本实例可用的内置插件，并维护全局设置。个人账号、密钥与设备由各用",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/admin/plugins/runs",
+      "status": 200,
+      "textLen": 239,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 执行记录 查看插件能力调用、同步与写入任务的实际结果。 返回插件 全部 状态 连接 状态 插件 ",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/scopedbooks",
+      "status": 200,
+      "textLen": 165,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看仅自己可见的私有书籍。 本书库暂无藏书 请先添加书籍到书库 1 GITHUB | DOC",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/user/detail",
+      "status": 200,
+      "textLen": 187,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 管理个人资料和登录密码。 头像 点击修改 用户名 e2e_admin 邮箱 密码 点击修改 昵称",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/user/history",
+      "status": 200,
+      "textLen": 177,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看正在阅读、已读书目与历史阅读记录。 在读 [0] 已读完 [0] 阅读记录 暂无在读的书籍 GI",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    },
+    {
+      "path": "/user/shelf",
+      "status": 200,
+      "textLen": 158,
+      "textHead": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看收藏到个人书架的书籍。 书架上还没有书，快去加入吧！ GITHUB | DOCKER | ",
+      "hasError": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "failedRequests": [
+        "GET https://tva1.sinaimg.cn/default/images/default_avatar_male_50.gif — net::ERR_BLOCKED_BY_ORB"
+      ]
+    }
+  ],
+  "errors": [],
+  "login": "ok"
+}

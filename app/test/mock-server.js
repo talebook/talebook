@@ -47,12 +47,13 @@ let audiobookWorkspace = null;
 let podcastTokenHint = '';
 let trashBooks = [];
 let importSettings = {
-  scan_upload_path: '/mock/scan/dir',
+  scan_upload_path: '/data/books/imports',
   import_mode: 'copy',
   auto_watch_enabled: false,
+  allowed_roots: ['/data/books/imports'],
   directory_check: {
     status: 'ok',
-    path: '/mock/scan/dir',
+    path: '/data/books/imports',
     readable: true,
     writable: true,
     in_allowed_roots: true,
@@ -207,12 +208,13 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookJobPolls = 0;
   audiobookProgress = null;
   importSettings = {
-    scan_upload_path: '/mock/scan/dir',
+    scan_upload_path: '/data/books/imports',
     import_mode: 'copy',
     auto_watch_enabled: false,
+    allowed_roots: ['/data/books/imports'],
     directory_check: {
       status: 'ok',
-      path: '/mock/scan/dir',
+      path: '/data/books/imports',
       readable: true,
       writable: true,
       in_allowed_roots: true,
@@ -1183,19 +1185,27 @@ router.get('/api/admin/import/settings', eventHandler(() => ({
 
 router.post('/api/admin/import/settings', eventHandler(async (event) => {
   const body = await readBody(event);
+  // 实施项 11.6：多目录列表。未传时保持原值（向后兼容）。
+  const allowedRoots = Array.isArray(body.import_allowed_roots)
+    ? body.import_allowed_roots.filter((item) => typeof item === 'string' && item.trim())
+    : importSettings.allowed_roots;
+  if (Array.isArray(body.import_allowed_roots) && allowedRoots.length === 0) {
+    return { err: 'params.allowed_roots', msg: '至少需要一个导入目录' };
+  }
   importSettings = {
     ...importSettings,
     scan_upload_path: body.scan_upload_path,
     import_mode: body.import_mode,
     auto_watch_enabled: !!body.auto_watch_enabled,
+    allowed_roots: allowedRoots,
     directory_check: {
       status: 'ok',
       path: body.scan_upload_path,
       readable: true,
-      writable: body.scan_upload_path !== '/mock/read-only',
+      writable: body.scan_upload_path !== '/data/books/read-only',
       in_allowed_roots: true,
       supported_file_count: 3,
-      msg: body.scan_upload_path === '/mock/read-only'
+      msg: body.scan_upload_path === '/data/books/read-only'
         ? '目录不可写，仍可读取导入；剪切模式将不可用。'
         : '目录可用。发现 3 个支持格式文件。'
     },
@@ -1208,7 +1218,7 @@ router.post('/api/admin/import/settings', eventHandler(async (event) => {
 
 router.post('/api/admin/import/directory/check', eventHandler(async (event) => {
   const body = await readBody(event);
-  const targetPath = body.path || '/mock/scan/dir';
+  const targetPath = body.path || '/data/books/imports';
   if (targetPath === '/mock/missing') {
     return {
       err: 'ok',
@@ -1226,17 +1236,17 @@ router.post('/api/admin/import/directory/check', eventHandler(async (event) => {
   }
   return {
     err: 'ok',
-    msg: targetPath === '/mock/read-only'
+    msg: targetPath === '/data/books/read-only'
       ? '目录不可写，仍可读取导入；剪切模式将不可用。'
       : '目录可用。发现 3 个支持格式文件。',
     directory: {
-      status: targetPath === '/mock/read-only' ? 'warning' : 'ok',
+      status: targetPath === '/data/books/read-only' ? 'warning' : 'ok',
       path: targetPath,
       readable: true,
-      writable: targetPath !== '/mock/read-only',
+      writable: targetPath !== '/data/books/read-only',
       in_allowed_roots: true,
       supported_file_count: 3,
-      msg: targetPath === '/mock/read-only'
+      msg: targetPath === '/data/books/read-only'
         ? '目录不可写，仍可读取导入；剪切模式将不可用。'
         : '目录可用。发现 3 个支持格式文件。'
     }
@@ -1245,15 +1255,15 @@ router.post('/api/admin/import/directory/check', eventHandler(async (event) => {
 
 router.get('/api/admin/import/directory/list', eventHandler((event) => {
   const query = getQuery(event);
-  const currentPath = query.path || '/mock/scan/dir';
+  const currentPath = query.path || '/data/books/imports';
   return {
     err: 'ok',
     path: currentPath,
-    parent: currentPath === '/mock/scan/dir' ? '' : '/mock/scan/dir',
-    allowed_roots: ['/mock/scan/dir'],
+    parent: currentPath === '/data/books/imports' ? '' : '/data/books/imports',
+    allowed_roots: ['/data/books/imports'],
     items: [
-      { name: 'incoming', path: '/mock/scan/dir/incoming', readable: true, writable: true, is_symlink: false, in_allowed_roots: true },
-      { name: 'read-only', path: '/mock/read-only', readable: true, writable: false, is_symlink: false, in_allowed_roots: true }
+      { name: 'incoming', path: '/data/books/imports/incoming', readable: true, writable: true, is_symlink: false, in_allowed_roots: true },
+      { name: 'read-only', path: '/data/books/read-only', readable: true, writable: false, is_symlink: false, in_allowed_roots: true }
     ]
   };
 }));

@@ -1,0 +1,32 @@
+{
+  "timestamp": "2026-10-12T15:55:04.188Z",
+  "backend": "real booksvr + real Calibre",
+  "mocks": false,
+  "steps": [
+    {
+      "name": "login",
+      "detail": "登录成功"
+    },
+    {
+      "name": "open-imports",
+      "detail": "页面文本长度 425"
+    },
+    {
+      "name": "click-scan",
+      "detail": "已点击扫描按钮"
+    },
+    {
+      "name": "close-scan-dialog",
+      "detail": "已关闭扫描进度弹窗"
+    },
+    {
+      "name": "click-import",
+      "detail": "已点击导入按钮"
+    }
+  ],
+  "errors": [],
+  "importsPageText": "搜索\n首页\n我的阅读\n书库浏览\n有声书\nBeta\n管理\n系统设置\n用户管理\n图书管理\n回收站\n有声书任务\n导入图书\n系统日志\n分类浏览\n分类导览\n出版社\n作者\n标签\n文件格式\n丛书\n评分\n热门\n最近\n导入图书 \nBeta\n导入设置\n目录：\n/data/books/imports/todo\n模式：复制到书库\n自动监控导入：未开启\n最近扫描：尚未扫描\n请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。\n刷新\n扫描书籍\n从其他 OPDS 导入\n导入全部书籍\n请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）\n待处理 (0)\n已导入 (0)\n失败 (0)\n\t\nID\n\t\n状态\n\t\n路径\n\t\n扫描信息\n\t\n时间\n\n无数据\n每页条目\n100\n第 0-0 条，共 0 条\n\nGITHUB\n | \nDOCKER\n | \nPROJECT",
+  "afterScanText": "搜索\n首页\n我的阅读\n书库浏览\n有声书\nBeta\n管理\n系统设置\n用户管理\n图书管理\n回收站\n有声书任务\n导入图书\n系统日志\n分类浏览\n分类导览\n出版社\n作者\n标签\n文件格式\n丛书\n评分\n热门\n最近\n导入图书 \nBeta\n导入设置\n目录：\n/data/books/imports/todo\n模式：复制到书库\n自动监控导入：未开启\n最近扫描：尚未扫描\n请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。\n刷新\n扫描书籍\n从其他 OPDS 导入\n导入全部书籍\n请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）\n待处理 (1)\n已导入 (0)\n失败 (0)\n\t\nID\n\t\n状态\n\t\n路径\n\t\n扫描信息\n\t\n时间\n\n\n\t1\t\n可导入\n\t/data/books/imports/todo/【精排】红星照耀中国 （又名：西行漫记）.mobi\t书名：【精排】红星照耀中国 （又名：西行漫记）\n作者：佚名\t2026-10-12T23:55:10Z\n每页条目\n100\n第 1-1 条，共 1 条\n\nGITHUB\n | \nDOCKER\n | \nPROJECT\n\n处理完毕！\n关闭",
+  "afterImportText": "搜索\n首页\n我的阅读\n书库浏览\n有声书\nBeta\n管理\n系统设置\n用户管理\n图书管理\n回收站\n有声书任务\n导入图书\n系统日志\n分类浏览\n分类导览\n出版社\n作者\n标签\n文件格式\n丛书\n评分\n热门\n最近\n导入图书 \nBeta\n导入设置\n目录：\n/data/books/imports/todo\n模式：复制到书库\n自动监控导入：未开启\n最近扫描：尚未扫描\n请注意：此功能为后台异步执行，不必重复点击，启动后可关闭浏览器，或刷新关注表格状态进展。已导入成功的记录请不要删除，以免书籍被再次导入。\n刷新\n扫描书籍\n从其他 OPDS 导入\n导入全部书籍\n请勾选需要处理的文件（默认情况下导入全部书籍即可。已存在的书籍，即使勾选了也不会重复导入）\n待处理 (0)\n已导入 (1)\n失败 (0)\n\t\nID\n\t\n状态\n\t\n路径\n\t\n扫描信息\n\t\n时间\n\n无数据\n每页条目\n100\n第 0-0 条，共 0 条\n\nGITHUB\n | \nDOCKER\n | \nPROJECT\n\n处理完毕！\n关闭",
+  "booksPageText": "搜索\n首页\n我的阅读\n书库浏览\n有声书\nBeta\n管理\n系统设置\n用户管理\n图书管理\n回收站\n有声书任务\n导入图书\n系统日志\n分类浏览\n分类导览\n出版社\n作者\n标签\n文件格式\n丛书\n评分\n热门\n最近\n图书管理 \nBeta\n此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面\n刷新\n自动更新图书信息...\nKINDLE格式转EPUB\n搜索\n\t\n封面\n\t\nID\n\t\n书名\n\t\n作者\n\t\n评分\n\t\n出版社\n\t\n标签\n\t\n简介\n\t\n操作\n\n\n\t\n\t1\t\n【精排】红星照耀中国 （又名：西行漫记）\n\t\n佚名\n\t\n-\n\t\n-\n\t\n\t\n-\n\t\n操作\n每页条目\n10\n第 1-1 条，共 1 条\n\nGITHUB\n | \nDOCKER\n | \nPROJECT"
+}

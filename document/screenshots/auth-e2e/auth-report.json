@@ -1,0 +1,209 @@
+{
+  "timestamp": "2026-10-12T11:17:20.928Z",
+  "backend": "real booksvr + real Calibre",
+  "mocks": false,
+  "loggedIn": true,
+  "pages": [
+    {
+      "url": "/",
+      "label": "首页",
+      "status": 200,
+      "title": "首页 | talebook",
+      "textLength": 185,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 推荐 新书推荐 登录态验证书 点击浏览详情 分类浏览 分类导览 0 本书籍 作者 0 位作者 出版社 0 家出版社 标签 0 个标签 文件格式 0 种格式 最近 热门 GITHUB | DOCKER | PROJECT"
+    },
+    {
+      "url": "/book/1",
+      "label": "书籍详情",
+      "status": 200,
+      "title": "登录态验证书 | talebook",
+      "textLength": 304,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 登录态验证书 作者 验证作者 评分 评分 0 / 10 评分 1 / 10 评分 2 / 10 评分 3 / 10 评分 4 / 10 评分 5 / 10 评分 6 / 10 评分 7 / 10 评分 8 / 10 评分 9 / 10 评分 10 / 10 出版社 验证"
+    },
+    {
+      "url": "/me/shelf",
+      "label": "我的书架",
+      "status": 200,
+      "title": "我的书架 | talebook",
+      "textLength": 158,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看收藏到个人书架的书籍。 书架上还没有书，快去加入吧！ GITHUB | DOCKER | PROJECT"
+    },
+    {
+      "url": "/me",
+      "label": "个人中心",
+      "status": 200,
+      "title": "我的书架 | talebook",
+      "textLength": 158,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看收藏到个人书架的书籍。 书架上还没有书，快去加入吧！ GITHUB | DOCKER | PROJECT"
+    },
+    {
+      "url": "/me/account",
+      "label": "账号设置",
+      "status": 200,
+      "title": "基本信息 | talebook",
+      "textLength": 187,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 管理个人资料和登录密码。 头像 点击修改 用户名 e2e_admin 邮箱 密码 点击修改 昵称 昵称 保存 GITHUB | DOCKER | PROJECT"
+    },
+    {
+      "url": "/me/history",
+      "label": "阅读历史",
+      "status": 200,
+      "title": "阅读记录 | talebook",
+      "textLength": 177,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 我的书架 阅读记录 基本信息 阅读设备 私有书籍 个人插件设置 查看正在阅读、已读书目与历史阅读记录。 在读 [0] 已读完 [0] 阅读记录 暂无在读的书籍 GITHUB | DOCKER | PROJECT"
+    },
+    {
+      "url": "/admin/books",
+      "label": "图书管理",
+      "status": 200,
+      "title": "图书管理 | talebook",
+      "textLength": 325,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 图书管理 Beta 此表格仅展示图书的部分字段，点击即可快捷修改。完整图书信息请点击链接查看书籍详情页面 刷新 自动更新图书信息... KINDLE格式转EPUB 搜索 封面 ID 书名"
+    },
+    {
+      "url": "/admin/plugins",
+      "label": "插件管理",
+      "status": 200,
+      "title": "插件 | talebook",
+      "textLength": 255,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 控制本实例可用的内置插件，并维护全局设置。个人账号、密钥与设备由各用户自行配置。 执行记录 0 个内置插件 0 个可用 0 个需处理 内置插件无需安装 搜索名称、说明"
+    },
+    {
+      "url": "/admin/users",
+      "label": "用户管理",
+      "status": 200,
+      "title": "用户管理 | talebook",
+      "textLength": 360,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 用户管理 新用户默认权限 访客权限 添加用户 ID 用户名 昵称 Email 注册平台 注册时间 登录时间 登录IP 详情 操作 2 e2e_user register 202"
+    },
+    {
+      "url": "/admin/settings",
+      "label": "系统设置",
+      "status": 200,
+      "title": "系统设置 | talebook",
+      "textLength": 1755,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 系统设置 插件中心 主题管理 管理当前 Talebook 实例的全局设置。 保存配置 站点 基础信息 书籍标签分类 友情链接 访问与用户 用户设置 社交网络登录 人机验证设置 服务与集成 邮件服务"
+    },
+    {
+      "url": "/admin/imports",
+      "label": "导入管理",
+      "status": 200,
+      "title": "导入图书 | talebook",
+      "textLength": 515,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 系统设置 用户管理 图书管理 回收站 有声书任务 导入图书 系统日志 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 导入图书 Beta 需处理 导入设置 目录： /data/books/imports/ 模式：复制到书库 自动监控导入：未开启 最近扫描：尚未扫描 该目录不在允许的导入范围内，请选择允许的导入目录。"
+    },
+    {
+      "url": "/admin/booksources",
+      "label": "书源管理",
+      "status": 200,
+      "title": "Legado 书源工作台 | talebook",
+      "textLength": 462,
+      "hasError": false,
+      "snippet": "搜索 首页 我的阅读 书库浏览 有声书 Beta 管理 分类浏览 分类导览 出版社 作者 标签 文件格式 丛书 评分 热门 最近 Legado 书源工作台 导入、启停、检测并测试兼容 Legado 的在线书源。 网络书库通过「书源」从第三方网站搜索、阅读并保存网络小说。在此导入、管理与检测书源；失效书源会在检测后被自动停用，不参与搜索。 兼容「阅读」(Legado) 3.0 书源 JSON 格式（"
+    }
+  ],
+  "apiChecks": [
+    {
+      "url": "/api/user/info",
+      "err": "ok",
+      "status": 200
+    },
+    {
+      "url": "/api/shelf",
+      "err": "ok",
+      "status": 200
+    },
+    {
+      "url": "/api/scopedbooks?scope=public",
+      "err": "ok",
+      "status": 200
+    },
+    {
+      "url": "/api/admin/book/list",
+      "err": "ok",
+      "status": 200
+    },
+    {
+      "url": "/api/book/1",
+      "err": "ok",
+      "status": 200
+    }
+  ],
+  "errors": [
+    "console: Hydration completed but contains mismatches.",
+    "pageerror: Cannot read properties of undefined (reading 'forEach')",
+    "console: Hydration completed but contains mismatches."
+  ],
+  "userInfo": {
+    "err": "ok"
+  },
+  "shelf": {
+    "err": "ok",
+    "count": 0
+  },
+  "scoped": {
+    "err": "ok",
+    "count": 0
+  },
+  "adminBooks": {
+    "err": "ok",
+    "total": 1
+  },
+  "favoriteButtonCount": 0,
+  "favoriteClicked": false,
+  "visibleButtons": [
+    "",
+    "",
+    "",
+    "",
+    "丛书",
+    "评分",
+    "热门",
+    "最近",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "阅读",
+    "下载",
+    "发送到设备",
+    "有声书",
+    "GITHUB",
+    "DOCKER",
+    "PROJECT",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "bookState": {
+    "download": 0,
+    "favorite": 0,
+    "favorite_date": null,
+    "online_read": 0,
+    "read_date": null,
+    "read_state": 0,
+    "wants": 0,
+    "wants_date": null
+  }
+}

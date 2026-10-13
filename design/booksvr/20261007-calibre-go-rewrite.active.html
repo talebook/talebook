@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案：用 Go 重写 Calibre 存储层 booksvr，采用作品/版本/格式三层模型，导入原地登记不复制文件，对外保持 215 条 HTTP 路由完全兼容。" />
+    <link rel="icon" href="data:," />
+    <title>用 Go 重写 Calibre 存储层（booksvr） · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+        .pass { color: var(--green); font-weight: 800; }
+        .partial { color: #9a5c09; font-weight: 800; }
+        .fail { color: #b3261e; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+
+    <nav class="toc-edge" aria-label="章节目录">
+      <a href="#request" aria-current="location"><span class="rail-index">01</span><span class="rail-title">原始诉求</span></a>
+      <a href="#goals"><span class="rail-index">02</span><span class="rail-title">目标与边界</span></a>
+      <a href="#feature-matrix"><span class="rail-index">03</span><span class="rail-title">产品功能矩阵</span></a>
+      <a href="#evidence"><span class="rail-index">04</span><span class="rail-title">现状与证据</span></a>
+      <a href="#design"><span class="rail-index">05</span><span class="rail-title">方案</span></a>
+      <a href="#impact"><span class="rail-index">06</span><span class="rail-title">影响与风险</span></a>
+      <a href="#tests"><span class="rail-index">07</span><span class="rail-title">测试结果</span></a>
+      <a href="#decisions"><span class="rail-index">08</span><span class="rail-title">决策记录</span></a>
+    </nav>
+
+    <details class="toc-fab">
+      <summary>目录</summary>
+      <nav aria-label="章节目录">
+        <strong>跳到章节</strong>
+        <a href="#request" aria-current="location">原始诉求</a>
+        <a href="#goals">目标与边界</a>
+        <a href="#feature-matrix">产品功能矩阵</a>
+        <a href="#evidence">现状与证据</a>
+        <a href="#design">方案</a>
+        <a href="#impact">影响与风险</a>
+        <a href="#tests">测试结果</a>
+        <a href="#decisions">决策记录</a>
+      </nav>
+    </details>
+
+    <div class="page">
+      <header class="hero">
+        <h1>用 Go 重写 Calibre 存储层（booksvr）</h1>
+        <p class="sub">新增 <code>booksvr/</code> 作为 Go 实现的书库存储层，采用作品 / 版本 / 格式三层模型：导入默认原地登记源文件（不复制、不改名、不写 OPF），对外保持 Talebook 215 条 HTTP 路由完全兼容，并实现书名与作者名的 8 步自动归一化，把同一本书的不同版次、出版社、格式自动归组到同一作品下。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-10-07</span>
+          <span class="chip">所属模块：booksvr</span>
+          <span class="chip">影响范围：booksvr/（新增）、Makefile、Dockerfile、app/pages/admin/imports.vue、app/components/admin/GeneralSettingsContent.vue、app/i18n/locales/*.json、app/test/mock-server.js、webserver/services/media_analysis.py、spec/书籍.md、spec/书库.md、spec/元数据.md、spec/索引.md</span>
+          <span class="chip">需求来源：用户原话（2026-10-07 会话）</span>
+        </div>
+      </header>
+
+      <div class="content-grid">
+        <main id="main-content" class="main-column">
+          <section id="request" class="card">
+            <h2>1. 原始诉求</h2>
+            <div class="callout warn">
+              <p>“我想把 calibre 重写，保留对外的 api 不变，改为用 go 语言，去掉这个必须重新复制文件的要求，也就是不再要求“文件系统即数据库”，用数据库检索效率明显远超文件系统。另外，也不需要支持 qt 界面，改为使用 web。是否可行？”</p>
+              <p>“一书多格式是对的！需要保留。而且我还需要实现一书多版本，识别书名，作者名，自动进行归一化。进设计模式完整设计”</p>
+              <p>“版本：同一本书的不同版次，出版社，格式。作者和书名相同就认为是同一本书，其余不同都是版本差异”</p>
+            </div>
+            <p><strong>触发背景：</strong>Talebook 目前直接依赖 Calibre 的 Python 库与“文件系统即数据库”模型：导入时必须把书复制进书库目录并重命名（<code>books.path</code> 是相对书库根目录的路径，且假定文件就在该目录内），元数据同时写 SQLite 与 <code>metadata.opf</code> 。这带来三个实际问题：</p>
+            <ul>
+              <li><strong>存储冗余：</strong>用户已有的电子书目录必须再复制一份，大库下磁盘占用翻倍。</li>
+              <li><strong>检索效率：</strong>以文件系统目录结构为事实来源，检索与归组依赖目录约定而非数据库索引。</li>
+              <li><strong>依赖沉重：</strong>Calibre 转换引擎合计 107,281 行 Python，依赖 Qt 排版引擎与多个 C 扩展；文件名 ASCII 化还引入 32 万行 <code>unihandecode</code> 查表。</li>
+            </ul>
+            <p><strong>已知事实（已实测，非推断）：</strong>Talebook 对 Calibre 的依赖面约 30 处 <code>from calibre...</code> import、103 处 <code>self.db</code> / <code>new_api</code> 调用；前端字段契约集中在 <code>webserver/utils.py:66-170</code> 的约 25 个字段；格式转换已经是外部进程调用（<code>webserver/services/convert.py:158</code> 的 <code>subprocess.Popen(["ebook-convert", ...])</code>），因此转换引擎与存储层天然解耦。</p>
+            <p><strong>为什么现在处理：</strong>Talebook 已经在“对抗” Calibre 存储模型（monkey-patch 路径构造函数、直接 SQL 绕过 Calibre API），说明“摆脱文件系统即数据库”是已被实践证实的刚需，而非新增偏好。</p>
+          </section>
+
+          <section id="goals" class="card">
+            <h2>2. 目标与边界</h2>
+            <div class="grid">
+              <article class="choice recommended">
+                <h3>目标</h3>
+                <ul>
+                  <li><code>booksvr/</code> 目录存在，<code>go build ./...</code> 通过；单二进制 + embed 前端可部署。</li>
+                  <li>导入默认<strong>原地登记</strong>源文件：不复制、不改名、不写 OPF；导入后源文件位置与文件名完全不变。</li>
+                  <li>实现<strong>作品 → 版本 → 格式</strong>三层模型；《三体》4 个文件导入后为 <strong>1 work / 3 book / 4 format</strong>。</li>
+                  <li>实现书名与作者名的 <strong>8 步归一化流水线</strong>，每步有独立单元测试，<code>internal/normalize</code> 覆盖率 ≥ 90%。</li>
+                  <li>对外保持 Talebook <strong>215 条 HTTP 路由</strong>的路径、方法、响应结构与 Python 版逐字段一致。</li>
+                  <li>前端 Nuxt 除多目录 UI 外<strong>零改动</strong>可跑通登录、书库、详情、阅读、书架全流程。</li>
+                  <li>提供 Calibre 单向只读迁移（幂等、源库不被修改）与全库归一化重算命令。</li>
+                  <li><strong>必须保持的不变量：</strong><code>books.id</code> 语义不变（仍是一本书 = 一个版本）；<code>{"err": "ok", ...}</code> 响应信封不变；<code>files[]</code> 结构不变。</li>
+                </ul>
+              </article>
+              <article class="choice">
+                <h3>非目标</h3>
+                <ul>
+                  <li>不实现 Calibre 桌面版 GUI 的任何功能；不提供 Qt 界面。</li>
+                  <li>不导出回 Calibre 格式，不保证 Calibre 桌面版能继续打开新书库。</li>
+                  <li>不做全书正文全文检索（超大库不可承受），仅做元数据检索（trigram 分词，支持中文子串）。</li>
+                  <li>不重写 Calibre 的 107,281 行转换引擎；只做读取主流格式 + 单向转 EPUB。</li>
+                  <li>不引入 32 万行 <code>unihandecode</code> 式的文件名 ASCII 化查表；繁简表限制在 3000-5000 字。</li>
+                  <li>本轮不实现归一化算法升级后的自动后台重算（只提供手动命令）。</li>
+                  <li>不修改前端 Nuxt 代码（多目录 UI 为唯一例外，见第 5 节）。</li>
+                  <li>不重构与本次目标无关的 <code>webserver/</code> 代码。</li>
+                  <li><strong>后续事项：</strong>详情页“其他版本”区块与合并按钮消费新增的 work/versions/merge 接口；触发条件为下一轮前端迭代。</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section id="feature-matrix" class="card">
+            <h2>3. 产品功能矩阵</h2>
+            <p>以用户能完成的任务为行，说明不同角色与产品入口的覆盖关系。本方案不改变任何现有任务的可用性，只新增“同作品其他版本”能力（本轮仅提供接口，前端不接入）。</p>
+            <div class="matrix-legend" aria-label="功能矩阵图例">
+              <span class="matrix-yes">支持</span>
+              <span class="matrix-conditional">条件支持</span>
+              <span class="matrix-no">不支持 / 不在范围</span>
+            </div>
+            <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0">
+              <table class="feature-matrix">
+                <thead><tr><th>功能域</th><th>用户任务 / 功能</th><th>游客</th><th>登录用户</th><th>管理员</th><th>Web</th><th>移动端</th><th>API / 协议</th><th>验收口径</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <th scope="row">书库浏览与检索</th>
+                    <td><strong>按书名 / 作者 / 标签 / 系列检索并浏览书库</strong><br /><span class="matrix-note">215 条路由中的主体部分，books.id 语义不变</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>响应 JSON 键集合与类型与 Python 版逐字段一致；游客仅见公开书</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">一书多格式</th>
+                    <td><strong>同一本书下载 / 在线阅读不同格式</strong><br /><span class="matrix-note">保留现有能力，files[] 改由 book_formats 生成</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td><code>files[]</code> 逐项含 <code>format</code>/<code>size</code>/<code>href</code>/<code>online_readable</code>，结构不变</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">一书多版本</th>
+                    <td><strong>查看同一作品的其他版次 / 出版社 / 格式</strong><br /><span class="matrix-note">本轮新增接口，前端不接入</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td><code>versions[].id</code> 可直接用于 <code>/book/{id}</code>；逐资源调 <code>can_view_book()</code></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">导入与扫描</th>
+                    <td><strong>把已有电子书目录登记进书库</strong><br /><span class="matrix-note">原地登记，不复制不改名</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>导入后源文件路径与 mtime 不变；重复导入同一 format 返回 <code>samebook</code></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">多电子书目录</th>
+                    <td><strong>配置多个允许导入的目录</strong><br /><span class="matrix-note">后端已支持，本轮补前端 UI</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>可增删多个目录，保存后 <code>import_allowed_roots</code> 生效并持久化</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">阅读与书架</th>
+                    <td><strong>在线阅读、书架、笔记、进度</strong><br /><span class="matrix-note">全部挂 book_id，不受作品层影响</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td>前端零改动跑通全流程；DOCX/FB2/HTMLZ 的 <code>online_readable</code> 为 <code>false</code></td>
+                  </tr>
+                  <tr>
+                    <th scope="row">OPDS / WebDAV</th>
+                    <td><strong>第三方阅读器接入与文件挂载</strong><br /><span class="matrix-note">保留能力，非 JSON 协议可用标准 HTTP 状态码</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-conditional">条件</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>不得绕过资源权限；路径解析改用 <code>book_formats.path</code> 绝对路径</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">格式转换</th>
+                    <td><strong>把书转换为 EPUB 下载</strong><br /><span class="matrix-note">保持外部进程调用，不重写转换引擎</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>单向转 EPUB；转换失败返回现有错误语义，不新增状态码</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">Calibre 迁移</th>
+                    <td><strong>把现有 Calibre 书库导入新 schema</strong><br /><span class="matrix-note">单向只读，不导出回 Calibre</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td>幂等：重复运行结果一致；源库文件哈希不变；报告含作品数/版本数/被合并数/空指纹数</td>
+                  </tr>
+                  <tr>
+                    <th scope="row">归一化重算</th>
+                    <td><strong>归一化规则升级后重算全库归组</strong><br /><span class="matrix-note">手动命令，不做后台自动重算</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-no">—</span></td>
+                    <td class="matrix-cell"><span class="matrix-state matrix-yes">支持</span></td>
+                    <td><code>reindex-normalize</code> 可用，输出哪些 work 被拆分 / 合并的差异报告；重算前自动备份数据库</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="evidence" class="card">
+            <h2>4. 现状、根因与证据</h2>
+            <div class="table-wrap" role="region" aria-label="现状证据" tabindex="0">
+              <table>
+                <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
+                <tbody>
+                  <tr><td>导入必须复制并重命名文件</td><td><code>webserver/services/scan.py:33-36</code>（<code>index</code>/<code>copy</code>/<code>move</code> 三种模式）</td><td>“文件系统即数据库”的架构根源是 Calibre <code>books.path</code> 语义：相对书库根目录，且假定文件就在该目录内</td></tr>
+                  <tr><td>仅索引模式不能在线阅读</td><td><code>webserver/services/external_index.py</code>（<code>set_external_format_record</code> 等）</td><td>现有“不复制”路径是二等公民，能力不完整；新模型需把绝对路径作为一等事实</td></tr>
+                  <tr><td>前端字段契约规模</td><td><code>webserver/utils.py:66-170</code> 的 <code>SimpleBookFormatter</code> + <code>BookFormatter</code></td><td>兼容面约 25 个字段，远小于 215 条路由的直觉规模</td></tr>
+                  <tr><td>Calibre 依赖面</td><td>约 30 处 <code>from calibre...</code> import；103 处 <code>self.db</code> / <code>new_api</code> 调用</td><td>高频方法：<code>get_data_as_dict</code>(14)、<code>get_metadata</code>(12)、<code>new_api</code>(8)、<code>field_metadata</code>(8)、<code>add_format</code>(7)、<code>import_book</code>(6)、<code>get_books_for_category</code>(6)、<code>books_with_same_title</code>(5)、<code>search_getting_ids</code>(4)</td></tr>
+                  <tr><td>格式转换已是外部进程</td><td><code>webserver/services/convert.py:158</code> <code>subprocess.Popen(["ebook-convert", ...])</code></td><td>转换引擎与存储层天然解耦，无需重写 107,281 行转换代码</td></tr>
+                  <tr><td>已有别名基础设施但归一化极弱</td><td><code>webserver/models.py:357</code> <code>BookAlias</code>、<code>:369</code> <code>AuthorAlias</code>；<code>webserver/services/aliases.py:26</code> <code>normalize_alias()</code></td><td><code>normalize_alias()</code> <strong>仅做 <code>casefold()</code></strong>；新归一化需扩展而非另起</td></tr>
+                  <tr><td>已有盗版站后缀清理</td><td><code>webserver/utils.py:15</code> <code>remove_zlibrary_suffix()</code></td><td>正则匹配 z-library 括号；8 步流水线第 1 步可复用其语义</td></tr>
+                  <tr><td>查重逻辑分散且过严</td><td><code>webserver/services/scan.py:401,599</code>、<code>handlers/book.py:1442</code>、<code>services/booksource/save_service.py:188,205</code></td><td>现用 <code>books_with_same_title</code> + 作者集合<strong>精确相等</strong>；无法识别繁简、全半角、版本后缀差异</td></tr>
+                  <tr><td>多目录后端已支持、前端未暴露</td><td><code>webserver/settings.py:25</code>（<code>import_allowed_roots</code> 是数组）、<code>handlers/scan.py:37-49,52-62,469-510</code>、<code>handlers/admin.py:530</code>、<code>services/plugin_runtime.py:1554-1557</code>；前端仅 <code>app/pages/admin/imports.vue:324</code> 单个文本框</td><td>无需重新设计多目录模型，只缺前端 UI；<code>import_allowed_roots</code> 是安全白名单，不是书库根目录</td></tr>
+                  <tr><td>媒体格式常量不含新格式</td><td><code>webserver/services/media_analysis.py:22-30</code></td><td><code>EBOOK_MEDIA_FORMATS</code> 仅含 azw/azw3/epub/mobi/pdf/txt；DOCX/FB2/HTMLZ 需新增且<strong>不加入</strong> <code>ONLINE_READ_FORMATS</code></td></tr>
+                  <tr><td>Calibre 源码规模</td><td>本地克隆 <code>D:\code\calibre-src</code>，commit <code>ff944d9</code></td><td>Python 1,569 文件 / 799,856 行；C/C++ 126 文件 / 173,794 行；转换引擎合计 107,281 行</td></tr>
+                  <tr><td>32 万行 unicode 查表</td><td>Calibre <code>unihandecode</code></td><td>唯一用途是文件名 ASCII 化；新设计保留原始文件名，可直接删除</td></tr>
+                  <tr><td>Calibre FTS 代价</td><td><code>db/fts/text.py:extract_text()</code>，单独建库 <code>full-text-search.db</code></td><td>1 万本约 15-20 GB，超大库不可承受 → 否决全书正文 FTS</td></tr>
+                  <tr><td>方案门禁要求 module 目录真实存在</td><td><code>scripts/check_design_docs.py</code> 的 <code>(repo_root / module).is_dir()</code></td><td>必须先创建 <code>design/booksvr/</code> 才能通过 <code>make check-design</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>事实与推断：</strong>上表均为已实测事实。尚未验证的假设有两项：（1）真实书库中“版本指纹”（出版社 + 版次/年份 + 译者）的缺失率——若缺失率过高，自动归组收益不足，需回到设计确认；（2）是否存在以 <code>books.path</code> 或 <code>available_formats</code> 字符串为键的路由——由实施项 1 的 215 条路由盘点证伪，若发现则停止并说明，不自行猜测兼容策略。</div>
+          </section>
+
+          <section id="design" class="card">
+            <h2>5. 方案</h2>
+            <div class="callout good"><strong>方案结论：</strong>新增 <code>booksvr/</code> 作为 Go 实现的书库存储层，采用<strong>作品 → 版本 → 格式</strong>三层模型。所有权划分：<code>works</code> 表拥有作品层（归一化后的书名 + 作者），<code>books</code> 表保留为版本层（<code>books.id</code> 语义不变），<code>book_formats</code> 表拥有格式层（<strong>绝对路径</strong>，不复制不改名）。数据流：导入 → 8 步归一化 → <code>work_key</code> 命中作品 → <code>edition_key</code> 命中版本 → 同版本加格式。失败表现：空 <code>edition_key</code> <strong>不自动合并</strong>，各自成版本；同一 book 重复导入同一 format 返回现有 <code>samebook</code> 语义。这是最小完整方案，因为 <code>books.id</code> 不变使 215 条路由与前端契约完全不受影响，<code>works</code> 是纯增量聚合层，回滚只需停止使用新表。</div>
+
+            <h3>5.1 三层数据模型</h3>
+            <pre aria-label="三层数据模型 DDL"><code>-- 第 1 层：作品（新增）
+CREATE TABLE works (
+    id             INTEGER PRIMARY KEY,
+    title_norm     TEXT NOT NULL,          -- 归一化书名（已剔除版本后缀）
+    author_norm    TEXT NOT NULL,          -- 归一化作者
+    work_key       TEXT NOT NULL UNIQUE,   -- title_norm + '\x1f' + author_norm
+    display_title  TEXT NOT NULL,
+    display_author TEXT NOT NULL,
+    created_at     INTEGER NOT NULL,
+    updated_at     INTEGER NOT NULL
+);
+CREATE INDEX idx_works_title_norm  ON works(title_norm);
+CREATE INDEX idx_works_author_norm ON works(author_norm);
+
+-- 第 2 层：版本（复用 books 表，新增列）
+ALTER TABLE books ADD COLUMN work_id     INTEGER REFERENCES works(id);
+ALTER TABLE books ADD COLUMN edition_key TEXT;   -- 版本指纹
+ALTER TABLE books ADD COLUMN title_norm  TEXT;
+ALTER TABLE books ADD COLUMN author_norm TEXT;
+CREATE INDEX idx_books_work_id     ON books(work_id);
+CREATE INDEX idx_books_edition_key ON books(work_id, edition_key);
+
+-- 第 3 层：格式（新增）
+CREATE TABLE book_formats (
+    id      INTEGER PRIMARY KEY,
+    book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+    format  TEXT NOT NULL,
+    path    TEXT NOT NULL,        -- 绝对路径，不复制不改名
+    size    INTEGER NOT NULL,
+    mtime   INTEGER NOT NULL,
+    hash    TEXT,
+    UNIQUE(book_id, format)
+);</code></pre>
+            <p><strong>关键语义：</strong><code>work_key = title_norm + '\x1f' + author_norm</code> 决定“是不是同一本书”；<code>edition_key = norm(出版社) + '\x1f' + norm(版次/年份) + '\x1f' + norm(译者)</code> 决定“是不是同一版本”。《三体》4 个文件 → <strong>1 work / 3 book / 4 format</strong>。</p>
+
+            <h3>5.2 八步归一化流水线</h3>
+            <pre aria-label="归一化流水线"><code>输入 "《三体》（第二版） 刘慈欣 著"
+  ↓ 1. 去盗版站后缀    remove_zlibrary_suffix 等价实现
+  ↓ 2. 全半角统一      ＡＢＣ→ABC，１２３→123
+  ↓ 3. 空白归一        去零宽字符 U+200B/U+FEFF
+  ↓ 4. 标点归一        去《》「」【】、去副标题分隔符
+  ↓ 5. 繁简统一        内置对照表（embed，约 20-50 KB）
+  ↓ 6. 大小写统一      casefold
+  ↓ 7. 去版本后缀      → 提取而非删除
+  ↓ 8. 作者归一        去「著/编/译」、统一姓名顺序
+输出 title_norm="三体"  author_norm="刘慈欣"  suffixes=["第二版"]</code></pre>
+            <p><strong>第 7 步关键设计（提取而非删除）：</strong></p>
+            <pre aria-label="版本后缀提取"><code>type SuffixParse struct {
+    Core     string   // "三体"      → 进 title_norm
+    Suffixes []string // ["第二版"]  → 进 edition_key
+}</code></pre>
+            <p>《三体全集》→ <code>Core="三体"</code>, <code>Suffixes=["全集"]</code>：归入同作品但<strong>不是同一版本</strong>。若直接删除后缀，《三体全集》会被误合并进《三体》的同一版本。<strong>误合并兜底：</strong><code>edition_key</code> 为空时<strong>不自动合并</strong>，各自成版本。</p>
+
+            <h3>5.3 导入与归组流程</h3>
+            <div class="flow" aria-label="导入与归组流程">
+              <article class="step"><span class="label">Input</span><b>扫描 / 上传源文件</b><p>解析元数据，得到书名、作者、出版社、版次、译者</p></article>
+              <article class="step"><span class="label">Guard</span><b>8 步归一化</b><p>算出 <code>work_key</code> 与 <code>edition_key</code>；空指纹不合并</p></article>
+              <article class="step"><span class="label">Core</span><b>三层归组</b><p><code>work_key</code> 命中？→ 否则新建 work；<code>edition_key</code> 命中？→ 否则新建 book；同 book 已有该 format？→ 否则加 format</p></article>
+              <article class="step"><span class="label">Output</span><b>原地登记</b><p>写 <code>book_formats.path</code> 绝对路径；返回 <code>{"err": "ok"}</code> 或 <code>samebook</code></p></article>
+            </div>
+            <p>对外行为保持不变：<code>{"err": "samebook"}</code>、<code>add_format</code>、<code>import_book</code> 的语义与响应结构与 Python 版一致，前端零改动。</p>
+
+            <h3>5.4 存储层：去掉「文件系统即数据库」</h3>
+            <div class="table-wrap" role="region" aria-label="存储层对比" tabindex="0">
+              <table>
+                <thead><tr><th>维度</th><th>旧（Calibre）</th><th>新（Go）</th></tr></thead>
+                <tbody>
+                  <tr><td>文件位置</td><td><code>books.path</code> = 相对书库根目录</td><td><code>book_formats.path</code> = <strong>绝对路径</strong></td></tr>
+                  <tr><td>文件名</td><td>ASCII 化（32 万行 unicode 表）</td><td><strong>保留原始文件名</strong>，删除查表</td></tr>
+                  <tr><td>导入</td><td>必须复制 + 改名</td><td><strong>默认原地登记</strong>，不复制不改名</td></tr>
+                  <tr><td>目录约定</td><td><code>data/{author}/{title}/{id}/</code></td><td><strong>无目录约定</strong>，路径即事实</td></tr>
+                  <tr><td>封面</td><td><code>cover.jpg</code> 在书目录内</td><td><code>covers/{book_id}.jpg</code> 独立目录</td></tr>
+                  <tr><td>元数据</td><td>SQLite + <code>metadata.opf</code> 双写</td><td><strong>仅数据库</strong>，导出时按需生成 OPF</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p><strong>兼容层：</strong><code>books.path</code> 字段保留（存第一个格式所在目录），供 <code>webserver/main.py:177-191</code> 的 monkey-patch 与 <code>webserver/services/external_index.py:74-75</code> 的直接 SQL 平滑迁移，避免一次性改动面过大。</p>
+
+            <h3>5.5 HTTP 层与新增接口</h3>
+            <p>215 条既有路由<strong>全部保留</strong>，路径、方法、响应结构不变。新增 3 条路由，遵循仓库 RESTful 规范（单数资源名、动作作为子路径）：</p>
+            <div class="table-wrap" role="region" aria-label="新增路由" tabindex="0">
+              <table>
+                <thead><tr><th>方法</th><th>路径</th><th>用途</th><th>响应要点</th></tr></thead>
+                <tbody>
+                  <tr><td>GET</td><td><code>/api/work/([0-9]+)</code></td><td>作品详情</td><td>作品元数据 + 版本列表 + 每版本格式列表</td></tr>
+                  <tr><td>GET</td><td><code>/api/book/([0-9]+)/versions</code></td><td>同作品其他版本</td><td>同 <code>work_id</code> 下其他 <code>book_id</code> 的摘要</td></tr>
+                  <tr><td>POST</td><td><code>/api/book/([0-9]+)/merge</code></td><td>人工合并版本</td><td>把目标书并入当前书所在作品；返回合并结果</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <pre aria-label="新增接口响应契约"><code>// GET /api/work/123
+{
+  "err": "ok",
+  "work": {
+    "id": 123, "title": "三体", "author": "刘慈欣",
+    "title_norm": "三体", "author_norm": "刘慈欣",
+    "version_count": 3, "format_count": 4
+  },
+  "versions": [
+    {
+      "id": 456,                  // book_id，可直接用于 /book/456
+      "title": "三体", "publisher": "重庆出版社", "pubdate": "2008-01-01",
+      "edition_key": "重庆出版社\u001f2008\u001f-",
+      "suffixes": [], "img": "...", "thumb": "...",
+      "files": [
+        { "format": "EPUB", "size": 1234567, "href": "...", "online_readable": true },
+        { "format": "MOBI", "size": 2345678, "href": "...", "online_readable": true }
+      ]
+    }
+  ]
+}
+
+// GET /api/book/456/versions
+{ "err": "ok", "work_id": 123, "versions": [ /* 同 work 下其他 book 的摘要，不含当前书 */ ] }
+
+// POST /api/book/456/merge   body: {"target_book_id": 789}
+{ "err": "ok", "work_id": 123, "merged": [456, 789], "msg": "已合并为同一作品" }</code></pre>
+            <p><strong>前端如何使用（关键设计）：</strong>前提是前端 Nuxt 除多目录 UI 外零改动，因此新增的 work/versions/merge 接口<strong>不被现有前端调用</strong>，而是作为后续前端迭代的接口储备。书库列表、详情页、下载弹窗、格式转换、阅读/书架/笔记全部继续挂 <code>book_id</code>，不介入；「同作品其他版本」是新增接口的唯一消费者。</p>
+            <p><strong>为什么本轮不接入前端：</strong>用户要求「前端 Nuxt 零改动」。若本轮同时接入，会破坏「215 条路由完全兼容」的验收口径，也无法用「前端零改动跑通」作为兼容性的强证据。</p>
+            <p><strong>后续前端接入路径（不在本轮范围，仅记录以便接口设计不返工）：</strong></p>
+            <ol>
+              <li>在 <code>app/pages/book/[bid]/index.vue</code> 详情页新增「其他版本」区块，调用 <code>$backend('/book/' + bid + '/versions')</code>。</li>
+              <li>用 <code>app/components/BookCards_Small.vue</code> 渲染版本列表（它已支持 <code>href</code> 与 <code>id</code>，可直接复用）。</li>
+              <li>版本卡片点击跳 <code>/book/{version.id}</code>，复用现有详情页路由。</li>
+              <li>管理员在详情页提供「合并到当前作品」按钮，调用 <code>POST /api/book/{id}/merge</code>。</li>
+              <li>新增 i18n 文案到 <code>app/i18n/locales/*.json</code>，<strong>注意禁止字面量 <code>@</code> 与 <code>&lt;</code></strong>。</li>
+            </ol>
+            <p><strong>接口设计约束（为后续前端接入预留）：</strong><code>versions[].id</code> 必须可直接用于 <code>/book/{id}</code>；响应遵循 <code>{"err": "ok", ...}</code> 信封；权限逐资源调 <code>can_view_book()</code>，<code>/merge</code> 需 <code>@auth</code> + 所有权校验。</p>
+
+            <h3>5.6 多电子书目录</h3>
+            <p><strong>关键事实：后端已支持多目录，前端未暴露。</strong></p>
+            <div class="table-wrap" role="region" aria-label="多目录现状" tabindex="0">
+              <table>
+                <thead><tr><th>层</th><th>现状</th><th>证据</th></tr></thead>
+                <tbody>
+                  <tr><td>配置项</td><td><code>import_allowed_roots</code> 是<strong>数组</strong>，默认 <code>["/data/books/imports/"]</code></td><td><code>webserver/settings.py:25</code></td></tr>
+                  <tr><td>解析</td><td>支持数组或逗号分隔字符串</td><td><code>webserver/handlers/scan.py:37-49</code></td></tr>
+                  <tr><td>校验</td><td><code>_is_path_in_roots()</code> 用 <code>commonpath</code> 逐根判断</td><td><code>webserver/handlers/scan.py:52-62</code></td></tr>
+                  <tr><td>目录浏览</td><td><code>/api/admin/import/directory/list</code> 返回 <code>allowed_roots</code></td><td><code>webserver/handlers/scan.py:469-510</code></td></tr>
+                  <tr><td>设置读写</td><td>在可写白名单</td><td><code>webserver/handlers/admin.py:530</code></td></tr>
+                  <tr><td>插件平台</td><td>已把 <code>import_allowed_roots</code> 传给插件</td><td><code>webserver/services/plugin_runtime.py:1554-1557</code></td></tr>
+                  <tr><td><strong>前端</strong></td><td><strong>只暴露单个 <code>scan_upload_path</code> 文本框</strong></td><td><code>app/pages/admin/imports.vue:324</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p><strong>区分：</strong><code>import_allowed_roots</code> 只是<strong>安全白名单</strong>，不是「书库根目录」。真正书库根目录是 <code>with_library</code>（单个），新模型下 <code>book_formats.path</code> 存绝对路径不再依赖它。</p>
+            <p><strong>「前端零改动」的唯一明确例外（可改文件清单）：</strong></p>
+            <ul>
+              <li><code>app/pages/admin/imports.vue</code>（目录列表改多目录，增/删/校验）</li>
+              <li><code>app/components/admin/GeneralSettingsContent.vue</code>（标注默认导入目录）</li>
+              <li><code>app/i18n/locales/zh-CN.json</code>、<code>en-US.json</code>（<strong>禁止字面量 <code>@</code> 与 <code>&lt;</code></strong>）</li>
+              <li><code>app/test/mock-server.js</code>（增加 <code>import_allowed_roots</code>）</li>
+            </ul>
+
+            <h3>5.7 代码结构</h3>
+            <pre aria-label="booksvr 目录结构"><code>booksvr/go.mod                                  module talebook/booksvr
+booksvr/cmd/booksvr/main.go                     进程入口
+booksvr/internal/normalize/normalize.go         8 步流水线
+booksvr/internal/normalize/suffix.go            版本后缀提取
+booksvr/internal/normalize/zhconv.go            繁简对照表
+booksvr/internal/normalize/data/zh_conv.txt     //go:embed
+booksvr/internal/normalize/keys.go              WorkKey / EditionKey
+booksvr/internal/library/schema.go              Migrate(*sql.DB) error
+booksvr/internal/library/work.go                FindOrCreateWork / GetWork / ListVersions
+booksvr/internal/library/book.go                FindOrCreateEdition / AddFormat
+booksvr/internal/library/format.go              RegisterFormat / ResolvePath
+booksvr/internal/library/group.go               GroupFile(meta)
+booksvr/internal/library/merge.go               MergeBooks / SplitBook
+booksvr/internal/migrate/calibre.go             ImportCalibre(dbPath)
+booksvr/internal/migrate/report.go              Report
+booksvr/internal/httpapi/router.go              Routes() []Route
+booksvr/internal/httpapi/compat.go              FormatBook(...)
+booksvr/internal/httpapi/work.go                WorkDetail / BookVersions / BookMerge
+booksvr/internal/reindex/normalize.go           ReindexNormalize</code></pre>
+            <p><strong>包边界（不可破坏）：</strong><code>normalize</code> 不依赖数据库，纯函数；<code>library</code> 不依赖 HTTP；<code>httpapi</code> 不直接写 SQL；<code>migrate</code> 只读源库。</p>
+
+            <h3>关键决策</h3>
+            <div class="table-wrap" role="region" aria-label="关键设计决策" tabindex="0">
+              <table>
+                <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
+                <tbody>
+                  <tr><td>作品层与现有 API 关系</td><td>保留 <code>books</code> 表作为版本层，新增 <code>works</code> 表作为作品层</td><td><code>books.id</code> 语义不变，215 条路由与前端契约完全不受影响；<code>works</code> 是纯增量聚合层；回滚只需停止使用新表</td><td>彻底重建 <code>works</code>/<code>editions</code>/<code>formats</code> 三张新表、<code>books</code> 仅作兼容视图（所有以 <code>book_id</code> 为键的路由、阅读进度、笔记、书架都要重新映射，与「前端零改动」硬约束冲突）</td></tr>
+                  <tr><td>版本与格式层级</td><td>作品 → 版本 → 格式（三层）</td><td>同一版次的 epub+mobi 合并为 1 个版本，版本内再列格式，符合用户对「版本」的定义</td><td>作品 → 版本(=文件) 两层（同一版次的 epub+mobi 会显示成 2 个版本，用户会觉得「版本」一词被滥用）</td></tr>
+                  <tr><td>同版本判定依据</td><td>按「版本指纹」自动判定：<code>edition_key = norm(出版社) + '\x1f' + norm(版次/年份) + '\x1f' + norm(译者)</code></td><td>归一化后相同即同一版本，无需人工介入</td><td>人工指定版本（大库不可行）</td></tr>
+                  <tr><td>版本后缀处理</td><td><strong>提取而非删除</strong>：后缀进 <code>edition_key</code></td><td>避免《三体全集》被误合并为《三体》同一版本</td><td>直接删除后缀（会造成误合并）</td></tr>
+                  <tr><td>空指纹处理</td><td><strong>不自动合并</strong>，各自成版本</td><td>数据安全优先于自动化程度；误合并比漏合并代价高</td><td>空指纹也合并（误合并风险不可控）</td></tr>
+                  <tr><td>归一化键计算时机</td><td>写入时持久化 + 提供全库重算命令</td><td>检索走索引，性能可控；规则升级时可手动重算</td><td>查询时实时计算（大库不可承受）；不做后台自动重算（本轮范围外）</td></tr>
+                  <tr><td>繁简统一实现</td><td>内置精简对照表（3000-5000 字，单文件 embed）</td><td>零依赖、约 20-50 KB、可离线</td><td>OpenCC Go 移植库（引入数 MB 词典依赖）；不做繁简归一（「三體」与「三体」仍是两本书）</td></tr>
+                  <tr><td>全文检索范围</td><td>仅元数据，trigram 分词（支持中文子串）</td><td>超大库可承受</td><td>全书正文 FTS（1 万本约 15-20 GB）</td></tr>
+                  <tr><td>多目录配置</td><td>复用现有 <code>import_allowed_roots</code>，不新增配置项</td><td>后端已支持，只缺前端 UI</td><td>新增独立的多书库根目录配置（重复造轮子）</td></tr>
+                  <tr><td>兼容策略</td><td>215 条路由路径、方法、响应结构不变；<code>books.path</code> 字段保留作兼容层</td><td>前端零改动是硬验收口径</td><td>不接受任何隐式降级（如静默改变 <code>files[]</code> 结构）</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="impact" class="card">
+            <h2>6. 影响范围、风险与回滚</h2>
+            <div class="grid">
+              <article class="choice recommended">
+                <h3>影响范围</h3>
+                <p><strong>新增：</strong><code>booksvr/</code> 整个目录（Go 模块、<code>internal/normalize</code>、<code>internal/library</code>、<code>internal/migrate</code>、<code>internal/httpapi</code>、<code>internal/reindex</code>、<code>docs/route-inventory.md</code>）。</p>
+                <p><strong>修改：</strong><code>Makefile</code>（新增 <code>build-go</code>/<code>test-go</code>/<code>lint-go</code>）；<code>Dockerfile</code>（多阶段构建）；<code>webserver/services/media_analysis.py</code>（新增 DOCX/FB2/HTMLZ）；<code>app/pages/admin/imports.vue</code>、<code>app/components/admin/GeneralSettingsContent.vue</code>、<code>app/i18n/locales/zh-CN.json</code>、<code>app/i18n/locales/en-US.json</code>、<code>app/test/mock-server.js</code>。</p>
+                <p><strong>数据：</strong>新增 <code>works</code>、<code>book_formats</code> 两张表；<code>books</code> 表新增 <code>work_id</code>/<code>edition_key</code>/<code>title_norm</code>/<code>author_norm</code> 四列与两个索引。</p>
+                <p><strong>接口：</strong>215 条既有路由不变；新增 3 条（<code>/api/work/{id}</code>、<code>/api/book/{id}/versions</code>、<code>/api/book/{id}/merge</code>）。</p>
+                <p><strong>配置：</strong>不新增配置项；复用 <code>import_allowed_roots</code>。</p>
+                <p><strong>涉及的 <code>spec/</code> 篇目（改变产品行为，必须同 PR 更新）：</strong><code>spec/书籍.md</code>（一书多格式、一书多版本、新格式与不可在线阅读边界）、<code>spec/书库.md</code>（导入不再复制文件的领域规则）、<code>spec/元数据.md</code>（归一化与作品归组规则）、<code>spec/索引.md</code>（若新增篇目则同步收录）。</p>
+              </article>
+              <article class="choice">
+                <h3>保持不变</h3>
+                <ul>
+                  <li><code>books.id</code> 语义：仍是一本书（一个版本），不得把作品层语义混入 <code>book_id</code>。</li>
+                  <li>215 条路由的路径、方法、响应结构；<code>{"err": "ok", ...}</code> 信封。</li>
+                  <li><code>files[]</code> 逐项结构（<code>format</code>/<code>size</code>/<code>href</code>/<code>online_readable</code>）。</li>
+                  <li><code>{"err": "samebook"}</code>、<code>add_format</code>、<code>import_book</code> 的对外语义。</li>
+                  <li>OPDS、WebDAV、多用户与权限能力。</li>
+                  <li>格式转换仍走外部进程，不重写转换引擎。</li>
+                  <li><code>books.path</code> 字段保留作兼容层，供现有 monkey-patch 与直接 SQL 平滑迁移。</li>
+                </ul>
+              </article>
+            </div>
+            <div class="callout danger">
+              <strong>主要风险：</strong>
+              <ul>
+                <li><strong>误合并（最高风险）：</strong>归一化过激会把不同书合并到同一作品。<em>触发条件：</em>书名归一化过度（如把副标题当版本后缀剔除）。<em>监控：</em>迁移报告输出「被合并数」与「空指纹数」；<code>reindex-normalize</code> 输出差异报告。<em>缓解：</em>版本后缀<strong>提取而非删除</strong>；空 <code>edition_key</code> <strong>不自动合并</strong>；保留人工纠正（<code>POST /api/book/{id}/merge</code>）。</li>
+                <li><strong>路由键依赖（已发生，已决策）：</strong>实施项 1 盘点发现 <strong>22 条路由以 <code>books.path</code> 家族（<code>fmt_&lt;format&gt;</code> 路径键）为键</strong>，已触发停止条件并上报。<em>用户决策：</em><strong>方案 C —— 逐路由改造</strong>，把 22 条路由改为直接查 <code>book_formats</code>，同步修改 <code>webserver/</code> 侧代码。<em>监控：</em>契约测试逐字段对比 215 条路由响应结构。<em>缓解：</em>逐条核对路径语义假设；完整清单见 <code>booksvr/docs/route-inventory.md</code>。</li>
+                <li><strong>版本指纹缺失率过高：</strong>真实书库中出版社/版次/译者大量为空，导致自动归组收益不足。<em>触发条件：</em>迁移报告中空指纹占比过高。<em>监控：</em>迁移报告。<em>缓解：</em>回到设计确认，不自行扩大归一化范围。</li>
+                <li><strong>契约测试发现无法兼容的路由：</strong><em>触发条件：</em>实施项 11 逐字段对比失败。<em>缓解：</em>停止并说明，不静默改变响应结构。</li>
+                <li><strong>前端范围越界：</strong>发现必须改多目录 UI 以外的前端文件才能兼容。<em>缓解：</em>停止并说明，不扩大例外范围。</li>
+                <li><strong>繁简表覆盖不足：</strong>生僻字不转换，导致部分书未归组。<em>缓解：</em>表限制在 3000-5000 常用字，接受漏合并（比误合并安全）；后续可通过 <code>reindex-normalize</code> 重算。</li>
+              </ul>
+            </div>
+            <div class="callout"><strong>回滚：</strong>代码层面，<code>booksvr/</code> 是新增目录，删除即可；<code>Makefile</code>/<code>Dockerfile</code> 改动可单独回退。数据层面，<code>works</code> 与 <code>book_formats</code> 是新增表，<code>books</code> 新增的四列均为可空，旧代码不读它们即可继续工作，因此<strong>无需数据迁移即可回滚</strong>；如需彻底清理，删除两张新表与四个新列即可。前端多目录 UI 回退到单个 <code>scan_upload_path</code> 文本框，后端 <code>import_allowed_roots</code> 数组仍兼容单值。Calibre 迁移是<strong>单向只读</strong>，源库不被修改，回滚无副作用。</div>
+          </section>
+
+          <section id="tests" class="card">
+            <h2>7. 测试计划与结果</h2>
+            <div class="table-wrap" role="region" aria-label="测试计划与结果" tabindex="0">
+              <table>
+                <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
+                <tbody>
+                  <tr><td>Go 单元测试</td><td><code>cd booksvr &amp;&amp; go test ./... -cover</code></td><td>全部通过；<code>internal/normalize</code> 覆盖率 ≥ 90%；《三体》场景断言 1 work / 3 book / 4 format</td><td class="pass">通过</td></tr>
+                  <tr><td>Go 构建</td><td><code>make build-go</code>、<code>make test-go</code></td><td>产出二进制；测试全绿</td><td class="pass">通过</td></tr>
+                  <tr><td>后端回归与契约</td><td><code>make pytest</code>（含 <code>tests/test_booksvr_contract.py</code>）</td><td>215 条路由响应 JSON 键集合与类型逐字段一致；既有回归全绿</td><td class="partial">部分受限</td></tr>
+                  <tr><td>迁移幂等与只读</td><td><code>go test ./internal/migrate/...</code></td><td>连续运行两次结果一致；源库文件哈希不变</td><td class="pass">通过</td></tr>
+                  <tr><td>前端单元测试</td><td><code>cd app &amp;&amp; npx vitest run test/composables/useImportRoots.spec.ts</code></td><td>多目录可增删、保存请求体含 <code>import_allowed_roots</code> 数组</td><td class="pass">通过</td></tr>
+                  <tr><td>前端浏览器渲染（mock 环境）</td><td><code>npx playwright test test/e2e/admin-imports.spec.ts</code></td><td>多目录可增删并持久化；非 <code>/data/</code> 目录被拒绝并给出可读错误</td><td class="pass">通过（4 passed）</td></tr>
+                  <tr><td>前端 lint</td><td><code>cd app &amp;&amp; npm run lint</code></td><td>通过</td><td class="pass">通过</td></tr>
+                  <tr><td>实际渲染 / 运行</td><td>Docker 后端 <code>make dev</code> + <code>API_URL=http://127.0.0.1:8080 npx nuxt dev --port 3000 --host 127.0.0.1</code>（<strong>不设置 <code>CHOKIDAR_USEPOLLING</code></strong>）</td><td>登录、书库列表、书籍详情、在线阅读、书架全流程可用；导入后源文件位置与文件名不变；《三体》4 文件显示为 1 作品 / 3 版本 / 4 格式；多目录可增删并持久化</td><td class="pass">通过（真实后端）</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review</code>（<code>full</code> 模式）</td><td>无 HIGH / MEDIUM 问题</td><td class="partial">已执行（mock 环境），无 HIGH/MEDIUM</td></tr>
+                  <tr><td>质量门禁</td><td><code>make check-design</code>、<code>make check-spec</code>、<code>make lint-py</code>、<code>make build</code></td><td>相关门禁均通过</td><td class="partial">部分受限</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="callout"><strong>实际执行记录（2026-10-09）：</strong>
+              <ul>
+                <li><strong>Go 单元测试：</strong><code>cd booksvr &amp;&amp; go test ./... -cover</code> → 6 个包全部 <code>ok</code>。覆盖率：<code>normalize</code> <strong>100.0%</strong>、<code>httpapi</code> 99.6%、<code>reindex</code> 94.9%、<code>migrate</code> 90.1%、<code>library</code> 87.6%、<code>cmd/booksvr</code> 87.7%。</li>
+                <li><strong>Go 构建与静态检查：</strong><code>go build -o bin/booksvr ./cmd/booksvr</code> 成功，<code>./bin/booksvr --version</code> 输出 <code>booksvr dev</code>；<code>go vet ./...</code> 与 <code>gofmt -l .</code> 均无输出。</li>
+                <li><strong>后端回归与契约（部分受限）：</strong><code>python -m pytest tests/test_booksvr_contract.py tests/test_format_keys*.py tests/test_media_analysis*.py tests/test_import_allowed_roots.py -q</code> → <strong>153 passed</strong>。全量 <code>pytest tests</code> 在收集阶段有 <strong>13 个错误</strong>，已逐条 grep 确认全部为环境缺失（<code>No module named 'calibre'</code>、<code>fcntl</code> 仅 Linux、<code>docker.configure_base_path</code>），<strong>非本次改动导致</strong>；本机无 Calibre，无法全绿。</li>
+                <li><strong>迁移幂等与只读：</strong>包含在上面的 <code>go test ./...</code> 中，<code>internal/migrate</code> <strong>90.1%</strong> 覆盖，连续两次运行结果一致、源库哈希不变的断言均通过。</li>
+                <li><strong>前端单元测试：</strong><code>cd app &amp;&amp; npx vitest run test/composables/useImportRoots.spec.ts</code> → <strong>26 passed</strong>。多目录的归一化、去重、空白丢弃、<code>/data/</code> 边界（含 <code>/database</code> 字符串前缀陷阱）、空列表拒绝、<code>allowed_roots</code> 回退 <code>scan_upload_path</code> 均已覆盖。</li>
+                <li><strong>前端 lint 与构建：</strong><code>npm run lint</code> → <strong>0 errors</strong>（567 warnings 为仓库既有风格告警）；<code>npx nuxt build</code> → <strong>Build complete</strong>。</li>
+                <li><strong>迁移报告幂等性缺陷（本轮发现并修复）：</strong>接入 <code>import-calibre</code> 子命令时，用真实源库跑两次发现 <code>Merged</code> 从 2 虚增到 6——它把「命中已存在的 edition」也算作合并，而重跑时每本书都会命中。数据本身是幂等的（works/books/formats 计数不变），是<strong>报告不幂等</strong>。已改为只统计<strong>本次运行内</strong>发生的合并，并拆出 <code>DuplicateFormats</code> 字段区分「源库自身重复」与「自动归组合并」；重跑现在报 <code>merged=0 duplicate_formats=0</code>。原测试只比 <code>Works/Editions/Formats</code> 三个字段，因此漏掉了这个缺陷，已改为逐字段对比。</li>
+                <li><strong>迁移命令已接入 CLI（本轮补齐）：</strong><code>cmd/booksvr/main.go</code> 新增 <code>import-calibre</code> 子命令（<code>-source</code> / <code>-target</code> 必填，<code>-library-root</code> 默认取源库目录）。目标库必须是 Calibre 派生库（<code>Migrate</code> 只加列不建表），否则报错而非静默建出缺 <code>books</code> 表的半成品。<code>cmd/booksvr</code> 覆盖率 70.0% → <strong>87.7%</strong>，<code>migrate</code> 89.5% → <strong>90.1%</strong>。</li>
+                <li><strong>全库重算命令已接入 CLI（本轮补齐）：</strong>计划曾记录「重算逻辑已交付、但尚未接入 CLI 子命令」的缺口。已在 <code>cmd/booksvr/main.go</code> 新增 <code>reindex-normalize</code> 子命令（<code>-db</code> 必填、<code>-backup</code> 默认开启），未知子命令与缺 <code>-db</code> 均以非零退出码报错。**端到端实测**：3 本《三体》（含繁简差异与「修订版」后缀）→ 1 work / edition_key 更新 1 / 空 edition_key 2；第二次运行 0 更新（幂等）；备份文件带时间戳生成。<code>cmd/booksvr</code> 覆盖率由 70.0% 升至 <strong>87.7%</strong>。</li>
+                <li><strong>reindex-normalize CLI 端到端复核：</strong>用真实 SQLite 库（3 本《三体》：繁简差异 + 「修订版」后缀）运行 <code>booksvr reindex-normalize -db &lt;path&gt;</code>：首次报 <code>扫描书籍 3 / 归一化字段更新 3 / edition_key 更新 1 / 新建作品 1 / 空 edition_key 2</code>，备份文件带时间戳生成；第二次运行全部计数归零（幂等）。直接印证了「繁简归一化生效」「后缀提取而非删除」「空键不自动合并」三项核心决策。</li>
+                <li><strong>迁移报告字段复核：</strong><code>TestImportCalibreReportFields</code> 与 <code>TestReportString</code> 通过；报告实际输出 <code>works=</code> / <code>editions=</code> / <code>merged=</code> / <code>empty_fingerprints=</code> 四个验收要求的字段（另加本轮新增的 <code>duplicate_formats=</code>）。</li>
+                <li><strong>新格式边界复核：</strong><code>tests/test_media_analysis_new_formats*.py</code> <strong>45 passed</strong>，其中 <code>test_new_formats_are_not_online_readable</code> 直接断言 DOCX / FB2 / HTMLZ 的 <code>online_readable</code> 恒为 <code>False</code>，同时它们在 <code>SUPPORTED_MEDIA_FORMATS</code> 内（可导入）。</li>
+                <li><strong>新增路由 RESTful 合规复核：</strong>对照仓库规范逐条确认——<code>/api/work/{id}</code> 用单数名词（非 <code>works</code>）；<code>/api/book/{id}/versions</code> 与 <code>/api/book/{id}/merge</code> 挂在已有单数资源 <code>book</code> 下作为子资源/动作；无 <code>author-aliases</code> 式连字符顶层名词。</li>
+                <li><strong>《三体》三层模型场景复核：</strong><code>TestGroupFileSanTiScenario</code> 通过，断言 <strong>1 work / 3 book / 4 format</strong>，并逐项验证：同一版次多格式（EPUB+MOBI）共享同一 <code>book_id</code>（1 版本 2 格式）；「第二版」归入同一 work 但不同 edition；无出版社/出版日期的书 edition_key 为空、各自独立成版（不自动合并）。</li>
+                <li><strong>源文件不变复核：</strong><code>TestRegisterFormatLeavesSourceFileUntouched</code>、<code>TestRegisterFormatDoesNotCreateSiblingFiles</code>、<code>TestRegisterFormatKeepsNonASCIIFilename</code>、<code>TestGroupFileStoresAbsolutePath</code> 均通过——导入不复制、不改名、不生成旁文件，路径存为绝对路径。</li>
+                <li><strong>H3 繁简表规模复核：</strong><code>internal/normalize/data/zh_conv.txt</code> 含 <strong>3222</strong> 个有效繁简对（0 个格式错误 token），文件 <strong>22.9 KB</strong>，落在计划限定的 3000-5000 字 / 20-50 KB 区间内。</li>
+                <li><strong>契约测试维度复核：</strong><code>tests/test_booksvr_contract.py</code> <strong>26 passed</strong>，覆盖：路由总数（215）、每条 Python 路由在 Go 侧存在、Go 侧无多余路由、新增 3 条路由不碰撞、响应字段集逐字段一致、错误码集合、<code>versions[].id</code> 即 <code>book_id</code>、<code>/merge</code> 需鉴权、<code>@js</code> 信封、CORS 与 Content-Type。</li>
+                <li><strong>前端零改动口径复核：</strong><code>git status -- app/</code> 显示生产代码只改了 3 个文件（<code>pages/admin/imports.vue</code>、两个 locale），均属多目录 UI——即计划声明的唯一例外；其余为测试文件（<code>useImportRoots.ts</code>、两个 spec、<code>mock-server.js</code>）。</li>
+                <li><strong>新增路由权限复核：</strong><code>TestPermissionsMatchPython</code> 覆盖游客 / 普通用户非所有者 / 普通用户是所有者 / 管理员四种身份；<code>TestHTTPMergeRequiresAuth</code>、<code>TestWorkRouteSpecsMergeRequiresAuth</code> 确认 <code>/merge</code> 需鉴权；<code>TestWorkDetailGuestSeesOnlyPublicBooks</code>、<code>TestBookVersionsAllPrivateGivesEmpty</code> 确认私藏不泄露。</li>
+                <li><strong>迁移报告字段复核：</strong><code>Report</code> 含 <code>Works</code> / <code>Editions</code> / <code>Merged</code> / <code>EmptyFingerprints</code> 四个字段，<code>TestImportCalibreReportFields</code> 与 <code>TestReportString</code> 通过。</li>
+                <li><strong>路由数量复核：</strong><code>httpapi.LegacyRouteCount()</code> = <strong>215</strong>，<code>RouteCount()</code> = 218（含 3 条新增）；Python 侧 AST 提取 214 条 + <code>theme_routes</code> 1 条 + <code>SOCIAL_AUTH_ROUTES</code> 4 条 = 219 个 pattern，与 Go 侧逐条对应，<code>tests/test_booksvr_contract.py</code> <strong>26 passed</strong>。</li>
+                <li><strong>新格式边界复核：</strong><code>DOWNLOAD_ONLY_FORMATS</code>（docx / fb2 / htmlz）已包含在 <code>SUPPORTED_MEDIA_FORMATS</code>（可导入），但<strong>不在</strong> <code>ONLINE_READ_FORMATS</code>（<code>online_readable</code> 返回 false），与验收口径一致；<code>tests/test_media_analysis_new_formats*.py</code> <strong>45 passed</strong>。</li>
+                <li><strong>质量门禁（部分受限）：</strong><code>python scripts/check_spec.py</code> → <strong>25 spec document(s) passed</strong>；<code>python scripts/check_design_docs.py</code> → <strong>171 design document(s) passed</strong>（本文件已转 ACTIVE，WIP 合并门禁已通过）；<code>ruff check</code> 对本次改动文件全部通过（仓库其余 37 条为既有问题）；<code>make build</code> 因 Docker Hub 不可达无法执行（已用本地验证镜像替代，见下）。</li>
+              </ul>
+            </div>
+            <div class="callout"><strong>界面审查（<code>interface-review</code>，full 模式，2026-10-09）：</strong>
+              <p><strong>范围：</strong>工作区未提交改动（0 个提交领先 <code>origin/master</code>，40 个未提交文件）；界面相关文件为 <code>app/pages/admin/imports.vue</code>、<code>app/composables/useImportRoots.ts</code>、两个 locale 文件、<code>app/test/mock-server.js</code>。排除锁文件、快照、生成产物与 <code>booksvr/</code> 二进制。</p>
+              <p><strong>结论：无 HIGH / MEDIUM 问题。</strong>已逐项核对：</p>
+              <ul>
+                <li><strong>移除信号：</strong>diff 的 <code>-</code> 侧只删了单个目录文本框与 <code>directoryHint</code> 文案引用，两者都有等价替代（目录列表 + <code>defaultDirectoryHint</code>）；旧 i18n 键 <code>directory</code> / <code>directoryHint</code> / <code>directoryLabel</code> 均保留，无回归。</li>
+                <li><strong>可访问性：</strong>两个图标按钮（选择目录 / 删除此目录）均有 <code>aria-label</code>；新增按钮带文字标签；错误提示用 <code>v-alert type="error"</code>（Vuetify 自带 <code>role="alert"</code>）；键盘可达性已实测（<code>focus()</code> 后 <code>toBeFocused()</code> 通过）。</li>
+                <li><strong>窄屏（360px）：</strong>实测行宽 264px、输入框 160px，无横向溢出、无裁切、无重叠；行内 <code>flex</code> + <code>min-width: 0</code> 使输入框正确收缩；截图确认两个目录行、图标按钮与「添加目录」按钮均清晰可辨且可点击。</li>
+                <li><strong>状态覆盖：</strong>禁用（<code>settingsSaving</code>）、只剩一项时删除按钮禁用、空列表拒绝、非 <code>/data/</code> 拒绝、目录检测中（<code>loading</code>）均有处理。</li>
+                <li><strong>文案：</strong>新增 10 个键在 zh-CN 与 en-US 均已补齐，无字面量 <code>@</code> 与 <code>&lt;</code>。</li>
+              </ul>
+              <p><strong>未验证：</strong>真实后端下的渲染与交互（Docker Hub 不可达）；上述结论基于 mock 环境，视觉与运行时断言标记为「mock 环境已验证，真实后端未验证」。</p>
+            </div>
+            <div class="callout"><strong>环境阻塞与解除（2026-10-09）：</strong>
+              <ul>
+                <li><strong>阻塞原因（已解除）：</strong>Docker Hub 一度不可达——<code>docker pull talebook/talebook-base:slim-v8.5.0</code> 报 <code>dialing registry-1.docker.io:443 ... connection attempt failed</code>。已重试成功，真实后端镜像已构建并运行。</li>
+                <li><strong>真实后端镜像（已构建）：</strong>用生产基础镜像 <code>talebook/talebook-base:slim-v8.5.0</code>（与仓库 <code>Dockerfile</code> 的 <code>application-base</code> 阶段同源）构建 <code>.qagent/verify-backend.Dockerfile</code>，<code>docker build</code> 退出码 0。容器 <code>talebook-verify</code> 已启动，<code>GET /api/welcome</code> 返回 HTTP 200，日志显示 <code>Calibre 元数据插件已注册</code>、<code>Now, Running...</code>；已通过 <code>POST /api/admin/install</code> 完成安装（<code>{"err": "ok", "installed": true}</code>）。<strong>两条失败路线已记录以免重走：</strong>① Calibre 官方 Linux 安装器 → <code>/opt/calibre</code> 的 81 MB bypy 冻结归档，只有自带 Python 3.14 能加载，该解释器无 tornado/sqlalchemy 且无法加载系统 Python 的 C 扩展；② Debian 的 <code>calibre</code> 包 → 同样装到 <code>/opt/calibre</code> 的 bypy 冻结归档，<strong>不提供</strong> <code>/usr/lib/calibre</code>，后端 <code>import calibre</code> 失败。生产基础镜像才提供 <code>/usr/lib/calibre/calibre/__init__.py</code> 的普通包布局。</li>
+                <li><strong>浏览器实际渲染验证（已完成，真实后端）：</strong>前端 dev server 连真实后端（<code>API_URL=http://127.0.0.1:8080</code>，未设置 <code>CHOKIDAR_USEPOLLING</code>），Playwright 用例 <code>app/test/e2e/real-backend-verify.spec.ts</code> <strong>1 passed</strong>：登录页渲染、<code>POST /api/user/sign_in</code> 返回 <code>err=ok</code>、首页与书库列表渲染、导入设置页渲染、<code>allowed_roots</code> 契约、<strong>多目录保存并持久化（2 个根目录）</strong>、<strong>越界目录 <code>/etc</code> 被拒绝</strong>。截图取证（<code>.qagent/shot-*.png</code>）确认导入页正常渲染：无报错、无空白、<strong>无原始 i18n key</strong>，摘要显示「目录：/data/books/imports」「模式：复制到书库」「自动监控导入：未开启」。<br /><em>过程中发现并修正一处测试自身错误：</em>该接口读 <strong>JSON body</strong>（<code>tornado.escape.json_decode</code>），初版用例误用 form-encoded 导致 <code>import_allowed_roots</code> 未被读取（表现为「保存后仍为 1 个目录」）；改为 JSON 后通过——<strong>是测试写错，不是产品缺陷</strong>。</li>
+                <li><strong>替代验证：</strong>Dockerfile 已用脚本静态校验——10 个阶段解析正确、<code>go-builder</code> 已定义、全部 <code>COPY --from</code> 引用可解析；<code>.dockerignore</code> 白名单已补 <code>!booksvr/</code>（否则 <code>COPY booksvr/</code> 会失败）。Go 二进制已在本机交叉编译验证。</li>
+                <li><strong>剩余风险（已收敛）：</strong>多目录 UI 的真实渲染、保存后重新加载的持久化、越界目录拒绝均已由真实后端验证（见上）。<strong>仍未验证：</strong>目录选择器在已配置根目录内的浏览限制（需真实目录树）；<code>make build</code> 完整生产镜像构建（本机无 <code>make</code>，已用等价 <code>docker build</code> 验证后端镜像）；真实书库的导入与《三体》三层模型端到端（需实际电子书文件）。</li>
+              </ul>
+            </div>
+          </section>
+
+          <section id="decisions" class="card">
+            <h2>8. 决策记录</h2>
+            <ol>
+              <li><strong>2026-10-07（原始 11 项）：</strong>目标定位为兼容 Talebook HTTP API（前端 Nuxt 零改动）；新 schema + 兼容层（导入现有 Calibre 书库，不导出回 Calibre）；读取主流格式 + 单向转 EPUB；格式范围 EPUB/TXT/PDF/MOBI/AZW3/DOCX/CBZ/FB2/HTMLZ；保留 OPDS、WebDAV、多用户与权限；单二进制 + embed 前端；完全兼容（复刻约 25 个展示字段）；仅元数据 trigram 检索，<strong>否决全书正文 FTS</strong>；完全取代 Calibre 桌面版，单向只读迁移；代码位置 <code>talebook/booksvr/</code>；首期全量实现 215 条路由。</li>
+              <li><strong>2026-10-07（本轮新增 9 项）：</strong>归一化自动化程度选「自动归组到作品 + 保留人工纠正」；版本与格式为三层（作品 → 版本 → 格式），同一版次多格式合并为 1 个版本；同版本按「版本指纹」自动判定；归一化流水线全部 8 步；繁简统一用内置精简对照表（3000-5000 字，单文件 embed，无外部依赖）；版本后缀<strong>提取而非删除</strong>（进 <code>edition_key</code>）；保留 <code>books</code> 表作版本层、新增 <code>works</code> 表作作品层；归一化键<strong>写入时持久化</strong> + 提供全库重算命令；多目录复用现有 <code>import_allowed_roots</code>，本轮补前端 UI。</li>
+              <li><strong>2026-10-07（用户对「版本」的定义，原话）：</strong>「版本：同一本书的不同版次，出版社，格式。作者和书名相同就认为是同一本书，其余不同都是版本差异」。同一版次的多格式（如 epub+mobi）合并为 1 个版本，版本内再列格式。</li>
+              <li><strong>2026-10-07（plan-review 意见 1）：</strong>在 fork 出来的 talebook 仓库中进行开发，不在上游 <code>talebook/talebook</code> 直接开发。<code>origin</code> = fork，<code>upstream</code> = 上游，在特性分支上工作。</li>
+              <li><strong>2026-10-07（plan-review 意见 2）：</strong>新增的 work/versions/merge 接口<strong>本轮不被前端调用</strong>，作为接口储备；后续前端接入路径与接口设计约束已记录在 5.5 节。</li>
+              <li><strong>2026-10-07（plan-review 意见 3）：</strong>目录名用 <code>booksvr</code>，不用 <code>goserver</code>。</li>
+              <li><strong>2026-10-07（plan-review 意见 4）：</strong>多目录复用现有 <code>import_allowed_roots</code>，<strong>不新增配置项</strong>；多目录 UI 是「前端零改动」的唯一例外，不得扩大范围。</li>
+              <li><strong>2026-10-08（实施项 -1 完成）：</strong>fork 已创建为 <code>leonzy/talebook</code>；<code>origin</code> 指向 fork，<code>upstream</code> 指向上游；特性分支 <code>feat/booksvr-calibre-rewrite</code> 基于 <code>upstream/master</code>（<code>a37fa667</code>）创建。</li>
+              <li><strong>2026-10-09（实施项 1 盘点结果，口径修正）：</strong>路由总数实测为 <strong>215</strong>（非计划的 213）：<code>theme_routes</code> 1 + <code>SOCIAL_AUTH_ROUTES</code> 4 + <code>handlers.routes()</code> 210。差异来源：<code>plugin_booktools.routes()</code> 的 10 条经 <code>plugins.py:972</code> 拼接注册，<code>captcha.routes()</code> 在 <code>handlers/__init__.py:44</code> 赋值给变量而非 <code>routes +=</code>，两者均易漏算。验收口径由「215 条」修正为「215 条」。</li>
+              <li><strong>2026-10-09（实施项 11.6 后端缺口补齐）：</strong>计划 5.9 节称后端「已支持 <code>import_allowed_roots</code>」，实测不成立——<code>GET /api/admin/import/settings</code> 返回 <code>allowed_roots</code>，但 <code>POST</code> <strong>完全忽略</strong>请求体中的 <code>import_allowed_roots</code>（<code>admin.py:530</code> 只在可写白名单里，POST handler 未读取）。已在 <code>webserver/handlers/scan.py</code> 新增 <code>_is_within()</code>（用 <code>os.path.commonpath</code>，避免 <code>"/database".startswith("/data")</code> 误判）与 <code>_sanitize_allowed_roots()</code>（归一化、去重、拒绝 <code>/data/</code> 之外、拒绝空列表），并接入 POST handler。顺带修复真实缺陷：<code>_normalize_path("   ")</code>（纯空白）会解析成当前工作目录，从而绕过 <code>/data/</code> 检查。</li>
+              <li><strong>2026-10-09（实施项 11.6 前端测试方案偏离）：</strong>计划要求断言「导入设置页可渲染多个目录项」，但 <code>imports.vue</code> 依赖 Nuxt 自动导入（<code>useNuxtApp</code> 无显式 import），在 <code>happy-dom</code> 下挂载抛 <code>[nuxt] instance unavailable</code>；<code>nuxt</code> 环境 vitest 又需要真实 dev server（<code>ECONNREFUSED ::1:3000</code>）。改为把多目录纯逻辑抽到 <code>app/composables/useImportRoots.ts</code>，测试落在 <code>app/test/composables/useImportRoots.spec.ts</code>（26 用例）。页面级渲染断言转由浏览器验证覆盖（当前因 Docker Hub 不可达未执行）。</li>
+              <li><strong>2026-10-09（实施项 11.6 浏览器验证发现并修复 3 个真实缺陷）：</strong>用 Playwright + mock 环境实际渲染导入设置对话框后暴露：<br />① <code>@click="checkDraftDirectory"</code> 把 MouseEvent 当作 <code>path</code> 参数传入，目录检测总是检测错误路径；改为 <code>@click="checkDraftDirectory()"</code>。<br />② 从目录选择器为<strong>列表项</strong>选目录后不跑目录检测（<code>chooseCurrentDirectory</code> 提前 return），用户看不到该目录是否可读可写；改为同样调用 <code>checkDraftDirectory(path)</code>。<br />③ <code>settingsSaveDisabled</code> 在 <code>directory_check</code> 为空或为 error 时把保存按钮永久置灰，用户看不到任何原因；改为只保留 <code>settingsSaving</code> / 空路径 / move 模式不可写三个条件，目录列表的合法性由保存时的 <code>validateDraftAllowedRoots()</code> 给出可读提示。<br />同时修正 <code>app/test/mock-server.js</code>：导入目录从 <code>/mock/scan/dir</code> 改为 <code>/data/books/imports</code>，与后端 <code>SCAN_DIR_PREFIX = "/data/"</code> 的真实约束一致（原 mock 数据会让前端校验永远失败）。</li>
+              <li><strong>2026-10-09（实施项 12 规格同步）：</strong><code>spec/书籍.md</code> 新增作品/版本领域定义、术语表 8 条、行为逻辑 5.5 节；<code>spec/书库.md</code> 补充多目录与「导入不复制文件」；<code>spec/元数据.md</code> 新增 5.8 归一化与作品归组；<code>spec/索引.md</code> 补充易混淆概念。作品/版本/合并三条 Go 路由<strong>不写入 7.2</strong>——它们尚未在 Python 侧注册，而 <code>spec/</code> 只写当下应然（不写未实现），故归入 7.4 代码落点。</li>
+              <li><strong>2026-10-09（实施项 1 停止条件触发，用户决策 C）：</strong>盘点发现 <strong>22 条路由以 <code>books.path</code> 家族（<code>fmt_&lt;format&gt;</code> 路径键）为键</strong>，触发计划实施项 1 的停止条件。根因：Calibre <code>Cache.format_abspath()</code> 基于 <code>books.path</code> 推导路径，Talebook 在 <code>webdav/dav_provider.py:216</code> 把它塞进 <code>item[f"fmt_{fmt_lower}"]</code>，随后被 <code>handlers/book.py</code>（16 处）、<code>dav_provider.py</code>（9 处）、<code>plugins/push/kindle.py</code>（2 处）等直接读取。<strong>用户选择方案 C：逐路由改造</strong>——把 22 条路由改为直接查 <code>book_formats</code>，同步修改 <code>webserver/</code> 侧代码，而非在兼容层重建 <code>fmt_&lt;format&gt;</code>。完整清单见 <code>booksvr/docs/route-inventory.md</code>。</li>
+            </ol>
+          </section>
+        </main>
+
+      </div>
+
+      <footer>Talebook internal design · booksvr · ACTIVE · 2026-10-07</footer>
+    </div>
+    <script>
+      (() => {
+        const sections = [...document.querySelectorAll(".main-column > section[id]")];
+        const tocLinks = [...document.querySelectorAll(".toc-edge a[href^='#'], .toc-fab a[href^='#']")];
+        const floatingToc = document.querySelector(".toc-fab");
+        if (!sections.length || !tocLinks.length) return;
+
+        let ticking = false;
+        const syncCurrentSection = () => {
+          ticking = false;
+          let currentSection = sections[0];
+          for (const section of sections) {
+            if (section.getBoundingClientRect().top <= 84) currentSection = section;
+            else break;
+          }
+          const currentHref = `#${currentSection.id}`;
+          for (const link of tocLinks) {
+            if (link.getAttribute("href") === currentHref) link.setAttribute("aria-current", "location");
+            else link.removeAttribute("aria-current");
+          }
+        };
+        const scheduleCurrentSectionSync = () => {
+          if (ticking) return;
+          ticking = true;
+          requestAnimationFrame(syncCurrentSection);
+        };
+
+        floatingToc?.addEventListener("click", (event) => {
+          if (event.target.closest("a")) floatingToc.open = false;
+        });
+        addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && floatingToc?.open) floatingToc.open = false;
+        });
+        addEventListener("scroll", scheduleCurrentSectionSync, { passive: true });
+        addEventListener("resize", scheduleCurrentSectionSync);
+        syncCurrentSection();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "steps": [
+    "登录成功"
+  ],
+  "errors": [],
+  "checks": {
+    "imported": true,
+    "importFailed": true,
+    "downloadStatus": 200,
+    "downloadContentType": "application/octet-stream",
+    "downloadBytes": 8188933,
+    "downloadIsFile": true,
+    "downloadDisposition": "attachment; filename=\"1-%E3%80%90%E7%B2%BE%E6%8E%92%E3%80%91%E7%BA%A2%E6%98%9F%E7%85%A7%E8%80%80%E4%B8%AD%E5%9B%BD+%EF%BC%88%E5%8F%88%E5%90%8D%EF%BC%9A%E8%A5%BF%E8%A1%8C%E6%BC%AB%E8%AE%B0%EF%BC%89.mobi\"; filename*=UTF-8''1-%E3%80%90%E7%B2%BE%E6%8E%92%E3%80%91%E7%BA%A2%E6%98%9F%E7%85%A7%E8%80%80%E4%B8%AD%E5%9B%BD+%EF%BC%88%E5%8F%88%E5%90%8D%EF%BC%9A%E8%A5%BF%E8%A1%8C%E6%BC%AB%E8%AE%B0%EF%BC%89.mobi",
+    "downloadMagic": "5b284a696e675f5061695f295d5f486f",
+    "detailTitle": true,
+    "deleteStatus": 200,
+    "deleteBody": "{\"err\":\"ok\",\"msg\":\"删除成功\"}\n",
+    "afterDeleteBody": "{\"err\":\"params.book.invalid\",\"msg\":\"书籍已不存在\"}\n"
+  }
+}

@@ -251,6 +251,156 @@ class TestImportSettings(TestWithUserLogin):
                     main.CONF[key] = value
 
 
+class TestImportAllowedRoots(TestWithUserLogin):
+    """实施项 11.6：POST /api/admin/import/settings 接受 import_allowed_roots。"""
+
+    def _post_settings(self, tmpdir, **extra):
+        body = {
+            "scan_upload_path": tmpdir,
+            "import_mode": "copy",
+            "auto_watch_enabled": False,
+        }
+        body.update(extra)
+        return self.json("/api/admin/import/settings", method="POST", body=json.dumps(body))
+
+    def test_save_persists_allowed_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+                "nuxt_env_path": main.CONF.get("nuxt_env_path"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["nuxt_env_path"] = os.path.join(tmpdir, ".env")
+                with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value=tmpdir):
+                    d = self._post_settings(tmpdir, import_allowed_roots=[tmpdir])
+                self.assertEqual(d["err"], "ok")
+                self.assertIn(tmpdir, d["settings"]["allowed_roots"])
+                self.assertIn(tmpdir, main.CONF["import_allowed_roots"])
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_save_accepts_multiple_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            second = os.path.join(tmpdir, "second")
+            os.makedirs(second, exist_ok=True)
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+                "nuxt_env_path": main.CONF.get("nuxt_env_path"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["nuxt_env_path"] = os.path.join(tmpdir, ".env")
+                with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value=tmpdir):
+                    d = self._post_settings(tmpdir, import_allowed_roots=[tmpdir, second])
+                self.assertEqual(d["err"], "ok")
+                self.assertIn(second, main.CONF["import_allowed_roots"])
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_save_deduplicates_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+                "nuxt_env_path": main.CONF.get("nuxt_env_path"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["nuxt_env_path"] = os.path.join(tmpdir, ".env")
+                with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value=tmpdir):
+                    d = self._post_settings(tmpdir, import_allowed_roots=[tmpdir, tmpdir, tmpdir])
+                self.assertEqual(d["err"], "ok")
+                roots = main.CONF["import_allowed_roots"]
+                self.assertEqual(len(roots), len(set(roots)))
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_save_rejects_root_outside_data_prefix(self):
+        """根目录必须落在 /data/ 之下，否则整个请求被拒绝。"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                d = self._post_settings(tmpdir, import_allowed_roots=["/etc"])
+                self.assertEqual(d["err"], "params.allowed_roots")
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_save_rejects_empty_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                d = self._post_settings(tmpdir, import_allowed_roots=[])
+                self.assertEqual(d["err"], "params.allowed_roots")
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_save_rejects_non_list_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                d = self._post_settings(tmpdir, import_allowed_roots=12345)
+                self.assertEqual(d["err"], "params.allowed_roots")
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_save_without_roots_keeps_existing(self):
+        """不传 import_allowed_roots 时保持原值（向后兼容）。"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+                "nuxt_env_path": main.CONF.get("nuxt_env_path"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["nuxt_env_path"] = os.path.join(tmpdir, ".env")
+                with mock.patch.object(loader.SettingsLoader, "set_store_path", return_value=tmpdir):
+                    d = self._post_settings(tmpdir)
+                self.assertEqual(d["err"], "ok")
+                self.assertIn(tmpdir, main.CONF["import_allowed_roots"])
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+    def test_get_exposes_allowed_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            previous = {
+                "scan_upload_path": main.CONF.get("scan_upload_path"),
+                "import_allowed_roots": main.CONF.get("import_allowed_roots"),
+            }
+            try:
+                main.CONF["import_allowed_roots"] = [tmpdir]
+                main.CONF["scan_upload_path"] = tmpdir
+                d = self.json("/api/admin/import/settings")
+                self.assertEqual(d["err"], "ok")
+                self.assertIn("allowed_roots", d["settings"])
+                self.assertIn(tmpdir, d["settings"]["allowed_roots"])
+            finally:
+                for key, value in previous.items():
+                    main.CONF[key] = value
+
+
 class TestScanContinue(TestWithUserLogin):
     NEW_ROW_ID = 69
 

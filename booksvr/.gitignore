@@ -1,0 +1,11 @@
+bin/
+*.exe
+*.test
+*.out
+tmp_*/
+
+# 交叉编译产物与临时调试二进制（仓库根目录）
+/booksvr-linux-amd64
+/cb
+/ch
+/cu

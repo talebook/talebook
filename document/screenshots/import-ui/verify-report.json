@@ -1,0 +1,14 @@
+{
+  "steps": [
+    "登录成功"
+  ],
+  "errors": [],
+  "checks": {
+    "homeShowsBook": true,
+    "detailTitle": true,
+    "detailAuthor": true,
+    "coverStatus": 200,
+    "downloadStatus": 404,
+    "libraryShowsBook": false
+  }
+}

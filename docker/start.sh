@@ -49,6 +49,7 @@ chown talebook:talebook /var/www/talebook/app
 chown -R talebook:talebook \
   /run/talebook \
   /data/books/ssl \
+  /data/books/library \
   /data/log/ \
   /var/lib/nginx \
   /var/log/nginx \

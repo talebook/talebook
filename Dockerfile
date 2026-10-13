@@ -29,6 +29,30 @@ RUN cp -r dist package* /app-static/
 
 
 # ----------------------------------------
+# 第一阶段之二，编译 Go 存储层（booksvr）
+# 纯静态二进制，不依赖 libc，可直接拷进运行镜像。
+FROM golang:1.22-alpine AS go-builder
+ARG BUILD_COUNTRY=""
+ARG TARGETARCH
+ARG TARGETVARIANT
+
+WORKDIR /build/booksvr
+RUN if [ "x${BUILD_COUNTRY}" = "xCN" ]; then \
+    echo "using repo mirrors for ${BUILD_COUNTRY}"; \
+    go env -w GOPROXY=https://goproxy.cn,direct; \
+    fi
+
+# 先只拷依赖清单，让依赖层可缓存
+COPY booksvr/go.mod booksvr/go.sum ./
+RUN go mod download
+
+COPY booksvr/ /build/booksvr/
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/booksvr ./cmd/booksvr && \
+    /out/booksvr --version
+
+
+# ----------------------------------------
 # 第二阶段，应用运行基线
 # 基础镜像由 https://github.com/talebook/talebook-base 独立维护和发布
 FROM talebook/talebook-base:slim-v8.5.0 AS application-base
@@ -186,6 +210,9 @@ RUN python3 -m docker.configure_base_path /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/
 COPY docker/status_page.html /var/www/talebook/status/status_page.html
 COPY --from=builder /app-static/ /var/www/talebook/app/
+# Go 存储层二进制（作品 / 版本 / 格式三层模型）
+COPY --from=go-builder /out/booksvr /usr/local/bin/booksvr
+RUN chmod +x /usr/local/bin/booksvr && /usr/local/bin/booksvr --version
 COPY --from=builder /app-static/dist/logo/ /data/books/logo/
 
 RUN rm -f /etc/nginx/sites-enabled/default /var/www/html -rf && \
