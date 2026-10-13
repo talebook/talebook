@@ -288,12 +288,29 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		CountSeries:     func() (int64, error) { return library.CountSeries(db) },
 		CountFormats:    func() (int64, error) { return library.CountFormats(db) },
 	})...)
+	// 书籍、有声书与 WebDAV：接线到 library / userdb 的真实实现。
+	// 必须在 MetaRouteSpecs 之前构造：分类详情页（/api/publisher/<name> 等）
+	// 复用 bookCfg 的完整 BookFormatter，否则返回的书籍缺少 img/thumb/href，
+	// 前端 BookCards 拿不到封面地址（用户可见现象：钻取页无封面图）。
+	publicURL := bookPublicURL(opts.BasePath)
+	bookWiring := newBookWiring(userDB, db, opts.Settings)
+	// 删除公开书时把目录移入 <libraryRoot>/.caltrash，供回收站页面恢复。
+	bookWiring.libraryRoot = opts.LibraryRoot
+	// 在线阅读需要把 mobi/azw3 转成 EPUB；转换产物放在书库下的 convert 目录。
+	// 转换器用 Calibre 的 ebook-convert；未安装时 convertOne 会明确报错，
+	// 阅读页回退到「请下载后本地阅读」，而不是给出一个假的 EPUB。
+	convertSvc := convert.NewService(db, filepath.Join(opts.LibraryRoot, "convert"))
+	convertSvc.Converter = convert.NewCalibreConverter(ebookConvertPath())
+	bookWiring.convert = convertSvc
+	bookCfg := bookWiring.Config(opts.CDNURL)
+
 	// MetaConfig.DB 是 Calibre 元数据库（authors / tags / publishers 等表）；
 	// UserDB 是 Talebook 自有库（author_aliases / book_aliases 等表）。
 	specs = append(specs, MetaRouteSpecs(MetaConfig{
 		DB:       db,
 		UserDB:   userDB,
 		Settings: opts.Settings,
+		Book:     bookCfg,
 	})...)
 	specs = append(specs, UpgradeRouteSpecs(UpgradeConfig{
 		DB:          userDB,
@@ -327,18 +344,6 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		InstallSSL: newSSLInstaller(opts.Settings),
 	})...)
 
-	// 书籍、有声书与 WebDAV：接线到 library / userdb 的真实实现。
-	publicURL := bookPublicURL(opts.BasePath)
-	bookWiring := newBookWiring(userDB, db, opts.Settings)
-	// 删除公开书时把目录移入 <libraryRoot>/.caltrash，供回收站页面恢复。
-	bookWiring.libraryRoot = opts.LibraryRoot
-	// 在线阅读需要把 mobi/azw3 转成 EPUB；转换产物放在书库下的 convert 目录。
-	// 转换器用 Calibre 的 ebook-convert；未安装时 convertOne 会明确报错，
-	// 阅读页回退到「请下载后本地阅读」，而不是给出一个假的 EPUB。
-	convertSvc := convert.NewService(db, filepath.Join(opts.LibraryRoot, "convert"))
-	convertSvc.Converter = convert.NewCalibreConverter(ebookConvertPath())
-	bookWiring.convert = convertSvc
-	bookCfg := bookWiring.Config(opts.CDNURL)
 	specs = append(specs, BookRouteSpecs(bookCfg)...)
 
 	audioRoot := opts.AudiobookRoot

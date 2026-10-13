@@ -182,6 +182,36 @@ func TestMetaBooksPublisher(t *testing.T) {
 	}
 }
 
+// TestMetaBooksReturnsCoverFields 回归：钻取页的书籍必须带 img/thumb/href。
+//
+// 前端 BookCards 用 book.img 渲染封面；曾经用精简字典导致钻取页无封面图。
+func TestMetaBooksReturnsCoverFields(t *testing.T) {
+	fx := newMetaFixture(t)
+	metaSeedBook(t, fx.DB, 1, "书一")
+	metaSeedPublisher(t, fx.DB, 1, "人民文学出版社", 1)
+	// 接线完整 BookFormatter（生产路径由 serve.go 注入）。
+	fx.Cfg.Book = BookConfig{DB: fx.DB, LibraryDB: fx.DB, CDNURL: "https://cdn.example.com"}
+
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/publisher/人民文学出版社", "", 0, false)
+	ctx.Params = []string{"publisher", "人民文学出版社"}
+	got, err := MetaBooksHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	books, _ := got["books"].([]map[string]any)
+	if len(books) != 1 {
+		t.Fatalf("books = %v", books)
+	}
+	for _, key := range []string{"img", "thumb", "href"} {
+		if stringOf(books[0][key]) == "" {
+			t.Errorf("书籍缺少 %s 字段: %v", key, books[0])
+		}
+	}
+	if got := stringOf(books[0]["href"]); got != "/book/1" {
+		t.Errorf("href = %q, want /book/1", got)
+	}
+}
+
 // TestMetaListRating 回归：rating 同样需要查 ratings 表。
 func TestMetaListRating(t *testing.T) {
 	fx := newMetaFixture(t)

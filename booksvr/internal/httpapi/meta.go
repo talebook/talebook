@@ -26,6 +26,9 @@ type MetaConfig struct {
 	// UpdateBook 触发单本书的元数据刷新（对应 do_book_update）。
 	// 为 nil 时表示该能力未接线。
 	UpdateBook func(ctx *Context, bookID int64) error
+	// Book 是书籍格式化配置，分类详情页用它生成与 /api/book 一致的书籍字典
+	// （含 img / thumb / href）。为零值时回落到精简字典，仅用于测试。
+	Book BookConfig
 }
 
 // userDB 返回 Talebook 自有库句柄；未单独指定时回落为 Calibre 库。
@@ -372,7 +375,7 @@ func MetaBooksHandler(cfg MetaConfig) HandlerFunc {
 			return nil, err
 		}
 
-		books, err := metaLoadBooks(cfg.DB, ids)
+		books, err := metaLoadBooks(cfg, ids)
 		if err != nil {
 			return nil, err
 		}
@@ -455,16 +458,23 @@ func metaCategoryBookIDs(db *sql.DB, meta, name string) ([]int64, error) {
 }
 
 // metaLoadBooks 按 id 批量取书并转成响应字典。
-func metaLoadBooks(db *sql.DB, ids []int64) ([]map[string]any, error) {
+//
+// 对应 Python 的 `[self.fmt(b) for b in books]`：必须用完整的 BookFormatter，
+// 否则返回的书籍缺少 img / thumb / href，前端 BookCards 拿不到封面地址。
+func metaLoadBooks(cfg MetaConfig, ids []int64) ([]map[string]any, error) {
 	if len(ids) == 0 {
 		return []map[string]any{}, nil
 	}
-	data, err := library.GetBooksData(db, ids)
+	data, err := library.GetBooksData(cfg.DB, ids)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]map[string]any, 0, len(data))
 	for _, b := range data {
+		if cfg.Book.DB != nil {
+			out = append(out, bookDict(cfg.Book, b))
+			continue
+		}
 		out = append(out, bookDataToDict(b))
 	}
 	return out, nil
