@@ -46,14 +46,20 @@ const (
 	rPubBooksUpdate = "/api/publisher/(.*)/update"
 )
 
-// metaCategory 把 URL 里的 meta 名映射到 Calibre 的分类表名。
+// metaCategory 把 URL 里的 meta 名映射到 library 包使用的分类表名。
 //
-// 对应 Python 的 `meta + "s" if meta in ["tag", "author"] else meta`。
+// 对应 Python BaseHandler.get_category_with_count 的
+// `table = field if field in ["series"] else field + "s"`。
+//
+// 注意：Python 详情页把单数字段名交给 Calibre 的 get_item_id /
+// get_books_for_category，由 Calibre 内部解析到复数表；Go 侧直接查
+// categorySpecs 里的表名，因此列表页与详情页必须用同一个复数映射，
+// 否则 publisher / rating 会因查不到表而恒返回空集。
 func metaCategory(meta string) string {
-	if meta == "tag" || meta == "author" {
-		return meta + "s"
+	if meta == "series" {
+		return meta
 	}
-	return meta
+	return meta + "s"
 }
 
 // metaListTitles 是分类列表页的标题模板。

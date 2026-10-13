@@ -65,6 +65,19 @@ func metaSeedTag(t *testing.T, db *sql.DB, tagID int64, name string, bookIDs ...
 	}
 }
 
+// metaSeedPublisher 插入出版社并关联书籍。
+func metaSeedPublisher(t *testing.T, db *sql.DB, publisherID int64, name string, bookIDs ...int64) {
+	t.Helper()
+	if _, err := db.Exec(`INSERT INTO publishers (id, name) VALUES (?, ?)`, publisherID, name); err != nil {
+		t.Fatalf("插入出版社失败: %v", err)
+	}
+	for _, bid := range bookIDs {
+		if _, err := db.Exec(`INSERT INTO books_publishers_link (book, publisher) VALUES (?, ?)`, bid, publisherID); err != nil {
+			t.Fatalf("关联出版社失败: %v", err)
+		}
+	}
+}
+
 // metaSeedFormat 插入一条 data 记录（格式）。
 func metaSeedFormat(t *testing.T, db *sql.DB, bookID int64, format string) {
 	t.Helper()
@@ -109,6 +122,89 @@ func TestMetaListTags(t *testing.T) {
 	}
 	if got["total"] != 2 || got["unfiltered_total"] != 2 {
 		t.Errorf("total = %v, unfiltered = %v", got["total"], got["unfiltered_total"])
+	}
+}
+
+// TestMetaListPublisher 回归：/api/publisher 曾经恒返回 0 项。
+//
+// 根因是列表页误用了详情页的字段名映射（publisher 不加 s），
+// 导致 GetCategories 拿到未知分类名而返回空集。
+func TestMetaListPublisher(t *testing.T) {
+	fx := newMetaFixture(t)
+	metaSeedBook(t, fx.DB, 1, "书一")
+	metaSeedBook(t, fx.DB, 2, "书二")
+	metaSeedPublisher(t, fx.DB, 1, "人民文学出版社", 1, 2)
+	metaSeedPublisher(t, fx.DB, 2, "三联书店", 1)
+
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/publisher", "", 0, false)
+	ctx.Params = []string{"publisher"}
+	got, err := MetaListHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got["err"] != "ok" {
+		t.Fatalf("err = %v", got["err"])
+	}
+	items, _ := got["items"].([]map[string]any)
+	if len(items) != 2 {
+		t.Fatalf("出版社数 = %d, want 2", len(items))
+	}
+	// 计数降序：人民文学出版社(2) 在前。
+	if items[0]["name"] != "人民文学出版社" || int64Of(items[0]["count"]) != 2 {
+		t.Errorf("首项 = %v", items[0])
+	}
+	if got["total"] != 2 || got["unfiltered_total"] != 2 {
+		t.Errorf("total = %v, unfiltered = %v", got["total"], got["unfiltered_total"])
+	}
+}
+
+// TestMetaBooksPublisher 回归：/api/publisher/<name> 钻取曾经恒返回 0 本。
+func TestMetaBooksPublisher(t *testing.T) {
+	fx := newMetaFixture(t)
+	metaSeedBook(t, fx.DB, 1, "书一")
+	metaSeedPublisher(t, fx.DB, 1, "人民文学出版社", 1)
+
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/publisher/人民文学出版社", "", 0, false)
+	ctx.Params = []string{"publisher", "人民文学出版社"}
+	got, err := MetaBooksHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got["err"] != "ok" {
+		t.Fatalf("err = %v", got["err"])
+	}
+	if got["total"] != 1 {
+		t.Fatalf("total = %v, want 1", got["total"])
+	}
+	books, _ := got["books"].([]map[string]any)
+	if len(books) != 1 || books[0]["title"] != "书一" {
+		t.Errorf("books = %v", books)
+	}
+}
+
+// TestMetaListRating 回归：rating 同样需要查 ratings 表。
+func TestMetaListRating(t *testing.T) {
+	fx := newMetaFixture(t)
+	metaSeedBook(t, fx.DB, 1, "书一")
+	if _, err := fx.DB.Exec(`INSERT INTO ratings (id, rating) VALUES (1, 8)`); err != nil {
+		t.Fatalf("插入评分失败: %v", err)
+	}
+	if _, err := fx.DB.Exec(`INSERT INTO books_ratings_link (book, rating) VALUES (1, 1)`); err != nil {
+		t.Fatalf("关联评分失败: %v", err)
+	}
+
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/rating", "", 0, false)
+	ctx.Params = []string{"rating"}
+	got, err := MetaListHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	items, _ := got["items"].([]map[string]any)
+	if len(items) != 1 {
+		t.Fatalf("评分数 = %d, want 1", len(items))
+	}
+	if items[0]["name"] != "8" || int64Of(items[0]["count"]) != 1 {
+		t.Errorf("首项 = %v", items[0])
 	}
 }
 
@@ -573,9 +669,12 @@ func TestPubBooksUpdateNoPublisherFallback(t *testing.T) {
 // ---- 小工具 ----
 
 func TestMetaCategory(t *testing.T) {
+	// 除 series 外一律加 s（与 Python get_category_with_count 一致）。
+	// 回归：publisher / rating 曾经沿用单数字段名，导致列表页与详情页
+	// 都因查不到表而恒返回 0 项。
 	cases := map[string]string{
 		"tag": "tags", "author": "authors", "series": "series",
-		"rating": "rating", "publisher": "publisher", "format": "format",
+		"rating": "ratings", "publisher": "publishers", "format": "formats",
 	}
 	for in, want := range cases {
 		if got := metaCategory(in); got != want {
