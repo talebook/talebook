@@ -35,9 +35,16 @@ func WorkRouteSpecs() []RouteSpec {
 }
 
 // workService 用请求上下文构造 WorkService。
+//
+// 作品/版本层读的是 Calibre 元数据库的 books 表（work_id / edition_key 列），
+// 因此必须用 LibraryDB；用 ctx.DB（Talebook 自有库）会报 "no such table: books"。
 func workService(ctx *Context) *WorkService {
+	db := ctx.LibraryDB
+	if db == nil {
+		db = ctx.DB
+	}
 	return &WorkService{
-		DB:       ctx.DB,
+		DB:       db,
 		CDNURL:   ctx.CDNURL,
 		APIURL:   ctx.APIURL,
 		IsPublic: ctx.IsPublicFunc(),

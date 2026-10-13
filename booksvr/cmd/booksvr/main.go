@@ -16,6 +16,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
+	"talebook/booksvr/internal/httpapi"
 	"talebook/booksvr/internal/library"
 	"talebook/booksvr/internal/migrate"
 	"talebook/booksvr/internal/reindex"
@@ -94,6 +95,10 @@ func runImportCalibre(args []string, out io.Writer) error {
 		root = filepath.Dir(*source)
 	}
 
+	// 导入会写 books.sort，触发 Calibre 的 title_sort 触发器；
+	// 未注册该 SQL 函数会报 "no such function: title_sort"。
+	httpapi.RegisterCalibreFunctions()
+
 	db, err := sql.Open("sqlite", *target)
 	if err != nil {
 		return fmt.Errorf("import-calibre: 打开目标库失败: %w", err)
@@ -137,6 +142,10 @@ func runReindexNormalize(args []string, out io.Writer) error {
 	if _, err := os.Stat(*dbPath); err != nil {
 		return fmt.Errorf("reindex-normalize: 无法访问数据库 %s: %w", *dbPath, err)
 	}
+
+	// 重算会写 books.sort，触发 Calibre 的 title_sort 触发器；
+	// 未注册该 SQL 函数会报 "no such function: title_sort"。
+	httpapi.RegisterCalibreFunctions()
 
 	db, err := sql.Open("sqlite", *dbPath)
 	if err != nil {

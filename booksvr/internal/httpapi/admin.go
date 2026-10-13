@@ -36,6 +36,8 @@ type AdminConfig struct {
 	// CDNURL / APIURL 用于拼接资源地址。
 	CDNURL string
 	APIURL string
+	// BasePath 是部署前缀，用于拼出 site_url（对应 Python 的 BASE_PATH）。
+	BasePath string
 	// SendMail 发送邮件。
 	SendMail func(to, subject, body string) error
 	// TestDBConnection 测试数据库连接。
@@ -1300,17 +1302,78 @@ func AdminSettingsHandler(cfg AdminConfig) HandlerFunc {
 		if ctx.Request.Method == http.MethodPost {
 			return adminSettingsSave(cfg, ctx)
 		}
-		return adminSettingsGet(cfg), nil
+		return adminSettingsGet(cfg, ctx), nil
 	}
 }
 
-// adminSettingsGet 返回当前配置（脱敏）。
-func adminSettingsGet(cfg AdminConfig) map[string]any {
+// adminSettingsSNS 是社交登录提供方清单（对应 Python AdminSettings.get 的 sns）。
+//
+// 前端 GeneralSettingsContent 会遍历 rsp.sns 构建 value→item 映射，
+// 缺这个字段会抛 "Cannot read properties of undefined (reading 'forEach')"，
+// 导致整个系统设置页白屏。
+var adminSettingsSNS = []map[string]any{
+	{"value": "qq", "text": "QQ", "link": "https://connect.qq.com/"},
+	{"value": "amazon", "text": "Amazon", "link": "https://developer.amazon.com/zh/docs/login-with-amazon/web-docs.html"},
+	{"value": "github", "text": "Github", "link": "https://github.com/settings/applications/new"},
+	{"value": "weibo", "text": "微博", "link": "http://open.weibo.com/developers"},
+	{"value": "wechat", "text": "微信", "link": "https://developers.weixin.qq.com/doc/offiaccount/OA_Web_Apps/Wechat_webpage_authorization.html"},
+}
+
+// adminSettingsPluginFields 是已迁入插件中心的字段，不再由系统设置读写，
+// 避免形成第二个配置入口。
+var adminSettingsPluginFields = []string{
+	"auto_fill_meta",
+	"auto_fill_keep_cover",
+	"META_SELECTED_SOURCES",
+	"ai_api_url",
+	"ai_api_key",
+	"ai_model",
+	"ai_use_thinking",
+	"DEVICES",
+}
+
+// adminSettingsGet 返回当前配置。
+//
+// 响应形状对齐 Python：{err, settings, sns, site_url}。
+func adminSettingsGet(cfg AdminConfig, ctx *Context) map[string]any {
 	out := map[string]any{}
 	for k, v := range cfg.Settings {
 		out[k] = v
 	}
-	return map[string]any{"err": "ok", "settings": out}
+	for _, k := range adminSettingsPluginFields {
+		delete(out, k)
+	}
+	return map[string]any{
+		"err":      "ok",
+		"settings": out,
+		"sns":      adminSettingsSNS,
+		"site_url": adminSiteURL(cfg, ctx),
+	}
+}
+
+// adminSiteURL 拼出站点完整地址（对应 Python 的 self.site_url）。
+//
+// Python 用 request.protocol + host + BASE_PATH；Go 侧协议由反向代理终止，
+// 因此优先读 X-Forwarded-Proto / X-Forwarded-Host，回落到请求自身的
+// scheme 与 Host。
+func adminSiteURL(cfg AdminConfig, ctx *Context) string {
+	scheme := "http"
+	host := ""
+	if ctx != nil && ctx.Request != nil {
+		if v := ctx.Request.Header.Get("X-Forwarded-Proto"); v != "" {
+			scheme = v
+		} else if ctx.Request.URL != nil && ctx.Request.URL.Scheme != "" {
+			scheme = ctx.Request.URL.Scheme
+		} else if ctx.Request.TLS != nil {
+			scheme = "https"
+		}
+		if v := ctx.Request.Header.Get("X-Forwarded-Host"); v != "" {
+			host = v
+		} else {
+			host = ctx.Request.Host
+		}
+	}
+	return scheme + "://" + host + cfg.BasePath
 }
 
 // adminSettingsSave 保存配置。

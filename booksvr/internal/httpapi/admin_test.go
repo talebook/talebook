@@ -1113,6 +1113,51 @@ func TestAdminSettingsGet(t *testing.T) {
 	}
 }
 
+// TestAdminSettingsGetResponseShape 回归：响应必须含 sns 与 site_url。
+//
+// 前端 GeneralSettingsContent 会遍历 rsp.sns，缺字段会抛
+// "Cannot read properties of undefined (reading 'forEach')"，整页白屏。
+func TestAdminSettingsGetResponseShape(t *testing.T) {
+	fx := newAdminFixture(t)
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/admin/settings", "", 1, true)
+	got, err := AdminSettingsHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	sns, ok := got["sns"].([]map[string]any)
+	if !ok || len(sns) == 0 {
+		t.Fatalf("sns = %v, want 非空列表", got["sns"])
+	}
+	for _, item := range sns {
+		for _, key := range []string{"value", "text", "link"} {
+			if stringOf(item[key]) == "" {
+				t.Errorf("sns 项缺少 %s: %v", key, item)
+			}
+		}
+	}
+	if _, ok := got["site_url"].(string); !ok {
+		t.Errorf("site_url = %v, want string", got["site_url"])
+	}
+}
+
+// TestAdminSettingsGetStripsPluginFields 回归：已迁入插件中心的字段不再下发。
+func TestAdminSettingsGetStripsPluginFields(t *testing.T) {
+	fx := newAdminFixture(t)
+	fx.Cfg.Settings["DEVICES"] = []any{map[string]any{"name": "x"}}
+	fx.Cfg.Settings["ai_api_key"] = "secret"
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/admin/settings", "", 1, true)
+	got, err := AdminSettingsHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	settings, _ := got["settings"].(map[string]any)
+	for _, key := range []string{"DEVICES", "ai_api_key"} {
+		if _, exists := settings[key]; exists {
+			t.Errorf("settings 不应包含 %s", key)
+		}
+	}
+}
+
 func TestAdminSettingsSave(t *testing.T) {
 	fx := newAdminFixture(t)
 	var saved map[string]any

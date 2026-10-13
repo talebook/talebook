@@ -66,12 +66,21 @@ func newReindexDB(t *testing.T) string {
 		path TEXT NOT NULL DEFAULT '',
 		timestamp INTEGER,
 		publisher TEXT,
-		pubdate TEXT
+		pubdate TEXT,
+		sort TEXT
 	)`); err != nil {
 		t.Fatalf("create books: %v", err)
 	}
 	if err := library.Migrate(db); err != nil {
 		t.Fatalf("migrate: %v", err)
+	}
+	// 真实 Calibre 库在 books 上有 AFTER UPDATE 触发器，会调用 title_sort()。
+	// 不建这个触发器，测试就绕过了自定义 SQL 函数的注册，
+	// 线上会报 "no such function: title_sort"。
+	if _, err := db.Exec(`CREATE TRIGGER books_update_trg AFTER UPDATE ON books BEGIN
+		UPDATE books SET sort=title_sort(NEW.title) WHERE id=NEW.id;
+	END`); err != nil {
+		t.Fatalf("create trigger: %v", err)
 	}
 	if _, err := db.Exec(
 		`INSERT INTO books (title, author_sort) VALUES ('三体', '刘慈欣')`,

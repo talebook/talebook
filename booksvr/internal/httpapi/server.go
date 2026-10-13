@@ -50,8 +50,11 @@ type Context struct {
 	Params []string
 	// Identity 是当前请求者。
 	Identity Identity
-	// DB 是只读/读写数据库句柄。
+	// DB 是只读/读写数据库句柄（Talebook 自有库）。
 	DB *sql.DB
+	// LibraryDB 是 Calibre 元数据库（books / authors / data 等表）。
+	// 与 DB 分属两个文件，混用会报 "no such table: books"。
+	LibraryDB *sql.DB
 	// CDNURL / APIURL 用于拼接资源地址。
 	CDNURL string
 	APIURL string
@@ -207,8 +210,11 @@ type RouteSpec struct {
 
 // Server 把路由注册表与处理函数组装成一个可监听的 HTTP 服务。
 type Server struct {
-	// DB 是数据库句柄。
+	// DB 是数据库句柄（Talebook 自有库）。
 	DB *sql.DB
+	// LibraryDB 是 Calibre 元数据库（books / authors / data 等表）。
+	// 作品/版本层需要读 books 表，必须与 DB 分开注入。
+	LibraryDB *sql.DB
 	// CDNURL / APIURL 用于拼接资源地址。
 	CDNURL string
 	// APIURL 同时用于兼容层。
@@ -301,13 +307,14 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		ctx := &Context{
-			Request:  r,
-			Writer:   w,
-			Params:   m[1:],
-			Identity: identity,
-			DB:       s.DB,
-			CDNURL:   s.CDNURL,
-			APIURL:   s.APIURL,
+			Request:   r,
+			Writer:    w,
+			Params:    m[1:],
+			Identity:  identity,
+			DB:        s.DB,
+			LibraryDB: s.LibraryDB,
+			CDNURL:    s.CDNURL,
+			APIURL:    s.APIURL,
 			isPublic: func(bookID int64) (bool, error) {
 				if s.IsPublic == nil {
 					return true, nil

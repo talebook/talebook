@@ -110,10 +110,16 @@ func uuid4() string {
 
 var calibreFuncsOnce sync.Once
 
-// registerCalibreFunctions 注册 Calibre 自定义 SQL 函数。
+// RegisterCalibreFunctions 注册 Calibre 自定义 SQL 函数（title_sort / uuid4）。
 //
 // modernc.org/sqlite 的 RegisterScalarFunction 是包级注册，对之后新开的连接生效；
 // 因此必须在打开书库连接之前调用。用 sync.Once 保证只注册一次（重复注册会报错）。
+//
+// 除 HTTP 服务外，任何直接操作 Calibre 书库的命令行子命令（如 reindex-normalize）
+// 也必须先调用它，否则会报 "no such function: title_sort"。
+func RegisterCalibreFunctions() { registerCalibreFunctions() }
+
+// registerCalibreFunctions 是 RegisterCalibreFunctions 的内部实现。
 func registerCalibreFunctions() {
 	calibreFuncsOnce.Do(func() {
 		sqlite.MustRegisterScalarFunction("title_sort", 1,

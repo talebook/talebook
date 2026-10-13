@@ -332,6 +332,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		Settings:    opts.Settings,
 		CDNURL:      opts.CDNURL,
 		APIURL:      opts.APIURL,
+		BasePath:    opts.BasePath,
 
 		// OPDS 导入：浏览 / 导入 / 状态 / 失败列表 / 重试。
 		OpdsBrowse:       opdsWiring.Browse,
@@ -362,6 +363,8 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		return err
 	}
 	server.DB = userDB
+	// 作品/版本层要读 Calibre 元数据库的 books 表（work_id / edition_key）。
+	server.LibraryDB = db
 	server.Identify = NewCookieIdentifier(opts.CookieSecret, nil)
 	// 接入 can_view_book：非管理员看不到他人的私藏书。
 	server.IsPublic = func(identity Identity, bookID int64) (bool, error) {
