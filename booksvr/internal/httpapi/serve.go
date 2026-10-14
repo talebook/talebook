@@ -216,10 +216,11 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	specs = append(specs, ThemeRouteSpecs(opts.ThemeStore)...)
 	specs = append(specs, AdminOpdsSourcesRouteSpecs()...)
 	specs = append(specs, AnnotationRouteSpecs(opts.AnnotationSyncer)...)
-	specs = append(specs, ComicRouteSpecs(ComicConfig{
+	// 漫画路由在 bookWiring 构造后接线（需要它的 recordHistory）。
+	comicCfg := ComicConfig{
 		CookieSecret: opts.CookieSecret,
 		LibraryRoot:  opts.LibraryRoot,
-	}, opts.ComicService)...)
+	}
 	onlineComicCfg := OnlineComicConfig{
 		Settings: map[string]any{"cookie_secret": opts.CookieSecret},
 	}
@@ -309,6 +310,10 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	convertSvc.Converter = convert.NewCalibreConverter(ebookConvertPath())
 	bookWiring.convert = convertSvc
 	bookCfg := bookWiring.Config(opts.CDNURL)
+
+	// 漫画路由需要 bookWiring 的 recordHistory（阅读历史）。
+	comicCfg.RecordHistory = bookWiring.recordHistory
+	specs = append(specs, ComicRouteSpecs(comicCfg, opts.ComicService)...)
 
 	// MetaConfig.DB 是 Calibre 元数据库（authors / tags / publishers 等表）；
 	// UserDB 是 Talebook 自有库（author_aliases / book_aliases 等表）。

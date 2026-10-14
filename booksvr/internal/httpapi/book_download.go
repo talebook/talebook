@@ -47,14 +47,20 @@ func BookDownloadHandler(cfg BookConfig) HandlerFunc {
 			return nil, notFound(ctx, "格式文件不存在")
 		}
 
-		// 下载计数：与 Python 的 count_increase(count_download=1) 对应。
-		if cfg.CountDownload != nil {
-			cfg.CountDownload(ctx, bookID)
-		}
-
 		title := ""
 		if cfg.BookTitle != nil {
 			title = cfg.BookTitle(bookID)
+		}
+
+		// 下载历史与计数，对齐 Python BookDownload.get：
+		//
+		//	self.user_history("download_history", book)
+		//	self.count_increase(book_id, count_download=1)
+		if cfg.RecordHistory != nil {
+			cfg.RecordHistory(ctx, bookID, title, "download_history")
+		}
+		if cfg.CountDownload != nil {
+			cfg.CountDownload(ctx, bookID)
 		}
 		writeBookFile(ctx, path, bookID, title, format, info.Size())
 		return nil, nil

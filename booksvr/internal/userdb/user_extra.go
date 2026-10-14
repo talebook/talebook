@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -122,6 +123,90 @@ func SetReaderExtra(db *sql.DB, id int64, key, value string) error {
 		return fmt.Errorf("userdb: 更新 extra 失败: %w", err)
 	}
 	return nil
+}
+
+// HistoryItemLimit 是单类历史记录的条数上限。
+//
+// 与 Python base.py 的 ITEM_COUNT_LIMIT 一致：一条记录约 100 字节，
+// sqlite 单字段上限 32KB，共 5 类历史，故取 32KB/100B/5 = 60。
+const HistoryItemLimit = 60
+
+// AppendUserHistory 把一本书追加到读者的某类历史记录（对应 Python 的 user_history）。
+//
+// 语义与 Python 完全一致：
+//   - 前 12 条内已存在同一 book_id 时直接返回，不重复记录（也不刷新时间戳）；
+//   - 新记录插入到列表头部；
+//   - 整类历史截断到 HistoryItemLimit 条。
+//
+// 返回是否实际写入。readerID 为 0（游客）时不做任何事。
+func AppendUserHistory(db *sql.DB, readerID, bookID int64, title, action string) (bool, error) {
+	if readerID == 0 || action == "" {
+		return false, nil
+	}
+	r, err := GetReaderByID(db, readerID)
+	if err != nil {
+		return false, err
+	}
+	if r == nil {
+		return false, fmt.Errorf("userdb: 读者 %d 不存在", readerID)
+	}
+
+	extra := r.ExtraMap()
+	if extra == nil {
+		extra = map[string]any{}
+	}
+
+	// 读取已有历史；非列表时按空列表处理（与 Python 的 extra.get(action, []) 一致）。
+	history, _ := extra[action].([]any)
+
+	// 前 12 条内命中同一本书则跳过。
+	for i, raw := range history {
+		if i >= 12 {
+			break
+		}
+		if item, ok := raw.(map[string]any); ok && int64OfAny(item["id"]) == bookID {
+			return false, nil
+		}
+	}
+
+	entry := map[string]any{
+		"id":        bookID,
+		"title":     title,
+		"timestamp": time.Now().Unix(),
+	}
+	history = append([]any{entry}, history...)
+	if len(history) > HistoryItemLimit {
+		history = history[:HistoryItemLimit]
+	}
+	extra[action] = history
+
+	raw, err := marshalJSON(extra)
+	if err != nil {
+		return false, err
+	}
+	if _, err := db.Exec(`UPDATE readers SET extra = ?, update_time = ? WHERE id = ?`,
+		raw, time.Now().Format("2006-01-02 15:04:05"), readerID); err != nil {
+		return false, fmt.Errorf("userdb: 更新历史记录失败: %w", err)
+	}
+	return true, nil
+}
+
+// int64OfAny 把 JSON 反序列化得到的数值转成 int64。
+//
+// encoding/json 把数字解成 float64，而测试夹具可能直接塞 int64，两种都要认。
+func int64OfAny(v any) int64 {
+	switch n := v.(type) {
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	case float64:
+		return int64(n)
+	case json.Number:
+		i, _ := n.Int64()
+		return i
+	}
+	return 0
 }
 
 // ExtraMap 返回读者的 extra 字段（副本）。

@@ -104,6 +104,10 @@ type BookConfig struct {
 	ReadTxt func(ctx *Context, bookID int64) (map[string]any, error)
 	// CountDownload 递增书籍下载计数（对应 Python 的 count_increase）。
 	CountDownload func(ctx *Context, bookID int64)
+	// RecordHistory 把书追加到当前用户的某类历史记录
+	// （对应 Python 的 user_history(action, book)）。
+	// action 取 read_history / download_history / push_history / upload_history。
+	RecordHistory func(ctx *Context, bookID int64, title, action string)
 	// Aliases 提供书名别名读写（对应 Python 的 AliasService）。
 	Aliases *userdb.AliasService
 	// AllowGuestRead 报告是否允许游客在线阅读。

@@ -48,6 +48,9 @@ type ComicConfig struct {
 	CaptchaEnabled func(scene string) bool
 	// Clock 返回当前 Unix 秒；为 nil 时用 time.Now。
 	Clock func() int64
+	// RecordHistory 把书追加到当前用户的阅读历史
+	// （对应 Python ComicManifestHandler 的 user_history("read_history", book)）。
+	RecordHistory func(ctx *Context, bookID int64, title, action string)
 }
 
 // now 返回当前 Unix 秒。
@@ -307,6 +310,13 @@ func ComicManifestHandler(cfg ComicConfig, svc *comic.Service) HandlerFunc {
 		if title == "" {
 			title = "漫画"
 		}
+
+		// 阅读历史，对齐 Python ComicManifestHandler.get：
+		// self.user_history("read_history", book)。
+		if cfg.RecordHistory != nil {
+			cfg.RecordHistory(ctx, bookID, title, "read_history")
+		}
+
 		return map[string]any{
 			"err":              "ok",
 			"contract_version": 1,

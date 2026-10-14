@@ -151,6 +151,7 @@ func (w *bookWiring) Config(cdnURL string) BookConfig {
 		EditBook:      w.bookEdit,
 		DeleteBook:    w.bookDelete,
 		CountDownload: w.countDownload,
+		RecordHistory: w.recordHistory,
 		Aliases:       w.aliases,
 		ReaderAssets:  "/static/candle-reader/",
 		// 阅读器选择来自系统设置的 EPUB_VIEWER，不能写死：

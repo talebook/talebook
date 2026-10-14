@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"html"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -78,6 +79,25 @@ func (w *bookWiring) bookDelete(ctx *Context, bookID int64) (map[string]any, err
 // 行不存在时静默跳过（与 Python 的 upsert 语义一致，不因缺行而失败）。
 func (w *bookWiring) countDownload(_ *Context, bookID int64) {
 	_, _ = w.db.Exec(`UPDATE items SET count_download = count_download + 1 WHERE book_id = ?`, bookID)
+}
+
+// recordReadHistory 把书追加到当前用户的阅读历史。
+//
+// 对应 Python 的 user_history("read_history", book)。游客（UserID 为 0）
+// 不记录；写入失败只记日志，不影响阅读器渲染。
+func (w *bookWiring) recordReadHistory(ctx *Context, bookID int64, title string) {
+	w.recordHistory(ctx, bookID, title, "read_history")
+}
+
+// recordHistory 把书追加到当前用户的指定历史记录。
+func (w *bookWiring) recordHistory(ctx *Context, bookID int64, title, action string) {
+	if ctx == nil || ctx.Identity.UserID == 0 {
+		return
+	}
+	if _, err := userdb.AppendUserHistory(w.db, ctx.Identity.UserID, bookID, title, action); err != nil {
+		log.Printf("booksvr: 写入历史记录失败 action=%s book=%d reader=%d: %v",
+			action, bookID, ctx.Identity.UserID, err)
+	}
 }
 
 // bookDeleteFormat 复刻 Python BookDeleteFormat.post。
@@ -416,6 +436,17 @@ func (w *bookWiring) bookReadBook(ctx *Context, bookID int64) (map[string]any, e
 		http.Error(ctx.Writer, "抱歉，在线阅读器暂不支持该格式的书籍", http.StatusUnsupportedMediaType)
 		return nil, nil
 	}
+
+	// 阅读历史与下载计数，对齐 Python BookRead.get：
+	//
+	//	self.user_history("read_history", book)
+	//	self.count_increase(book_id, count_download=1)
+	//
+	// 之前两者都漏了，导致「我的阅读 → 阅读记录」永远为空：
+	// 用户点「阅读」打开阅读器后，前端读的是 user.extra.read_history。
+	// 写失败不阻断阅读（Python 同样不因历史写入失败而拒绝渲染）。
+	w.recordReadHistory(ctx, bookID, book.Title)
+	w.countDownload(ctx, bookID)
 
 	if has["epub"] {
 		// 阅读器选择，对齐 Python BookRead.get：
