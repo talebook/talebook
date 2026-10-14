@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -440,9 +442,33 @@ func BookReaderResourceHandler(cfg BookConfig) HandlerFunc {
 			http.Error(ctx.Writer, "Not Found", http.StatusNotFound)
 			return nil, nil
 		}
-		serveAudioFile(ctx, path)
+		serveEPUBResource(ctx, path)
 		return nil, nil
 	}
+}
+
+// serveEPUBResource 以 EPUB 的 MIME 流式返回文件，支持 Range 与 HEAD。
+//
+// 不能用 serveAudioFile：它把 Content-Type 写死成 audio/mpeg，
+// 且只注册了 GET 路由。Readest 会先发 HEAD 探测（拿 Content-Length 与
+// Accept-Ranges），405 会让它报「Failed to open the book file: online.network」。
+func serveEPUBResource(ctx *Context, path string) {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		http.Error(ctx.Writer, "Not Found", http.StatusNotFound)
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		http.Error(ctx.Writer, "Not Found", http.StatusNotFound)
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	ctx.Writer.Header().Set("Content-Type", "application/epub+zip")
+	ctx.Writer.Header().Set("Accept-Ranges", "bytes")
+	// http.ServeContent 自己处理 Range / If-Modified-Since / HEAD。
+	http.ServeContent(ctx.Writer, ctx.Request, filepath.Base(path), info.ModTime(), f)
 }
 
 // BookTxtReadHandler 实现 /api/read/txt。
@@ -594,6 +620,9 @@ func bookBoolOf(v any) bool {
 // BookRouteSpecs 返回书籍模块接管的 38 条路由。
 func BookRouteSpecs(cfg BookConfig) []RouteSpec {
 	get := []string{http.MethodGet}
+	// getHead 用于媒体流：Readest 等客户端会先发 HEAD 探测
+	// Content-Length 与 Accept-Ranges，只注册 GET 会得到 405。
+	getHead := []string{http.MethodGet, http.MethodHead}
 	getPost := []string{http.MethodGet, http.MethodPost}
 	all := []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete}
 	return []RouteSpec{
@@ -617,7 +646,7 @@ func BookRouteSpecs(cfg BookConfig) []RouteSpec {
 		{Pattern: rBookUploadDone, Methods: all, Auth: true, Handler: BookUploadCompleteHandler(cfg)},
 		{Pattern: rBookRead, Methods: get, Handler: BookReadHandler(cfg)},
 		{Pattern: rBookReaderBoot, Methods: getPost, Handler: BookReaderBootstrapHandler(cfg)},
-		{Pattern: rBookReaderRes, Methods: get, Handler: BookReaderResourceHandler(cfg)},
+		{Pattern: rBookReaderRes, Methods: getHead, Handler: BookReaderResourceHandler(cfg)},
 		{Pattern: rBookTxtRead, Methods: getPost, Handler: BookTxtReadHandler(cfg)},
 		{Pattern: rBookTxtInit, Methods: all, Auth: true, Handler: BookTxtInitHandler(cfg)},
 		{Pattern: rBookSendDevice, Methods: all, Auth: true, Handler: BookSendDeviceHandler(cfg)},

@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -327,22 +329,45 @@ func TestBookReadBookNoFormat(t *testing.T) {
 }
 
 // TestBookReaderBootstrapPrefersEpub 覆盖阅读器引导的格式优先级。
+//
+// 有 EPUB 时必须走 EPUB 分支（返回 Readest 协议），
+// 而不是因为同时存在 MOBI 就报 conversion_pending。
 func TestBookReaderBootstrapPrefersEpub(t *testing.T) {
 	w, db := newWriteFixture(t)
 	insertBook(t, db, 1, "书")
 	insertItem(t, db, 1, "public", 1)
 	seedFormat(t, db, 1, "MOBI", "/tmp/a.mobi")
-	seedFormat(t, db, 1, "EPUB", "/tmp/a.epub")
 
-	resp, err := w.bookReaderBootstrap(adminCtx(1), 1)
+	// EPUB 必须是真实存在的文件：引导协议要用 mtime/size 算 revision。
+	dir := t.TempDir()
+	epub := filepath.Join(dir, "a.epub")
+	if err := os.WriteFile(epub, []byte("PK\x03\x04fake"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	seedFormat(t, db, 1, "EPUB", epub)
+
+	// 必须带 engine=readest：协议要求，否则返回 reader.engine_unsupported。
+	ctx := adminCtx(1)
+	ctx.Request = httptest.NewRequest(http.MethodGet,
+		"/api/book/1/reader-bootstrap?engine=readest", nil)
+	ctx.Writer = httptest.NewRecorder()
+
+	resp, err := w.bookReaderBootstrap(ctx, 1)
 	if err != nil {
 		t.Fatalf("引导失败: %v", err)
 	}
 	if resp["err"] != "ok" {
-		t.Fatalf("err = %v，期望 ok", resp["err"])
+		t.Fatalf("err = %v，期望 ok（有 EPUB 就不该报转换中）", resp["err"])
 	}
-	if resp["preferred"] != "epub" {
-		t.Errorf("preferred = %v，期望 epub", resp["preferred"])
+	if resp["schema"] != "talebook.reader.bootstrap.v1" {
+		t.Errorf("schema = %v，期望 talebook.reader.bootstrap.v1", resp["schema"])
+	}
+	book, ok := resp["book"].(map[string]any)
+	if !ok {
+		t.Fatalf("book 类型是 %T", resp["book"])
+	}
+	if book["format"] != "epub" {
+		t.Errorf("book.format = %v，期望 epub", book["format"])
 	}
 }
 

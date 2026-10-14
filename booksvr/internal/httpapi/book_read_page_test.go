@@ -130,8 +130,12 @@ func TestBookReadUnsupportedFormat(t *testing.T) {
 	}
 }
 
-// TestReaderBootstrapReportsEpubReady 轮询接口必须报告 epub_ready。
-func TestReaderBootstrapReportsEpubReady(t *testing.T) {
+// TestReaderBootstrapReportsConversionPending 回归：只有 MOBI 时报告转换中。
+//
+// 旧实现返回 {book_id, epub_ready, ...} 的 Candle 形状，
+// 与 Readest 启动协议（schema/engine/book/resource/navigation）不符，
+// 前端会报「阅读器启动协议不兼容」。现在改为返回 reader.conversion_pending。
+func TestReaderBootstrapReportsConversionPending(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
 	createFormatTables(t, db)
@@ -145,12 +149,21 @@ func TestReaderBootstrapReportsEpubReady(t *testing.T) {
 	}
 
 	w := newBookWiring(db, db, map[string]any{})
-	got, err := w.bookReaderBootstrap(&Context{Identity: Identity{UserID: 1, IsAdmin: true}}, 1)
+	rec := httptest.NewRecorder()
+	ctx := &Context{
+		Identity: Identity{UserID: 1, IsAdmin: true},
+		Writer:   rec,
+		Request:  httptest.NewRequest(http.MethodGet, "/api/book/1/reader-bootstrap?engine=readest", nil),
+	}
+	got, err := w.bookReaderBootstrap(ctx, 1)
 	if err != nil {
 		t.Fatalf("bookReaderBootstrap: %v", err)
 	}
-	if got["epub_ready"] != false {
-		t.Errorf("epub_ready = %v, want false（只有 MOBI）", got["epub_ready"])
+	if got["err"] != "reader.conversion_pending" {
+		t.Errorf("err = %v, want reader.conversion_pending（只有 MOBI，待转 EPUB）", got["err"])
+	}
+	if rec.Code != http.StatusConflict {
+		t.Errorf("status = %d, want 409", rec.Code)
 	}
 }
 

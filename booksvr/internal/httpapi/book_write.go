@@ -186,6 +186,44 @@ func (w *bookWiring) hasFormat(bookID int64, format string) bool {
 	return false
 }
 
+// epubPath 返回书籍 EPUB 文件的绝对路径；不存在时返回空串。
+//
+// 复刻 Python 的 book["fmt_epub"]：先查 book_formats 表拿相对路径，
+// 再拼上书库根目录。
+func (w *bookWiring) epubPath(bookID int64) string {
+	formats, err := library.ListFormats(w.libraryDB, bookID)
+	if err != nil {
+		return ""
+	}
+	for _, f := range formats {
+		if !strings.EqualFold(f.Format, "epub") {
+			continue
+		}
+		if f.Path == "" {
+			return ""
+		}
+		if filepath.IsAbs(f.Path) {
+			return f.Path
+		}
+		if w.libraryRoot == "" {
+			return f.Path
+		}
+		return filepath.Join(w.libraryRoot, f.Path)
+	}
+	return ""
+}
+
+// hasKindleFormat 报告书籍是否只有 mobi/azw/azw3 这类待转 EPUB 的格式。
+func (w *bookWiring) hasKindleFormat(bookID int64) bool {
+	for _, f := range w.availableFormats(bookID) {
+		switch f {
+		case "mobi", "azw", "azw3":
+			return true
+		}
+	}
+	return false
+}
+
 // availableFormats 返回书籍的全部格式名（小写）。
 func (w *bookWiring) availableFormats(bookID int64) []string {
 	formats, err := library.ListFormats(w.libraryDB, bookID)
@@ -531,53 +569,126 @@ func pdfViewerURL(pdfURL string) string {
 	return "/static/pdfjs/web/viewer.html?file=" + pdfURL
 }
 
-// bookReaderBootstrap 返回阅读器引导数据。
+// readerBootstrapSchema 是 Readest 启动协议的 schema 标识。
+//
+// 前端 app/public/readest/talebook-launch.js 会逐字段校验这个响应，
+// 任何字段缺失都会报「阅读器启动协议不兼容」并拒绝启动。
+const readerBootstrapSchema = "talebook.reader.bootstrap.v1"
+
+// readerResourceRevision 复刻 Python 的 reader_resource_revision：
+// 用 mtime(ns) 与 size 的十六进制拼出版本标识，文件一变版本就变。
+func readerResourceRevision(path string) string {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return ""
+	}
+	return fmt.Sprintf("%x-%x", fi.ModTime().UnixNano(), fi.Size())
+}
+
+// bookReaderBootstrap 实现 /api/book/<id>/reader-bootstrap。
+//
+// 复刻 Python BookReaderBootstrap.get：返回 Readest 启动协议 v1。
+// 前端 talebook-launch.js 会校验 schema/engine/book/resource 四组字段，
+// 缺一个就报「阅读器启动协议不兼容」。
 func (w *bookWiring) bookReaderBootstrap(ctx *Context, bookID int64) (map[string]any, error) {
+	// engine 必须是 readest，否则 400（对齐 Python）。
+	if ctx.Query("engine") != "readest" {
+		if ctx.Writer != nil {
+			ctx.Writer.WriteHeader(http.StatusBadRequest)
+		}
+		return map[string]any{"err": "reader.engine_unsupported"}, nil
+	}
+
 	book, err := bookGetOne(w.Config(""), bookID)
 	if err != nil {
 		return nil, err
 	}
 	if book == nil {
-		return map[string]any{"err": "params.book.invalid", "msg": "书籍已不存在"}, nil
+		if ctx.Writer != nil {
+			ctx.Writer.WriteHeader(http.StatusNotFound)
+		}
+		return map[string]any{"err": "book.not_found"}, nil
 	}
 	if !w.canView(ctx, bookID) {
-		return map[string]any{"err": "permission", "msg": "无权查看"}, nil
+		if ctx.Writer != nil {
+			ctx.Writer.WriteHeader(http.StatusForbidden)
+		}
+		return map[string]any{"err": "permission"}, nil
 	}
 
-	formats := w.availableFormats(bookID)
-	preferred := ""
-	for _, want := range []string{"epub", "pdf", "txt", "mobi", "azw3"} {
-		for _, f := range formats {
-			if f == want {
-				preferred = f
-				break
+	epubPath := w.epubPath(bookID)
+	if epubPath == "" {
+		// 有 mobi/azw3 但还没转出 EPUB：返回 409 让前端提示等待；
+		// 否则 404（对齐 Python 的 conversion_pending / format_unsupported）。
+		if w.hasKindleFormat(bookID) {
+			if ctx.Writer != nil {
+				ctx.Writer.WriteHeader(http.StatusConflict)
 			}
+			return map[string]any{"err": "reader.conversion_pending"}, nil
 		}
-		if preferred != "" {
-			break
+		if ctx.Writer != nil {
+			ctx.Writer.WriteHeader(http.StatusNotFound)
 		}
-	}
-	if preferred == "" && len(formats) > 0 {
-		preferred = formats[0]
+		return map[string]any{"err": "reader.format_unsupported"}, nil
 	}
 
-	// epub_ready 供阅读器页面轮询：mobi/azw3 转 EPUB 完成后为 true。
-	epubMediaReady := false
-	for _, f := range formats {
-		if f == "epub" {
-			epubMediaReady = true
-			break
+	revision := readerResourceRevision(epubPath)
+	if revision == "" {
+		if ctx.Writer != nil {
+			ctx.Writer.WriteHeader(http.StatusNotFound)
 		}
+		return map[string]any{"err": "reader.format_unsupported"}, nil
 	}
 
 	return map[string]any{
-		"err":        "ok",
-		"book_id":    bookID,
-		"title":      book.Title,
-		"formats":    formats,
-		"preferred":  preferred,
-		"epub_ready": epubMediaReady,
+		"err":    "ok",
+		"schema": readerBootstrapSchema,
+		"engine": "readest",
+		"book": map[string]any{
+			"id":       bookID,
+			"title":    book.Title,
+			"format":   "epub",
+			"revision": revision,
+		},
+		"resource": map[string]any{
+			"kind":  "authorized-epub-url",
+			"url":   fmt.Sprintf("/read/resource/%d.epub?revision=%s", bookID, revision),
+			"mime":  "application/epub+zip",
+			"range": true,
+		},
+		"navigation": map[string]any{
+			"back":     fmt.Sprintf("/book/%d", bookID),
+			"fallback": fmt.Sprintf("/read/%d?reader=candle", bookID),
+		},
+		"capabilities": readerBootstrapCapabilities(),
 	}, nil
+}
+
+// readerBootstrapCapabilities 声明 Readest 内嵌阅读器支持的能力。
+//
+// 与 Python 一致：只开阅读核心、导航、目录、搜索与本地设置，
+// 云端/账号/同步/支付等一律关闭（本站不提供这些服务）。
+func readerBootstrapCapabilities() map[string]any {
+	on := []string{
+		"readerCore", "navigation", "tableOfContents", "textSearch",
+		"localPosition", "localSettings", "layoutSettings",
+		"appearanceSettings", "languageSettings",
+	}
+	off := []string{
+		"customFonts", "backgroundImages", "annotations", "serverProgress",
+		"pdf", "dictionaries", "translation", "tts", "library", "account",
+		"auth", "cloud", "sync", "payment", "upgrade", "updater", "send",
+		"rss", "opds", "integrations", "telemetry", "aiAssistant", "reedy",
+		"readestGateway", "tauri",
+	}
+	caps := make(map[string]any, len(on)+len(off))
+	for _, k := range on {
+		caps[k] = true
+	}
+	for _, k := range off {
+		caps[k] = false
+	}
+	return caps
 }
 
 // bookReadTxt 返回 TXT 阅读内容（按章节切分）。
