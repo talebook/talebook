@@ -13,7 +13,9 @@ import (
 //
 // 配置文件是 Python 源码（conf/auto.py），这里只做保守的键值提取，
 // 不执行任何 Python 代码。
-var settingsLine = regexp.MustCompile(`(?m)^\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]\s*:\s*(.*?),\s*(?:#.*)?$`)
+// 值部分用 [^\n]* 而不是 .*?：后者在超长行上会回溯爆炸。
+// 配置行内不会出现换行，[^\n]* 语义等价且线性。
+var settingsLine = regexp.MustCompile(`(?m)^[ \t]*['"]([A-Za-z_][A-Za-z0-9_]*)['"]\s*:[ \t]*([^\n]*?),[ \t]*(?:#.*)?$`)
 
 // LoadSettings 从 Talebook 配置文件解析配置项。
 //
@@ -57,10 +59,20 @@ func liveSettings(snapshot map[string]any, path string) map[string]any {
 	return snapshot
 }
 
+// maxSettingsFileSize 是配置文件的大小上限。
+//
+// 正常配置只有几十 KB；超过上限说明文件已被写坏（历史上曾因
+// 反斜杠转义不对称涨到 528MB），此时直接跳过而不是把内存与 CPU 打满。
+const maxSettingsFileSize = 8 << 20 // 8MB
+
 // mergeSettingsFile 把单个配置文件里的键值覆盖进 out。
 //
 // 文件不存在或无法读取时静默跳过，与 Python 的 try/except 一致。
 func mergeSettingsFile(out map[string]any, path string) {
+	if fi, err := os.Stat(path); err == nil && fi.Size() > maxSettingsFileSize {
+		// 文件异常巨大：不解析，避免正则回溯把进程拖死。
+		return
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return
@@ -90,7 +102,14 @@ func parseSettingValue(raw string) any {
 	}
 	if len(raw) >= 2 {
 		if (raw[0] == '\'' && raw[len(raw)-1] == '\'') || (raw[0] == '"' && raw[len(raw)-1] == '"') {
-			return raw[1 : len(raw)-1]
+			// 必须反转义，与 quotePython 的转义对称。
+			//
+			// 不对称会导致每次「读→写」都把反斜杠翻倍：
+			// quotePython 把 \ 写成 \\，而这里若不还原，
+			// 下次再写就变成 \\\\，指数增长。
+			// 曾把 auto.py 涨到 528MB，并让 settingsLine 正则
+			// 在超长行上回溯爆炸，把 /read/<id> 拖死。
+			return unquotePython(raw[1 : len(raw)-1])
 		}
 	}
 	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {

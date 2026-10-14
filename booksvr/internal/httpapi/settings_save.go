@@ -22,6 +22,9 @@ func SaveSettings(path string, values map[string]any) error {
 		return fmt.Errorf("httpapi: 保存配置需要配置文件路径")
 	}
 
+	if fi, err := os.Stat(path); err == nil && fi.Size() > maxSettingsFileSize {
+		return fmt.Errorf("httpapi: 配置文件异常巨大（%d 字节），拒绝写入以免继续损坏", fi.Size())
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("httpapi: 读取配置失败: %w", err)
@@ -40,7 +43,10 @@ func SaveSettings(path string, values map[string]any) error {
 		line := formatSettingLine(key, values[key])
 		re := settingLineRegexp(key)
 		if re.MatchString(content) {
-			content = re.ReplaceAllString(content, line)
+			// 必须用 Literal 版本：ReplaceAllString 会把替换串里的
+			// $1 / ${name} 当捕获组引用、把 $ 当转义，导致配置值被静默截断
+			// （实测 'a$b' 会被写成 'a'）。
+			content = re.ReplaceAllLiteralString(content, line)
 			continue
 		}
 		appended = append(appended, line)
@@ -78,8 +84,12 @@ func SaveSettings(path string, values map[string]any) error {
 // settingLineRegexp 构造匹配指定键的配置行正则。
 //
 // 与 settingsLine 同形，但把键名固定，用于原地替换单个键。
+//
+// 值部分用 [^\n]* 而不是 .*?：后者在超长行上会回溯爆炸。
+// 曾因 auto.py 被写成 528MB（单行 184MB）而把 /read/<id> 拖死。
+// 配置行内不会出现换行，[^\n]* 语义等价且线性。
 func settingLineRegexp(key string) *regexp.Regexp {
-	return regexp.MustCompile(`(?m)^\s*['"]` + regexp.QuoteMeta(key) + `['"]\s*:\s*.*?,\s*(?:#.*)?$`)
+	return regexp.MustCompile(`(?m)^[ \t]*['"]` + regexp.QuoteMeta(key) + `['"]\s*:[^\n]*$`)
 }
 
 // keysToLines 把键值对转成配置行。

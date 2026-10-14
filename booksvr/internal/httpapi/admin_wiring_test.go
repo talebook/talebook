@@ -3,6 +3,8 @@ package httpapi
 import (
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -93,6 +95,56 @@ func TestAdminFillWiredReportsUnimplemented(t *testing.T) {
 	}
 	if err := cfg.StartFill([]int64{1}); err == nil {
 		t.Error("StartFill 应明确报错，而不是静默成功")
+	}
+}
+
+// TestAdminSaveSettingsWritesOnlySubmittedKeys 回归：只写用户提交的键。
+//
+// auto.py 是「用户覆盖层」，出厂默认值在 webserver/settings.py。
+// 若把合并后的 159 个键全写进去，文件会膨胀，
+// 且以后升级默认值时会被旧值盖住。
+func TestAdminSaveSettingsWritesOnlySubmittedKeys(t *testing.T) {
+	// 用真实的出厂默认表作为 cfg.Settings，模拟生产装配。
+	fx := newAdminFixture(t)
+	settingsPath := t.TempDir() + "/auto.py"
+	cfg := newAdminConfig(ServeOptions{
+		Settings:     LoadSettings(""),
+		SettingsPath: settingsPath,
+		LibraryRoot:  t.TempDir(),
+	}, fx.DB, fx.DB)
+	ctx := pluginCtx(t, cfg.DB, http.MethodPost, "/api/admin/settings",
+		`{"site_title":"只写这个"}`, 1, true)
+
+	got, err := AdminSettingsHandler(cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got["err"] != "ok" {
+		t.Fatalf("err = %v, msg = %v", got["err"], got["msg"])
+	}
+
+	// 必须看磁盘原文：LoadSettings 会合并出厂默认，
+	// 直接查它无法区分「文件里有」与「默认值里有」。
+	raw, err := os.ReadFile(cfg.SettingsPath)
+	if err != nil {
+		t.Fatalf("读配置文件: %v", err)
+	}
+	content := string(raw)
+	if !strings.Contains(content, "只写这个") {
+		t.Errorf("auto.py 未写入 site_title:\n%s", content)
+	}
+	// 未提交的键不应被写进 auto.py（它们来自出厂默认）。
+	if strings.Contains(content, "MAX_UPLOAD_SIZE") {
+		t.Errorf("MAX_UPLOAD_SIZE 未被提交，不应写入 auto.py:\n%s", content)
+	}
+
+	// 但响应里的 rsp 必须是合并后的完整配置（前端要用）。
+	rsp, ok := got["rsp"].(map[string]any)
+	if !ok {
+		t.Fatalf("rsp 类型是 %T", got["rsp"])
+	}
+	if rsp["MAX_UPLOAD_SIZE"] != "100MB" {
+		t.Errorf("rsp 应包含出厂默认值，实际 MAX_UPLOAD_SIZE = %v", rsp["MAX_UPLOAD_SIZE"])
 	}
 }
 

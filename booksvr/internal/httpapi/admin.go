@@ -1454,10 +1454,12 @@ func adminSettingsSave(cfg AdminConfig, ctx *Context) (map[string]any, error) {
 		return map[string]any{"err": "file.permission", "msg": "保存配置未接线"}, nil
 	}
 
+	// 只把用户本次提交的键写回 auto.py，不把合并后的全量配置落盘。
+	//
+	// auto.py 是「用户覆盖层」，出厂默认值在 webserver/settings.py。
+	// 若把 159 个键全写进去，文件会从几 KB 涨到几十 KB，
+	// 且以后升级默认值时会被旧值盖住（Python 的 KEYS 白名单也是这个意图）。
 	next := map[string]any{}
-	for k, v := range cfg.Settings {
-		next[k] = v
-	}
 	for k, v := range data {
 		next[k] = v
 	}
@@ -1466,7 +1468,16 @@ func adminSettingsSave(cfg AdminConfig, ctx *Context) (map[string]any, error) {
 	if err := cfg.SaveSettings(next); err != nil {
 		return map[string]any{"err": "file.permission", "msg": "更新磁盘配置文件失败！请确保配置文件的权限为可写入！"}, nil
 	}
-	return map[string]any{"err": "ok", "rsp": next}, nil
+
+	// 响应仍返回合并后的完整配置，与 Python 的 {err, rsp} 形状一致。
+	rsp := map[string]any{}
+	for k, v := range cfg.Settings {
+		rsp[k] = v
+	}
+	for k, v := range next {
+		rsp[k] = v
+	}
+	return map[string]any{"err": "ok", "rsp": rsp}, nil
 }
 
 // sizeValueRe 匹配 Python utils._SIZE_RE：`^\s*([\d.]+)\s*([a-z]*)\s*$`。

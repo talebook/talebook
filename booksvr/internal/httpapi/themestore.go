@@ -56,13 +56,52 @@ func (s *FileThemeStore) readFromFile() string {
 }
 
 // unquotePython 去掉 Python repr 的单/双引号。
+// unquotePython 去掉 Python 字符串字面量的引号并还原转义序列。
+//
+// 必须与 quotePython 严格对称（\n → 换行、\t → 制表、\r → 回车、
+// \\ → 反斜杠、\' → 单引号、\" → 双引号）。
+//
+// 不对称会导致每次「读→写」都把反斜杠翻倍：quotePython 把 \ 写成 \\，
+// 而这里若不还原，下次再写就变成 \\\\，指数增长。
+// 曾把 auto.py 涨到 528MB，并让配置行正则回溯爆炸，把 /read/<id> 拖死。
 func unquotePython(s string) string {
 	if len(s) >= 2 {
 		if (s[0] == '\'' && s[len(s)-1] == '\'') || (s[0] == '"' && s[len(s)-1] == '"') {
-			return s[1 : len(s)-1]
+			s = s[1 : len(s)-1]
 		}
 	}
-	return s
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	var sb strings.Builder
+	sb.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c != '\\' || i+1 >= len(s) {
+			sb.WriteByte(c)
+			continue
+		}
+		i++
+		switch s[i] {
+		case 'n':
+			sb.WriteByte('\n')
+		case 't':
+			sb.WriteByte('\t')
+		case 'r':
+			sb.WriteByte('\r')
+		case '\\':
+			sb.WriteByte('\\')
+		case '\'':
+			sb.WriteByte('\'')
+		case '"':
+			sb.WriteByte('"')
+		default:
+			// 未知转义：保留反斜杠与字符，与 Python 行为一致。
+			sb.WriteByte('\\')
+			sb.WriteByte(s[i])
+		}
+	}
+	return sb.String()
 }
 
 // SetActiveTheme 写入激活主题；空串表示恢复默认。
