@@ -227,7 +227,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, useId, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const props = defineProps({
@@ -242,7 +242,10 @@ defineEmits(['locate']);
 
 const { t, locale } = useI18n();
 const backend = props.backend || useNuxtApp().$backend;
-const headingId = `annotation-heading-${Math.random().toString(36).slice(2)}`;
+// 用 useId 而非 Math.random：随机值在服务端与客户端会不同，
+// 导致 id 属性水合不匹配（服务端 annotation-heading-xxx、客户端 -yyy）。
+// useId 在 SSR 与客户端保持一致。
+const headingId = `annotation-heading-${useId()}`;
 const annotations = ref([]);
 const loading = ref(true);
 const loadError = ref('');

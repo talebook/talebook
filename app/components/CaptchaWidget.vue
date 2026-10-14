@@ -51,7 +51,7 @@
 
 <script setup>
 import { useNuxtApp } from 'nuxt/app';
-import { ref, nextTick, onMounted, onUnmounted } from 'vue';
+import { ref, nextTick, onMounted, onUnmounted, useId } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { loadTurnstileSDK } from '~/utils/captcha';
 import ImageCaptchaWidget from './ImageCaptchaWidget.vue';
@@ -74,7 +74,9 @@ const emit = defineEmits(['verify', 'error']);
 const loading = ref(true);
 const error = ref('');
 const config = ref(null);
-const containerId = `captcha-${Math.random().toString(36).substr(2, 9)}`;
+// 用 useId 而非 Math.random：随机值在服务端与客户端会不同，
+// 而 containerId 绑在模板的 :id 上，会导致 id 属性水合不匹配。
+const containerId = `captcha-${useId()}`;
 const imageCaptchaRef = ref(null);
 
 // 极验实例
