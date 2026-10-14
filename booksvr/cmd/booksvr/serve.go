@@ -303,6 +303,7 @@ func runServe(args []string, out io.Writer) error {
 		Version:            resolveVersion(opts),
 		BookSourceSeedFile: resolveSeedFile(opts),
 		Settings:           httpapi.LoadSettings(opts.SettingsFile),
+		SettingsPath:       opts.SettingsFile,
 		ServiceFactory:     wiring,
 		Out:                out,
 	})

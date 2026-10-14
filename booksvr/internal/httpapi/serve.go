@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -23,6 +24,7 @@ import (
 	"talebook/booksvr/internal/pluginruntime"
 	"talebook/booksvr/internal/scan"
 	"talebook/booksvr/internal/sslcert"
+	"talebook/booksvr/internal/updatecheck"
 )
 
 // ServeOptions 是 Serve 的装配参数。
@@ -76,6 +78,9 @@ type ServeOptions struct {
 	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
 	// Settings 是 Talebook 配置（CONF），供网络书库与插件运行时读取。
 	Settings map[string]any
+	// SettingsPath 是配置文件路径（conf/auto.py），供系统设置页保存配置。
+	// 为空时保存接口返回未接线错误。
+	SettingsPath string
 	// PluginRegistry 是插件注册表；为 nil 时插件接口返回 plugin.not_found。
 	PluginRegistry *pluginruntime.PluginRegistry
 	// BookSourceSeedFile 是内置种子书源文件路径；为空时种子接口返回加载失败。
@@ -324,26 +329,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		DB:       db,
 		Settings: opts.Settings,
 	})...)
-	opdsWiring := newAdminOpdsWiring(userDB, opts.Settings)
-	specs = append(specs, AdminRouteSpecs(AdminConfig{
-		DB:          userDB,
-		LibraryDB:   db,
-		LibraryRoot: opts.LibraryRoot,
-		Settings:    opts.Settings,
-		CDNURL:      opts.CDNURL,
-		APIURL:      opts.APIURL,
-		BasePath:    opts.BasePath,
-
-		// OPDS 导入：浏览 / 导入 / 状态 / 失败列表 / 重试。
-		OpdsBrowse:       opdsWiring.Browse,
-		OpdsImport:       opdsWiring.Import,
-		OpdsImportStatus: opdsWiring.Status,
-		OpdsImportFailed: opdsWiring.Failed,
-		OpdsImportRetry:  opdsWiring.Retry,
-
-		// SSL 证书热更新。
-		InstallSSL: newSSLInstaller(opts.Settings),
-	})...)
+	specs = append(specs, AdminRouteSpecs(newAdminConfig(opts, userDB, db))...)
 
 	specs = append(specs, BookRouteSpecs(bookCfg)...)
 
@@ -411,6 +397,132 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 // 证书与私钥路径取自站点配置（对应 Python 的 CONF["ssl_crt_file"] /
 // CONF["ssl_key_file"]），缺省时回落为 /data/books/ssl/ssl.{crt,key}。
 // 配置缺失或路径非法时返回 nil，handler 会回落到「未接线」错误。
+// newAdminConfig 组装管理后台的依赖注入配置。
+//
+// 单独抽成函数是为了让测试能直接检查真实装配路径：
+// 曾经这里的 8 个回调只接了 InstallSSL，其余全为 nil，
+// 系统设置页的「测试连接」「迁移数据库」「测试邮件」都返回「未接线」。
+func newAdminConfig(opts ServeOptions, userDB, libraryDB *sql.DB) AdminConfig {
+	opdsWiring := newAdminOpdsWiring(userDB, opts.Settings)
+	return AdminConfig{
+		DB:           userDB,
+		LibraryDB:    libraryDB,
+		LibraryRoot:  opts.LibraryRoot,
+		Settings:     opts.Settings,
+		SettingsPath: opts.SettingsPath,
+		CDNURL:       opts.CDNURL,
+		APIURL:       opts.APIURL,
+		BasePath:     opts.BasePath,
+		// 系统设置页保存配置：写回 conf/auto.py（对应 Python 的 dumpfile）。
+		SaveSettings: func(next map[string]any) error {
+			return SaveSettings(opts.SettingsPath, next)
+		},
+		// 数据库管理：测试连接与数据迁移。
+		TestDBConnection: TestDBConnection,
+		MigrateDB:        MigrateDB,
+		// 邮件服务：测试邮件与推送书籍。
+		SendMail: func(mailCfg MailConfig, from, to, subject, body string) error {
+			return SendMail(mailCfg, from, to, subject, body, nil, "")
+		},
+
+		// OPDS 导入：浏览 / 导入 / 状态 / 失败列表 / 重试。
+		OpdsBrowse:       opdsWiring.Browse,
+		OpdsImport:       opdsWiring.Import,
+		OpdsImportStatus: opdsWiring.Status,
+		OpdsImportFailed: opdsWiring.Failed,
+		OpdsImportRetry:  opdsWiring.Retry,
+
+		// 升级检查：对应 Python 的 UpdateChecker。
+		CheckUpdates: newUpdateCheckWiring(opts.Version),
+
+		// 批量 Kindle 转 EPUB：对应 Python 的 BatchConvertService。
+		ConvertStatus: newConvertStatusWiring(libraryDB, opts),
+		StartConvert:  newStartConvertWiring(libraryDB, opts),
+
+		// 自动填充元数据：对应 Python 的 AutoFillService。
+		FillStatus: newFillStatusWiring(libraryDB, opts),
+		StartFill:  newStartFillWiring(libraryDB, opts),
+
+		// SSL 证书热更新。
+		InstallSSL: newSSLInstaller(opts.Settings),
+	}
+}
+
+// newUpdateCheckWiring 接线升级检查。
+//
+// Python 的 UpdateChecker 是进程内单例，缓存上次检查结果；
+// 这里同样用包级单例，避免每次请求都打 GitHub API。
+func newUpdateCheckWiring(version string) func() map[string]any {
+	checker := updatecheck.NewChecker(version)
+	return func() map[string]any {
+		st := checker.Check()
+		return map[string]any{
+			"current_version": st.CurrentVersion,
+			"latest_version":  st.LatestVersion,
+			"has_update":      st.HasUpdate,
+			"release_url":     st.ReleaseURL,
+			"release_name":    st.ReleaseName,
+			"release_body":    st.ReleaseBody,
+			"last_check_time": st.LastCheckTime,
+			"check_error":     st.CheckError,
+		}
+	}
+}
+
+// newConvertStatusWiring 接线批量转换状态查询。
+func newConvertStatusWiring(libraryDB *sql.DB, opts ServeOptions) func() map[string]any {
+	return func() map[string]any {
+		if libraryDB == nil {
+			return map[string]any{"total": 0, "skip": 0, "done": 0, "fail": 0, "running": false}
+		}
+		p := convert.NewService(libraryDB, ebookConvertPath()).Progress()
+		return map[string]any{
+			"total":   p.Total,
+			"skip":    p.Skip,
+			"done":    p.Done,
+			"fail":    p.Fail,
+			"running": p.Running,
+		}
+	}
+}
+
+// newStartConvertWiring 接线启动批量转换。
+func newStartConvertWiring(libraryDB *sql.DB, opts ServeOptions) func(int64, []int64) error {
+	return func(userID int64, ids []int64) error {
+		if libraryDB == nil {
+			return errors.New("书库数据库未就绪")
+		}
+		svc := convert.NewService(libraryDB, ebookConvertPath())
+		go func() {
+			if _, err := svc.ConvertAll(ids); err != nil {
+				log.Printf("批量转换失败: %v", err)
+			}
+		}()
+		return nil
+	}
+}
+
+// newFillStatusWiring 接线自动填充状态查询。
+//
+// Go 侧尚未移植 AutoFillService（Python 的 metabase 刮削服务），
+// 这里返回零值状态而不是 nil 回调，避免前端拿到「未接线」；
+// 真正的刮削能力由插件运行时（pluginjobs）承担。
+func newFillStatusWiring(libraryDB *sql.DB, opts ServeOptions) func() map[string]any {
+	return func() map[string]any {
+		return map[string]any{"total": 0, "skip": 0, "done": 0, "fail": 0}
+	}
+}
+
+// newStartFillWiring 接线启动自动填充。
+//
+// 同 newFillStatusWiring：Go 侧尚无 AutoFillService，
+// 明确返回错误而不是静默假装成功，避免用户以为任务已启动。
+func newStartFillWiring(libraryDB *sql.DB, opts ServeOptions) func([]int64) error {
+	return func(ids []int64) error {
+		return errors.New("自动填充服务尚未移植到 Go 版本")
+	}
+}
+
 func newSSLInstaller(settings map[string]any) func(crt, key []byte) error {
 	crtPath := settingString(settings, "ssl_crt_file")
 	if crtPath == "" {

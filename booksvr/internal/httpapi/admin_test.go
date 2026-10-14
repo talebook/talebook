@@ -382,7 +382,7 @@ func TestAdminUsersBatchBadPermission(t *testing.T) {
 func TestAdminTestMail(t *testing.T) {
 	fx := newAdminFixture(t)
 	var gotTo string
-	fx.Cfg.SendMail = func(to, subject, body string) error {
+	fx.Cfg.SendMail = func(_ MailConfig, from, to, subject, body string) error {
 		gotTo = to
 		return nil
 	}
@@ -402,7 +402,7 @@ func TestAdminTestMail(t *testing.T) {
 
 func TestAdminTestMailFailure(t *testing.T) {
 	fx := newAdminFixture(t)
-	fx.Cfg.SendMail = func(string, string, string) error { return bsErrString("smtp down") }
+	fx.Cfg.SendMail = func(MailConfig, string, string, string, string) error { return bsErrString("smtp down") }
 	ctx := pluginCtx(t, fx.DB, http.MethodPost, "/api/admin/testmail", "smtp_username=a@b.com", 1, true)
 	ctx.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	got, err := AdminTestMailHandler(fx.Cfg)(ctx)
@@ -1137,6 +1137,69 @@ func TestAdminSettingsGetResponseShape(t *testing.T) {
 	}
 	if _, ok := got["site_url"].(string); !ok {
 		t.Errorf("site_url = %v, want string", got["site_url"])
+	}
+}
+
+// TestAdminSettingsSavePersistsToFile 回归：保存必须真正写回配置文件。
+//
+// 曾经 AdminConfig.SaveSettings 未接线，页面点保存返回「保存配置未接线」。
+func TestAdminSettingsSavePersistsToFile(t *testing.T) {
+	fx := newAdminFixture(t)
+	path := filepath.Join(t.TempDir(), "auto.py")
+	if err := os.WriteFile(path, []byte("settings = {\n    'OPDS_ENABLED'        : True,\n}\n"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	fx.Cfg.SettingsPath = path
+	fx.Cfg.SaveSettings = func(next map[string]any) error {
+		return SaveSettings(path, next)
+	}
+
+	ctx := pluginCtx(t, fx.DB, http.MethodPost, "/api/admin/settings", `{"site_title":"落盘标题"}`, 1, true)
+	got, err := AdminSettingsHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got["err"] != "ok" {
+		t.Fatalf("err = %v, msg = %v", got["err"], got["msg"])
+	}
+	// 响应形状对齐 Python：{err, rsp}。
+	if _, ok := got["rsp"].(map[string]any); !ok {
+		t.Errorf("rsp = %v, want map", got["rsp"])
+	}
+
+	// 真正落盘。
+	if saved := LoadSettings(path); saved["site_title"] != "落盘标题" {
+		t.Errorf("磁盘上的 site_title = %v", saved["site_title"])
+	}
+}
+
+// TestAdminSettingsSaveRejectsBadSize 回归：非法上传大小必须被拒绝。
+func TestAdminSettingsSaveRejectsBadSize(t *testing.T) {
+	fx := newAdminFixture(t)
+	fx.Cfg.SaveSettings = func(map[string]any) error { return nil }
+	ctx := pluginCtx(t, fx.DB, http.MethodPost, "/api/admin/settings",
+		`{"MAX_UPLOAD_SIZE":"abc"}`, 1, true)
+	got, err := AdminSettingsHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got["err"] != "params.max_upload_size" {
+		t.Errorf("err = %v, want params.max_upload_size", got["err"])
+	}
+}
+
+// TestAdminSettingsSaveRejectsEmptyInviteCode 回归：私人图书馆模式必须有访问码。
+func TestAdminSettingsSaveRejectsEmptyInviteCode(t *testing.T) {
+	fx := newAdminFixture(t)
+	fx.Cfg.SaveSettings = func(map[string]any) error { return nil }
+	ctx := pluginCtx(t, fx.DB, http.MethodPost, "/api/admin/settings",
+		`{"INVITE_MODE":true,"INVITE_CODE":""}`, 1, true)
+	got, err := AdminSettingsHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if got["err"] != "params.invite_code_required" {
+		t.Errorf("err = %v, want params.invite_code_required", got["err"])
 	}
 }
 

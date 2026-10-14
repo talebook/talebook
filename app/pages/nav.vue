@@ -76,7 +76,16 @@ const { data: navData } = useAsyncData('nav', async () => {
 const navs = computed(() => navData.value?.navs || []);
 const loaded = computed(() => navData.value != null);
 
+// 空状态应看「书库有没有书」，而不是「有没有标签」。
+//
+// 原实现只遍历 tags，书库有书但未打标签时会误报「本书库暂无藏书」。
+// 书数来自 /api/user/info 的 sys.books（store.sys）。
 const hasAnyBooks = computed(() => {
+    const total = Number(store.sys?.books);
+    if (Number.isFinite(total)) {
+        return total > 0;
+    }
+    // sys 尚未就绪时回落到标签计数，避免闪一下空状态。
     for (const nav of navs.value) {
         for (const tag of nav.tags) {
             if (tag.count > 0) {

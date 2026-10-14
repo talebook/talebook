@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,8 +39,8 @@ type AdminConfig struct {
 	APIURL string
 	// BasePath 是部署前缀，用于拼出 site_url（对应 Python 的 BASE_PATH）。
 	BasePath string
-	// SendMail 发送邮件。
-	SendMail func(to, subject, body string) error
+	// SendMail 发送邮件；cfg 携带本次发信的 SMTP 参数。
+	SendMail func(cfg MailConfig, from, to, subject, body string) error
 	// TestDBConnection 测试数据库连接。
 	TestDBConnection func(dbURL string) error
 	// MigrateDB 迁移数据库。
@@ -446,12 +447,29 @@ func AdminTestMailHandler(cfg AdminConfig) HandlerFunc {
 		if resp := adminRequire(ctx); resp != nil {
 			return resp, nil
 		}
+		// 表单里的 SMTP 参数优先（用户可能刚改完还没保存），
+		// 缺省时回落到已保存的配置。
 		form := parseFormValues(ctx.Request)
-		username := form.Get("smtp_username")
+		pick := func(key string) string {
+			if v := strings.TrimSpace(form.Get(key)); v != "" {
+				return v
+			}
+			return settingString(cfg.Settings, key)
+		}
+		username := pick("smtp_username")
+		if username == "" {
+			return map[string]any{"err": "email.server_error", "msg": "请先填写 SMTP 用户名"}, nil
+		}
 		if cfg.SendMail == nil {
 			return map[string]any{"err": "email.server_error", "msg": "邮件服务未接线"}, nil
 		}
-		if err := cfg.SendMail(username, "Calibre功能验证邮件",
+		// 对应 Python：发件人与收件人都是 smtp_username。
+		if err := cfg.SendMail(MailConfig{
+			Relay:      pick("smtp_server"),
+			Username:   username,
+			Password:   pick("smtp_password"),
+			Encryption: pick("smtp_encryption"),
+		}, username, username, "Calibre功能验证邮件",
 			"这是一封测试邮件，验证邮件参数是否配置正确。"); err != nil {
 			return map[string]any{"err": "email.server_error", "msg": err.Error()}, nil
 		}
@@ -1377,14 +1395,59 @@ func adminSiteURL(cfg AdminConfig, ctx *Context) string {
 }
 
 // adminSettingsSave 保存配置。
+//
+// 对应 Python AdminSettings.post：先做参数校验，再写回配置文件，
+// 成功时返回 {"err":"ok","rsp":<完整配置>}。
 func adminSettingsSave(cfg AdminConfig, ctx *Context) (map[string]any, error) {
 	data, ok := decodeJSONObject(ctx.Request)
 	if !ok {
 		return map[string]any{"err": "params.invalid", "msg": "参数错误"}, nil
 	}
+
+	// 私人图书馆模式下访问码不能为空。
+	if inviteMode, _ := data["INVITE_MODE"].(bool); inviteMode {
+		if code, _ := data["INVITE_CODE"].(string); strings.TrimSpace(code) == "" {
+			return map[string]any{"err": "params.invite_code_required", "msg": "访问码不能为空"}, nil
+		}
+	}
+
+	// 上传大小类配置必须是合法的大小字符串（如 4MB）。
+	for _, key := range []string{"MAX_UPLOAD_SIZE", "UPLOAD_CHUNK_THRESHOLD", "UPLOAD_CHUNK_SIZE"} {
+		raw, exists := data[key]
+		if !exists {
+			continue
+		}
+		if _, err := parseSizeValue(raw); err != nil {
+			return map[string]any{
+				"err": "params." + strings.ToLower(key),
+				"msg": "上传大小配置格式不合法，例如 4MB",
+			}, nil
+		}
+	}
+
+	// 最大分片数量必须是正整数。
+	if raw, exists := data["MAX_CHUNK_COUNT"]; exists {
+		if n, err := strconv.ParseInt(strings.TrimSpace(fmt.Sprint(raw)), 10, 64); err != nil || n <= 0 {
+			return map[string]any{"err": "params.max_chunk_count", "msg": "最大分片数量必须是正整数"}, nil
+		}
+	}
+
+	// 有声书备份保留数必须在 0..20。
+	if raw, exists := data["AUDIOBOOK_BACKUP_RETENTION"]; exists {
+		n, err := strconv.ParseInt(strings.TrimSpace(fmt.Sprint(raw)), 10, 64)
+		if err != nil || n < 0 || n > 20 {
+			return map[string]any{
+				"err": "params.audiobook_backup_retention",
+				"msg": "有声书备份保留数必须在 0 到 20 之间",
+			}, nil
+		}
+		data["AUDIOBOOK_BACKUP_RETENTION"] = n
+	}
+
 	if cfg.SaveSettings == nil {
 		return map[string]any{"err": "file.permission", "msg": "保存配置未接线"}, nil
 	}
+
 	next := map[string]any{}
 	for k, v := range cfg.Settings {
 		next[k] = v
@@ -1392,10 +1455,52 @@ func adminSettingsSave(cfg AdminConfig, ctx *Context) (map[string]any, error) {
 	for k, v := range data {
 		next[k] = v
 	}
+	next["installed"] = true
+
 	if err := cfg.SaveSettings(next); err != nil {
-		return map[string]any{"err": "file.permission", "msg": "保存配置失败: " + err.Error()}, nil
+		return map[string]any{"err": "file.permission", "msg": "更新磁盘配置文件失败！请确保配置文件的权限为可写入！"}, nil
 	}
-	return map[string]any{"err": "ok", "msg": "设置已保存"}, nil
+	return map[string]any{"err": "ok", "rsp": next}, nil
+}
+
+// sizeValueRe 匹配 Python utils._SIZE_RE：`^\s*([\d.]+)\s*([a-z]*)\s*$`。
+var sizeValueRe = regexp.MustCompile(`^\s*([0-9.]+)\s*([a-zA-Z]*)\s*$`)
+
+// sizeUnits 对齐 Python utils._SIZE_UNITS。
+var sizeUnits = map[string]int64{
+	"": 1, "b": 1,
+	"k": 1024, "kb": 1024,
+	"m": 1024 * 1024, "mb": 1024 * 1024,
+	"g": 1024 * 1024 * 1024, "gb": 1024 * 1024 * 1024,
+}
+
+// parseSizeValue 复刻 Python utils.parse_size：解析 "100MB"/"1024" 为字节数。
+//
+// 与 parseSizeSafe 的区别：非法值返回 error 而不是默认值，
+// 因为系统设置页需要据此拒绝非法配置。
+func parseSizeValue(raw any) (int64, error) {
+	switch t := raw.(type) {
+	case float64:
+		return int64(t), nil
+	case int64:
+		return t, nil
+	case int:
+		return int64(t), nil
+	}
+	s := strings.ToLower(strings.TrimSpace(fmt.Sprint(raw)))
+	m := sizeValueRe.FindStringSubmatch(s)
+	if m == nil {
+		return 0, fmt.Errorf("invalid size string: %q", raw)
+	}
+	unit, ok := sizeUnits[m[2]]
+	if !ok {
+		return 0, fmt.Errorf("invalid size unit: %q", m[2])
+	}
+	f, err := strconv.ParseFloat(m[1], 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid size number: %q", m[1])
+	}
+	return int64(f * float64(unit)), nil
 }
 
 // ---- 路由表 ----
