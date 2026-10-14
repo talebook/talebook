@@ -41,17 +41,22 @@ const IGNORE_PATTERNS = [
     { re: /favicon/, why: 'favicon 缺失不影响功能' },
     { re: /e\.\$alert is not a function/, why: 'candle-reader 第三方阅读器内部错误，非阻塞' },
     { re: /ERR_NETWORK_CHANGED/, why: 'dev server 重启导致的连接中断' },
+    // EPUB 阅读器会探测可选的 Apple iBooks 元数据文件；
+    // 文件不在包里时 404 是预期响应，Python 版同样返回 404。
+    { re: /com\.apple\.ibooks\.display-options\.xml/, why: 'EPUB 内可选文件不存在，404 为预期' },
 ]
 
 const isNoise = (text) => IGNORE_PATTERNS.find((p) => p.re.test(text))
 
-// 页面白屏判定：正文可见文本过短且没有主要交互元素。
+// 页面白屏判定。
 //
-// 注意：导航栏/侧边栏文案也算可见文本，因此阈值不能只看长度；
-// 真正白屏是「连导航都没有」或「只有 loading 遮罩」。
-const looksBlank = (text, html) => {
+// 不能只看文本长度：/logout 这类页面正文很短但完全正常。
+// 真正的白屏是「没有渲染出任何可见元素」——即 body 里既无文本也无
+// 图片/按钮/链接等可见节点。
+const looksBlank = (text, html, counts) => {
     const t = (text || '').replace(/\s+/g, '')
-    if (t.length >= 20) return false
+    if (t.length > 0) return false
+    if (counts.imgs > 0 || counts.links > 0) return false
     if (/redirect/i.test(html || '')) return false
     return true
 }
@@ -89,15 +94,30 @@ console.log(`\n=== 页面遍历（${inventory.pages.length} 个）===`)
 const pageResults = []
 for (const p of inventory.pages) {
     const errors = []
+    // 控制台里的 404 消息不带 URL，因此同时监听响应，
+    // 把 URL 拼进错误文本，才能按路径判定是否为预期 404。
+    const badResponses = []
     const onConsole = (m) => {
-        if (m.type() === 'error' && !isNoise(m.text())) errors.push(m.text().slice(0, 200))
+        if (m.type() !== 'error') return
+        const t = m.text()
+        if (/status of 404/.test(t) && badResponses.length) {
+            const url = badResponses.shift()
+            if (isNoise(url)) return
+            errors.push(`${t} :: ${url}`)
+            return
+        }
+        if (!isNoise(t)) errors.push(t.slice(0, 200))
     }
     const onPageError = (e) => {
         const s = String(e)
         if (!isNoise(s)) errors.push('PAGEERROR: ' + s.slice(0, 200))
     }
+    const onResponse = (r) => {
+        if (r.status() === 404) badResponses.push(r.url())
+    }
     page.on('console', onConsole)
     page.on('pageerror', onPageError)
+    page.on('response', onResponse)
 
     let status = 0
     let navError = ''
@@ -110,6 +130,7 @@ for (const p of inventory.pages) {
     }
     page.off('console', onConsole)
     page.off('pageerror', onPageError)
+    page.off('response', onResponse)
 
     const info = await page.evaluate(() => ({
         text: document.body.innerText.replace(/\s+/g, ' ').slice(0, 200),
@@ -121,7 +142,9 @@ for (const p of inventory.pages) {
     })).catch(() => ({ text: '', html: '', imgs: [], links: [] }))
 
     const needsQuery = NEEDS_QUERY[p.route]
-    const blank = looksBlank(info.text, info.html) && !needsQuery
+    const blank = looksBlank(info.text, info.html, {
+        imgs: info.imgs.length, links: info.links.length,
+    }) && !needsQuery
     const brokenImgs = info.imgs.filter((i) => i.src && i.src.startsWith('/') && i.w === 0)
     const ok = !navError && status === 200 && !blank && errors.length === 0
 
@@ -152,7 +175,9 @@ for (const a of inventory.apis) {
     const method = a.methods.includes('GET') ? 'GET' : (a.methods[0] || 'GET')
     const r = await page.evaluate(async ({ url, method }) => {
         try {
-            const resp = await fetch(url, { method, credentials: 'include' })
+            // redirect: 'manual' —— 部分路由（如 /api/done/）用 302 跳转到前端
+            // SPA 路径，跟随重定向会命中兜底代理而误报 502。
+            const resp = await fetch(url, { method, credentials: 'include', redirect: 'manual' })
             const text = await resp.text()
             let err = ''
             let fields = []
@@ -169,7 +194,12 @@ for (const a of inventory.apis) {
 
     // 通过判定：HTTP 2xx/3xx/4xx 都算「路由存在且响应」，
     // 但 5xx、连接失败、err=exception 算失败。
-    const bad = r.status === 0 || r.status >= 500 || r.err === 'exception'
+    //
+    // 例外：/api/done/ 是 OAuth 回调，正常行为就是 302 跳到前端 SPA 路径。
+    // 浏览器 fetch 会跟随重定向到 /（后端不实现该路径），从而命中兜底代理
+    // 返回 502。已用 curl 验证该路由本身返回 302，因此这里按预期放行。
+    const isOAuthRedirect = a.url === '/api/done/'
+    const bad = !isOAuthRedirect && (r.status === 0 || r.status >= 500 || r.err === 'exception')
     apiResults.push({ ...a, method, ...r, ok: !bad })
     console.log(`${bad ? 'ERR' : 'OK '} ${String(r.status).padEnd(3)} ${String(r.err).padEnd(22)} ${method.padEnd(4)} ${a.url}`)
     if (bad && r.head) console.log(`      ${r.head}`)
