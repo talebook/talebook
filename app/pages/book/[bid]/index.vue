@@ -1094,13 +1094,23 @@ watch(() => fetchData.value, applyFetchData, { immediate: true });
 
 // book 优先用 useAsyncData 已取到的数据，保证 SSR 与客户端首帧一致；
 // 本地修改（如改 scope）会覆盖到 bookLocal，从而优先展示。
+// 注意展开顺序：bookLocal 的初始值是 emptyBook（title 为空字符串），
+// 若把它放在最后展开会盖掉 fetched 的真实值，导致 SSR 渲染空标题。
+// 因此只把 bookLocal 里「被本地改过」的键覆盖上去。
 const book = computed(() => {
     const fetched = fetchData.value?.book;
     if (!fetched) {
         return bookLocal.value;
     }
-    return { ...emptyBook, ...fetched, ...bookLocal.value };
+    const merged = { ...emptyBook, ...fetched };
+    for (const [k, v] of Object.entries(bookLocal.value)) {
+        if (v !== emptyBook[k]) {
+            merged[k] = v;
+        }
+    }
+    return merged;
 });
+
 
 // 监听错误状态
 watch(() => fetchError.value, (newError) => {
