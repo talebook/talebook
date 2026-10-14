@@ -679,8 +679,10 @@ func TestSettingHelpers(t *testing.T) {
 	if len(settingList(s, "d")) != 1 {
 		t.Error("settingList")
 	}
-	if settingList(s, "missing") != nil {
-		t.Error("settingList 缺失应返回 nil")
+	// 缺失时必须返回空切片而不是 nil：前端直接对结果调 .map()，
+	// nil 会序列化成 JSON null 并让侧边栏渲染报错。
+	if got := settingList(s, "missing"); got == nil || len(got) != 0 {
+		t.Errorf("settingList 缺失应返回空切片，实际 %#v", got)
 	}
 }
 
@@ -709,8 +711,8 @@ func TestSettingHelpersExtra(t *testing.T) {
 	if settingAny(nil, "a") != nil {
 		t.Error("settingAny(nil)")
 	}
-	if settingList(nil, "a") != nil {
-		t.Error("settingList(nil)")
+	if got := settingList(nil, "a"); got == nil || len(got) != 0 {
+		t.Errorf("settingList(nil) 应返回空切片，实际 %#v", got)
 	}
 
 	s := map[string]any{

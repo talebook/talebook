@@ -144,7 +144,9 @@ func userSysInfo(cfg UserConfig) (map[string]any, error) {
 	}
 
 	demoMode := cfg.Auth.isDemoMode()
-	socials := settingAny(cfg.Settings, "SOCIALS")
+	// 必须保证是数组：前端写的是 store.sys.friends.map(...)，
+	// 字符串虽然 truthy 却没有 .map，抛 TypeError 会让整个侧边栏渲染失败。
+	socials := settingList(cfg.Settings, "SOCIALS")
 	if demoMode {
 		socials = []any{}
 	}
@@ -162,7 +164,7 @@ func userSysInfo(cfg UserConfig) (map[string]any, error) {
 		"version":              cfg.Version,
 		"title":                settingString(cfg.Settings, "site_title"),
 		"socials":              socials,
-		"friends":              settingAny(cfg.Settings, "FRIENDS"),
+		"friends":              settingList(cfg.Settings, "FRIENDS"),
 		"footer":               settingString(cfg.Settings, "FOOTER"),
 		"footer_extra_html":    settingString(cfg.Settings, "FOOTER_EXTRA_HTML"),
 		"sidebar_extra_html":   sidebar,
@@ -801,12 +803,15 @@ func settingAny(settings map[string]any, key string) any {
 }
 
 // settingList 读取列表配置。
+//
+// 永远返回非 nil 的切片：前端直接对结果调 .map()，
+// 返回 nil 会序列化成 JSON null，同样会让侧边栏渲染报错。
 func settingList(settings map[string]any, key string) []any {
 	v := settingAny(settings, key)
 	if list, ok := v.([]any); ok {
 		return list
 	}
-	return nil
+	return []any{}
 }
 
 // stringOf 把任意值转成字符串。
