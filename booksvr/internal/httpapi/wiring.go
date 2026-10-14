@@ -17,11 +17,14 @@ import (
 // 把 handler 层的注入钩子接到 library / userdb 的真实实现上，
 // 使 booksvr 不依赖 Tornado 即可独立提供书籍接口。
 type bookWiring struct {
-	db        *sql.DB
-	settings  map[string]any
-	libraryDB *sql.DB
-	aliases   *userdb.AliasService
-	registry  *pluginruntime.PluginRegistry
+	db       *sql.DB
+	settings map[string]any
+	// settingsPath 非空时，读配置一律从磁盘重读，
+	// 使管理员在系统设置页的改动立即生效。
+	settingsPath string
+	libraryDB    *sql.DB
+	aliases      *userdb.AliasService
+	registry     *pluginruntime.PluginRegistry
 	// convert 用于在线阅读时把 mobi/azw3 转成 EPUB；为 nil 时跳过转换。
 	convert *convert.Service
 	// libraryRoot 是书库根目录，删除书籍时用于把目录移入 .caltrash。
@@ -38,6 +41,14 @@ func newBookWiring(db, libraryDB *sql.DB, settings map[string]any) *bookWiring {
 		aliases:   userdb.NewAliasService(db),
 		registry:  pluginruntime.NewPluginRegistry(),
 	}
+}
+
+// withSettingsPath 设置配置文件路径，使读配置从磁盘重读。
+//
+// 返回自身以便链式调用。
+func (w *bookWiring) withSettingsPath(path string) *bookWiring {
+	w.settingsPath = path
+	return w
 }
 
 // autoLogin 报告是否开启自动登录（影响 is_book_owner 语义）。
@@ -142,8 +153,13 @@ func (w *bookWiring) Config(cdnURL string) BookConfig {
 		CountDownload: w.countDownload,
 		Aliases:       w.aliases,
 		ReaderAssets:  "/static/candle-reader/",
-		EPUBViewer:    "creader.html",
-		DeleteFormat:  w.bookDeleteFormat,
+		// 阅读器选择来自系统设置的 EPUB_VIEWER，不能写死：
+		// 写死会让「设置 EPUB 阅读器为另一个」完全不生效。
+		//
+		// 必须每次重读磁盘：w.settings 是启动快照，
+		// 管理员改完设置后不重启进程也应该立即生效。
+		EPUBViewer:   settingString(liveSettings(w.settings, w.settingsPath), "EPUB_VIEWER"),
+		DeleteFormat: w.bookDeleteFormat,
 
 		// 阅读路径：在线阅读 / 阅读器引导 / TXT 阅读 / 阅读资源。
 		ReadBook:        w.bookReadBook,

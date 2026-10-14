@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -146,6 +147,59 @@ func TestUserSysInfoFriendsWithEntries(t *testing.T) {
 	}
 	if item["text"] != "A" || item["href"] != "http://a.example" {
 		t.Errorf("friends[0] = %v", item)
+	}
+}
+
+// TestParsePythonLiteralErrorPaths 覆盖解析器的错误分支。
+//
+// 这些输入在真实配置里不该出现，但解析器必须优雅回落而不是 panic 或
+// 返回半成品：parsePythonLiteral 返回 ok=false，由调用方保留原始字符串。
+func TestParsePythonLiteralErrorPaths(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+	}{
+		{"空字符串", ""},
+		{"只有空白", "   "},
+		{"不以括号开头", "abc"},
+		{"列表未闭合", "[1, 2"},
+		{"字典未闭合", "{'a': 1"},
+		{"字典缺冒号", "{'a' 1}"},
+		{"字符串未闭合", "['abc]"},
+		{"标量无法解析", "[os.path.join('a')]"},
+		{"尾部有多余内容", "[1] extra"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			v, ok := parsePythonLiteral(c.in)
+			if ok {
+				t.Errorf("parsePythonLiteral(%q) 应返回 ok=false，实际 %#v", c.in, v)
+			}
+			// 调用方（parseSettingValue）必须回落到原始字符串，不能丢配置。
+			// 注意 parseSettingValue 会先 TrimSpace，纯空白输入回落为 ""。
+			want := strings.TrimSpace(c.in)
+			if got := parseSettingValue(c.in); got != want {
+				t.Errorf("parseSettingValue(%q) = %#v，应回落为 %#v", c.in, got, want)
+			}
+		})
+	}
+}
+
+// TestParsePythonLiteralEscapes 覆盖字符串转义分支。
+func TestParsePythonLiteralEscapes(t *testing.T) {
+	got := parseSettingValue(`['a\nb', 'c\td', 'e\\f']`)
+	list, ok := got.([]any)
+	if !ok {
+		t.Fatalf("类型是 %T，期望 []any", got)
+	}
+	want := []string{"a\nb", "c\td", "e\\f"}
+	if len(list) != len(want) {
+		t.Fatalf("长度 %d，期望 %d", len(list), len(want))
+	}
+	for i, w := range want {
+		if list[i] != w {
+			t.Errorf("list[%d] = %q，期望 %q", i, list[i], w)
+		}
 	}
 }
 

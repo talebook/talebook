@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"talebook/booksvr/internal/library"
@@ -379,6 +380,19 @@ func (w *bookWiring) bookReadBook(ctx *Context, bookID int64) (map[string]any, e
 	}
 
 	if has["epub"] {
+		// 阅读器选择，对齐 Python BookRead.get：
+		//   use_readest = requested_reader == "readest"
+		//                 or (未指定 reader 且 CONF["EPUB_VIEWER"] == "readest")
+		// 之前这里写死走 Candle Reader，导致系统设置里改 EPUB 阅读器不生效。
+		requested := ctx.Query("reader")
+		viewer := w.Config("").EPUBViewer
+		if requested == "readest" || (requested == "" && viewer == "readest") {
+			launch := "/readest/talebook-launch.html?" + url.Values{
+				"bookId": {strconv.FormatInt(bookID, 10)},
+			}.Encode()
+			http.Redirect(ctx.Writer, ctx.Request, launch, http.StatusFound)
+			return nil, nil
+		}
 		w.writeReaderPage(ctx, bookID, book.Title, true)
 		return nil, nil
 	}

@@ -299,7 +299,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 	// 复用 bookCfg 的完整 BookFormatter，否则返回的书籍缺少 img/thumb/href，
 	// 前端 BookCards 拿不到封面地址（用户可见现象：钻取页无封面图）。
 	publicURL := bookPublicURL(opts.BasePath)
-	bookWiring := newBookWiring(userDB, db, opts.Settings)
+	bookWiring := newBookWiring(userDB, db, opts.Settings).withSettingsPath(opts.SettingsPath)
 	// 删除公开书时把目录移入 <libraryRoot>/.caltrash，供回收站页面恢复。
 	bookWiring.libraryRoot = opts.LibraryRoot
 	// 在线阅读需要把 mobi/azw3 转成 EPUB；转换产物放在书库下的 convert 目录。
