@@ -1353,9 +1353,15 @@ var adminSettingsPluginFields = []string{
 // adminSettingsGet 返回当前配置。
 //
 // 响应形状对齐 Python：{err, settings, sns, site_url}。
+//
+// 每次请求都从磁盘重新读取，而不是用启动时的快照：
+// Python 的 CONF 是进程内可变字典，保存后立即生效；
+// 若这里返回启动快照，用户保存后刷新页面会看到旧值，
+// 误以为「保存没生效」。
 func adminSettingsGet(cfg AdminConfig, ctx *Context) map[string]any {
+	source := liveSettings(cfg.Settings, cfg.SettingsPath)
 	out := map[string]any{}
-	for k, v := range cfg.Settings {
+	for k, v := range source {
 		out[k] = v
 	}
 	for _, k := range adminSettingsPluginFields {

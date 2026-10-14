@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,23 +16,57 @@ var settingsLine = regexp.MustCompile(`(?m)^\s*['"]([A-Za-z_][A-Za-z0-9_]*)['"]\
 
 // LoadSettings 从 Talebook 配置文件解析配置项。
 //
-// 支持字符串、整数、浮点与布尔字面量；列表与字典按原始文本保留。
-// 文件不存在或无法读取时返回空 map（不报错），使 booksvr 在缺少
-// 配置文件时仍能以默认值启动。
+// 复刻 Python SettingsLoader.loadfile() 的三层合并语义：
+//
+//	出厂默认（builtinSettingsDefaults） → auto.py 用户覆盖 → manual.py 手工覆盖
+//
+// 这一点很关键：auto.py 只存用户改过的键，出厂默认值在 webserver/settings.py 里。
+// 早期实现只解析 auto.py，导致 /api/admin/settings 只返回一两个键，
+// 前端把这份残缺对象整体回存后就把用户配置覆盖没了。
+//
+// path 指向 auto.py；manual.py 取同目录下的同名文件。
+// 文件不存在或无法读取时跳过该层（不报错），使 booksvr 在缺少
+// 配置文件时仍能以出厂默认启动。
 func LoadSettings(path string) map[string]any {
-	out := map[string]any{}
+	out := make(map[string]any, len(builtinSettingsDefaults))
+	for k, v := range builtinSettingsDefaults {
+		out[k] = v
+	}
 	if path == "" {
 		return out
 	}
+	mergeSettingsFile(out, path)
+	mergeSettingsFile(out, filepath.Join(filepath.Dir(path), "manual.py"))
+	return out
+}
+
+// liveSettings 返回当前生效的配置。
+//
+// 优先从磁盘重新读取（Python 的 CONF 是进程内可变字典，保存后立即生效）；
+// 读取失败或路径为空时回落到启动快照。
+//
+// 所有读配置的 handler 都应经过这里，否则用户保存后刷新页面会看到旧值，
+// 误以为「保存没生效」。
+func liveSettings(snapshot map[string]any, path string) map[string]any {
+	if path != "" {
+		if fresh := LoadSettings(path); len(fresh) > 0 {
+			return fresh
+		}
+	}
+	return snapshot
+}
+
+// mergeSettingsFile 把单个配置文件里的键值覆盖进 out。
+//
+// 文件不存在或无法读取时静默跳过，与 Python 的 try/except 一致。
+func mergeSettingsFile(out map[string]any, path string) {
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return out
+		return
 	}
 	for _, m := range settingsLine.FindAllStringSubmatch(string(raw), -1) {
-		key := m[1]
-		out[key] = parseSettingValue(strings.TrimSpace(m[2]))
+		out[m[1]] = parseSettingValue(strings.TrimSpace(m[2]))
 	}
-	return out
 }
 
 // parseSettingValue 把配置字面量转成 Go 值。

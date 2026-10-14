@@ -278,11 +278,12 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		DefaultCover: loadDefaultCover(opts.HTMLPath),
 	})...)
 	specs = append(specs, UserRouteSpecs(UserConfig{
-		Auth:     authCfg,
-		DB:       userDB,
-		Settings: opts.Settings,
-		Version:  opts.Version,
-		CDNURL:   opts.CDNURL,
+		Auth:         authCfg,
+		DB:           userDB,
+		Settings:     opts.Settings,
+		SettingsPath: opts.SettingsPath,
+		Version:      opts.Version,
+		CDNURL:       opts.CDNURL,
 		// 首页「分类浏览」的计数来自 /api/user/info 的 sys 字段。
 		// 这些回调必须接线，否则全部返回 0（曾导致首页显示 0 本书籍）。
 		// 统计的是 Calibre 元数据库（books/authors/publishers/tags/series/data）。

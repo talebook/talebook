@@ -20,8 +20,11 @@ type UserConfig struct {
 	Auth AuthConfig
 	// DB 是 Talebook 自有库（readers / devices / messages）。
 	DB *sql.DB
-	// Settings 是站点配置。
+	// Settings 是站点配置（启动快照）。
 	Settings map[string]any
+	// SettingsPath 是配置文件路径；非空时每次请求都从磁盘重读，
+	// 使管理员保存配置后立即生效。
+	SettingsPath string
 	// Version 是站点版本号。
 	Version string
 	// CheckCaptcha 校验人机验证；返回 (是否通过, 提示)。
@@ -109,6 +112,10 @@ func UserInfoHandler(cfg UserConfig) HandlerFunc {
 
 // userSysInfo 汇总站点统计信息。
 func userSysInfo(cfg UserConfig) (map[string]any, error) {
+	// 从磁盘重新读取配置，而不是用启动快照：
+	// 管理员在系统设置页改完站点标题后，这里必须立即反映新值。
+	cfg.Settings = liveSettings(cfg.Settings, cfg.SettingsPath)
+
 	count := func(fn func() (int64, error)) int64 {
 		if fn == nil {
 			return 0

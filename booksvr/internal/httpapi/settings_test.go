@@ -49,16 +49,27 @@ CONF = {
 	}
 }
 
+// TestLoadSettingsMissingFile 验证配置文件缺失时回落到出厂默认。
+//
+// 旧实现返回空 map，导致前端拿到空配置；正确行为是与 Python 一致，
+// 至少给出 webserver/settings.py 的出厂默认值。
 func TestLoadSettingsMissingFile(t *testing.T) {
 	got := LoadSettings(filepath.Join(t.TempDir(), "nope.py"))
-	if len(got) != 0 {
-		t.Fatalf("文件不存在应返回空 map: %+v", got)
+	if len(got) != len(builtinSettingsDefaults) {
+		t.Fatalf("文件不存在应返回出厂默认（%d 个键），实际 %d 个",
+			len(builtinSettingsDefaults), len(got))
+	}
+	if got["MAX_UPLOAD_SIZE"] != "100MB" {
+		t.Errorf("MAX_UPLOAD_SIZE = %v，期望出厂默认", got["MAX_UPLOAD_SIZE"])
 	}
 }
 
+// TestLoadSettingsEmptyPath 验证空路径同样回落到出厂默认。
 func TestLoadSettingsEmptyPath(t *testing.T) {
-	if got := LoadSettings(""); len(got) != 0 {
-		t.Fatalf("空路径应返回空 map: %+v", got)
+	got := LoadSettings("")
+	if len(got) != len(builtinSettingsDefaults) {
+		t.Fatalf("空路径应返回出厂默认（%d 个键），实际 %d 个",
+			len(builtinSettingsDefaults), len(got))
 	}
 }
 
