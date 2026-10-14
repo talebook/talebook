@@ -7,7 +7,10 @@
                 <AppPress />
             </ClientOnly>
         </template>
-        <v-main v-show="themeRuntimeReady">
+        <!-- 服务端 themeRuntimeReady 恒为 false；若用 v-show 会让 SSR 输出
+             display:none，客户端首帧又显示，造成水合不匹配。
+             改为只在客户端挂载后才隐藏。 -->
+        <v-main v-show="themeRuntimeReady || !mounted">
             <v-container fluid>
                 <slot />
                 <template v-if="store.nav && themeRuntimeReady">
@@ -64,7 +67,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter, useHead } from 'nuxt/app';
 import { useThemeRuntime } from '@/composables/useThemeRuntime';
 import { useMainStore } from '@/stores/main';
@@ -81,14 +84,24 @@ const {
     ready: themeRuntimeReady,
 } = useThemeRuntime();
 
+// 服务端为 false，挂载后置 true。用于让 SSR 与客户端首帧渲染一致。
+const mounted = ref(false);
+
 useHead({
     title: computed(() => store.site_title),
     titleTemplate: computed(() => store.site_title_template),
 });
 
 onMounted(() => {
+    mounted.value = true;
     store.bootstrap();
 });
 
-watch(themeRuntimeReady, value => store.setLoading(!value), { immediate: true });
+// 主题运行时只在 onMounted 里就绪，服务端永远是 false。
+// 若在 SSR 阶段就把 loading 置 true，服务端会渲染遮罩、客户端首帧渲染内容，
+// 触发 hydration mismatch（服务端空、客户端有内容）。
+// 因此只在客户端同步 loading，服务端保持初始值 false。
+if (import.meta.client) {
+    watch(themeRuntimeReady, value => store.setLoading(!value), { immediate: true });
+}
 </script>

@@ -50,7 +50,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
 import { useMainStore } from '@/stores/main';
@@ -59,10 +59,6 @@ const store = useMainStore();
 const { $backend } = useNuxtApp();
 const { t } = useI18n();
 
-const navs = ref([]);
-const loaded = ref(false);
-
-// 修复1: 移除 await，正确使用 useAsyncData
 const { data: navData } = useAsyncData('nav', async () => {
     try {
         const response = await $backend('/book/nav');
@@ -73,13 +69,12 @@ const { data: navData } = useAsyncData('nav', async () => {
     }
 });
 
-// 修复2: 使用 watch 监听数据变化
-watch(navData, (newData) => {
-    if (newData) {
-        navs.value = newData.navs || [];
-        loaded.value = true;
-    }
-}, { immediate: true });
+// 直接从 useAsyncData 的结果派生，不用 watch 回填 ref。
+//
+// 服务端渲染时 watch 回调不会于渲染前触发，用 ref + watch 会让 SSR 输出空列表、
+// 客户端首帧却有内容，触发 hydration mismatch。
+const navs = computed(() => navData.value?.navs || []);
+const loaded = computed(() => navData.value != null);
 
 const hasAnyBooks = computed(() => {
     for (const nav of navs.value) {

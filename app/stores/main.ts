@@ -4,7 +4,9 @@ import { withBasePath } from '@/utils/base-path'
 export const useMainStore = defineStore('main', () => {
   // State
   const nav = ref(true)
-  const loading = ref(true)
+  // 初始为 false：服务端渲染必须直接输出内容，否则客户端首帧会与服务端
+  // 渲染的遮罩不一致，触发 hydration mismatch。客户端挂载后再按需置 true。
+  const loading = ref(false)
   const count = ref(0)
 
   // 使用 cookie 持久化主题

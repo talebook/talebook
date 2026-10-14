@@ -63,5 +63,9 @@ useHead({
     titleTemplate: computed(() => store.site_title_template),
 });
 
-watch(themeRuntimeReady, value => store.setLoading(!value), { immediate: true });
+// 同 default.vue：主题运行时只在 onMounted 里就绪，服务端恒为 false。
+// 在 SSR 阶段置 loading 会让服务端渲染遮罩、客户端渲染内容，触发水合不匹配。
+if (import.meta.client) {
+    watch(themeRuntimeReady, value => store.setLoading(!value), { immediate: true });
+}
 </script>

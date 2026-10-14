@@ -944,7 +944,9 @@ watch(routeBookId, (newBookId) => {
         bookid.value = newBookId;
     }
 });
-const book = ref({
+// book 的默认值。SSR 渲染前 useAsyncData 可能尚未回填，
+// 因此用 computed 直接从 fetchData 派生，保证服务端与客户端首帧一致。
+const emptyBook = {
     id: 0,
     title: '',
     files: [],
@@ -964,7 +966,10 @@ const book = ref({
     media_type: 'unknown',
     media_type_locked: false,
     online_readable: null
-});
+};
+
+// 本地可变副本：详情页多处会就地修改 book（如改 scope、删格式后刷新）。
+const bookLocal = ref({ ...emptyBook });
 const hasBookLabels = computed(() => (
     book.value.tags?.some(Boolean)
     || (book.value.media_type && book.value.media_type !== 'unknown')
@@ -1069,15 +1074,33 @@ const { data: fetchData, error: fetchError, pending: fetchPending, refresh } = u
     server: true
 });
 
-// 监听数据变化并更新 book.value
-watch(() => fetchData.value, (newData) => {
+// 把 useAsyncData 的结果同步进本地副本。
+//
+// 服务端渲染前 useAsyncData 可能尚未回填，只靠 watch 会让 SSR 输出空的
+// <h1>，客户端首帧却有书名，触发 hydration mismatch。
+// 因此 book 用 computed 直接从 fetchData 派生（SSR 也能拿到），
+// 本地副本只承载后续的就地修改。
+const applyFetchData = (newData) => {
     if (newData && newData.book) {
-        // 直接更新 book.value 的所有属性，保持响应式
-        Object.assign(book.value, newData.book);
+        // 直接更新本地副本的所有属性，保持响应式
+        Object.assign(bookLocal.value, newData.book);
         kindle_sender.value = newData.kindle_sender || '';
         conversion_options.value = newData.conversion_options || [];
     }
-}, { immediate: true });
+};
+
+// 监听数据变化并更新本地副本
+watch(() => fetchData.value, applyFetchData, { immediate: true });
+
+// book 优先用 useAsyncData 已取到的数据，保证 SSR 与客户端首帧一致；
+// 本地修改（如改 scope）会覆盖到 bookLocal，从而优先展示。
+const book = computed(() => {
+    const fetched = fetchData.value?.book;
+    if (!fetched) {
+        return bookLocal.value;
+    }
+    return { ...emptyBook, ...fetched, ...bookLocal.value };
+});
 
 // 监听错误状态
 watch(() => fetchError.value, (newError) => {
