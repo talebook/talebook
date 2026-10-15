@@ -87,10 +87,13 @@ ENV/
 
 # Rope project settings
 .ropeproject
-/.idea/
-/talebook-compose/
-data/
-.npm
+ /.idea/
+ /talebook-compose/
+ data/
+ # 例外：booksvr 的繁简对照表是编译必需（//go:embed），不能被上面的 data/ 规则误伤
+ !booksvr/internal/normalize/data/
+ !booksvr/internal/normalize/data/zh_conv.txt
+ .npm
 .config
 dev.yml
 ssr.yml
