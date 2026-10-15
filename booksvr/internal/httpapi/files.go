@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -59,6 +60,7 @@ type FilesConfig struct {
 const (
 	rGetImage    = "/get/(.*)/(.*)"
 	rGetExtract  = "/get/extract/([0-9]+)/(.*)"
+	rReadExtract = "/read/extract/([0-9]+)/(.*)"
 	rGetPcover   = "/get/pcover"
 	rGetProgress = "/get/progress/([0-9]+)"
 	rLogo        = "/logo/(.*)"
@@ -363,6 +365,9 @@ func ProgressHandler(cfg FilesConfig) HandlerFunc {
 // EpubReader 实现 /get/extract/<bid>/<path>（EPUB 内文件抽取）。
 func EpubReader(cfg FilesConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		// Authentication redirects must never survive a subsequent login.
+		ctx.Writer.Header().Set("Cache-Control", "private, no-store")
+		ctx.Writer.Header().Add("Vary", "Cookie")
 		rawBID := ctx.Param(0)
 		innerPath := ctx.Param(1)
 
@@ -395,12 +400,23 @@ func EpubReader(cfg FilesConfig) HandlerFunc {
 			http.Error(ctx.Writer, "not found", http.StatusNotFound)
 			return nil, nil
 		}
+		if cfg.CanViewBook != nil && !cfg.CanViewBook(ctx, bookID) {
+			http.Error(ctx.Writer, "not found", http.StatusNotFound)
+			return nil, nil
+		}
 		if cfg.RequireCaptcha != nil && !cfg.RequireCaptcha(ctx, bookID, "read") {
 			return nil, nil
 		}
 
-		fpath, missing, err := library.ResolvePath(cfg.DB, bookID, "EPUB")
-		if err != nil || missing || fpath == "" {
+		// Legacy Calibre imports store formats in data.name + books.path;
+		// newer imports register absolute paths in book_formats.
+		fpath, err := library.FormatAbsPath(cfg.DB, bookID, "EPUB", cfg.LibraryRoot)
+		if err != nil || fpath == "" {
+			http.Error(ctx.Writer, "not found", http.StatusNotFound)
+			return nil, nil
+		}
+		info, err := os.Stat(fpath)
+		if err != nil || info.IsDir() {
 			http.Error(ctx.Writer, "not found", http.StatusNotFound)
 			return nil, nil
 		}
@@ -409,6 +425,9 @@ func EpubReader(cfg FilesConfig) HandlerFunc {
 		if err != nil {
 			http.Error(ctx.Writer, "not found", http.StatusNotFound)
 			return nil, nil
+		}
+		if contentType := mime.TypeByExtension(filepath.Ext(innerPath)); contentType != "" {
+			ctx.Writer.Header().Set("Content-Type", contentType)
 		}
 		_, _ = ctx.Writer.Write(data)
 		return nil, nil
@@ -454,6 +473,7 @@ func FilesRouteSpecs(cfg FilesConfig) []RouteSpec {
 		{Pattern: rGetPcover, Methods: methods, Handler: ProxyImageHandler(cfg)},
 		{Pattern: rGetProgress, Methods: methods, Handler: ProgressHandler(cfg)},
 		{Pattern: rGetExtract, Methods: methods, Handler: EpubReader(cfg)},
+		{Pattern: rReadExtract, Methods: methods, Handler: EpubReader(cfg)},
 		{Pattern: rGetImage, Methods: methods, Handler: ImageHandler(cfg)},
 		{Pattern: rLogo, Methods: methods, Handler: LogoHandler(cfg)},
 		{Pattern: rStaticThemes, Methods: methods, Handler: StaticThemesHandler(cfg)},

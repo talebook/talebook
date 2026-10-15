@@ -84,7 +84,8 @@ var (
 // UserInfoHandler 实现 /api/user/info。
 func UserInfoHandler(cfg UserConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
-		if installed, ok := cfg.Settings["installed"].(bool); ok && !installed {
+		settings := liveSettings(cfg.Settings, cfg.SettingsPath)
+		if installed, ok := settings["installed"].(bool); ok && !installed {
 			return map[string]any{"err": "not_installed"}, nil
 		}
 

@@ -2,6 +2,7 @@
 """校验 spec/ 领域规格文档的结构、互链与实现对照的可核对性。"""
 
 import argparse
+import json
 import re
 from pathlib import Path
 
@@ -107,6 +108,22 @@ def collect_routes(repo_root):
                     patterns.append(re.compile(rf"\A{raw.rstrip('$')}\Z"))
                 except re.error:
                     continue
+    # Go 后端的新增路由不一定存在于旧 Python 路由表。
+    for source in sorted((repo_root / "booksvr/internal/httpapi").glob("*.go")):
+        if source.name.endswith("_test.go"):
+            continue
+        body = source.read_text(encoding="utf-8")
+        registered = set(re.findall(r"Pattern:\s*(\w+)", body))
+        for name, literal in re.findall(r'(\w+)\s*=\s*("(?:[^"\\]|\\.)*")', body):
+            if name not in registered:
+                continue
+            raw = json.loads(literal)
+            if not raw.startswith("/") or raw in ("/(.*)", "/(.*)$"):
+                continue
+            try:
+                patterns.append(re.compile(rf"\A{raw.rstrip('$')}\Z"))
+            except re.error:
+                continue
     return patterns
 
 

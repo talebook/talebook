@@ -27,7 +27,8 @@ const (
 // ScanConfig 是扫描/导入流水线路由的配置。
 type ScanConfig struct {
 	// Dir 是导入目录逻辑的配置（提供 scan_upload_path 与导入模式）。
-	Dir importdir.Config
+	Dir          importdir.Config
+	SettingsPath string
 	// Service 返回扫描服务；为 nil 时相关接口返回服务不可用。
 	Service func() *scan.Service
 	// WatchStatus 返回自动监控状态；为 nil 时返回「关闭」。
@@ -96,6 +97,8 @@ func orNA(s string) string {
 // ScanListHandler 实现 /api/admin/scan/list（GET，需管理员）。
 func ScanListHandler(cfg ScanConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		cfg := cfg
+		cfg.Dir = LiveImportDir(cfg.Dir, cfg.SettingsPath)
 		svc := cfg.scanService()
 		if svc == nil {
 			return map[string]any{"err": "service.unavailable", "msg": "扫描服务不可用"}, nil
@@ -147,20 +150,8 @@ func ScanListHandler(cfg ScanConfig) HandlerFunc {
 // ScanRunHandler 实现 /api/admin/scan/run（POST，需管理员）。
 func ScanRunHandler(cfg ScanConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
-		path := cfg.Dir.ScanUploadPath
-		if !strings.HasPrefix(path, importdir.ScanDirPrefix) &&
-			!importdir.IsPathInRoots(path, importdir.ConfiguredAllowedRoots(cfg.Dir)) {
-			return map[string]any{
-				"err": "params.error",
-				"msg": "书籍导入目录必须是" + importdir.ScanDirPrefix + "的子目录",
-			}, nil
-		}
-		check := importdir.CheckImportDirectory(path, cfg.Dir)
-		if check.Status == "error" {
-			return map[string]any{
-				"err": "params.path", "msg": check.Msg, "directory_check": check,
-			}, nil
-		}
+		cfg := cfg
+		cfg.Dir = LiveImportDir(cfg.Dir, cfg.SettingsPath)
 		if cfg.StartScan == nil {
 			return map[string]any{"err": "service.unavailable", "msg": "扫描服务不可用"}, nil
 		}
@@ -168,11 +159,34 @@ func ScanRunHandler(cfg ScanConfig) HandlerFunc {
 		if limit <= 0 {
 			limit = 500
 		}
-		if err := cfg.StartScan(path, limit); err != nil {
-			return nil, err
+		roots := importdir.ConfiguredAllowedRoots(cfg.Dir)
+		scanRoots := make([]string, 0, len(roots))
+		for _, path := range roots {
+			covered := false
+			for _, other := range roots {
+				if path != other && importdir.IsWithin(path, other) {
+					covered = true
+					break
+				}
+			}
+			if !covered {
+				scanRoots = append(scanRoots, path)
+			}
 		}
-		// do_scan 是异步的，Python 总是返回 1 表示任务已启动。
-		return map[string]any{"err": "ok", "msg": "开始扫描了", "total": 1}, nil
+		for _, path := range scanRoots {
+			checkCfg := cfg.Dir
+			checkCfg.AllowedRoots = roots
+			check := importdir.CheckImportDirectory(path, checkCfg)
+			if check.Status == "error" {
+				return map[string]any{
+					"err": "params.path", "msg": check.Msg, "directory_check": check,
+				}, nil
+			}
+			if err := cfg.StartScan(path, limit); err != nil {
+				return nil, err
+			}
+		}
+		return map[string]any{"err": "ok", "msg": "开始扫描了", "total": len(scanRoots)}, nil
 	}
 }
 
@@ -191,7 +205,7 @@ func ScanStatusHandler(cfg ScanConfig) HandlerFunc {
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"err": "ok", "msg": "成功", "status": status, "summary": summary}, nil
+		return taskStatusResponse(cfg, "scan", status, summary), nil
 	}
 }
 
@@ -227,6 +241,8 @@ func ScanMarkHandler(cfg ScanConfig) HandlerFunc {
 // ImportRunHandler 实现 /api/admin/import/run（POST，需管理员）。
 func ImportRunHandler(cfg ScanConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		cfg := cfg
+		cfg.Dir = LiveImportDir(cfg.Dir, cfg.SettingsPath)
 		svc := cfg.scanService()
 		if svc == nil {
 			return map[string]any{"err": "service.unavailable", "msg": "扫描服务不可用"}, nil
@@ -260,7 +276,7 @@ func ImportRunHandler(cfg ScanConfig) HandlerFunc {
 		if err := cfg.StartImport(hashlist, userID, deleteAfter, mode); err != nil {
 			return nil, err
 		}
-		return map[string]any{"err": "ok", "msg": "扫描成功", "import_mode": mode}, nil
+		return map[string]any{"err": "ok", "msg": "导入任务已提交", "import_mode": mode}, nil
 	}
 }
 
@@ -279,8 +295,19 @@ func ImportStatusHandler(cfg ScanConfig) HandlerFunc {
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"err": "ok", "msg": "成功", "status": status, "summary": summary}, nil
+		return taskStatusResponse(cfg, "import", status, summary), nil
 	}
+}
+
+func taskStatusResponse(cfg ScanConfig, kind string, status, summary any) map[string]any {
+	watch := cfg.watchStatus()
+	running, _ := watch["manual_"+kind+"_running"].(bool)
+	message, _ := watch["manual_"+kind+"_error"].(string)
+	response := map[string]any{"err": "ok", "msg": "成功", "status": status, "summary": summary, "running": running}
+	if message != "" && !running {
+		response["err"], response["msg"] = "task.failed", message
+	}
+	return response
 }
 
 // ScanRouteSpecs 返回扫描/导入流水线模块接管的 7 条路由。

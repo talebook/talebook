@@ -302,7 +302,7 @@ const { $backend, $alert } = useNuxtApp();
 const { t } = useI18n();
 
 const bookid = route.params.bid;
-// 本地可变副本；book 由下面的 computed 从 useAsyncData 派生。
+// 本地可编辑副本；请求完成时同步服务端数据。
 const bookLocal = ref({ id: 0, files: [], tags: [], aliases: [], pubdate: '' });
 const author_input = ref(null);
 const tag_input = ref(null);
@@ -316,8 +316,8 @@ const pub_year = computed(() => {
     return book.value.pubdate.split('-')[0];
 });
 
-// 修复1: 移除 await，正确使用 useAsyncData
-const { data, refresh } = useAsyncData(`book-edit-${bookid}`, async () => {
+// 等待初始数据，避免编辑表单在数据到达前提交空值。
+const { data, refresh } = await useAsyncData(`book-edit-${bookid}`, async () => {
     try {
         const response = await $backend(`/book/${bookid}`);
         return response;
@@ -327,24 +327,14 @@ const { data, refresh } = useAsyncData(`book-edit-${bookid}`, async () => {
     }
 });
 
-// 直接从 useAsyncData 的结果派生，不用 watch 回填 ref。
-//
-// 服务端渲染时 watch 回调不会于渲染前触发，用 ref + watch 会让 SSR 输出空内容、
-// 客户端首帧却有内容，触发 hydration mismatch。
-const book = computed(() => {
-    const fetched = data.value?.book;
-    if (!fetched) {
-        return bookLocal.value;
-    }
-    return { ...fetched, aliases: fetched.aliases || [] };
-});
-
-// 错误提示仍用 watch（不影响渲染结构）。
+const book = bookLocal;
 watch(data, (newData) => {
-    if (newData && newData.err !== 'ok' && $alert) {
+    if (newData?.err === 'ok' && newData.book) {
+        book.value = { ...newData.book, aliases: newData.book.aliases || [] };
+    } else if (newData && newData.err !== 'ok' && $alert) {
         $alert('error', newData.msg || '获取书籍信息失败');
     }
-});
+}, { immediate: true });
 
 // 修复3: useHead 使用函数形式
 useHead({

@@ -63,6 +63,8 @@ type serveOptions struct {
 	ImportScanBatchSize int
 	// LibraryRoot 是书库根目录（对应 CONF 的 library_path）。
 	LibraryRoot string
+	// BookStorageRoot 是复制/移动导入的文件存储根目录。
+	BookStorageRoot string
 	// HTMLPath 是前端静态资源根目录（对应 CONF 的 html_path）。
 	HTMLPath string
 	// CDNURL 是资源前缀（对应 CONF 的 cdn_url）。
@@ -108,6 +110,7 @@ func newServeFlagSet(out io.Writer) *flag.FlagSet {
 	fs.Bool("import-auto-watch-enabled", false, "开启导入目录自动监控（可用 BOOKSVR_IMPORT_AUTO_WATCH_ENABLED）")
 	fs.Int("import-scan-batch-size", 0, "每批扫描的文件数上限（可用 BOOKSVR_IMPORT_SCAN_BATCH_SIZE）")
 	fs.String("library-root", "", "书库根目录（可用 BOOKSVR_LIBRARY_ROOT）")
+	fs.String("book-storage-root", "", "复制/移动导入的书籍文件存储根目录（可用 BOOKSVR_BOOK_STORAGE_ROOT）")
 	fs.String("html-path", "", "前端静态资源根目录（可用 BOOKSVR_HTML_PATH）")
 	fs.String("cdn-url", "", "资源前缀（可用 BOOKSVR_CDN_URL）")
 	fs.String("api-url", "", "接口前缀（可用 BOOKSVR_API_URL）")
@@ -157,13 +160,14 @@ func parseServeOptions(args []string) (*serveOptions, error) {
 		ImportMode:             pick(fs.Lookup("import-mode").Value.String(), os.Getenv("BOOKSVR_IMPORT_MODE")),
 		ImportAutoWatchEnabled: fs.Lookup("import-auto-watch-enabled").Value.String() == "true" || os.Getenv("BOOKSVR_IMPORT_AUTO_WATCH_ENABLED") == "true",
 
-		LibraryRoot:   pick(fs.Lookup("library-root").Value.String(), os.Getenv("BOOKSVR_LIBRARY_ROOT")),
-		HTMLPath:      pick(fs.Lookup("html-path").Value.String(), os.Getenv("BOOKSVR_HTML_PATH")),
-		CDNURL:        pick(fs.Lookup("cdn-url").Value.String(), os.Getenv("BOOKSVR_CDN_URL")),
-		APIURL:        pick(fs.Lookup("api-url").Value.String(), os.Getenv("BOOKSVR_API_URL")),
-		BasePath:      pick(fs.Lookup("base-path").Value.String(), os.Getenv("BOOKSVR_BASE_PATH")),
-		AudiobookRoot: pick(fs.Lookup("audiobook-root").Value.String(), os.Getenv("BOOKSVR_AUDIOBOOK_ROOT")),
-		Version:       pick(fs.Lookup("version").Value.String(), os.Getenv("BOOKSVR_VERSION")),
+		LibraryRoot:     pick(fs.Lookup("library-root").Value.String(), os.Getenv("BOOKSVR_LIBRARY_ROOT")),
+		BookStorageRoot: pick(fs.Lookup("book-storage-root").Value.String(), os.Getenv("BOOKSVR_BOOK_STORAGE_ROOT")),
+		HTMLPath:        pick(fs.Lookup("html-path").Value.String(), os.Getenv("BOOKSVR_HTML_PATH")),
+		CDNURL:          pick(fs.Lookup("cdn-url").Value.String(), os.Getenv("BOOKSVR_CDN_URL")),
+		APIURL:          pick(fs.Lookup("api-url").Value.String(), os.Getenv("BOOKSVR_API_URL")),
+		BasePath:        pick(fs.Lookup("base-path").Value.String(), os.Getenv("BOOKSVR_BASE_PATH")),
+		AudiobookRoot:   pick(fs.Lookup("audiobook-root").Value.String(), os.Getenv("BOOKSVR_AUDIOBOOK_ROOT")),
+		Version:         pick(fs.Lookup("version").Value.String(), os.Getenv("BOOKSVR_VERSION")),
 		BookSourceSeedFile: pick(fs.Lookup("booksource-seed-file").Value.String(),
 			os.Getenv("BOOKSVR_BOOKSOURCE_SEED_FILE")),
 	}
@@ -288,6 +292,7 @@ func runServe(args []string, out io.Writer) error {
 			GeetestCaptchaKey:  opts.GeetestCaptchaKey,
 		},
 		ImportDir: importdir.Config{
+			SupportedFormats: supportedEbookFormats,
 			ScanUploadPath:   opts.ScanUploadPath,
 			AllowedRoots:     opts.ImportAllowedRoots,
 			SavedImportMode:  opts.ImportMode,

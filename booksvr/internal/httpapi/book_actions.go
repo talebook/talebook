@@ -349,9 +349,19 @@ func bookUploadDelegate(cfg BookConfig,
 
 // BookTxtInitHandler 实现 /api/book/txt/init。
 func BookTxtInitHandler(cfg BookConfig) HandlerFunc {
-	return bookUploadDelegate(cfg, func(c BookConfig) func(*Context, map[string]any) (map[string]any, error) {
-		return c.TxtInit
-	}, "TXT 初始化未接线")
+	legacy := bookUploadDelegate(cfg, func(c BookConfig) func(*Context, map[string]any) (map[string]any, error) { return c.TxtInit }, "TXT 初始化未接线")
+	return func(ctx *Context) (map[string]any, error) {
+		if ctx.Request.Method != http.MethodGet {
+			return legacy(ctx)
+		}
+		if ok, response := bookRequireReadPermission(cfg, ctx); !ok {
+			return response, nil
+		}
+		if cfg.TxtInit == nil {
+			return map[string]any{"err": "not_wired", "msg": "TXT 初始化未接线"}, nil
+		}
+		return cfg.TxtInit(ctx, map[string]any{"id": ctx.Query("id"), "test": ctx.Query("test")})
+	}
 }
 
 // ---- 阅读 ----
@@ -659,7 +669,7 @@ func BookRouteSpecs(cfg BookConfig) []RouteSpec {
 		{Pattern: rBookReaderBoot, Methods: getPost, Handler: BookReaderBootstrapHandler(cfg)},
 		{Pattern: rBookReaderRes, Methods: getHead, Handler: BookReaderResourceHandler(cfg)},
 		{Pattern: rBookTxtRead, Methods: getPost, Handler: BookTxtReadHandler(cfg)},
-		{Pattern: rBookTxtInit, Methods: all, Auth: true, Handler: BookTxtInitHandler(cfg)},
+		{Pattern: rBookTxtInit, Methods: all, Handler: BookTxtInitHandler(cfg)},
 		{Pattern: rBookSendDevice, Methods: all, Auth: true, Handler: BookSendDeviceHandler(cfg)},
 		{Pattern: rBookSendMail, Methods: all, Auth: true, Handler: BookSendMailHandler(cfg)},
 		{Pattern: rBookSetScope, Methods: all, Auth: true, Handler: BookSetScopeHandler(cfg)},

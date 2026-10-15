@@ -484,7 +484,7 @@ func AdminTestMailHandler(cfg AdminConfig) HandlerFunc {
 // 安装前（installed=false）允许匿名调用，安装后要求管理员。
 func AdminTestDBHandler(cfg AdminConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
-		if settingBool(cfg.Settings, "installed", true) {
+		if settingBool(liveSettings(cfg.Settings, cfg.SettingsPath), "installed", true) {
 			if ctx.Identity.IsGuest() {
 				return map[string]any{"err": "user.need_login", "msg": "请先登录"}, nil
 			}
@@ -572,7 +572,7 @@ func AdminMigrateDBHandler(cfg AdminConfig) HandlerFunc {
 // AdminInstallHandler 实现 /api/admin/install。
 func AdminInstallHandler(cfg AdminConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
-		installed := settingBool(cfg.Settings, "installed", true)
+		installed := settingBool(liveSettings(cfg.Settings, cfg.SettingsPath), "installed", true)
 		if ctx.Request.Method == http.MethodGet {
 			if installed {
 				return map[string]any{"err": "installed"}, nil
@@ -1471,11 +1471,11 @@ func adminSettingsSave(cfg AdminConfig, ctx *Context) (map[string]any, error) {
 
 	// 响应仍返回合并后的完整配置，与 Python 的 {err, rsp} 形状一致。
 	rsp := map[string]any{}
-	for k, v := range cfg.Settings {
+	for k, v := range liveSettings(cfg.Settings, cfg.SettingsPath) {
 		rsp[k] = v
 	}
 	for k, v := range next {
-		rsp[k] = v
+		if cfg.SettingsPath == "" { rsp[k] = v }
 	}
 	return map[string]any{"err": "ok", "rsp": rsp}, nil
 }

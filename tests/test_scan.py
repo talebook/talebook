@@ -6,7 +6,6 @@ import json
 import os
 import tempfile
 import threading
-import time
 import urllib.parse
 import zipfile
 from unittest import mock
@@ -22,6 +21,7 @@ from webserver.services.scan import SCAN_EXT, ScanService
 def setUpModule():
     init()
     handlers.scan.SCAN_DIR_PREFIX = "/"
+    main.CONF["import_allowed_roots"] = [testdir + "/cases/"]
 
 
 def write_supported_media(path, extension):
@@ -34,6 +34,16 @@ def write_supported_media(path, extension):
     elif extension == "uvz":
         with zipfile.ZipFile(path, "w") as archive:
             archive.writestr("0001.pdg", b"scanned page")
+    elif extension == "docx":
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("[Content_Types].xml", "<Types/>")
+            archive.writestr("word/document.xml", "<document/>")
+    elif extension == "htmlz":
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("index.html", "<html><body>Test</body></html>")
+    elif extension == "fb2":
+        with open(path, "w", encoding="utf-8") as stream:
+            stream.write('<FictionBook xmlns="http://www.gribuser.ru/xml/fictionbook/2.0"><body/></FictionBook>')
     elif extension == "pdf":
         with open(path, "wb") as stream:
             stream.write(b"%PDF-1.4 indexed test")
@@ -88,14 +98,11 @@ class TestScan(TestWithUserLogin):
         self.assertEqual(d["err"], "ok")
         self.assertEqual(n + 1, threading.active_count())
 
-        # wait job done
-        time.sleep(2)
+        # Queue size becomes zero as soon as the worker takes the job;
+        # join waits for task_done, including the actual scan and commit.
         q = ScanService().get_queue("do_scan")
-        n = q.qsize()
-        while n:
-            n = q.qsize()
-            time.sleep(0.1)
-
+        q.join()
+        self.session.rollback()
         row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
         self.assertEqual(row.status, ScanFile.READY)
         # self.assertEqual(row.status, ScanFile.DROP)
@@ -195,7 +202,7 @@ class TestImportSettings(TestWithUserLogin):
         self.assertEqual(d["path"], os.path.realpath(child))
         self.assertIn("grandchild", [item["name"] for item in d["items"]])
 
-    def test_directory_list_rejects_path_escape(self):
+    def test_directory_list_accepts_arbitrary_absolute_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = os.path.join(tmpdir, "root")
             outside = os.path.join(tmpdir, "outside")
@@ -213,9 +220,8 @@ class TestImportSettings(TestWithUserLogin):
                 self._restore_import_roots(previous)
 
         self.assertEqual(d["err"], "ok")
-        self.assertEqual(d["path"], os.path.realpath(root))
-        self.assertIn("allowed", [item["name"] for item in d["items"]])
-        self.assertNotIn("secret", [item["name"] for item in d["items"]])
+        self.assertEqual(d["path"], os.path.realpath(outside))
+        self.assertIn("secret", [item["name"] for item in d["items"]])
 
     def test_save_import_settings_persists_mode_and_directory(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -321,8 +327,8 @@ class TestImportAllowedRoots(TestWithUserLogin):
                 for key, value in previous.items():
                     main.CONF[key] = value
 
-    def test_save_rejects_root_outside_data_prefix(self):
-        """根目录必须落在 /data/ 之下，否则整个请求被拒绝。"""
+    def test_save_rejects_relative_directory(self):
+        """目录须使用绝对路径。"""
         with tempfile.TemporaryDirectory() as tmpdir:
             previous = {
                 "scan_upload_path": main.CONF.get("scan_upload_path"),
@@ -330,7 +336,7 @@ class TestImportAllowedRoots(TestWithUserLogin):
             }
             try:
                 main.CONF["import_allowed_roots"] = [tmpdir]
-                d = self._post_settings(tmpdir, import_allowed_roots=["/etc"])
+                d = self._post_settings(tmpdir, import_allowed_roots=["relative/books"])
                 self.assertEqual(d["err"], "params.allowed_roots")
             finally:
                 for key, value in previous.items():

@@ -18,7 +18,7 @@ func TestImportRealMOBIPopulatesMetadata(t *testing.T) {
 		t.Skipf("缺少真实 MOBI 样本: %v", err)
 	}
 
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	mi, gone := svc.importMetadata(sample, "mobi")
 	if gone {
 		t.Fatal("样本文件存在，不应返回 gone")
@@ -56,7 +56,7 @@ func TestImportRealMOBIAZW3Alias(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	mi, gone := svc.importMetadata(azw3, "azw3")
 	if gone {
 		t.Fatal("文件存在，不应返回 gone")

@@ -13,7 +13,8 @@ import (
 	"time"
 )
 
-// ScanDirPrefix 复刻 SCAN_DIR_PREFIX：限定扫描必须在 /data/ 之下。
+// ScanDirPrefix 保留默认扫描根路径；导入根目录现在由管理员显式配置，
+// 可以是容器内任意绝对路径。
 const ScanDirPrefix = "/data/"
 
 // DefaultScanPath 复刻 scan_upload_path 的默认值。
@@ -127,13 +128,12 @@ func ConfiguredAllowedRoots(cfg Config) []string {
 
 // SanitizeAllowedRoots 复刻 _sanitize_allowed_roots。
 //
-// 每个根目录都必须落在 /data/ 之下，否则整个请求被拒绝。
+// 每个根目录必须是绝对路径，且不能是空白输入。
 // 返回 (roots, errCode, errMsg)；errCode 非空时调用方应直接返回该错误。
 func SanitizeAllowedRoots(raw []string, present bool) ([]string, string, string) {
 	if !present {
 		return nil, "", ""
 	}
-	prefix := NormalizePath(ScanDirPrefix)
 	normalized := make([]string, 0, len(raw))
 	for _, root := range raw {
 		// 先剔除纯空白项：NormalizePath("   ") 会解析成当前工作目录，
@@ -141,12 +141,13 @@ func SanitizeAllowedRoots(raw []string, present bool) ([]string, string, string)
 		if strings.TrimSpace(root) == "" {
 			continue
 		}
+		root = strings.TrimSpace(root)
+		if !filepath.IsAbs(expandUser(root)) {
+			return nil, "params.allowed_roots", "导入目录必须是服务器上的绝对路径"
+		}
 		path := NormalizePath(root)
 		if path == "" {
 			continue
-		}
-		if !IsWithin(path, prefix) {
-			return nil, "params.allowed_roots", fmt.Sprintf("目录必须位于 %s 之下", ScanDirPrefix)
 		}
 		if !contains(normalized, path) {
 			normalized = append(normalized, path)
@@ -297,7 +298,9 @@ func CheckImportDirectory(path string, cfg Config) DirectoryResult {
 		Exists:         pathExists(normalized),
 		IsDir:          isDir(normalized),
 		IsSymlink:      isSymlink(normalized),
-		InAllowedRoots: IsPathInRoots(normalized, roots),
+		// This legacy response field is retained for older clients. Directories
+		// are scan targets, never an access whitelist.
+		InAllowedRoots: true,
 		CheckedAt:      time.Now().Format("2006-01-02T15:04:05"),
 		Status:         "error",
 	}
@@ -306,11 +309,11 @@ func CheckImportDirectory(path string, cfg Config) DirectoryResult {
 		res.Writable = isWritable(normalized)
 	}
 
-	if res.InAllowedRoots && res.Exists && res.IsDir && !res.IsSymlink && res.Readable {
+	if res.Exists && res.IsDir && !res.IsSymlink && res.Readable {
 		countFiles(&res, normalized, maxFiles, cfg.SupportedFormats)
 	}
 
-	hardError := !res.InAllowedRoots || !res.Exists || !res.IsDir || res.IsSymlink || !res.Readable
+	hardError := !res.Exists || !res.IsDir || res.IsSymlink || !res.Readable
 	switch {
 	case hardError:
 		res.Status = "error"
@@ -376,8 +379,6 @@ func countFiles(res *DirectoryResult, root string, maxFiles int, formats []strin
 // directoryMessage 复刻 _directory_message。
 func directoryMessage(res DirectoryResult) string {
 	switch {
-	case !res.InAllowedRoots:
-		return "该目录不在允许的导入范围内，请选择允许的导入目录。"
 	case !res.Exists:
 		return "目录不存在，请检查路径或先在服务器上创建目录。"
 	case !res.IsDir:
@@ -423,10 +424,13 @@ func ListDirectories(requested string, cfg Config) ListResult {
 	if requested == "" {
 		requested = cfg.ScanUploadPath
 	}
-	if requested == "" && len(roots) > 0 {
+	if requested == "" {
 		requested = roots[0]
 	}
-	path := SafeDirectoryForListing(requested, roots)
+	path := NormalizePath(requested)
+	if path == "" || !isDir(path) {
+		return ListResult{Err: "params.path", Msg: "目录不存在或不可访问", Path: path, Items: []ListItem{}, AllowedRoots: roots}
+	}
 
 	items := []ListItem{}
 	entries, err := os.ReadDir(path)
@@ -444,7 +448,7 @@ func ListDirectories(requested string, cfg Config) ListResult {
 		}
 		child := filepath.Join(path, name)
 		info, err := os.Lstat(child)
-		if err != nil || !info.IsDir() {
+		if err != nil || !isDir(child) {
 			continue
 		}
 		items = append(items, ListItem{
@@ -453,12 +457,12 @@ func ListDirectories(requested string, cfg Config) ListResult {
 			Readable:       isReadable(child),
 			Writable:       isWritable(child),
 			IsSymlink:      info.Mode()&os.ModeSymlink != 0,
-			InAllowedRoots: IsPathInRoots(child, roots),
+			InAllowedRoots: true,
 		})
 	}
 
 	parent := NormalizePath(filepath.Dir(path))
-	canGoParent := IsPathInRoots(parent, roots) && parent != path && !isRootParent(parent, roots)
+	canGoParent := parent != path
 	outParent := ""
 	if canGoParent {
 		outParent = parent

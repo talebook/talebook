@@ -71,6 +71,29 @@ type Task struct {
 //
 // 返回 (是否有书籍文件, 任务列表, 跳过数)。
 func CollectTasks(pathDir string, limit int, donePaths map[string]bool, supported map[string]bool) (bool, []Task, int, error) {
+	// 普通 ZIP/RAR 可能是小说合集，不能让大量非漫画压缩包占满每个批次。
+	// 先收集明确的电子书/漫画格式，余下名额再校验通用压缩包。
+	books, archives := map[string]bool{}, map[string]bool{}
+	for format, enabled := range supported {
+		if format == "zip" || format == "rar" {
+			archives[format] = enabled
+		} else {
+			books[format] = enabled
+		}
+	}
+	hasBooks, tasks, skipped, err := collectTasksByFormat(pathDir, limit, donePaths, books)
+	if err != nil || len(archives) == 0 || (limit > 0 && len(tasks) >= limit) {
+		return hasBooks, tasks, skipped, err
+	}
+	remaining := limit
+	if limit > 0 {
+		remaining -= len(tasks)
+	}
+	hasArchives, extra, skippedArchives, err := collectTasksByFormat(pathDir, remaining, donePaths, archives)
+	return hasBooks || hasArchives, append(tasks, extra...), skipped + skippedArchives, err
+}
+
+func collectTasksByFormat(pathDir string, limit int, donePaths map[string]bool, supported map[string]bool) (bool, []Task, int, error) {
 	hasBooks := false
 	tasks := []Task{}
 	skipped := 0
@@ -211,6 +234,8 @@ type Service struct {
 	LibraryDB *sql.DB
 	// LibraryRoot 是书库根目录，用于写入提取出的封面；为空时跳过封面提取。
 	LibraryRoot string
+	// BookStorageRoot 是复制/移动导入的文件存储根目录；为空时回退到 LibraryRoot。
+	BookStorageRoot string
 	// SupportedFormats 是支持的文件扩展名（小写，不含点）。
 	SupportedFormats map[string]bool
 	// SavedImportMode 是配置中已保存的导入模式（index/copy/move）。

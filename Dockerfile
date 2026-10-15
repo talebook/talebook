@@ -240,9 +240,11 @@ ARG GIT_COMMIT=""
 ENV TALEBOOK_UPGRADE_MODE=spa
 COPY scripts/upgrade/protocol.py scripts/upgrade/executor.py scripts/upgrade/fingerprint.py /opt/talebook-upgrade/
 COPY webserver/self_check.py /opt/talebook-upgrade/self_check.py
+COPY docker/booksvr-entrypoint.py /opt/talebook-upgrade/booksvr-entrypoint.py
 COPY Dockerfile requirements.txt /opt/talebook-contract/
 COPY conf/ /opt/talebook-contract/conf/
 COPY docker/start.sh /opt/talebook-contract/docker/start.sh
+COPY docker/booksvr-entrypoint.py /opt/talebook-contract/docker/booksvr-entrypoint.py
 COPY webserver/models.py webserver/migrate_db.py webserver/self_check.py /opt/talebook-contract/webserver/
 RUN python3 /opt/talebook-upgrade/fingerprint.py /opt/talebook-contract /opt/talebook-upgrade/image.json \
     "$TARGETARCH$TARGETVARIANT" "$GIT_VERSION" "$UPGRADE_SEQUENCE" "$GIT_COMMIT"

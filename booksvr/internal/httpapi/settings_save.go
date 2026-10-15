@@ -8,7 +8,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+var settingsSaveMu sync.Mutex
 
 // SaveSettings 把配置写回 Talebook 配置文件（conf/auto.py）。
 //
@@ -18,6 +21,8 @@ import (
 //
 // 写入采用「先写临时文件再原子替换」，避免写一半崩溃导致配置文件损坏。
 func SaveSettings(path string, values map[string]any) error {
+	settingsSaveMu.Lock()
+	defer settingsSaveMu.Unlock()
 	if path == "" {
 		return fmt.Errorf("httpapi: 保存配置需要配置文件路径")
 	}
@@ -130,6 +135,12 @@ func formatSettingValue(v any) string {
 		return strconv.FormatInt(t, 10)
 	case float64:
 		return strconv.FormatFloat(t, 'g', -1, 64)
+	case []string:
+		parts := make([]string, len(t))
+		for i, item := range t {
+			parts[i] = quotePython(item)
+		}
+		return "[" + strings.Join(parts, ", ") + "]"
 	case []any:
 		parts := make([]string, 0, len(t))
 		for _, item := range t {
@@ -157,5 +168,7 @@ func quotePython(s string) string {
 	s = strings.ReplaceAll(s, `\`, `\\`)
 	s = strings.ReplaceAll(s, `'`, `\'`)
 	s = strings.ReplaceAll(s, "\n", `\n`)
+	s = strings.ReplaceAll(s, "\r", `\r`)
+	s = strings.ReplaceAll(s, "\t", `\t`)
 	return "'" + s + "'"
 }

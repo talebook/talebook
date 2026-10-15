@@ -16,6 +16,7 @@ import (
 func importTestConfig(t *testing.T, root string) ImportConfig {
 	t.Helper()
 	return ImportConfig{
+		SaveSettings: func(map[string]any) error { return nil },
 		Dir: importdir.Config{
 			ScanUploadPath:   root,
 			AllowedRoots:     []string{root},
@@ -171,10 +172,10 @@ func TestImportSettingsPostAllowedRoots(t *testing.T) {
 		return nil
 	}
 
-	// 合法：/data/ 之下。
+	// 合法：任意实际存在的绝对路径。
 	body, _ := json.Marshal(map[string]any{
 		"scan_upload_path":     root,
-		"import_allowed_roots": []string{"/data/books"},
+		"import_allowed_roots": []string{root},
 	})
 	ctx, _ := importCtx(t, http.MethodPost, "/api/admin/import/settings", string(body), true)
 	resp, err := ImportSettingsHandler(cfg)(ctx)
@@ -188,10 +189,10 @@ func TestImportSettingsPostAllowedRoots(t *testing.T) {
 		t.Error("应保存 import_allowed_roots")
 	}
 
-	// 非法：不在 /data/ 之下。
+	// 非法：相对路径。
 	body, _ = json.Marshal(map[string]any{
 		"scan_upload_path":     root,
-		"import_allowed_roots": []string{"/etc"},
+		"import_allowed_roots": []string{"relative/books"},
 	})
 	ctx, _ = importCtx(t, http.MethodPost, "/api/admin/import/settings", string(body), true)
 	resp, err = ImportSettingsHandler(cfg)(ctx)

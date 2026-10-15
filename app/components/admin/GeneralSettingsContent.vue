@@ -526,6 +526,7 @@ import { useDisplay } from 'vuetify';
 import SSLManager from '~/components/SSLManager.vue';
 import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useMainStore } from '@/stores/main';
+import { changedSettings } from '@/composables/useSettingsChanges';
 
 const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
@@ -775,7 +776,6 @@ const cards = computed(() => [
             { icon: 'mdi-information', key: 'UPLOAD_CHUNK_SIZE', label: t('admin.settings.label.uploadChunkSize'), show_when: () => settings.value.UPLOAD_CHUNK_ENABLED },
             { icon: 'mdi-information', key: 'MAX_CHUNK_COUNT', label: t('admin.settings.label.maxChunkCount'), show_when: () => settings.value.UPLOAD_CHUNK_ENABLED },
             { icon: 'mdi-lock', key: 'cookie_secret', label: t('admin.settings.label.cookieSecret') },
-            { icon: 'mdi-folder', key: 'scan_upload_path', label: t('admin.settings.label.scanUploadPath') },
             { icon: 'mdi-information', key: 'push_title', label: t('admin.settings.label.pushTitle') },
             { icon: 'mdi-information', key: 'push_content', label: t('admin.settings.label.pushContent') },
             { icon: 'mdi-clock', key: 'convert_timeout', label: t('admin.settings.label.convertTimeout') },
@@ -942,6 +942,7 @@ onMounted(() => {
         if (!settings.value.FRIENDS) {
             settings.value.FRIENDS = [];
         }
+        savedSettings = JSON.parse(JSON.stringify(settings.value));
     });
 
     fetchTrashSize();
@@ -956,15 +957,19 @@ onBeforeUnmount(() => {
     if (scrollRaf) cancelAnimationFrame(scrollRaf);
 });
 
+let savedSettings = {};
+
 const save_settings = () => {
+    const changed = changedSettings(settings.value, savedSettings);
     $backend('/admin/settings', {
         method: 'POST',
-        body: JSON.stringify(settings.value),
+        body: JSON.stringify(changed),
     })
         .then( rsp => {
             if ( rsp.err != 'ok' ) {
                 if ($alert) $alert('error', rsp.msg);
             } else {
+                savedSettings = JSON.parse(JSON.stringify(settings.value));
                 if ($alert) $alert('success', t('admin.settings.message.saveSuccess'));
             }
         });

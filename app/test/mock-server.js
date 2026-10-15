@@ -1186,15 +1186,17 @@ router.get('/api/admin/import/settings', eventHandler(() => ({
 router.post('/api/admin/import/settings', eventHandler(async (event) => {
   const body = await readBody(event);
   // 实施项 11.6：多目录列表。未传时保持原值（向后兼容）。
-  const allowedRoots = Array.isArray(body.import_allowed_roots)
-    ? body.import_allowed_roots.filter((item) => typeof item === 'string' && item.trim())
+  const requestedRoots = body.import_directories ?? body.import_allowed_roots;
+  const allowedRoots = Array.isArray(requestedRoots)
+    ? requestedRoots.filter((item) => typeof item === 'string' && item.trim()).map(item => item.trim().replace(/\/+$/, '') || '/')
     : importSettings.allowed_roots;
-  if (Array.isArray(body.import_allowed_roots) && allowedRoots.length === 0) {
+  if (Array.isArray(requestedRoots) && allowedRoots.length === 0) {
     return { err: 'params.allowed_roots', msg: '至少需要一个导入目录' };
   }
   importSettings = {
     ...importSettings,
-    scan_upload_path: body.scan_upload_path,
+    scan_upload_path: allowedRoots[0],
+    import_directories: allowedRoots,
     import_mode: body.import_mode,
     auto_watch_enabled: !!body.auto_watch_enabled,
     allowed_roots: allowedRoots,
@@ -1218,7 +1220,7 @@ router.post('/api/admin/import/settings', eventHandler(async (event) => {
 
 router.post('/api/admin/import/directory/check', eventHandler(async (event) => {
   const body = await readBody(event);
-  const targetPath = body.path || '/data/books/imports';
+  const targetPath = (body.path || '/data/books/imports').replace(/\/+$/, '') || '/';
   if (targetPath === '/mock/missing') {
     return {
       err: 'ok',

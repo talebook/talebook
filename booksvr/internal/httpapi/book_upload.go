@@ -256,6 +256,18 @@ func (w *bookWiring) bookUploadComplete(ctx *Context, args map[string]any) (map[
 
 // bookTxtInit 复刻 Python BookTxtInit：为 TXT 上传准备阅读元数据。
 func (w *bookWiring) bookTxtInit(ctx *Context, args map[string]any) (map[string]any, error) {
+	if raw, ok := args["id"]; ok {
+		id, err := strconv.ParseInt(stringOf(raw), 10, 64)
+		if err != nil {
+			return map[string]any{"err": "params.book.invalid", "msg": "书籍已不存在"}, nil
+		}
+		result, err := w.bookReadTxt(ctx, id)
+		if err != nil || result["err"] != "ok" {
+			return result, err
+		}
+		text, _ := result["raw_text"].(string)
+		return map[string]any{"err": "ok", "msg": "已解析", "data": map[string]any{"name": result["title"], "encoding": "utf-8", "content": txtChapters(text)}}, nil
+	}
 	if resp := w.checkUploadPermission(ctx); resp != nil {
 		return resp, nil
 	}

@@ -35,7 +35,7 @@ type Metadata struct {
 
 // FilenameMetadata 复刻 filename_metadata：用文件名（去扩展名）作书名，作者为「佚名」。
 func FilenameMetadata(path string) Metadata {
-	base := filepath.Base(path)
+	base := filepath.Base(strings.ReplaceAll(path, `\`, "/"))
 	return Metadata{
 		Title:   strings.TrimSuffix(base, filepath.Ext(base)),
 		Authors: []string{AnonymousAuthor},

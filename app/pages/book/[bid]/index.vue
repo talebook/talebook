@@ -945,7 +945,7 @@ watch(routeBookId, (newBookId) => {
     }
 });
 // book 的默认值。SSR 渲染前 useAsyncData 可能尚未回填，
-// 因此用 computed 直接从 fetchData 派生，保证服务端与客户端首帧一致。
+// 等待 useAsyncData 完成后同步可编辑副本，保证首帧与后续编辑一致。
 const emptyBook = {
     id: 0,
     title: '',
@@ -1060,7 +1060,7 @@ store.setNavbar(true);
 
 // 数据获取逻辑
 const bookDataKey = computed(() => `book-${bookid.value}`);
-const { data: fetchData, error: fetchError, pending: fetchPending, refresh } = useAsyncData(bookDataKey, async () => {
+const { data: fetchData, error: fetchError, pending: fetchPending, refresh } = await useAsyncData(bookDataKey, async () => {
     const response = await $backend(`/book/${bookid.value}`);
     
     if (response.err === 'ok') {
@@ -1074,50 +1074,15 @@ const { data: fetchData, error: fetchError, pending: fetchPending, refresh } = u
     server: true
 });
 
-// 把 useAsyncData 的结果同步进本地副本。
-//
-// 服务端渲染前 useAsyncData 可能尚未回填，只靠 watch 会让 SSR 输出空的
-// <h1>，客户端首帧却有书名，触发 hydration mismatch。
-// 因此 book 用 computed 直接从 fetchData 派生（SSR 也能拿到），
-// 本地副本只承载后续的就地修改。
-const applyFetchData = (newData) => {
-    if (newData && newData.book) {
-        // 直接更新本地副本的所有属性，保持响应式
-        Object.assign(bookLocal.value, newData.book);
+// Await the initial data for SSR, then keep one mutable reactive book for edits.
+const book = bookLocal;
+watch(fetchData, (newData) => {
+    if (newData?.book) {
+        book.value = { ...emptyBook, ...newData.book };
         kindle_sender.value = newData.kindle_sender || '';
         conversion_options.value = newData.conversion_options || [];
     }
-};
-
-// 监听数据变化并更新本地副本
-watch(() => fetchData.value, applyFetchData, { immediate: true });
-
-// book 优先用 useAsyncData 已取到的数据，保证 SSR 与客户端首帧一致；
-// 本地修改（如改 scope）会覆盖到 bookLocal，从而优先展示。
-// 注意展开顺序：bookLocal 的初始值是 emptyBook（title 为空字符串、
-// authors/files 为空数组），若把它放在最后展开会盖掉 fetched 的真实值，
-// 导致 SSR 渲染空标题、且作者/格式行不出现（客户端却有），
-// 两者都会触发 hydration mismatch。
-//
-// 因此只把 bookLocal 里「确实被本地改过」的键覆盖上去：
-// 与 emptyBook 不同，且不是空数组/空字符串这类初始值。
-const isEmptyish = (v) => v === '' || v === null || v === undefined
-    || (Array.isArray(v) && v.length === 0);
-
-const book = computed(() => {
-    const fetched = fetchData.value?.book;
-    if (!fetched) {
-        return bookLocal.value;
-    }
-    const merged = { ...emptyBook, ...fetched };
-    for (const [k, v] of Object.entries(bookLocal.value)) {
-        if (v === emptyBook[k]) continue;
-        if (isEmptyish(v)) continue;
-        merged[k] = v;
-    }
-    return merged;
-});
-
+}, { immediate: true });
 
 // 监听错误状态
 watch(() => fetchError.value, (newError) => {

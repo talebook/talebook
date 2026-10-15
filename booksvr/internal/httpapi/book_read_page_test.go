@@ -58,10 +58,10 @@ func TestBookReadReturnsHTML(t *testing.T) {
 	if !strings.Contains(body, `id="app"`) {
 		t.Error("缺少阅读器挂载点 #app")
 	}
-	// book_url 在页面里是运行时拼接的（API + "/get/extract/" + BOOK_ID + "/"），
+	// book_url 在页面里是运行时拼接的（API + "/read/extract/" + BOOK_ID + "/"），
 	// 因此断言拼接片段而非完整 URL。
-	if !strings.Contains(body, `"/get/extract/" + BOOK_ID + "/"`) {
-		t.Error("book_url 未指向 /get/extract/<id>/")
+	if !strings.Contains(body, `"/read/extract/" + BOOK_ID + "/"`) {
+		t.Error("book_url 未指向 /read/extract/<id>/")
 	}
 	// MOBI 未就绪时应显示转换提示。
 	if !strings.Contains(body, "正在转换为 EPUB") {

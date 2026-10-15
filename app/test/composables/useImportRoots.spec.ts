@@ -59,15 +59,13 @@ describe('isWithinDataPrefix', () => {
         expect(isWithinDataPrefix('/data/books/imports/')).toBe(true);
     });
 
-    it('rejects a sibling with the same string prefix', () => {
-        // 关键：/database 不是 /data 的子目录
-        expect(isWithinDataPrefix('/database')).toBe(false);
+    it('accepts any absolute server path', () => {
+        expect(isWithinDataPrefix('/mnt/books')).toBe(true);
+        expect(isWithinDataPrefix('/etc')).toBe(true);
     });
 
-    it('rejects unrelated absolute paths', () => {
-        expect(isWithinDataPrefix('/etc')).toBe(false);
-        expect(isWithinDataPrefix('/root')).toBe(false);
-        expect(isWithinDataPrefix('/')).toBe(false);
+    it('accepts the filesystem root', () => {
+        expect(isWithinDataPrefix('/')).toBe(true);
     });
 
     it('rejects blank input', () => {
@@ -79,8 +77,8 @@ describe('isWithinDataPrefix', () => {
         expect(isWithinDataPrefix('data/books')).toBe(false);
     });
 
-    it('exposes the prefix constant', () => {
-        expect(IMPORT_ROOT_PREFIX).toBe('/data/');
+    it('exposes the absolute path prefix', () => {
+        expect(IMPORT_ROOT_PREFIX).toBe('/');
     });
 });
 
@@ -99,17 +97,17 @@ describe('validateAllowedRoots', () => {
         expect(validateAllowedRoots(['', '  ']).error).toBe('empty');
     });
 
-    it('reports outside for a path beyond /data/', () => {
-        expect(validateAllowedRoots(['/etc']).error).toBe('outside');
+    it('accepts paths beyond /data/', () => {
+        expect(validateAllowedRoots(['/mnt/books']).error).toBe('');
     });
 
-    it('rejects the whole list when one entry is outside', () => {
-        const result = validateAllowedRoots(['/data/a', '/etc', '/data/b']);
+    it('rejects the whole list when one entry is relative', () => {
+        const result = validateAllowedRoots(['/data/a', 'books', '/data/b']);
         expect(result.error).toBe('outside');
     });
 
-    it('rejects /database (string-prefix trap)', () => {
-        expect(validateAllowedRoots(['/database']).error).toBe('outside');
+    it('rejects relative paths', () => {
+        expect(validateAllowedRoots(['books']).error).toBe('outside');
     });
 
     it('normalizes before validating', () => {

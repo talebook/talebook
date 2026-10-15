@@ -67,10 +67,11 @@ func importLibraryDB(t *testing.T) *sql.DB {
 }
 
 // newImportService 构造一个带书库句柄的导入服务。
-func newImportService(db, lib *sql.DB) *Service {
+func newImportService(t *testing.T, db, lib *sql.DB) *Service {
 	s := NewService(db, supported())
 	s.Clock = fixedClock
 	s.LibraryDB = lib
+	s.LibraryRoot = t.TempDir()
 	return s
 }
 
@@ -94,7 +95,7 @@ func TestImportNewBook(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeCopy)
@@ -147,7 +148,7 @@ func TestImportSetsItemMediaType(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeCopy)
@@ -175,7 +176,7 @@ func TestImportExistingFormat(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	// 书库已有《三体》/佚名/EPUB。
@@ -211,7 +212,7 @@ func TestImportAddsFormatToExistingBook(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	// 书库已有《三体》/佚名，但只有 MOBI。
@@ -262,7 +263,7 @@ func TestImportIndexMode(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeIndex)
@@ -299,7 +300,7 @@ func TestImportIndexModeReusesExistingBook(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	if _, err := lib.Exec(`INSERT INTO books (id, title, author_sort) VALUES (42, '三体', '佚名')`); err != nil {
@@ -339,7 +340,7 @@ func TestImportMoveModeDeletesSource(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeMove)
@@ -365,7 +366,7 @@ func TestImportMoveModeDeleteFailedWhenTargetMissing(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	// 预先登记一个指向不存在文件的格式，让 libraryFormatExists 返回 false。
@@ -399,7 +400,7 @@ func TestImportMediaAnalysisFailure(t *testing.T) {
 	p := writeBook(t, dir, "bad.epub", []byte("not a zip"))
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeCopy)
@@ -424,7 +425,7 @@ func TestImportMissingFile(t *testing.T) {
 	p := writeBook(t, dir, "a.epub", []byte("PK\x03\x04x"))
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 	if err := os.Remove(p); err != nil {
 		t.Fatalf("删除失败: %v", err)
@@ -447,7 +448,7 @@ func TestImportHashlistFilter(t *testing.T) {
 	p2 := makeValidEpubDifferent(t, dir, "b.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p1, "sha256:aaa")
 	seedReadyRow(t, db, p2, "sha256:bbb")
 
@@ -472,7 +473,7 @@ func TestImportHashlistFilter(t *testing.T) {
 func TestImportNoReadyRows(t *testing.T) {
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	res, err := svc.Import(nil, 7, false, ModeCopy)
 	if err != nil {
 		t.Fatalf("失败: %v", err)
@@ -488,7 +489,7 @@ func TestImportSetsImportID(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeCopy)
@@ -520,7 +521,7 @@ func TestImportNoLibraryDB(t *testing.T) {
 
 // TestImportClosedDB 库句柄损坏时报错。
 func TestImportClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, err := svc.Import(nil, 7, false, ModeCopy); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -529,7 +530,7 @@ func TestImportClosedDB(t *testing.T) {
 // TestSetItemMediaTypeMerge 媒体类型按优先级合并。
 func TestSetItemMediaTypeMerge(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	// 首次插入。
 	if err := svc.setItemMediaType(1, 7, "ebook"); err != nil {
@@ -562,7 +563,7 @@ func TestSetItemMediaTypeMerge(t *testing.T) {
 // TestSetItemMediaTypeLocked 锁定后不修改。
 func TestSetItemMediaTypeLocked(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 	if _, err := db.Exec(`INSERT INTO items (book_id, media_type, media_type_locked) VALUES (1, 'ebook', 1)`); err != nil {
 		t.Fatalf("插入失败: %v", err)
 	}
@@ -579,7 +580,7 @@ func TestSetItemMediaTypeLocked(t *testing.T) {
 func TestLibraryFormatExists(t *testing.T) {
 	dir := t.TempDir()
 	lib := importLibraryDB(t)
-	svc := newImportService(importTestDB(t), lib)
+	svc := newImportService(t, importTestDB(t), lib)
 
 	// book_id 为 0。
 	if svc.libraryFormatExists(0, "epub") {
@@ -698,7 +699,7 @@ func TestImportManagedDocumentSingleMatch(t *testing.T) {
 
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	svc.SupportedFormats["uvz"] = true
 	seedReadyRow(t, db, p, "sha256:x")
 
@@ -744,7 +745,7 @@ func TestImportManagedDocumentMultipleNoMerge(t *testing.T) {
 
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	svc.SupportedFormats["uvz"] = true
 	seedReadyRow(t, db, p, "sha256:x")
 
@@ -780,7 +781,7 @@ func TestImportIndexModeMediaFailure(t *testing.T) {
 	p := writeBook(t, dir, "bad.epub", []byte("not a zip"))
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	res, err := svc.Import(nil, 7, false, ModeIndex)
@@ -798,7 +799,7 @@ func TestImportAddFormatStatFailure(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 
 	if err := svc.addFormatToBook(1, "epub", filepath.Join(dir, "gone.epub")); err != nil {
 		t.Fatalf("文件不存在时不应报错: %v", err)
@@ -815,7 +816,7 @@ func TestImportAddFormatStatFailure(t *testing.T) {
 
 // TestImportAddFormatClosedDB 书库损坏时报错。
 func TestImportAddFormatClosedDB(t *testing.T) {
-	svc := newImportService(importTestDB(t), closedDB(t))
+	svc := newImportService(t, importTestDB(t), closedDB(t))
 	if err := svc.addFormatToBook(1, "epub", "/x.epub"); err == nil {
 		t.Error("书库损坏应报错")
 	}
@@ -823,15 +824,15 @@ func TestImportAddFormatClosedDB(t *testing.T) {
 
 // TestImportNewBookClosedDB 书库损坏时报错。
 func TestImportNewBookClosedDB(t *testing.T) {
-	svc := newImportService(importTestDB(t), closedDB(t))
-	if _, err := svc.importNewBook(importmetaForTest(), "/x.epub", "epub", 7, "ebook"); err == nil {
+	svc := newImportService(t, importTestDB(t), closedDB(t))
+	if _, err := svc.importNewBook(importmetaForTest(), "/x.epub", "epub", 7, "ebook", ModeIndex); err == nil {
 		t.Error("书库损坏应报错")
 	}
 }
 
 // TestImportSetItemMediaTypeClosedDB items 表损坏时报错。
 func TestImportSetItemMediaTypeClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if err := svc.setItemMediaType(1, 7, "ebook"); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -839,7 +840,7 @@ func TestImportSetItemMediaTypeClosedDB(t *testing.T) {
 
 // TestImportEnsureIndexedItemClosedDB 错误分支。
 func TestImportEnsureIndexedItemClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if err := svc.ensureIndexedItem(1, 7, "/x.epub", "ebook"); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -847,7 +848,7 @@ func TestImportEnsureIndexedItemClosedDB(t *testing.T) {
 
 // TestImportReadyRowsClosedDB 错误分支。
 func TestImportReadyRowsClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, err := svc.readyRows(nil); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -855,7 +856,7 @@ func TestImportReadyRowsClosedDB(t *testing.T) {
 
 // TestImportFindSameAuthorBookClosedDB 错误分支。
 func TestImportFindSameAuthorBookClosedDB(t *testing.T) {
-	svc := newImportService(importTestDB(t), closedDB(t))
+	svc := newImportService(t, importTestDB(t), closedDB(t))
 	if _, _, err := svc.findSameAuthorBook(importmetaForTest(), "epub"); err == nil {
 		t.Error("书库损坏应报错")
 	}
@@ -875,7 +876,7 @@ func TestImportFindSameAuthorBookNoLibrary(t *testing.T) {
 
 // TestImportMetadataMissingFile 文件消失。
 func TestImportMetadataMissingFile(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	_, gone := svc.importMetadata(filepath.Join(t.TempDir(), "nope.epub"), "epub")
 	if !gone {
 		t.Error("文件不存在应返回 gone=true")
@@ -886,7 +887,7 @@ func TestImportMetadataMissingFile(t *testing.T) {
 func TestImportMetadataPresent(t *testing.T) {
 	dir := t.TempDir()
 	p := writeBook(t, dir, "三体.epub", []byte("x"))
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	mi, gone := svc.importMetadata(p, "epub")
 	if gone {
 		t.Fatal("文件存在不应返回 gone")
@@ -898,7 +899,7 @@ func TestImportMetadataPresent(t *testing.T) {
 
 // TestImportMarkIndexedClosedDB 错误分支。
 func TestImportMarkIndexedClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	row := &userdb.ScanFile{Path: "/x.epub", Data: map[string]any{}}
 	if _, _, err := svc.markIndexed(row, importmetaForTest(), "/x.epub", "epub", 1, 7, "ebook", 0); err == nil {
 		t.Error("库损坏应报错")
@@ -907,7 +908,7 @@ func TestImportMarkIndexedClosedDB(t *testing.T) {
 
 // TestImportDeleteSourceClosedDB 错误分支。
 func TestImportDeleteSourceClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	row := &userdb.ScanFile{Path: "/x.epub", Data: map[string]any{}}
 	if err := svc.deleteSourceAfterImport(row, "/x.epub", "epub"); err == nil {
 		t.Error("库损坏应报错")
@@ -916,7 +917,7 @@ func TestImportDeleteSourceClosedDB(t *testing.T) {
 
 // TestImportMarkImportedClosedDB 错误分支。
 func TestImportMarkImportedClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	row := &userdb.ScanFile{Path: "/x.epub", Data: map[string]any{}}
 	if _, _, err := svc.markImported(row, "/x.epub", "epub", ModeCopy, false); err == nil {
 		t.Error("库损坏应报错")
@@ -925,7 +926,7 @@ func TestImportMarkImportedClosedDB(t *testing.T) {
 
 // TestImportAddExternalIndexClosedDB 错误分支。
 func TestImportAddExternalIndexClosedDB(t *testing.T) {
-	svc := newImportService(importTestDB(t), closedDB(t))
+	svc := newImportService(t, importTestDB(t), closedDB(t))
 	if _, _, err := svc.addExternalIndexRecord(importmetaForTest(), "/x.epub", "epub", 0); err == nil {
 		t.Error("书库损坏应报错")
 	}
@@ -936,7 +937,7 @@ func TestImportAddExternalIndexReuse(t *testing.T) {
 	dir := t.TempDir()
 	p := writeBook(t, dir, "a.epub", []byte("x"))
 	lib := importLibraryDB(t)
-	svc := newImportService(importTestDB(t), lib)
+	svc := newImportService(t, importTestDB(t), lib)
 
 	id, created, err := svc.addExternalIndexRecord(importmetaForTest(), p, "epub", 42)
 	if err != nil {
@@ -949,7 +950,7 @@ func TestImportAddExternalIndexReuse(t *testing.T) {
 
 // TestImportRowClosedDB 错误分支。
 func TestImportRowClosedDB(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	row := &userdb.ScanFile{Path: "/x.epub", Data: map[string]any{}}
 	if _, _, err := svc.importRow(row, 7, ModeCopy, 1); err == nil {
 		t.Error("库损坏应报错")
@@ -960,7 +961,7 @@ func TestImportRowClosedDB(t *testing.T) {
 func TestImportRowSaveErrorAfterAnalysis(t *testing.T) {
 	dir := t.TempDir()
 	p := makeValidEpub(t, dir, "三体.epub")
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	row := &userdb.ScanFile{Path: p, Data: map[string]any{}}
 	if _, _, err := svc.importRow(row, 7, ModeCopy, 1); err == nil {
 		t.Error("库损坏应报错")
@@ -973,7 +974,7 @@ func TestImportSameAuthorAddFormatError(t *testing.T) {
 	p := makeValidEpub(t, dir, "三体.epub")
 	db := importTestDB(t)
 	lib := importLibraryDB(t)
-	svc := newImportService(db, lib)
+	svc := newImportService(t, db, lib)
 	seedReadyRow(t, db, p, "sha256:x")
 
 	if _, err := lib.Exec(`INSERT INTO books (id, title, author_sort) VALUES (42, '三体', '佚名')`); err != nil {

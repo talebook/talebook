@@ -133,7 +133,7 @@ func FormatAbsPath(db *sql.DB, bookID int64, format, libraryRoot string) (string
 	if bookPath == "" || name == "" {
 		return "", nil
 	}
-	return filepath.Join(libraryRoot, bookPath, name), nil
+	return filepath.Join(libraryRoot, bookPath, name+"."+strings.ToLower(format)), nil
 }
 
 // sortableFields 是支持排序的字段到 SQL 列的映射。

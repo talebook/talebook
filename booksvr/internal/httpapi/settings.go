@@ -109,7 +109,7 @@ func parseSettingValue(raw string) any {
 			// 下次再写就变成 \\\\，指数增长。
 			// 曾把 auto.py 涨到 528MB，并让 settingsLine 正则
 			// 在超长行上回溯爆炸，把 /read/<id> 拖死。
-			return unquotePython(raw[1 : len(raw)-1])
+			return unquotePython(raw)
 		}
 	}
 	if n, err := strconv.ParseInt(raw, 10, 64); err == nil {
@@ -310,6 +310,10 @@ func indexUnquoted(s string, target byte) int {
 		c := s[i]
 		switch {
 		case quote != 0:
+			if c == '\\' {
+				i++
+				continue
+			}
 			if c == quote {
 				quote = 0
 			}

@@ -24,10 +24,26 @@ const (
 type ImportConfig struct {
 	// Dir 是导入目录逻辑的配置。
 	Dir importdir.Config
+	// SettingsPath lets requests observe settings saved since startup.
+	SettingsPath string
 	// WatchStatus 返回自动监控状态；为 nil 时返回「关闭」。
 	WatchStatus func() map[string]any
 	// SaveSettings 持久化导入设置；为 nil 时表示不支持保存。
 	SaveSettings func(values map[string]any) error
+}
+
+// LiveImportDir resolves the same persisted values for settings and scan requests.
+func LiveImportDir(fallback importdir.Config, path string) importdir.Config {
+	if path == "" {
+		return fallback
+	}
+	settings := LoadSettings(path)
+	fallback.ScanUploadPath = settingString(settings, "scan_upload_path")
+	fallback.AllowedRoots = toStringSlice(settings["import_allowed_roots"])
+	fallback.SavedImportMode = settingString(settings, "import_mode")
+	fallback.AutoWatchEnabled = settingBool(settings, "import_auto_watch_enabled", false)
+	fallback.ScanBatchSize = toIntSetting(settings, "import_scan_batch_size", 500)
+	return fallback
 }
 
 // watchStatus 返回自动监控状态。
@@ -49,7 +65,8 @@ func (c ImportConfig) watchStatus() map[string]any {
 //
 // check 为 nil 时按当前配置重新检查目录。
 func importSettingsPayload(cfg ImportConfig, check *importdir.DirectoryResult) map[string]any {
-	path := importdir.NormalizePath(cfg.Dir.ScanUploadPath)
+	directories := importdir.ConfiguredAllowedRoots(cfg.Dir)
+	path := directories[0]
 	result := importdir.CheckImportDirectory(path, cfg.Dir)
 	if check != nil {
 		result = *check
@@ -57,9 +74,10 @@ func importSettingsPayload(cfg ImportConfig, check *importdir.DirectoryResult) m
 	mode := normalizeImportMode(cfg.Dir)
 	return map[string]any{
 		"scan_upload_path":   path,
+		"import_directories": directories,
 		"import_mode":        mode,
 		"auto_watch_enabled": cfg.Dir.AutoWatchEnabled,
-		"allowed_roots":      importdir.ConfiguredAllowedRoots(cfg.Dir),
+		"allowed_roots":      directories, // 旧客户端兼容字段
 		"directory_check":    result,
 		"watch_status":       cfg.watchStatus(),
 	}
@@ -113,6 +131,8 @@ func jsonBody(ctx *Context) map[string]any {
 // ImportSettingsHandler 实现 /api/admin/import/settings（GET / POST，需管理员）。
 func ImportSettingsHandler(cfg ImportConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		cfg := cfg
+		cfg.Dir = LiveImportDir(cfg.Dir, cfg.SettingsPath)
 		if ctx.Request.Method == http.MethodGet {
 			return map[string]any{"err": "ok", "settings": importSettingsPayload(cfg, nil)}, nil
 		}
@@ -133,8 +153,11 @@ func ImportSettingsHandler(cfg ImportConfig) HandlerFunc {
 			autoWatch = asBoolDefault(v, autoWatch)
 		}
 
-		// 允许根目录：仅当请求显式提供该字段时才校验。
-		rawRoots, rootsPresent := req["import_allowed_roots"]
+		// 新字段表示实际扫描目录；保留旧字段兼容历史 UI。
+		rawRoots, rootsPresent := req["import_directories"]
+		if !rootsPresent {
+			rawRoots, rootsPresent = req["import_allowed_roots"]
+		}
 		var roots []string
 		if rootsPresent {
 			roots = toStringSlice(rawRoots)
@@ -144,13 +167,25 @@ func ImportSettingsHandler(cfg ImportConfig) HandlerFunc {
 			return map[string]any{"err": code, "msg": msg}, nil
 		}
 
-		check := importdir.CheckImportDirectory(path, cfg.Dir)
-		if check.Status == "error" {
-			return map[string]any{
-				"err": "params.path", "msg": check.Msg, "directory_check": check,
-			}, nil
+		if sanitized != nil {
+			path = sanitized[0]
 		}
-		if mode == importModeMove && !check.Writable {
+		checkCfg := cfg.Dir
+		checkCfg.AllowedRoots = sanitized
+		check := importdir.CheckImportDirectory(path, checkCfg)
+		if check.Status == "error" {
+			return map[string]any{"err": "params.path", "msg": check.Msg, "directory_check": check}, nil
+		}
+		for _, directory := range sanitized {
+			directoryCheck := importdir.CheckImportDirectory(directory, checkCfg)
+			if directoryCheck.Status == "error" {
+				return map[string]any{"err": "params.path", "msg": directoryCheck.Msg, "directory_check": directoryCheck}, nil
+			}
+			if mode == importModeMove && !directoryCheck.Writable {
+				return map[string]any{"err": "params.path_not_writable", "msg": "剪切模式需要删除源文件，请选择可写目录。", "directory_check": directoryCheck}, nil
+			}
+		}
+		if mode == importModeMove && sanitized == nil && !check.Writable {
 			return map[string]any{
 				"err":             "params.path_not_writable",
 				"msg":             "剪切到书库需要删除源文件，请选择可写目录。",
@@ -158,11 +193,17 @@ func ImportSettingsHandler(cfg ImportConfig) HandlerFunc {
 			}, nil
 		}
 
-		if cfg.SaveSettings != nil {
+		if cfg.SaveSettings == nil {
+			return map[string]any{"err": "service.unavailable", "msg": "导入设置保存未接线"}, nil
+		}
+		{
 			values := map[string]any{
 				"scan_upload_path":          path,
 				"import_mode":               mode,
 				"import_auto_watch_enabled": autoWatch,
+			}
+			if autoWatch {
+				values["import_watch_user_id"] = ctx.Identity.UserID
 			}
 			if sanitized != nil {
 				values["import_allowed_roots"] = sanitized
@@ -184,6 +225,7 @@ func ImportSettingsHandler(cfg ImportConfig) HandlerFunc {
 		if sanitized != nil {
 			updated.Dir.AllowedRoots = sanitized
 		}
+		updated.Dir = LiveImportDir(updated.Dir, updated.SettingsPath)
 		return map[string]any{
 			"err":      "ok",
 			"msg":      message,
@@ -195,9 +237,13 @@ func ImportSettingsHandler(cfg ImportConfig) HandlerFunc {
 // ImportDirectoryCheckHandler 实现 /api/admin/import/directory/check（POST，需管理员）。
 func ImportDirectoryCheckHandler(cfg ImportConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		cfg := cfg
+		cfg.Dir = LiveImportDir(cfg.Dir, cfg.SettingsPath)
 		req := jsonBody(ctx)
 		path := firstNonEmpty(toStr(req["path"]), toStr(req["scan_upload_path"]))
-		result := importdir.CheckImportDirectory(path, cfg.Dir)
+		checkCfg := cfg.Dir
+		checkCfg.AllowedRoots = append(append([]string{}, cfg.Dir.AllowedRoots...), path)
+		result := importdir.CheckImportDirectory(path, checkCfg)
 		return map[string]any{"err": "ok", "directory": result, "msg": result.Msg}, nil
 	}
 }
@@ -205,6 +251,8 @@ func ImportDirectoryCheckHandler(cfg ImportConfig) HandlerFunc {
 // ImportDirectoryListHandler 实现 /api/admin/import/directory/list（GET，需管理员）。
 func ImportDirectoryListHandler(cfg ImportConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		cfg := cfg
+		cfg.Dir = LiveImportDir(cfg.Dir, cfg.SettingsPath)
 		requested := ctx.Request.URL.Query().Get("path")
 		if requested == "" {
 			requested = cfg.Dir.ScanUploadPath

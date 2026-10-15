@@ -41,6 +41,7 @@ type serviceWiring struct {
 	pluginRegistry *pluginruntime.PluginRegistry
 	comicService   *comic.Service
 	settings       map[string]any
+	settingsPath   string
 	libraryRoot    string
 }
 
@@ -58,12 +59,14 @@ func newServiceWiring(userDB, libraryDB *sql.DB, opts *serveOptions) *serviceWir
 		pluginRegistry: pluginruntime.NewPluginRegistry(),
 		comicService:   comic.NewService(),
 		settings:       httpapi.LoadSettings(opts.SettingsFile),
+		settingsPath:   opts.SettingsFile,
 		libraryRoot:    opts.LibraryRoot,
 	}
 	// 重复检测要查 Calibre 的 books 表，必须用书库句柄。
 	w.scanService.LibraryDB = libraryDB
 	// 封面提取需要书库根目录：封面写到 <libraryRoot>/<books.path>/cover.jpg。
 	w.scanService.LibraryRoot = opts.LibraryRoot
+	w.scanService.BookStorageRoot = opts.BookStorageRoot
 	w.scanService.SavedImportMode = opts.ImportMode
 	return w
 }
@@ -86,7 +89,6 @@ func (w *serviceWiring) serviceSet() httpapi.ServiceSet {
 	return httpapi.ServiceSet{
 		ScanService: func() *scan.Service { return w.scanService },
 		StartScan: func(path string, limit int) error {
-			w.watch.Start()
 			_, err := w.scanService.Scan(path, limit)
 			return err
 		},
@@ -97,9 +99,13 @@ func (w *serviceWiring) serviceSet() httpapi.ServiceSet {
 		ImportWatchStatus: w.watchStatus,
 		PluginRegistry:    w.pluginRegistry,
 		ComicService:      w.comicService,
-		SaveOnline:        httpapi.NewSaveOnlineFunc(w.db, w.settings),
-		AnnotationSyncer:  httpapi.NewAnnotationSyncer(w.db, w.settings, w.pluginRegistry),
-		WebDAVServe:       httpapi.NewWebDAVServeFunc(w.db, w.libraryDB, w.settings, w.libraryRoot),
+		SaveOnline: func(ctx *httpapi.Context, sourceKey, bookURL, format string, clean bool, taskID int64) error {
+			return httpapi.NewSaveOnlineFunc(w.db, w.liveSettings())(ctx, sourceKey, bookURL, format, clean, taskID)
+		},
+		AnnotationSyncer: w,
+		WebDAVServe: func(ctx *httpapi.Context) bool {
+			return httpapi.NewWebDAVServeFunc(w.db, w.libraryDB, w.liveSettings(), w.libraryRoot)(ctx)
+		},
 	}
 }
 
@@ -159,4 +165,14 @@ func seedFileCandidates(opts *serveOptions) []string {
 		filepath.Join("webserver", "services", "booksource", "seeds", "booksources.seed.json"),
 	)
 	return out
+}
+
+func (w *serviceWiring) liveSettings() map[string]any {
+	if w.settingsPath != "" {
+		return httpapi.LoadSettings(w.settingsPath)
+	}
+	return w.settings
+}
+func (w *serviceWiring) SyncAnnotation(id int64, source, connection string) {
+	httpapi.NewAnnotationSyncer(w.db, w.liveSettings(), w.pluginRegistry).SyncAnnotation(id, source, connection)
 }

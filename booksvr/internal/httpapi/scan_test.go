@@ -200,6 +200,7 @@ func TestScanRunHandler(t *testing.T) {
 // 实际拦截发生在目录检查（`params.path`）。这里断言该真实行为。
 func TestScanRunHandlerOutsideData(t *testing.T) {
 	cfg := scanTestConfig(t, scanTestDB(t), "C:/not-data")
+	cfg.StartScan = func(string, int) error { t.Error("missing directory must not scan"); return nil }
 	cfg.Dir.AllowedRoots = nil
 
 	ctx, _ := scanCtx(t, http.MethodPost, "/api/admin/scan/run", "", true)
@@ -215,6 +216,7 @@ func TestScanRunHandlerOutsideData(t *testing.T) {
 // TestScanRunHandlerPrefixRejected 路径既不在 /data/ 下也不在根列表时报 params.error。
 func TestScanRunHandlerPrefixRejected(t *testing.T) {
 	cfg := scanTestConfig(t, scanTestDB(t), "C:/not-data")
+	cfg.StartScan = func(string, int) error { t.Error("missing directory must not scan"); return nil }
 	// 让根列表与 scan_upload_path 不一致，模拟路径被拒。
 	cfg.Dir.AllowedRoots = []string{"C:/other"}
 	cfg.Dir.ScanUploadPath = "C:/not-data"
@@ -381,8 +383,8 @@ func TestImportRunHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("失败: %v", err)
 	}
-	if got["err"] != "ok" || got["msg"] != "扫描成功" {
-		t.Errorf("得到 (%v,%v), want (ok,扫描成功)", got["err"], got["msg"])
+	if got["err"] != "ok" || got["msg"] != "导入任务已提交" {
+		t.Errorf("得到 (%v,%v), want (ok,导入任务已提交)", got["err"], got["msg"])
 	}
 	if gotMode != importModeCopy {
 		t.Errorf("import_mode = %q, want copy", gotMode)

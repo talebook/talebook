@@ -894,7 +894,7 @@
         "emptyDirectorySelectable": "此目录下没有可选择的子目录。可以选择当前目录。",
         "mode": "模式",
         "modeIndex": "仅索引",
-        "modeIndexDescription": "不复制文件，将源文件路径记录到扫描索引用于追踪；如需阅读仍需后续复制或剪切导入。",
+        "modeIndexDescription": "不复制、不移动源文件，直接登记到书库供阅读；原目录需保持挂载，源文件不能删除。",
         "modeCopy": "复制到书库",
         "modeCopyDescription": "导入到书库后保留源文件。",
         "modeMove": "剪切到书库",
@@ -912,14 +912,12 @@
         "saved": "导入设置已保存",
         "symlink": "软链接",
         "directoryList": "导入目录",
-        "directoryListHint": "Talebook 会扫描这些目录中的电子书文件。至少保留一个。",
+        "directoryListHint": "这里列出的目录都会被扫描。可填写多个服务器绝对路径；Docker 部署时，宿主机目录需先挂载到容器内。",
         "addDirectory": "添加目录",
         "removeDirectory": "删除此目录",
         "directoryItemLabel": "目录 {index}",
-        "defaultDirectory": "默认导入目录",
-        "defaultDirectoryHint": "自动监控与快速导入使用该目录。",
         "atLeastOneDirectory": "至少需要一个导入目录。",
-        "directoryOutsideRoots": "目录必须位于 /data/ 之下。"
+        "directoryOutsideRoots": "请输入服务器上的绝对目录路径。"
       },
       "watch": {
         "off": "未开启",

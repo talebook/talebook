@@ -19,6 +19,21 @@ def _load_checker():
 
 CHECKER = _load_checker()
 
+
+def test_registered_go_routes_are_collected(tmp_path):
+    folder = tmp_path / "booksvr/internal/httpapi"
+    folder.mkdir(parents=True)
+    (folder / "files.go").write_text(
+        'const rReadExtract = "/read/extract/([0-9]+)/(.*)"\n'
+        'const unused = "/unused"\n'
+        "var specs = []RouteSpec{{Pattern: rReadExtract}}\n",
+        encoding="utf-8",
+    )
+    patterns = CHECKER.collect_routes(tmp_path)
+    assert any(pattern.match("/read/extract/10/chapter.xhtml") for pattern in patterns)
+    assert not any(pattern.match("/unused") for pattern in patterns)
+
+
 SECTIONS = ("定义", "使用场景", "功能", "术语与界面用词", "行为逻辑", "关联实体", "实现对照")
 
 

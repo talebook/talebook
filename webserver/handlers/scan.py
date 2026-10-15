@@ -19,7 +19,7 @@ from webserver.services.scan import IMPORT_MODE_MOVE, ScanService, normalize_imp
 
 CONF = loader.get_settings()
 SCAN_EXT = sorted(SUPPORTED_MEDIA_FORMATS)
-SCAN_DIR_PREFIX = "/data/"  # 限定扫描必须在/data/目录下，以防黑客扫描到其他系统目录
+SCAN_DIR_PREFIX = "/data/"  # 默认导入范围；管理员可指定其他服务器绝对路径
 
 
 def _json_body(request):
@@ -65,8 +65,7 @@ def _is_within(path, prefix):
 def _sanitize_allowed_roots(raw_roots):
     """把请求里的 ``import_allowed_roots`` 归一化成去重、有序的绝对路径列表。
 
-    安全约束（与 ``SCAN_DIR_PREFIX`` 一致）：每个根目录都必须落在 ``/data/``
-    之下，否则整个请求被拒绝——不能让管理员把扫描范围扩到系统目录。
+    每个根目录必须是服务器上的绝对路径；目录存在性与权限在目录检查阶段验证。
 
     返回 ``(roots, error)``；``error`` 非空时调用方应直接返回该错误。
     """
@@ -77,21 +76,18 @@ def _sanitize_allowed_roots(raw_roots):
     if not isinstance(raw_roots, (list, tuple)):
         return None, {"err": "params.allowed_roots", "msg": _("目录列表格式不正确")}
 
-    prefix = _normalize_path(SCAN_DIR_PREFIX)
     normalized = []
     for root in raw_roots:
         # 先剔除纯空白项：_normalize_path("   ") 会把它解析成当前工作目录，
         # 那既不是用户意图，也可能绕过 /data/ 前缀检查。
         if not str(root).strip():
             continue
+        root = os.path.expanduser(str(root).strip())
+        if not os.path.isabs(root):
+            return None, {"err": "params.allowed_roots", "msg": "导入目录必须是服务器上的绝对路径"}
         path = _normalize_path(root)
         if not path:
             continue
-        if not _is_within(path, prefix):
-            return None, {
-                "err": "params.allowed_roots",
-                "msg": _("目录必须位于 %s 之下") % SCAN_DIR_PREFIX,
-            }
         if path not in normalized:
             normalized.append(path)
     if not normalized:
@@ -114,53 +110,13 @@ def _is_path_in_roots(path, roots=None):
 
 
 def _safe_directory_for_listing(requested, roots):
-    fallback = roots[0] if roots else _normalize_path(SCAN_DIR_PREFIX)
     requested_path = _normalize_path(requested)
     if not requested_path:
-        return fallback
-
-    for root in roots:
-        if not _is_path_in_roots(requested_path, [root]):
-            continue
-        relative = os.path.relpath(requested_path, root)
-        if relative in ("", "."):
-            return root
-
-        parts = [part for part in relative.split(os.sep) if part and part != "."]
-        if any(part == ".." or (os.path.altsep and os.path.altsep in part) for part in parts):
-            continue
-
-        current = root
-        valid = True
-        for part in parts:
-            matched_name = None
-            try:
-                for name in os.listdir(current):
-                    if name == part:
-                        matched_name = name
-                        break
-            except OSError:
-                valid = False
-                break
-            if matched_name is None:
-                valid = False
-                break
-
-            child = os.path.join(current, matched_name)
-            if os.path.islink(child) or not os.path.isdir(child):
-                valid = False
-                break
-            current = _normalize_path(child)
-
-        if valid:
-            return current
-
-    return fallback
+        return os.path.abspath(os.sep)
+    return requested_path
 
 
 def _directory_message(result):
-    if not result["in_allowed_roots"]:
-        return _("该目录不在允许的导入范围内，请选择允许的导入目录。")
     if not result["exists"]:
         return _("目录不存在，请检查路径或先在服务器上创建目录。")
     if not result["is_dir"]:
@@ -178,8 +134,8 @@ def _directory_message(result):
     return _("目录可用。发现 %d 个支持格式文件。") % result["supported_file_count"]
 
 
-def check_import_directory(path, max_files=None):
-    roots = _configured_allowed_roots()
+def check_import_directory(path, max_files=None, roots=None):
+    roots = roots or _configured_allowed_roots()
     normalized = _normalize_path(path)
     max_files = max_files or int(CONF.get("import_scan_batch_size", 500))
     result = {
@@ -190,7 +146,8 @@ def check_import_directory(path, max_files=None):
         "is_symlink": os.path.islink(normalized),
         "readable": False,
         "writable": False,
-        "in_allowed_roots": _is_path_in_roots(normalized, roots),
+        # Legacy response field; configured directories are scan targets, not a whitelist.
+        "in_allowed_roots": True,
         "file_count": 0,
         "supported_file_count": 0,
         "truncated": False,
@@ -202,13 +159,7 @@ def check_import_directory(path, max_files=None):
         result["readable"] = os.access(normalized, os.R_OK | os.X_OK)
         result["writable"] = os.access(normalized, os.W_OK)
 
-    if (
-        result["in_allowed_roots"]
-        and result["exists"]
-        and result["is_dir"]
-        and not result["is_symlink"]
-        and result["readable"]
-    ):
+    if result["exists"] and result["is_dir"] and not result["is_symlink"] and result["readable"]:
         try:
             for dirpath, dirnames, filenames in os.walk(normalized):
                 dirnames[:] = [
@@ -234,13 +185,7 @@ def check_import_directory(path, max_files=None):
             result["readable"] = False
             result["msg"] = str(err)
 
-    hard_error = (
-        not result["in_allowed_roots"]
-        or not result["exists"]
-        or not result["is_dir"]
-        or result["is_symlink"]
-        or not result["readable"]
-    )
+    hard_error = not result["exists"] or not result["is_dir"] or result["is_symlink"] or not result["readable"]
     if hard_error:
         result["status"] = "error"
     elif not result["writable"]:
@@ -440,12 +385,14 @@ class ScanMark(BaseHandler):
 
 class ImportSettings(BaseHandler):
     def _settings_payload(self, directory_check=None):
-        path = _normalize_path(CONF.get("scan_upload_path", ""))
+        directories = _configured_allowed_roots()
+        path = directories[0] if directories else _normalize_path(CONF.get("scan_upload_path", ""))
         return {
             "scan_upload_path": path,
+            "import_directories": directories,
             "import_mode": normalize_import_mode(CONF.get("import_mode")),
             "auto_watch_enabled": bool(CONF.get("import_auto_watch_enabled", False)),
-            "allowed_roots": _configured_allowed_roots(),
+            "allowed_roots": directories,  # legacy clients
             "directory_check": directory_check or check_import_directory(path),
             "watch_status": ScanService().get_watch_status(),
         }
@@ -459,7 +406,14 @@ class ImportSettings(BaseHandler):
     @is_admin
     def post(self):
         req = _json_body(self.request)
-        path = _normalize_path(req.get("scan_upload_path") or req.get("path") or CONF.get("scan_upload_path", ""))
+        raw_dirs = req.get("import_directories", req.get("import_allowed_roots"))
+        directories, roots_error = _sanitize_allowed_roots(raw_dirs) if raw_dirs is not None else (None, None)
+        if roots_error:
+            return roots_error
+        if directories:
+            path = directories[0]
+        else:
+            path = _normalize_path(req.get("scan_upload_path") or req.get("path") or CONF.get("scan_upload_path", ""))
         import_mode = normalize_import_mode(req.get("import_mode"))
         auto_watch_enabled = req.get(
             "auto_watch_enabled",
@@ -469,27 +423,25 @@ class ImportSettings(BaseHandler):
             auto_watch_enabled = auto_watch_enabled.lower() in ("1", "true", "yes", "on")
         auto_watch_enabled = bool(auto_watch_enabled)
 
-        allowed_roots, roots_error = _sanitize_allowed_roots(req.get("import_allowed_roots"))
-        if roots_error:
-            return roots_error
-
-        directory_check = check_import_directory(path)
-        if directory_check["status"] == "error":
-            return {"err": "params.path", "msg": directory_check["msg"], "directory_check": directory_check}
-        if import_mode == IMPORT_MODE_MOVE and not directory_check["writable"]:
-            return {
-                "err": "params.path_not_writable",
-                "msg": _("剪切到书库需要删除源文件，请选择可写目录。"),
-                "directory_check": directory_check,
-            }
+        directories = directories or [path]
+        directory_check = check_import_directory(path, roots=directories)
+        for directory in directories:
+            checked = check_import_directory(directory, roots=directories)
+            if checked["status"] == "error":
+                return {"err": "params.path", "msg": checked["msg"], "directory_check": checked}
+            if import_mode == IMPORT_MODE_MOVE and not checked["writable"]:
+                return {
+                    "err": "params.path_not_writable",
+                    "msg": _("剪切模式需要删除源文件，请选择可写目录。"),
+                    "directory_check": checked,
+                }
 
         args = loader.SettingsLoader()
         args.update(CONF)
         args["scan_upload_path"] = path
         args["import_mode"] = import_mode
         args["import_auto_watch_enabled"] = auto_watch_enabled
-        if allowed_roots is not None:
-            args["import_allowed_roots"] = allowed_roots
+        args["import_allowed_roots"] = directories
 
         from webserver.handlers.admin import SettingsSaverLogic
 
@@ -518,7 +470,7 @@ class ImportDirectoryCheck(BaseHandler):
     def post(self):
         req = _json_body(self.request)
         path = req.get("path") or req.get("scan_upload_path")
-        result = check_import_directory(path)
+        result = check_import_directory(path, roots=[path])
         return {"err": "ok", "directory": result, "msg": result["msg"]}
 
 
@@ -527,7 +479,7 @@ class ImportDirectoryList(BaseHandler):
     @is_admin
     def get(self):
         roots = _configured_allowed_roots()
-        requested = self.get_argument("path", "") or CONF.get("scan_upload_path") or roots[0]
+        requested = self.get_argument("path", "") or (roots[0] if roots else os.sep)
         path = _safe_directory_for_listing(requested, roots)
 
         items = []
@@ -547,16 +499,14 @@ class ImportDirectoryList(BaseHandler):
                         "readable": os.access(child, os.R_OK | os.X_OK),
                         "writable": os.access(child, os.W_OK),
                         "is_symlink": is_symlink,
-                        "in_allowed_roots": _is_path_in_roots(child, roots),
+                        "in_allowed_roots": True,
                     }
                 )
         except OSError as err:
             return {"err": "params.path", "msg": str(err), "path": path, "items": [], "allowed_roots": roots}
 
         parent = _normalize_path(os.path.dirname(path))
-        can_go_parent = (
-            _is_path_in_roots(parent, roots) and parent != path and parent not in [os.path.dirname(root) for root in roots]
-        )
+        can_go_parent = parent != path
         return {
             "err": "ok",
             "path": path,
@@ -577,17 +527,14 @@ class ScanRun(BaseHandler):
     @js
     @is_admin
     def post(self):
-        path = CONF["scan_upload_path"]
-        if not path.startswith(SCAN_DIR_PREFIX) and not _is_path_in_roots(path):
-            return {
-                "err": "params.error",
-                "msg": _("书籍导入目录必须是%s的子目录") % SCAN_DIR_PREFIX,
-            }
-        directory_check = check_import_directory(path)
-        if directory_check["status"] == "error":
-            return {"err": "params.path", "msg": directory_check["msg"], "directory_check": directory_check}
+        roots = _configured_allowed_roots()
+        scan_roots = [root for root in roots if not any(root != other and _is_within(root, other) for other in roots)]
+        for path in scan_roots:
+            directory_check = check_import_directory(path, roots=roots)
+            if directory_check["status"] == "error":
+                return {"err": "params.path", "msg": directory_check["msg"], "directory_check": directory_check}
         m = Scanner(self.db, self.session)
-        total = m.run_scan(path, limit=CONF.get("import_scan_batch_size", 500))
+        total = sum(m.run_scan(path, limit=CONF.get("import_scan_batch_size", 500)) for path in scan_roots)
         if total == 0:
             return {"err": "empty", "msg": _("目录中没有找到符合要求的书籍文件！")}
         return {"err": "ok", "msg": _("开始扫描了"), "total": total}

@@ -172,6 +172,7 @@ func (w *bookWiring) bookEdit(ctx *Context, bookID int64, args map[string]any) (
 		return map[string]any{"err": "permission", "msg": "无权操作"}, nil
 	}
 
+	args = normalizeBookEditArgs(args)
 	title := strings.TrimSpace(stringOf(args["title"]))
 	if title == "" {
 		return map[string]any{"err": "params.title", "msg": "书名不能为空"}, nil
@@ -179,6 +180,11 @@ func (w *bookWiring) bookEdit(ctx *Context, bookID int64, args map[string]any) (
 
 	if err := w.updateBookMeta(bookID, title, args); err != nil {
 		return nil, err
+	}
+	if aliases, ok := args["aliases"]; ok {
+		if _, err := w.aliases.ReplaceBookAliases(bookID, toStringSlice(aliases), title); err != nil {
+			return nil, err
+		}
 	}
 	return map[string]any{"err": "ok", "msg": "保存成功"}, nil
 }
@@ -239,25 +245,27 @@ func (w *bookWiring) hasFormat(bookID int64, format string) bool {
 // 再拼上书库根目录。
 func (w *bookWiring) epubPath(bookID int64) string {
 	formats, err := library.ListFormats(w.libraryDB, bookID)
+	if err == nil {
+		for _, f := range formats {
+			if !strings.EqualFold(f.Format, "epub") || f.Path == "" {
+				continue
+			}
+			if filepath.IsAbs(f.Path) {
+				return f.Path
+			}
+			if w.libraryRoot == "" {
+				return f.Path
+			}
+			return filepath.Join(w.libraryRoot, f.Path)
+		}
+	}
+	// 旧 Calibre 书籍尚未迁移到 book_formats 时，从 data.name 和
+	// books.path 回退解析；否则既有 EPUB 会被误判为不支持在线阅读。
+	path, err := library.FormatAbsPath(w.libraryDB, bookID, "EPUB", w.libraryRoot)
 	if err != nil {
 		return ""
 	}
-	for _, f := range formats {
-		if !strings.EqualFold(f.Format, "epub") {
-			continue
-		}
-		if f.Path == "" {
-			return ""
-		}
-		if filepath.IsAbs(f.Path) {
-			return f.Path
-		}
-		if w.libraryRoot == "" {
-			return f.Path
-		}
-		return filepath.Join(w.libraryRoot, f.Path)
-	}
-	return ""
+	return path
 }
 
 // hasKindleFormat 报告书籍是否只有 mobi/azw/azw3 这类待转 EPUB 的格式。
@@ -274,14 +282,36 @@ func (w *bookWiring) hasKindleFormat(bookID int64) bool {
 // availableFormats 返回书籍的全部格式名（小写）。
 func (w *bookWiring) availableFormats(bookID int64) []string {
 	formats, err := library.ListFormats(w.libraryDB, bookID)
-	if err != nil {
-		return nil
-	}
 	out := make([]string, 0, len(formats))
-	for _, f := range formats {
-		out = append(out, strings.ToLower(f.Format))
+	if err == nil {
+		for _, f := range formats {
+			out = append(out, strings.ToLower(f.Format))
+		}
+	}
+	// 保留既有 Calibre data 表格式的识别能力（如待转换的 MOBI/AZW3）。
+	rows, err := w.libraryDB.Query(`SELECT format FROM data WHERE book = ? ORDER BY format`, bookID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var format string
+			if rows.Scan(&format) == nil {
+				value := strings.ToLower(format)
+				if !containsFormat(out, value) {
+					out = append(out, value)
+				}
+			}
+		}
 	}
 	return out
+}
+
+func containsFormat(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 // removeFormat 删除书籍的某个格式（保留外部文件）。
@@ -327,19 +357,23 @@ func (w *bookWiring) updateBookMeta(bookID int64, title string, args map[string]
 			return err
 		}
 	}
-	if series := strings.TrimSpace(stringOf(args["series"])); series != "" {
-		if err := replaceSeries(tx, bookID, series); err != nil {
+	if series, ok := args["series"]; ok {
+		if err := replaceSeries(tx, bookID, strings.TrimSpace(stringOf(series))); err != nil {
 			return err
 		}
 	}
-	if comments := stringOf(args["comments"]); comments != "" {
+	if comments, ok := args["comments"]; ok {
 		if _, err := tx.Exec(`DELETE FROM comments WHERE book = ?`, bookID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(`INSERT INTO comments (book, text) VALUES (?, ?)`,
-			bookID, comments); err != nil {
-			return err
+		if text := stringOf(comments); text != "" {
+			if _, err := tx.Exec(`INSERT INTO comments (book, text) VALUES (?, ?)`, bookID, text); err != nil {
+				return err
+			}
 		}
+	}
+	if err := updateAdditionalBookMeta(tx, bookID, args); err != nil {
+		return err
 	}
 
 	return tx.Commit()
@@ -393,6 +427,9 @@ func replaceTags(tx *sql.Tx, bookID int64, names []string) error {
 func replaceSeries(tx *sql.Tx, bookID int64, name string) error {
 	if _, err := tx.Exec(`DELETE FROM books_series_link WHERE book = ?`, bookID); err != nil {
 		return err
+	}
+	if name == "" {
+		return nil
 	}
 	id, err := ensureNamedRow(tx, "series", "name", name)
 	if err != nil {
@@ -517,7 +554,7 @@ func (w *bookWiring) bookReadBook(ctx *Context, bookID int64) (map[string]any, e
 // writeReaderPage 写出阅读器 HTML 页面。
 //
 // 页面结构与 Python 的 resources/book/creader.html 对齐：
-// 加载 candle-reader 静态应用，book_url 指向 /get/extract/<id>/。
+// 加载 candle-reader 静态应用，book_url 指向 /read/extract/<id>/。
 // isReady 为 false 时显示「转换中」并轮询等待 EPUB 就绪。
 func (w *bookWiring) writeReaderPage(ctx *Context, bookID int64, title string, isReady bool) {
 	// 无 Writer 的调用（如单测直接调 bookReadBook）无法写页面，直接返回。
@@ -557,7 +594,7 @@ type readerPageData struct {
 // readerHTML 生成阅读器页面。
 //
 // 与 Python 的 creader.html 等价的最小实现：挂载 #app，加载 candle-reader，
-// 把 book_url 指向 /get/extract/<id>/。未就绪时轮询 /api/book/<id>/reader-bootstrap。
+// 把 book_url 指向 /read/extract/<id>/。未就绪时轮询 /api/book/<id>/reader-bootstrap。
 func readerHTML(d readerPageData) string {
 	ready := "true"
 	if !d.IsReady {
@@ -589,7 +626,7 @@ func readerHTML(d readerPageData) string {
       debug: false,
       server: window.location.origin,
       themes_css: API + "/static/candle-reader/css/themes.css",
-      book_url: API + "/get/extract/" + BOOK_ID + "/",
+      book_url: API + "/read/extract/" + BOOK_ID + "/",
       display_url: "",
       book_id: BOOK_ID,
     })
@@ -766,11 +803,11 @@ func (w *bookWiring) bookReadTxt(ctx *Context, bookID int64) (map[string]any, er
 		return map[string]any{"err": "format.not_found", "msg": "书籍不包含 TXT 格式"}, nil
 	}
 
-	path, missing, err := library.ResolvePath(w.libraryDB, bookID, "txt")
+	path, err := library.FormatAbsPath(w.libraryDB, bookID, "TXT", w.libraryRoot)
 	if err != nil {
 		return nil, err
 	}
-	if missing {
+	if path == "" {
 		return map[string]any{"err": "file.missing", "msg": "TXT 文件不存在"}, nil
 	}
 	body, err := os.ReadFile(path)
@@ -778,12 +815,34 @@ func (w *bookWiring) bookReadTxt(ctx *Context, bookID int64) (map[string]any, er
 		return map[string]any{"err": "file.missing", "msg": "TXT 文件读取失败"}, nil
 	}
 
-	return map[string]any{
+	text := strings.ReplaceAll(decodeTxtBody(body), "\r", "")
+	start, end := 0, len(text)
+	if raw := ctx.Query("start"); raw != "" {
+		start, err = strconv.Atoi(raw)
+		if err != nil {
+			return map[string]any{"err": "params.range", "msg": "章节范围无效"}, nil
+		}
+	}
+	if raw := ctx.Query("end"); raw != "" && raw != "-1" {
+		end, err = strconv.Atoi(raw)
+		if err != nil {
+			return map[string]any{"err": "params.range", "msg": "章节范围无效"}, nil
+		}
+	}
+	if start < 0 || end < start || end > len(text) {
+		return map[string]any{"err": "params.range", "msg": "章节范围无效"}, nil
+	}
+	result := map[string]any{
 		"err":     "ok",
 		"book_id": bookID,
 		"title":   book.Title,
-		"content": decodeTxtBody(body),
-	}, nil
+		"content": strings.ReplaceAll(html.EscapeString(text[start:end]), "\n", "<br>"),
+	}
+	// 只给初始化内部调用提供原文，不把整本书附带在章节响应中。
+	if ctx.Request.URL.Path == rBookTxtInit {
+		result["raw_text"] = text
+	}
+	return result, nil
 }
 
 // canView 判定当前请求方能否查看该书。
@@ -792,29 +851,20 @@ func (w *bookWiring) canView(ctx *Context, bookID int64) bool {
 	return err == nil && ok
 }
 
-// decodeTxtBody 把 TXT 字节转成字符串（UTF-8 优先，失败时按 GBK 近似回落）。
-func decodeTxtBody(body []byte) string {
-	if len(body) == 0 {
-		return ""
-	}
-	// 去掉 UTF-8 BOM。
-	if len(body) >= 3 && body[0] == 0xEF && body[1] == 0xBB && body[2] == 0xBF {
-		body = body[3:]
-	}
-	return string(body)
-}
-
 // bookReadResource 返回阅读资源文件路径（EPUB 内部资源）。
 func (w *bookWiring) bookReadResource(ctx *Context, bookID int64, name string) (string, error) {
 	if !w.canView(ctx, bookID) {
 		return "", fmt.Errorf("httpapi: 无权查看")
 	}
-	path, missing, err := library.ResolvePath(w.libraryDB, bookID, "epub")
+	path, err := library.FormatAbsPath(w.libraryDB, bookID, "EPUB", w.libraryRoot)
 	if err != nil {
 		return "", err
 	}
-	if missing {
+	if path == "" {
 		return "", fmt.Errorf("httpapi: EPUB 文件不存在")
+	}
+	if _, err := os.Stat(path); err != nil {
+		return "", fmt.Errorf("httpapi: EPUB 文件不存在: %w", err)
 	}
 	// 资源名做路径穿越防护。
 	clean := filepath.Clean("/" + name)

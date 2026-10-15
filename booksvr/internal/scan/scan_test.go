@@ -62,6 +62,25 @@ func supported() map[string]bool {
 	return map[string]bool{"epub": true, "pdf": true, "cbz": true, "txt": true}
 }
 
+func TestCollectTasksBooksBeforeGenericArchives(t *testing.T) {
+	root := t.TempDir()
+	archive := writeBook(t, root, "000-novels.zip", []byte("archive"))
+	book := writeBook(t, root, "zzz-book.txt", []byte("book"))
+	formats := map[string]bool{"txt": true, "zip": true}
+	_, tasks, _, err := CollectTasks(root, 1, nil, formats)
+	if err != nil || len(tasks) != 1 || tasks[0].Path != book {
+		t.Fatalf("book starved by archive: %v %v", tasks, err)
+	}
+	_, tasks, _, err = CollectTasks(root, 1, map[string]bool{book: true}, formats)
+	if err != nil || len(tasks) != 1 || tasks[0].Path != archive {
+		t.Fatalf("archive must remain discoverable: %v %v", tasks, err)
+	}
+	_, tasks, _, err = CollectTasks(root, 0, nil, formats)
+	if err != nil || len(tasks) != 2 {
+		t.Fatalf("unlimited scan: %v %v", tasks, err)
+	}
+}
+
 // fixedClock 返回固定时间。
 func fixedClock() time.Time {
 	return time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)

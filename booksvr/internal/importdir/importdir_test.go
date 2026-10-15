@@ -136,17 +136,17 @@ func TestSanitizeAllowedRoots(t *testing.T) {
 		t.Errorf("纯空白应被拒绝，得到 %q", code)
 	}
 
-	// 不在 /data/ 之下的路径被拒绝。
-	_, code, msg = SanitizeAllowedRoots([]string{"/etc"}, true)
+	// 相对路径被拒绝。
+	_, code, msg = SanitizeAllowedRoots([]string{"relative/books"}, true)
 	if code != "params.allowed_roots" {
-		t.Errorf("越界路径应被拒绝，得到 %q", code)
+		t.Errorf("相对路径应被拒绝，得到 %q", code)
 	}
-	if !strings.Contains(msg, ScanDirPrefix) {
-		t.Errorf("提示应含 %q，得到 %q", ScanDirPrefix, msg)
+	if !strings.Contains(msg, "绝对路径") {
+		t.Errorf("提示应要求绝对路径，得到 %q", msg)
 	}
 
-	// /data/ 之下合法。
-	roots, code, _ = SanitizeAllowedRoots([]string{"/data/books"}, true)
+	// 服务器上的任意绝对目录都可以配置。
+	roots, code, _ = SanitizeAllowedRoots([]string{"/mnt/books"}, true)
 	if code != "" {
 		t.Errorf("合法路径不应报错，得到 %q", code)
 	}
@@ -217,20 +217,10 @@ func TestCheckImportDirectoryNotDir(t *testing.T) {
 	}
 }
 
-// TestCheckImportDirectoryOutsideRoots 目录不在允许范围内。
+// Configured directories are scan targets, not a whitelist.
 func TestCheckImportDirectoryOutsideRoots(t *testing.T) {
-	dir := t.TempDir()
-	outside := t.TempDir()
-	res := CheckImportDirectory(outside, testConfig(t, dir))
-	if res.Status != "error" {
-		t.Errorf("status = %q, want error", res.Status)
-	}
-	if res.InAllowedRoots {
-		t.Error("in_allowed_roots 应为 false")
-	}
-	if !strings.Contains(res.Msg, "允许的导入范围") {
-		t.Errorf("msg = %q", res.Msg)
-	}
+ res := CheckImportDirectory(t.TempDir(), testConfig(t, t.TempDir()))
+ if res.Status != "ok" || !res.InAllowedRoots { t.Fatalf("arbitrary readable directory rejected: %+v", res) }
 }
 
 // TestCheckImportDirectoryEmpty 空目录提示。
@@ -344,7 +334,7 @@ func TestListDirectoriesParent(t *testing.T) {
 
 	// 根目录本身没有可返回的父目录。
 	res := ListDirectories(root, cfg)
-	if res.Parent != "" {
+	if res.Parent != NormalizePath(filepath.Dir(root)) {
 		t.Errorf("根目录的 parent 应为空，得到 %q", res.Parent)
 	}
 
@@ -357,41 +347,21 @@ func TestListDirectoriesParent(t *testing.T) {
 
 // TestListDirectoriesOutsideRoots 越界路径退回第一个允许根目录。
 func TestListDirectoriesOutsideRoots(t *testing.T) {
-	root := t.TempDir()
-	outside := t.TempDir()
-	res := ListDirectories(outside, testConfig(t, root))
-	if res.Path != NormalizePath(root) {
-		t.Errorf("越界应退回根目录 %q，得到 %q", NormalizePath(root), res.Path)
-	}
+ root, outside := t.TempDir(), t.TempDir()
+ res := ListDirectories(outside, testConfig(t, root))
+ if res.Path != NormalizePath(outside) || res.Err != "" { t.Fatalf("directory rejected: %+v", res) }
 }
-
-// TestListDirectoriesTraversal 含 .. 的路径退回根目录。
 func TestListDirectoriesTraversal(t *testing.T) {
-	root := t.TempDir()
-	sub := filepath.Join(root, "sub")
-	if err := os.Mkdir(sub, 0o755); err != nil {
-		t.Fatalf("建目录失败: %v", err)
-	}
-	// 构造 root/sub/../.. 这类越界路径。
-	traversal := filepath.Join(sub, "..", "..")
-	res := ListDirectories(traversal, testConfig(t, root))
-	if res.Path != NormalizePath(root) {
-		t.Errorf("越界应退回根目录，得到 %q", res.Path)
-	}
+ root := t.TempDir()
+ path := filepath.Join(root, "..")
+ res := ListDirectories(path, testConfig(t, root))
+ if res.Path != NormalizePath(path) || res.Err != "" { t.Fatalf("parent rejected: %+v", res) }
 }
-
-// TestListDirectoriesMissing 目录不存在时返回错误。
 func TestListDirectoriesMissing(t *testing.T) {
-	root := t.TempDir()
-	missing := filepath.Join(root, "nope")
-	res := ListDirectories(missing, testConfig(t, root))
-	// 不存在的路径会被 SafeDirectoryForListing 退回根目录，因此不报错。
-	if res.Err != "" {
-		t.Errorf("应退回根目录而非报错，得到 %v", res)
-	}
-	if res.Path != NormalizePath(root) {
-		t.Errorf("path = %q, want %q", res.Path, NormalizePath(root))
-	}
+ root := t.TempDir()
+ missing := filepath.Join(root, "nope")
+ res := ListDirectories(missing, testConfig(t, root))
+ if res.Err != "params.path" || res.Path != NormalizePath(missing) { t.Fatalf("missing directory must report error: %+v", res) }
 }
 
 // TestIsPathInRoots 路径归属判断。

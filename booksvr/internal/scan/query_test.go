@@ -24,7 +24,7 @@ func seedStatusRow(t *testing.T, db *sql.DB, hash, status string, scanID, import
 // TestSummaryCounts 覆盖 summary 的四类计数。
 func TestSummaryCounts(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusExist, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusImported, 1, 0)
@@ -46,7 +46,7 @@ func TestSummaryCounts(t *testing.T) {
 
 // TestSummaryEmpty 空表时全为 0。
 func TestSummaryEmpty(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	got, err := svc.Summary()
 	if err != nil {
 		t.Fatalf("失败: %v", err)
@@ -58,7 +58,7 @@ func TestSummaryEmpty(t *testing.T) {
 
 // TestSummaryError 库损坏时报错。
 func TestSummaryError(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, err := svc.Summary(); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -67,7 +67,7 @@ func TestSummaryError(t *testing.T) {
 // TestCountByStatus 覆盖计数与未知状态动态追加。
 func TestCountByStatus(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 5, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusReady, 5, 0)
@@ -98,7 +98,7 @@ func TestCountByStatus(t *testing.T) {
 // TestCountByStatusImport 按 import_id 计数。
 func TestCountByStatusImport(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusImported, 0, 9)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusImported, 0, 9)
@@ -115,7 +115,7 @@ func TestCountByStatusImport(t *testing.T) {
 
 // TestCountByStatusError 库损坏时报错。
 func TestCountByStatusError(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, err := svc.CountByStatus(1, 0, false); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -124,7 +124,7 @@ func TestCountByStatusError(t *testing.T) {
 // TestScanStatus 返回最大 scan_id 与计数。
 func TestScanStatus(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusReady, 3, 0)
@@ -142,9 +142,9 @@ func TestScanStatus(t *testing.T) {
 	}
 }
 
-// TestScanStatusEmpty 空表返回 (0, 空 map)。
+// TestScanStatusEmpty 空表也提供零值状态，前端才能结束轮询。
 func TestScanStatusEmpty(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	id, count, err := svc.ScanStatus()
 	if err != nil {
 		t.Fatalf("失败: %v", err)
@@ -152,15 +152,15 @@ func TestScanStatusEmpty(t *testing.T) {
 	if id != 0 {
 		t.Errorf("scan_id = %d, want 0", id)
 	}
-	if len(count) != 0 {
-		t.Errorf("count = %+v, want 空", count)
+	if value, ok := count["new"]; !ok || value != 0 || count["total"] != 0 {
+		t.Errorf("count = %+v, want explicit zero counts", count)
 	}
 }
 
 // TestImportStatus 返回最大 import_id 与计数。
 func TestImportStatus(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusImported, 0, 2)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusImported, 0, 7)
@@ -179,19 +179,19 @@ func TestImportStatus(t *testing.T) {
 
 // TestImportStatusEmpty 空表返回 (0, 空 map)。
 func TestImportStatusEmpty(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	id, count, err := svc.ImportStatus()
 	if err != nil {
 		t.Fatalf("失败: %v", err)
 	}
-	if id != 0 || len(count) != 0 {
-		t.Errorf("得到 (%d,%+v), want (0,空)", id, count)
+	if value, ok := count["ready"]; !ok || value != 0 || id != 0 || count["total"] != 0 {
+		t.Errorf("得到 (%d,%+v), want explicit zero counts", id, count)
 	}
 }
 
 // TestStatusByError 库损坏时报错。
 func TestStatusByError(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, _, err := svc.ScanStatus(); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -203,7 +203,7 @@ func TestStatusByError(t *testing.T) {
 // TestCountReady 覆盖待导入计数。
 func TestCountReady(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusReady, 1, 0)
@@ -239,7 +239,7 @@ func TestCountReady(t *testing.T) {
 
 // TestCountReadyError 库损坏时报错。
 func TestCountReadyError(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, err := svc.CountReady(nil); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -248,7 +248,7 @@ func TestCountReadyError(t *testing.T) {
 // TestDeleteAll hashlist 为 nil 时删除全部。
 func TestDeleteAll(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusReady, 1, 0)
@@ -269,7 +269,7 @@ func TestDeleteAll(t *testing.T) {
 // TestDeleteByHashList 按 hash 列表删除。
 func TestDeleteByHashList(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusReady, 1, 0)
@@ -291,7 +291,7 @@ func TestDeleteByHashList(t *testing.T) {
 // TestDeleteEmptyList 空列表不删除任何记录。
 func TestDeleteEmptyList(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 
 	n, err := svc.Delete([]string{})
@@ -309,7 +309,7 @@ func TestDeleteEmptyList(t *testing.T) {
 
 // TestDeleteError 库损坏时报错。
 func TestDeleteError(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, err := svc.Delete(nil); err == nil {
 		t.Error("库损坏应报错")
 	}
@@ -321,7 +321,7 @@ func TestDeleteError(t *testing.T) {
 // TestListAll 默认查询返回全部。
 func TestListAll(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusExist, 1, 0)
@@ -338,7 +338,7 @@ func TestListAll(t *testing.T) {
 // TestListFilters 覆盖 todo/done/failed 三种过滤。
 func TestListFilters(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)        // todo
 	seedStatusRow(t, db, "h2", userdb.ScanStatusExist, 1, 0)        // done
@@ -370,7 +370,7 @@ func TestListFilters(t *testing.T) {
 // TestListPagination 分页与 num<=0 不分页。
 func TestListPagination(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	for _, h := range []string{"h1", "h2", "h3", "h4", "h5"} {
 		seedStatusRow(t, db, h, userdb.ScanStatusReady, 1, 0)
@@ -408,7 +408,7 @@ func TestListPagination(t *testing.T) {
 // TestListSortDesc 降序排序。
 func TestListSortDesc(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h2", userdb.ScanStatusReady, 1, 0)
@@ -425,7 +425,7 @@ func TestListSortDesc(t *testing.T) {
 // TestListUnknownSort 未知排序字段退回 create_time。
 func TestListUnknownSort(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 	seedStatusRow(t, db, "h1", userdb.ScanStatusReady, 1, 0)
 
 	items, total, err := svc.List(ListOptions{Num: 20, Sort: "bogus", Desc: true, Filter: FilterAll})
@@ -440,7 +440,7 @@ func TestListUnknownSort(t *testing.T) {
 // TestListDataRoundTrip data 字段正确反序列化。
 func TestListDataRoundTrip(t *testing.T) {
 	db := importTestDB(t)
-	svc := newImportService(db, importLibraryDB(t))
+	svc := newImportService(t, db, importLibraryDB(t))
 
 	row := &userdb.ScanFile{
 		Name: "n", Path: "/data/n", Hash: "h1", Status: userdb.ScanStatusReady,
@@ -462,7 +462,7 @@ func TestListDataRoundTrip(t *testing.T) {
 
 // TestListError 库损坏时报错。
 func TestListError(t *testing.T) {
-	svc := newImportService(closedDB(t), importLibraryDB(t))
+	svc := newImportService(t, closedDB(t), importLibraryDB(t))
 	if _, _, err := svc.List(ListOptions{Num: 20, Filter: FilterAll}); err == nil {
 		t.Error("库损坏应报错")
 	}

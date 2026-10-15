@@ -128,12 +128,7 @@ func TestCheckImportDirectorySymlink(t *testing.T) {
 		t.Skipf("无法创建符号链接: %v", err)
 	}
 	res := CheckImportDirectory(link, testConfig(t, root))
-	if res.Status != "error" {
-		t.Errorf("status = %q, want error", res.Status)
-	}
-	if !strings.Contains(res.Msg, "软链接") {
-		t.Errorf("msg = %q", res.Msg)
-	}
+ if res.Status != "ok" || res.Path != NormalizePath(target) { t.Fatalf("explicit symlink target rejected: %+v", res) }
 }
 
 // TestCheckImportDirectoryUnreadable 不可读目录被判为 error。
@@ -242,7 +237,7 @@ func TestDirectoryMessageAllBranches(t *testing.T) {
 		res  DirectoryResult
 		want string
 	}{
-		{"不在范围", DirectoryResult{InAllowedRoots: false}, "允许的导入范围"},
+		{"未配置为扫描目录", DirectoryResult{InAllowedRoots: false}, "不存在"},
 		{"不存在", DirectoryResult{InAllowedRoots: true, Exists: false}, "不存在"},
 		{"非目录", DirectoryResult{InAllowedRoots: true, Exists: true, IsDir: false}, "不是目录"},
 		{"软链接", DirectoryResult{InAllowedRoots: true, Exists: true, IsDir: true, IsSymlink: true}, "软链接"},
@@ -269,7 +264,7 @@ func TestListDirectoriesRootParent(t *testing.T) {
 	root := t.TempDir()
 	cfg := testConfig(t, root)
 	res := ListDirectories(root, cfg)
-	if res.Parent != "" {
+	if res.Parent != NormalizePath(filepath.Dir(root)) {
 		t.Errorf("根目录 parent 应为空，得到 %q", res.Parent)
 	}
 }

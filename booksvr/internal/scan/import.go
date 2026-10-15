@@ -4,6 +4,7 @@ package scan
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,6 +70,12 @@ func (s *Service) Import(hashlist []string, userID int64, deleteAfter bool, impo
 	for _, row := range rows {
 		outcome, bookID, err := s.importRow(row, userID, mode, res.ImportID)
 		if err != nil {
+			row.Status = userdb.ScanStatusFailed
+			setRowData(row, "import_error", err.Error())
+			if saveErr := saveScanFile(s.DB, row); saveErr != nil {
+				return res, fmt.Errorf("%w; 保存导入失败状态: %v", err, saveErr)
+			}
+			res.Failed++
 			return res, err
 		}
 		switch outcome {
@@ -173,7 +180,7 @@ func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, imp
 		}
 		// 同名同作者：把格式加到现有书籍。
 		row.BookID = sameAuthorID
-		if err := s.addFormatToBook(row.BookID, format, fpath); err != nil {
+		if err := s.addImportedFormatToBook(row.BookID, format, fpath, mode); err != nil {
 			return "", 0, err
 		}
 		if err := s.setItemMediaType(row.BookID, userID, analysis.MediaType); err != nil {
@@ -186,7 +193,7 @@ func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, imp
 		return s.markIndexed(row, mi, fpath, format, importID, userID, analysis.MediaType, 0)
 	}
 	// 新书导入。
-	bookID, err := s.importNewBook(mi, fpath, format, userID, analysis.MediaType)
+	bookID, err := s.importNewBook(mi, fpath, format, userID, analysis.MediaType, mode)
 	if err != nil {
 		return "", 0, err
 	}
@@ -388,13 +395,17 @@ func (s *Service) addFormatToBook(bookID int64, format, fpath string) error {
 // 与 Calibre 的 db.import_book 不同：本实现**不复制、不改名、不写 OPF**，
 // 只把源文件的绝对路径登记进 book_formats（方案 5.4 导入语义表）。
 // 目录约定与 ASCII 转写都是被废弃的旧 Calibre 行为。
-func (s *Service) importNewBook(mi importmeta.Metadata, fpath, format string, userID int64, mediaType string) (int64, error) {
+func (s *Service) importNewBook(mi importmeta.Metadata, fpath, format string, userID int64, mediaType, mode string) (int64, error) {
 	if s.LibraryDB == nil {
 		return 0, fmt.Errorf("scan: 导入书籍需要书库句柄")
 	}
 	author := ""
 	if len(mi.Authors) > 0 {
 		author = mi.Authors[0]
+	}
+	bookPath := filepath.Dir(fpath)
+	if mode != ModeIndex {
+		bookPath = ""
 	}
 	bookID, err := library.ImportBook(s.LibraryDB, library.BookMeta{
 		Title:     mi.Title,
@@ -403,13 +414,19 @@ func (s *Service) importNewBook(mi importmeta.Metadata, fpath, format string, us
 		Pubdate:   mi.Pubdate,
 		Tags:      mi.Tags,
 		Comments:  mi.Comments,
-		// books.path 存源文件所在目录，供兼容层使用；不复制文件。
-		Path: filepath.Dir(fpath),
+		// 索引模式沿用源目录；复制/剪切模式稍后设为书库内的相对目录。
+		Path: bookPath,
 	})
 	if err != nil {
 		return 0, fmt.Errorf("scan: 导入书籍失败: %w", err)
 	}
-	if err := s.addFormatToBook(bookID, format, fpath); err != nil {
+	if mode != ModeIndex {
+		bookPath = filepath.Join("Talebook Imports", fmt.Sprintf("%d", bookID))
+		if _, err := s.LibraryDB.Exec(`UPDATE books SET path = ? WHERE id = ?`, filepath.ToSlash(bookPath), bookID); err != nil {
+			return 0, fmt.Errorf("scan: 设置书库文件目录失败: %w", err)
+		}
+	}
+	if err := s.addImportedFormatToBook(bookID, format, fpath, mode); err != nil {
 		return 0, err
 	}
 	// 提取内嵌封面并写入书库目录，同时把 books.has_cover 置 1。
@@ -419,6 +436,92 @@ func (s *Service) importNewBook(mi importmeta.Metadata, fpath, format string, us
 		return 0, err
 	}
 	return bookID, nil
+}
+
+// addImportedFormatToBook 把复制/剪切导入的格式文件写入 Calibre 书库根目录；
+// 仅索引模式才直接登记源路径。
+func (s *Service) addImportedFormatToBook(bookID int64, format, source, mode string) error {
+	if mode == ModeIndex {
+		return s.addFormatToBook(bookID, format, source)
+	}
+	storageRoot := s.bookStorageRoot()
+	if storageRoot == "" {
+		return fmt.Errorf("scan: 复制导入需要书库根目录")
+	}
+	var bookPath string
+	if err := s.LibraryDB.QueryRow(`SELECT COALESCE(path,'') FROM books WHERE id = ?`, bookID).Scan(&bookPath); err != nil {
+		return fmt.Errorf("scan: 查询书籍目录失败: %w", err)
+	}
+	if filepath.IsAbs(bookPath) || bookPath == "" {
+		bookPath = filepath.Join("Talebook Imports", fmt.Sprintf("%d", bookID))
+	}
+	bookPath = filepath.Clean(filepath.FromSlash(bookPath))
+	if bookPath == "." || bookPath == ".." || strings.HasPrefix(bookPath, ".."+string(filepath.Separator)) {
+		return fmt.Errorf("scan: 非法书籍目录 %q", bookPath)
+	}
+	dir := filepath.Join(storageRoot, bookPath)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("scan: 创建书籍目录失败: %w", err)
+	}
+	ext := strings.ToLower(strings.TrimPrefix(format, "."))
+	dest := filepath.Join(dir, fmt.Sprintf("book-%d.%s", bookID, ext))
+	if _, err := os.Lstat(dest); err == nil {
+		return fmt.Errorf("scan: 书库目标文件已存在: %s", dest)
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("scan: 检查书库目标文件失败: %w", err)
+	}
+	if err := copyImportedFile(source, dest); err != nil {
+		return err
+	}
+	if err := s.addFormatToBook(bookID, format, dest); err != nil {
+		_ = os.Remove(dest)
+		return err
+	}
+	return nil
+}
+
+func copyImportedFile(source, destination string) error {
+	if filepath.Clean(source) == filepath.Clean(destination) {
+		return nil
+	}
+	in, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("scan: 打开源文件失败: %w", err)
+	}
+	defer in.Close()
+	tmp, err := os.CreateTemp(filepath.Dir(destination), ".talebook-import-*")
+	if err != nil {
+		return fmt.Errorf("scan: 创建书库临时文件失败: %w", err)
+	}
+	tmpName := tmp.Name()
+	ok := false
+	defer func() {
+		_ = tmp.Close()
+		if !ok {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if _, err := io.Copy(tmp, in); err != nil {
+		return fmt.Errorf("scan: 复制书籍文件失败: %w", err)
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		return fmt.Errorf("scan: 设置书籍文件权限失败: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("scan: 写入书籍文件失败: %w", err)
+	}
+	if err := os.Rename(tmpName, destination); err != nil {
+		return fmt.Errorf("scan: 保存书籍文件失败: %w", err)
+	}
+	ok = true
+	return nil
+}
+
+func (s *Service) bookStorageRoot() string {
+	if s.BookStorageRoot != "" {
+		return s.BookStorageRoot
+	}
+	return s.LibraryRoot
 }
 
 // extractCover 从书籍文件里提取内嵌封面并写入书库。
@@ -443,7 +546,11 @@ func (s *Service) extractCover(bookID int64, fpath, format string) {
 	}
 	dir := filepath.FromSlash(rel)
 	if !filepath.IsAbs(dir) {
-		dir = filepath.Join(s.LibraryRoot, dir)
+		root := s.LibraryRoot
+		if s.BookStorageRoot != "" && strings.HasPrefix(filepath.ToSlash(dir), "Talebook Imports/") {
+			root = s.BookStorageRoot
+		}
+		dir = filepath.Join(root, dir)
 	}
 	if dir == "" {
 		return

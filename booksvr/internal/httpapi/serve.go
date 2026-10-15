@@ -207,163 +207,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 	}
 
-	authCfg := AuthConfig{
-		CookieSecret: opts.CookieSecret,
-		Demo:         opts.Demo,
-		Invite:       opts.Invite,
-	}
-	specs := append(WorkRouteSpecs(), AuthRouteSpecs(authCfg)...)
-	specs = append(specs, ThemeRouteSpecs(opts.ThemeStore)...)
-	specs = append(specs, AdminOpdsSourcesRouteSpecs()...)
-	specs = append(specs, AnnotationRouteSpecs(opts.AnnotationSyncer)...)
-	// 漫画路由在 bookWiring 构造后接线（需要它的 recordHistory）。
-	comicCfg := ComicConfig{
-		CookieSecret: opts.CookieSecret,
-		LibraryRoot:  opts.LibraryRoot,
-	}
-	onlineComicCfg := OnlineComicConfig{
-		Settings: map[string]any{"cookie_secret": opts.CookieSecret},
-	}
-	specs = append(specs, OnlineComicRouteSpecs(onlineComicCfg)...)
-	// 插件 run 执行器：在共享后台队列上执行已持久化的 run。
-	pluginExecutor := pluginjobs.NewExecutor(pluginjobs.Config{
-		DB:      userDB,
-		Runtime: pluginruntime.NewRuntime(userDB, opts.Settings, opts.PluginRegistry),
-	})
-	specs = append(specs, PluginRouteSpecs(PluginConfig{
-		Settings: opts.Settings,
-		Registry: opts.PluginRegistry,
-		ExecuteRun: func(_ *Context, runID int64) error {
-			_, err := pluginExecutor.Execute(runID)
-			return err
-		},
-	})...)
-	specs = append(specs, BookToolsRouteSpecs(BookToolsConfig{
-		Settings: opts.Settings,
-		Registry: opts.PluginRegistry,
-	})...)
-	specs = append(specs, BookSourceAdminRouteSpecs(BookSourceAdminConfig{
-		Settings: opts.Settings,
-		SeedFile: opts.BookSourceSeedFile,
-	})...)
-	// 网络书库的封面改写依赖在线漫画的签名图片地址，这里把两者接上。
-	specs = append(specs, NetworkRouteSpecs(NetworkConfig{
-		Settings:           opts.Settings,
-		LibraryRoot:        opts.LibraryRoot,
-		SaveOnline:         opts.SaveOnline,
-		ComicCoverRewriter: OnlineComicCoverRewriter(onlineComicCfg),
-	})...)
-	specs = append(specs, CaptchaRouteSpecs(CaptchaConfig{
-		CookieSecret: opts.CookieSecret,
-		Settings:     opts.CaptchaSettings,
-	})...)
-	specs = append(specs, ImportRouteSpecs(ImportConfig{
-		Dir:         opts.ImportDir,
-		WatchStatus: opts.ImportWatchStatus,
-	})...)
-	specs = append(specs, ScanRouteSpecs(ScanConfig{
-		Dir:         opts.ImportDir,
-		Service:     opts.ScanService,
-		WatchStatus: opts.ImportWatchStatus,
-		StartScan:   opts.StartScan,
-		StartImport: opts.StartImport,
-		UserID:      func(ctx *Context) int64 { return ctx.Identity.UserID },
-	})...)
-	// FilesConfig.DB 是 Calibre 元数据库（data / book_formats 等表）。
-	// DefaultCover 必须接线：书籍无封面时回退到它，否则 /get/cover 返回 0 字节，
-	// 前端封面图空白（用户可见现象：详情页/列表页都没有封面）。
-	specs = append(specs, FilesRouteSpecs(FilesConfig{
-		DB:           db,
-		LibraryRoot:  opts.LibraryRoot,
-		HTMLPath:     opts.HTMLPath,
-		DefaultCover: loadDefaultCover(opts.HTMLPath),
-	})...)
-	specs = append(specs, UserRouteSpecs(UserConfig{
-		Auth:         authCfg,
-		DB:           userDB,
-		Settings:     opts.Settings,
-		SettingsPath: opts.SettingsPath,
-		Version:      opts.Version,
-		CDNURL:       opts.CDNURL,
-		// 首页「分类浏览」的计数来自 /api/user/info 的 sys 字段。
-		// 这些回调必须接线，否则全部返回 0（曾导致首页显示 0 本书籍）。
-		// 统计的是 Calibre 元数据库（books/authors/publishers/tags/series/data）。
-		CountBooks:      func() (int64, error) { return library.CountBooks(db) },
-		CountAuthors:    func() (int64, error) { return library.CountAuthors(db) },
-		CountPublishers: func() (int64, error) { return library.CountPublishers(db) },
-		CountTags:       func() (int64, error) { return library.CountTags(db) },
-		CountSeries:     func() (int64, error) { return library.CountSeries(db) },
-		CountFormats:    func() (int64, error) { return library.CountFormats(db) },
-	})...)
-	// 书籍、有声书与 WebDAV：接线到 library / userdb 的真实实现。
-	// 必须在 MetaRouteSpecs 之前构造：分类详情页（/api/publisher/<name> 等）
-	// 复用 bookCfg 的完整 BookFormatter，否则返回的书籍缺少 img/thumb/href，
-	// 前端 BookCards 拿不到封面地址（用户可见现象：钻取页无封面图）。
-	publicURL := bookPublicURL(opts.BasePath)
-	bookWiring := newBookWiring(userDB, db, opts.Settings).withSettingsPath(opts.SettingsPath)
-	// 删除公开书时把目录移入 <libraryRoot>/.caltrash，供回收站页面恢复。
-	bookWiring.libraryRoot = opts.LibraryRoot
-	// 在线阅读需要把 mobi/azw3 转成 EPUB；转换产物放在书库下的 convert 目录。
-	// 转换器用 Calibre 的 ebook-convert；未安装时 convertOne 会明确报错，
-	// 阅读页回退到「请下载后本地阅读」，而不是给出一个假的 EPUB。
-	convertSvc := convert.NewService(db, filepath.Join(opts.LibraryRoot, "convert"))
-	convertSvc.Converter = convert.NewCalibreConverter(ebookConvertPath())
-	bookWiring.convert = convertSvc
-	bookCfg := bookWiring.Config(opts.CDNURL)
-
-	// 漫画路由需要 bookWiring 的 recordHistory（阅读历史）。
-	comicCfg.RecordHistory = bookWiring.recordHistory
-	specs = append(specs, ComicRouteSpecs(comicCfg, opts.ComicService)...)
-
-	// MetaConfig.DB 是 Calibre 元数据库（authors / tags / publishers 等表）；
-	// UserDB 是 Talebook 自有库（author_aliases / book_aliases 等表）。
-	specs = append(specs, MetaRouteSpecs(MetaConfig{
-		DB:       db,
-		UserDB:   userDB,
-		Settings: opts.Settings,
-		Book:     bookCfg,
-	})...)
-	specs = append(specs, UpgradeRouteSpecs(UpgradeConfig{
-		DB:          userDB,
-		Settings:    opts.Settings,
-		Version:     opts.Version,
-		UpgradeMode: UpgradeModeFromEnv(),
-	})...)
-	specs = append(specs, SocialRouteSpecs(SocialConfig{Auth: authCfg})...)
-	// OpdsConfig.DB 是 Calibre 元数据库。
-	specs = append(specs, OpdsRouteSpecs(OpdsConfig{
-		DB:       db,
-		Settings: opts.Settings,
-	})...)
-	specs = append(specs, AdminRouteSpecs(newAdminConfig(opts, userDB, db))...)
-
-	specs = append(specs, BookRouteSpecs(bookCfg)...)
-
-	audioRoot := opts.AudiobookRoot
-	if audioRoot == "" && opts.LibraryRoot != "" {
-		audioRoot = filepath.Join(opts.LibraryRoot, "audiobooks")
-	}
-	specs = append(specs, AudioRouteSpecs(newAudioWiring(userDB, db, opts.Settings, audioRoot).Config(opts.CDNURL, publicURL))...)
-
-	specs = append(specs, WebDAVRouteSpecs((&webdavWiring{
-		settings: opts.Settings,
-		serve:    opts.WebDAVServe,
-	}).Config(opts.Demo))...)
-
-	server, err := NewServer(specs)
-	if err != nil {
-		return err
-	}
-	server.DB = userDB
-	// 作品/版本层要读 Calibre 元数据库的 books 表（work_id / edition_key）。
-	server.LibraryDB = db
-	server.Identify = NewCookieIdentifier(opts.CookieSecret, nil)
-	// 接入 can_view_book：非管理员看不到他人的私藏书。
-	server.IsPublic = func(identity Identity, bookID int64) (bool, error) {
-		return userdb.CanViewBook(userDB, bookID, identity.UserID, identity.IsAdmin)
-	}
-
-	dispatcher, err := NewDispatcher(server, opts.TornadoURL, opts.ServeRoutes, opts.ServeAll)
+	opts, stopImports := attachImportWorker(ctx, opts, userDB)
+	defer stopImports()
+	dispatcher, err := newSettingsHandler(opts, db, userDB)
 	if err != nil {
 		return err
 	}
@@ -637,4 +483,181 @@ func openLibraryDB(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("httpapi: 初始化书库扩展表失败: %w", err)
 	}
 	return db, nil
+}
+
+// newServeDispatcher builds immutable route configurations for one settings snapshot.
+func newServeDispatcher(opts ServeOptions, db, userDB *sql.DB) (*Dispatcher, error) {
+	authCfg := AuthConfig{
+		CookieSecret: opts.CookieSecret,
+		Demo:         opts.Demo,
+		Invite:       opts.Invite,
+	}
+	specs := append(WorkRouteSpecs(), AuthRouteSpecs(authCfg)...)
+	specs = append(specs, ThemeRouteSpecs(opts.ThemeStore)...)
+	specs = append(specs, AdminOpdsSourcesRouteSpecs()...)
+	specs = append(specs, AnnotationRouteSpecs(opts.AnnotationSyncer)...)
+	// 漫画路由在 bookWiring 构造后接线（需要它的 recordHistory）。
+	comicCfg := ComicConfig{
+		CookieSecret: opts.CookieSecret,
+		LibraryRoot:  opts.LibraryRoot,
+	}
+	onlineComicCfg := OnlineComicConfig{
+		Settings: map[string]any{"cookie_secret": opts.CookieSecret},
+	}
+	specs = append(specs, OnlineComicRouteSpecs(onlineComicCfg)...)
+	// 插件 run 执行器：在共享后台队列上执行已持久化的 run。
+	pluginExecutor := pluginjobs.NewExecutor(pluginjobs.Config{
+		DB:      userDB,
+		Runtime: pluginruntime.NewRuntime(userDB, opts.Settings, opts.PluginRegistry),
+	})
+	specs = append(specs, PluginRouteSpecs(PluginConfig{
+		Settings: opts.Settings,
+		Registry: opts.PluginRegistry,
+		ExecuteRun: func(_ *Context, runID int64) error {
+			_, err := pluginExecutor.Execute(runID)
+			return err
+		},
+	})...)
+	specs = append(specs, BookToolsRouteSpecs(BookToolsConfig{
+		Settings: opts.Settings,
+		Registry: opts.PluginRegistry,
+	})...)
+	specs = append(specs, BookSourceAdminRouteSpecs(BookSourceAdminConfig{
+		Settings: opts.Settings,
+		SeedFile: opts.BookSourceSeedFile,
+	})...)
+	// 网络书库的封面改写依赖在线漫画的签名图片地址，这里把两者接上。
+	specs = append(specs, NetworkRouteSpecs(NetworkConfig{
+		Settings:           opts.Settings,
+		LibraryRoot:        opts.LibraryRoot,
+		SaveOnline:         opts.SaveOnline,
+		ComicCoverRewriter: OnlineComicCoverRewriter(onlineComicCfg),
+	})...)
+	specs = append(specs, CaptchaRouteSpecs(CaptchaConfig{
+		CookieSecret: opts.CookieSecret,
+		Settings:     opts.CaptchaSettings,
+	})...)
+	specs = append(specs, ImportRouteSpecs(ImportConfig{
+		Dir:          opts.ImportDir,
+		SettingsPath: opts.SettingsPath,
+		SaveSettings: func(values map[string]any) error {
+			return SaveSettings(opts.SettingsPath, values)
+		},
+		WatchStatus: opts.ImportWatchStatus,
+	})...)
+	specs = append(specs, ScanRouteSpecs(ScanConfig{
+		Dir:          opts.ImportDir,
+		SettingsPath: opts.SettingsPath,
+		Service:      opts.ScanService,
+		WatchStatus:  opts.ImportWatchStatus,
+		StartScan:    opts.StartScan,
+		StartImport:  opts.StartImport,
+		UserID:       func(ctx *Context) int64 { return ctx.Identity.UserID },
+	})...)
+	// FilesConfig.DB 是 Calibre 元数据库（data / book_formats 等表）。
+	// DefaultCover 必须接线：书籍无封面时回退到它，否则 /get/cover 返回 0 字节，
+	// 前端封面图空白（用户可见现象：详情页/列表页都没有封面）。
+	specs = append(specs, FilesRouteSpecs(FilesConfig{
+		DB:             db,
+		LibraryRoot:    opts.LibraryRoot,
+		HTMLPath:       opts.HTMLPath,
+		DefaultCover:   loadDefaultCover(opts.HTMLPath),
+		AllowGuestRead: settingBool(opts.Settings, "ALLOW_GUEST_READ", true),
+		CanViewBook: func(ctx *Context, bookID int64) bool {
+			ok, err := userdb.CanViewBook(userDB, bookID, ctx.Identity.UserID, ctx.Identity.IsAdmin)
+			return err == nil && ok
+		},
+	})...)
+	specs = append(specs, UserRouteSpecs(UserConfig{
+		Auth:         authCfg,
+		DB:           userDB,
+		Settings:     opts.Settings,
+		SettingsPath: opts.SettingsPath,
+		Version:      opts.Version,
+		CDNURL:       opts.CDNURL,
+		// 首页「分类浏览」的计数来自 /api/user/info 的 sys 字段。
+		// 这些回调必须接线，否则全部返回 0（曾导致首页显示 0 本书籍）。
+		// 统计的是 Calibre 元数据库（books/authors/publishers/tags/series/data）。
+		CountBooks:      func() (int64, error) { return library.CountBooks(db) },
+		CountAuthors:    func() (int64, error) { return library.CountAuthors(db) },
+		CountPublishers: func() (int64, error) { return library.CountPublishers(db) },
+		CountTags:       func() (int64, error) { return library.CountTags(db) },
+		CountSeries:     func() (int64, error) { return library.CountSeries(db) },
+		CountFormats:    func() (int64, error) { return library.CountFormats(db) },
+	})...)
+	// 书籍、有声书与 WebDAV：接线到 library / userdb 的真实实现。
+	// 必须在 MetaRouteSpecs 之前构造：分类详情页（/api/publisher/<name> 等）
+	// 复用 bookCfg 的完整 BookFormatter，否则返回的书籍缺少 img/thumb/href，
+	// 前端 BookCards 拿不到封面地址（用户可见现象：钻取页无封面图）。
+	publicURL := bookPublicURL(opts.BasePath)
+	bookWiring := newBookWiring(userDB, db, opts.Settings).withSettingsPath(opts.SettingsPath)
+	// 删除公开书时把目录移入 <libraryRoot>/.caltrash，供回收站页面恢复。
+	bookWiring.libraryRoot = opts.LibraryRoot
+	// 在线阅读需要把 mobi/azw3 转成 EPUB；转换产物放在书库下的 convert 目录。
+	// 转换器用 Calibre 的 ebook-convert；未安装时 convertOne 会明确报错，
+	// 阅读页回退到「请下载后本地阅读」，而不是给出一个假的 EPUB。
+	convertSvc := convert.NewService(db, filepath.Join(opts.LibraryRoot, "convert"))
+	convertSvc.Converter = convert.NewCalibreConverter(ebookConvertPath())
+	bookWiring.convert = convertSvc
+	bookCfg := bookWiring.Config(opts.CDNURL)
+
+	// 漫画路由需要 bookWiring 的 recordHistory（阅读历史）。
+	comicCfg.RecordHistory = bookWiring.recordHistory
+	specs = append(specs, ComicRouteSpecs(comicCfg, opts.ComicService)...)
+
+	// MetaConfig.DB 是 Calibre 元数据库（authors / tags / publishers 等表）；
+	// UserDB 是 Talebook 自有库（author_aliases / book_aliases 等表）。
+	specs = append(specs, MetaRouteSpecs(MetaConfig{
+		DB:       db,
+		UserDB:   userDB,
+		Settings: opts.Settings,
+		Book:     bookCfg,
+	})...)
+	specs = append(specs, UpgradeRouteSpecs(UpgradeConfig{
+		DB:          userDB,
+		Settings:    opts.Settings,
+		Version:     opts.Version,
+		UpgradeMode: UpgradeModeFromEnv(),
+	})...)
+	specs = append(specs, SocialRouteSpecs(SocialConfig{Auth: authCfg})...)
+	// OpdsConfig.DB 是 Calibre 元数据库。
+	specs = append(specs, OpdsRouteSpecs(OpdsConfig{
+		DB:       db,
+		Settings: opts.Settings,
+	})...)
+	specs = append(specs, AdminRouteSpecs(newAdminConfig(opts, userDB, db))...)
+
+	specs = append(specs, BookRouteSpecs(bookCfg)...)
+
+	audioRoot := opts.AudiobookRoot
+	if audioRoot == "" && opts.LibraryRoot != "" {
+		audioRoot = filepath.Join(opts.LibraryRoot, "audiobooks")
+	}
+	specs = append(specs, AudioRouteSpecs(newAudioWiring(userDB, db, opts.Settings, audioRoot).Config(opts.CDNURL, publicURL))...)
+
+	specs = append(specs, WebDAVRouteSpecs((&webdavWiring{
+		settings: opts.Settings,
+		serve:    opts.WebDAVServe,
+	}).Config(opts.Demo))...)
+
+	applyCaptchaSettings(specs, CaptchaConfig{CookieSecret: opts.CookieSecret, Settings: opts.CaptchaSettings})
+	server, err := NewServer(specs)
+	if err != nil {
+		return nil, err
+	}
+	server.DB = userDB
+	// 作品/版本层要读 Calibre 元数据库的 books 表（work_id / edition_key）。
+	server.LibraryDB = db
+	server.Identify = NewCookieIdentifier(opts.CookieSecret, nil)
+	// 接入 can_view_book：非管理员看不到他人的私藏书。
+	server.IsPublic = func(identity Identity, bookID int64) (bool, error) {
+		return userdb.CanViewBook(userDB, bookID, identity.UserID, identity.IsAdmin)
+	}
+
+	dispatcher, err := NewDispatcher(server, opts.TornadoURL, opts.ServeRoutes, opts.ServeAll)
+	if err != nil {
+		return nil, err
+	}
+
+	return dispatcher, nil
 }

@@ -38,7 +38,7 @@
                     size="small"
                     variant="tonal"
                 >
-                    {{ t('admin.imports.settings.directory') }}：<span class="summary-path">{{ scan_dir }}</span>
+                    {{ t('admin.imports.settings.directory') }}：<span class="summary-path">{{ allowed_roots.join('、') || scan_dir }}</span>
                 </v-chip>
                 <v-chip
                     size="small"
@@ -351,7 +351,7 @@
                             icon="mdi-delete-outline"
                             variant="text"
                             color="error"
-                            :disabled="settingsSaving || settingsDraft.import_allowed_roots.length <= 1"
+                            :disabled="settingsSaving"
                             :aria-label="t('admin.imports.settings.removeDirectory')"
                             :data-testid="'import-root-remove-' + index"
                             @click="removeAllowedRoot(index)"
@@ -380,55 +380,6 @@
                         variant="tonal"
                     >
                         {{ allowedRootsError }}
-                    </v-alert>
-                </section>
-
-                <section class="settings-section">
-                    <div class="settings-section-title">
-                        {{ t('admin.imports.settings.defaultDirectory') }}
-                    </div>
-                    <v-text-field
-                        v-model="settingsDraft.scan_upload_path"
-                        :label="t('admin.imports.settings.directoryLabel')"
-                        :hint="t('admin.imports.settings.defaultDirectoryHint')"
-                        persistent-hint
-                        variant="outlined"
-                        density="comfortable"
-                        :disabled="settingsSaving"
-                        data-testid="import-default-dir"
-                        @update:model-value="settingsDraft.directory_check = null"
-                    />
-                    <div class="settings-inline-actions">
-                        <v-btn
-                            variant="outlined"
-                            color="primary"
-                            :disabled="settingsSaving"
-                            @click="openDirectoryPicker(-1)"
-                        >
-                            <v-icon start>
-                                mdi-folder-open-outline
-                            </v-icon>{{ t('admin.imports.button.chooseDirectory') }}
-                        </v-btn>
-                        <v-btn
-                            variant="outlined"
-                            color="primary"
-                            :loading="directoryChecking"
-                            :disabled="settingsSaving || !settingsDraft.scan_upload_path"
-                            @click="checkDraftDirectory()"
-                        >
-                            <v-icon start>
-                                mdi-shield-check-outline
-                            </v-icon>{{ t('admin.imports.button.checkDirectory') }}
-                        </v-btn>
-                    </div>
-                    <v-alert
-                        v-if="settingsDraft.directory_check?.msg"
-                        class="mt-3"
-                        density="compact"
-                        :type="directoryCheckAlertType(settingsDraft.directory_check)"
-                        variant="tonal"
-                    >
-                        {{ settingsDraft.directory_check.msg }}
                     </v-alert>
                 </section>
 
@@ -565,7 +516,7 @@
                     <v-list-item
                         v-for="item in directoryItems"
                         :key="item.path"
-                        :disabled="item.is_symlink || !item.readable || !item.in_allowed_roots"
+                        :disabled="item.is_symlink || !item.readable"
                         @click="loadDirectory(item.path)"
                     >
                         <template #prepend>
@@ -620,7 +571,7 @@
 <script setup>
 import { allowedRootsFromSettings, validateAllowedRoots } from '@/composables/useImportRoots';
 import { withBasePath } from '@/utils/base-path';
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import OpdsImportDialog from '@/components/OpdsImportDialog.vue';
@@ -634,7 +585,7 @@ store.setNavbar(true);
 const filter_type = ref('todo');
 const selected = ref([]);
 const scan_dir = ref('/data/books/imports/');
-// 多目录列表（对应后端 import_allowed_roots）。
+// 单一的扫描目录清单，同时用于手动扫描与监控配置。
 const allowed_roots = ref(['/data/books/imports/']);
 const search = ref('');
 const items = ref([]);
@@ -664,8 +615,8 @@ const settingsDraft = ref({
 });
 // 多目录列表的本地校验错误（后端仍会再校验一次）。
 const allowedRootsError = ref('');
-// 目录选择器的目标：-1 表示默认导入目录，>=0 表示 import_allowed_roots 的第 N 项。
-const directoryPickerTarget = ref(-1);
+// 目录选择器的目标是 import_directories 清单中的一项。
+const directoryPickerTarget = ref(0);
 const directoryChecking = ref(false);
 const directoryPickerVisible = ref(false);
 const directoryLoading = ref(false);
@@ -751,8 +702,8 @@ const importActionsDisabled = computed(() => Boolean(directory_check.value && di
 const settingsSaveDisabled = computed(() => {
     const check = settingsDraft.value.directory_check;
     // 目录列表的合法性由 validateDraftAllowedRoots() 在保存时给出可读的错误提示，
-    // 不能因为默认导入目录尚未检测就把保存按钮永久置灰——那样用户看不到任何原因。
-    return settingsSaving.value || !settingsDraft.value.scan_upload_path || (settingsDraft.value.import_mode === 'move' && check?.writable === false);
+    // 目录检测在保存时执行，保证先把路径错误显示给用户。
+    return settingsSaving.value || directoryChecking.value || (settingsDraft.value.import_mode === 'move' && check?.writable === false);
 });
 
 const directoryCheckAlertType = (check) => {
@@ -810,41 +761,50 @@ const getDataFromApi = () => {
         });
 };
 
+let statusTimer = null;
+let pageDisposed = false;
+onBeforeUnmount(() => {
+    pageDisposed = true;
+    if (statusTimer) clearTimeout(statusTimer);
+});
 const loop_check_status = (url, callback) => {
-    setTimeout(() => {
-        $backend(url)
-            .then((rsp) => {
-                if (rsp.err != 'ok') {
-                    if ($alert) $alert('error', rsp.msg);
-                    return;
-                }
-                if (callback(rsp)) {
-                    getDataFromApi();
-                    setTimeout(() => {
-                        loop_check_status(url, callback);
-                    }, 2000);
-                } else {
-                    getDataFromApi();
-                    if ($alert) $alert('info', '处理完毕！');
-                }
-            });
+    if (pageDisposed) return;
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(async () => {
+        try {
+            const rsp = await $backend(url);
+            if (pageDisposed) return;
+            if (rsp.err !== 'ok') {
+                loading.value = false;
+                if ($alert) $alert('error', rsp.msg);
+                return;
+            }
+            if (callback(rsp)) {
+                loop_check_status(url, callback);
+            } else {
+                getDataFromApi();
+                if ($alert) $alert('info', '处理完毕！');
+            }
+        } catch (error) {
+            loading.value = false;
+            if (!pageDisposed && $alert) $alert('error', error.message || '状态查询失败');
+        }
     }, 2000);
 };
 
 const applyImportSettings = (settings) => {
     if (!settings) return;
-    scan_dir.value = settings.scan_upload_path || scan_dir.value;
+    allowed_roots.value = allowedRootsFromSettings(settings);
+    scan_dir.value = allowed_roots.value[0] || settings.scan_upload_path || scan_dir.value;
     import_mode.value = settings.import_mode || 'copy';
     auto_watch_enabled.value = Boolean(settings.auto_watch_enabled);
     directory_check.value = settings.directory_check || null;
     watch_status.value = settings.watch_status || watch_status.value;
-    // 后端把多目录列表放在 allowed_roots；缺失时回退到单个默认目录。
-    allowed_roots.value = allowedRootsFromSettings(settings);
 };
 
 const resetSettingsDraft = () => {
     settingsDraft.value = {
-        scan_upload_path: scan_dir.value,
+        scan_upload_path: allowed_roots.value[0] || scan_dir.value,
         import_allowed_roots: allowed_roots.value.length ? allowed_roots.value.slice() : [scan_dir.value],
         import_mode: import_mode.value,
         auto_watch_enabled: auto_watch_enabled.value,
@@ -857,12 +817,13 @@ const resetSettingsDraft = () => {
 const addAllowedRoot = () => {
     settingsDraft.value.import_allowed_roots.push('');
     allowedRootsError.value = '';
+    settingsDraft.value.directory_check = null;
 };
 
 const removeAllowedRoot = (index) => {
-    if (settingsDraft.value.import_allowed_roots.length <= 1) return;
     settingsDraft.value.import_allowed_roots.splice(index, 1);
     allowedRootsError.value = '';
+    settingsDraft.value.directory_check = null;
 };
 
 // 归一化与校验逻辑在 composables/useImportRoots.ts，便于脱离 Nuxt 单测。
@@ -904,11 +865,11 @@ const openImportSettingsDialog = () => {
 
 const closeSettingsDialog = () => {
     const draftChanged = JSON.stringify({
-        path: settingsDraft.value.scan_upload_path,
+        directories: settingsDraft.value.import_allowed_roots,
         mode: settingsDraft.value.import_mode,
         watch: settingsDraft.value.auto_watch_enabled,
     }) !== JSON.stringify({
-        path: scan_dir.value,
+        directories: allowed_roots.value,
         mode: import_mode.value,
         watch: auto_watch_enabled.value,
     });
@@ -920,10 +881,11 @@ const closeSettingsDialog = () => {
 
 const checkDraftDirectory = (path) => {
     directoryChecking.value = true;
+    settingsDraft.value.directory_check = null;
     return $backend('/admin/import/directory/check', {
         method: 'POST',
         body: JSON.stringify({
-            path: path || settingsDraft.value.scan_upload_path
+            path: path || settingsDraft.value.import_allowed_roots[0]
         }),
     }).then((rsp) => {
         if (rsp.err !== 'ok') {
@@ -939,19 +901,19 @@ const checkDraftDirectory = (path) => {
     });
 };
 
-const saveImportSettings = () => {
+const saveImportSettings = async () => {
     settingsError.value = '';
     // 先校验目录列表：它不依赖后端检测，能立即给出可读的错误。
     const roots = validateDraftAllowedRoots();
     if (!roots) return;
-    if (!settingsDraft.value.directory_check) {
-        checkDraftDirectory().then(() => {
-            if (settingsDraft.value.directory_check && settingsDraft.value.directory_check.status !== 'error') {
-                saveImportSettings();
-            }
-        });
+    const primaryDirectory = roots[0];
+    try {
+        await checkDraftDirectory(primaryDirectory);
+    } catch (error) {
+        settingsError.value = error.message || t('admin.imports.settings.directoryCheckFailed');
         return;
     }
+    if (!settingsDraft.value.directory_check) return;
     if (settingsDraft.value.directory_check.status === 'error') {
         settingsError.value = settingsDraft.value.directory_check.msg || t('admin.imports.settings.directoryCheckFailed');
         return;
@@ -972,7 +934,8 @@ const saveImportSettings = () => {
     $backend('/admin/import/settings', {
         method: 'POST',
         body: JSON.stringify({
-            scan_upload_path: settingsDraft.value.scan_upload_path,
+            scan_upload_path: roots[0],
+            import_directories: roots,
             import_allowed_roots: roots,
             import_mode: settingsDraft.value.import_mode,
             auto_watch_enabled: settingsDraft.value.auto_watch_enabled,
@@ -986,6 +949,8 @@ const saveImportSettings = () => {
         settingsDialogVisible.value = false;
         if ($alert) $alert('success', rsp.msg || t('admin.imports.settings.saved'));
         getDataFromApi();
+    }).catch((error) => {
+        settingsError.value = error.message || t('admin.imports.settings.saveFailed');
     }).finally(() => {
         settingsSaving.value = false;
     });
@@ -1010,28 +975,18 @@ const loadDirectory = (path) => {
         });
 };
 
-const openDirectoryPicker = (target = -1) => {
+const openDirectoryPicker = (target = 0) => {
     directoryPickerTarget.value = target;
     directoryPickerVisible.value = true;
-    const initial = target >= 0
-        ? settingsDraft.value.import_allowed_roots[target]
-        : settingsDraft.value.scan_upload_path;
-    loadDirectory(initial);
+    loadDirectory(settingsDraft.value.import_allowed_roots[target] || '/');
 };
 
 const chooseCurrentDirectory = () => {
     const target = directoryPickerTarget.value;
-    if (target >= 0) {
-        settingsDraft.value.import_allowed_roots[target] = directoryPickerPath.value;
-        allowedRootsError.value = '';
-        directoryPickerVisible.value = false;
-        // 列表项选定后同样要跑一次目录检测，否则用户看不到该目录是否可读可写。
-        checkDraftDirectory(directoryPickerPath.value);
-        return;
-    }
-    settingsDraft.value.scan_upload_path = directoryPickerPath.value;
+    settingsDraft.value.import_allowed_roots[target] = directoryPickerPath.value;
+    allowedRootsError.value = '';
+    settingsDraft.value.directory_check = null;
     directoryPickerVisible.value = false;
-    checkDraftDirectory();
 };
 
 const scan_books = () => {
@@ -1041,6 +996,7 @@ const scan_books = () => {
     }).then((rsp) => {
         if (rsp.err !== 'ok') {
             if ($alert) $alert('error', rsp.msg);
+            loading.value = false;
             return;
         }
 
@@ -1049,7 +1005,7 @@ const scan_books = () => {
             count_done.value = rsp.summary.done;
             count_todo.value = rsp.summary.todo;
             count_failed.value = rsp.summary.failed || 0;
-            if (scan_status.value.new === 0) {
+            if (!rsp.running && (scan_status.value.new || 0) === 0) {
                 loading.value = false;
                 if (scan_status.value.new === 0 && scan_status.value.total > 0) {
                     $alert('success', '扫描完成！请查看"待处理"列表中的书籍。');
@@ -1059,6 +1015,9 @@ const scan_books = () => {
             loading.value = true;
             return true;
         });
+    }).catch((error) => {
+        loading.value = false;
+        if ($alert) $alert('error', error.message || t('admin.imports.settings.directoryCheckFailed'));
     });
 };
 
@@ -1078,6 +1037,8 @@ const import_books = () => {
     }).then((rsp) => {
         if (rsp.err !== 'ok') {
             if ($alert) $alert('error', rsp.msg);
+            loading.value = false;
+            return;
         }
 
         loop_check_status('/admin/import/status', (rsp) => {
@@ -1085,13 +1046,17 @@ const import_books = () => {
             count_done.value = rsp.summary.done;
             count_todo.value = rsp.summary.todo;
             count_failed.value = rsp.summary.failed || 0;
-            if ((import_status.value.ready || 0) === 0 && (import_status.value.importing || 0) === 0) {
+            // 本轮请求已完成；未选择的 ready 记录不应让页面无限轮询。
+            if (!rsp.running && (import_status.value.importing || 0) === 0) {
                 loading.value = false;
                 return false;
             }
             loading.value = true;
             return true;
         });
+    }).catch((error) => {
+        loading.value = false;
+        if ($alert) $alert('error', error.message || t('admin.imports.settings.directoryCheckFailed'));
     });
 };
 

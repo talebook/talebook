@@ -874,7 +874,7 @@
         "emptyDirectorySelectable": "No subdirectories are available here. You can choose the current directory.",
         "mode": "Mode",
         "modeIndex": "Index only",
-        "modeIndexDescription": "Do not copy files. Record source paths in the scan index for tracking; reading still requires a later copy or move import.",
+        "modeIndexDescription": "Read directly from the source without copying or moving it. Keep the source directory mounted and retain the original files.",
         "modeCopy": "Copy to library",
         "modeCopyDescription": "Import into the library and keep source files.",
         "modeMove": "Move to library",
@@ -892,14 +892,12 @@
         "saved": "Import settings saved",
         "symlink": "Symlink",
         "directoryList": "Import directories",
-        "directoryListHint": "Talebook scans these directories for ebook files. Keep at least one.",
+        "directoryListHint": "Talebook scans every directory listed here. Add multiple absolute server paths as needed. With Docker, mount host directories into the container first.",
         "addDirectory": "Add directory",
         "removeDirectory": "Remove this directory",
         "directoryItemLabel": "Directory {index}",
-        "defaultDirectory": "Default import directory",
-        "defaultDirectoryHint": "Auto watch and quick import use this directory.",
         "atLeastOneDirectory": "At least one import directory is required.",
-        "directoryOutsideRoots": "Directories must live under /data/."
+        "directoryOutsideRoots": "Enter an absolute server directory path."
       },
       "watch": {
         "off": "Off",

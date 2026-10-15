@@ -14,7 +14,7 @@ import (
 //   - 漫画容器（cbz/zip/cbr/rar）与受管文档（djvu/uvz）不解析内嵌元数据；
 //   - 其余格式解析失败时退回文件名。
 func TestImportMetadataDispatchByFormat(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	cases := []struct {
@@ -57,7 +57,7 @@ func TestImportMetadataDispatchByFormat(t *testing.T) {
 //
 // Python 对 txt/pdf 无条件覆盖 title/authors，Go 侧必须一致。
 func TestImportMetadataTxtIgnoresEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	// 写一个真实可解析的 EPUB，但扩展名是 .txt。
@@ -81,7 +81,7 @@ func TestImportMetadataTxtIgnoresEmbedded(t *testing.T) {
 
 // TestImportMetadataEpubUsesEmbedded 验证 epub 走内嵌元数据解析。
 func TestImportMetadataEpubUsesEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	epub := buildMinimalEPUB(t, "内嵌书名", "内嵌作者")
@@ -104,7 +104,7 @@ func TestImportMetadataEpubUsesEmbedded(t *testing.T) {
 
 // TestImportMetadataMOBIUsesEmbedded 验证 mobi 走 MOBI 解析器。
 func TestImportMetadataMOBIUsesEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	p := filepath.Join(dir, "文件名书名.mobi")
@@ -129,7 +129,7 @@ func TestImportMetadataMOBIUsesEmbedded(t *testing.T) {
 
 // TestImportMetadataDOCXUsesEmbedded 验证 docx 走 DOCX 解析器。
 func TestImportMetadataDOCXUsesEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	p := filepath.Join(dir, "文件名书名.docx")
@@ -151,7 +151,7 @@ func TestImportMetadataDOCXUsesEmbedded(t *testing.T) {
 
 // TestImportMetadataFB2UsesEmbedded 验证 fb2 走 FB2 解析器。
 func TestImportMetadataFB2UsesEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	p := filepath.Join(dir, "文件名书名.fb2")
@@ -170,7 +170,7 @@ func TestImportMetadataFB2UsesEmbedded(t *testing.T) {
 
 // TestImportMetadataHTMLZUsesEmbedded 验证 htmlz 走 HTMLZ 解析器。
 func TestImportMetadataHTMLZUsesEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	p := filepath.Join(dir, "文件名书名.htmlz")
@@ -189,7 +189,7 @@ func TestImportMetadataHTMLZUsesEmbedded(t *testing.T) {
 
 // TestImportMetadataAZW3UsesEmbedded 验证 azw3 与 mobi 共用解析器。
 func TestImportMetadataAZW3UsesEmbedded(t *testing.T) {
-	svc := newImportService(importTestDB(t), importLibraryDB(t))
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
 	dir := t.TempDir()
 
 	p := filepath.Join(dir, "文件名书名.azw3")

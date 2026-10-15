@@ -95,7 +95,7 @@ def check_permission():
         # settings 很小，标记命中时仍定向修复，避免宿主目录重建或预置文件复制后属主失真。
         return False, "permission_denied"
 
-    for directory in (os.path.join(books_dir, "library"), settings_dir):
+    for directory in (os.path.join(books_dir, "library"), settings_dir, "/books"):
         if not check_atomic_write(directory):
             return False, "permission_denied"
 
@@ -185,10 +185,11 @@ def start_booksvr(secret=None):
         print("[self_check] 未取到 cookie_secret，跳过 booksvr")
         return False
 
-    env = dict(os.environ)
-    env["BOOKSVR_COOKIE_SECRET"] = secret
-    subprocess.run(["supervisorctl", "start", "talebook:booksvr"], env=env)
-    return True
+    # `supervisorctl` talks to the already-running supervisord; its own environment
+    # is not inherited by the program being started. The supervised entrypoint reads
+    # the same settings file and exports BOOKSVR_COOKIE_SECRET immediately before
+    # exec'ing booksvr.
+    return run(["supervisorctl", "start", "talebook:booksvr"])
 
 
 def run_bootstrap(checks=CHECKS, start_booksvr_fn=start_booksvr):
@@ -207,10 +208,13 @@ def run_bootstrap(checks=CHECKS, start_booksvr_fn=start_booksvr):
         write_status(steps, phase="starting")
 
     print("[self_check] all checks passed, starting booksvr")
-    write_status(steps, phase="ready")
     # booksvr 是唯一对外后端，本地服务全部 215 条 legacy 路由；
     # 它需要 syncdb/migrate 已完成才能打开数据库。
-    start_booksvr_fn()
+    if not start_booksvr_fn():
+        print("[self_check] booksvr 启动失败")
+        write_status(steps, phase="failed")
+        return False
+    write_status(steps, phase="ready")
     return True
 
 

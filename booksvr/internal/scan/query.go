@@ -66,7 +66,8 @@ func (s *Service) Summary() (Summary, error) {
 
 // CountByStatus 复刻 Scanner.count(query)：按状态计数，未知状态动态追加。
 func (s *Service) CountByStatus(scanID, importID int64, byImport bool) (map[string]int64, error) {
-	count := make(map[string]int64, len(countStatuses))
+	count := make(map[string]int64, len(countStatuses)+1)
+	count["total"] = 0
 	for _, st := range countStatuses {
 		count[st] = 0
 	}
@@ -86,6 +87,7 @@ func (s *Service) CountByStatus(scanID, importID int64, byImport bool) (map[stri
 			return nil, fmt.Errorf("scan: 读取状态失败: %w", err)
 		}
 		count[st]++
+		count["total"]++
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("scan: 遍历状态失败: %w", err)
@@ -109,7 +111,11 @@ func (s *Service) statusBy(col string) (int64, map[string]int64, error) {
 		return 0, nil, fmt.Errorf("scan: 查询最大 %s 失败: %w", col, err)
 	}
 	if !id.Valid {
-		return 0, map[string]int64{}, nil
+		count := map[string]int64{"total": 0}
+		for _, st := range countStatuses {
+			count[st] = 0
+		}
+		return 0, count, nil
 	}
 	count, err := s.CountByStatus(id.Int64, 0, col == "import_id")
 	if err != nil {
