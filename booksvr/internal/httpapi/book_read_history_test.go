@@ -188,6 +188,10 @@ func TestBookReadBookMarksReading(t *testing.T) {
 	if st == nil || st.ReadState != 1 {
 		t.Fatalf("打开阅读器后 read_state = %+v，期望自动置为 1（在读）", st)
 	}
+	// 在读的书自动加入书架（用户要求）。
+	if st.Wants != 1 {
+		t.Errorf("打开阅读器后 wants = %d，期望 1（自动加入书架）", st.Wants)
+	}
 }
 
 // TestBookReadBookKeepsFinished 覆盖已读完状态不被自动标记覆盖。
@@ -207,6 +211,41 @@ func TestBookReadBookKeepsFinished(t *testing.T) {
 	st, _ := userdb.GetReadingState(w.db, 1, readerID)
 	if st == nil || st.ReadState != 2 {
 		t.Fatalf("已读完被覆盖: %+v，期望保持 2", st)
+	}
+	// 已读完不自动加入书架（用户只要求在读）。
+	if st.Wants != 0 {
+		t.Errorf("已读完时 wants = %d，期望 0（不进书架）", st.Wants)
+	}
+}
+
+// TestWiringSetReadStateReadingAddsToShelf 覆盖手动置「在读」也进书架。
+func TestWiringSetReadStateReadingAddsToShelf(t *testing.T) {
+	w := epubBookWiring(t, map[string]any{"EPUB_VIEWER": "creader.html"})
+	readerID := seedHistoryReader(t, w.db, `{}`)
+	ensureReadingStateTable(t, w.db)
+
+	cfg := w.Config("")
+	ctx1 := pluginCtx(t, w.db, http.MethodPost, "/api/book/1/readstate", `{"read_state":1}`, readerID, false)
+	if err := cfg.SetReadState(ctx1, 1, map[string]any{"read_state": int64(1)}); err != nil {
+		t.Fatalf("SetReadState: %v", err)
+	}
+
+	st, err := userdb.GetReadingState(w.db, 1, readerID)
+	if err != nil {
+		t.Fatalf("GetReadingState: %v", err)
+	}
+	if st == nil || st.ReadState != 1 || st.Wants != 1 {
+		t.Fatalf("手动置在读后 = %+v，期望 read_state=1 且 wants=1", st)
+	}
+
+	// 已读完不进书架。
+	ctx2 := pluginCtx(t, w.db, http.MethodPost, "/api/book/1/readstate", `{"read_state":2}`, readerID, false)
+	if err := cfg.SetReadState(ctx2, 1, map[string]any{"read_state": int64(2)}); err != nil {
+		t.Fatalf("SetReadState(2): %v", err)
+	}
+	st, _ = userdb.GetReadingState(w.db, 1, readerID)
+	if st == nil || st.ReadState != 2 {
+		t.Fatalf("置已读完失败: %+v", st)
 	}
 }
 

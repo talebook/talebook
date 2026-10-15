@@ -129,7 +129,15 @@ func (w *bookWiring) Config(cdnURL string) BookConfig {
 				n := int64Of(v)
 				download = &n
 			}
-			return userdb.SetReadingState(w.db, bookID, ctx.Identity.UserID, readState, onlineRead, download)
+			if err := userdb.SetReadingState(w.db, bookID, ctx.Identity.UserID, readState, onlineRead, download); err != nil {
+				return err
+			}
+			// 在读的书自动加入书架（用户要求）：置为在读时同步 wants=1；
+			// 已读完/未读不改变书架状态。
+			if readState == 1 {
+				return userdb.SetReadingWants(w.db, bookID, ctx.Identity.UserID, true)
+			}
+			return nil
 		},
 		SetProgress: func(ctx *Context, bookID int64, progress map[string]any) error {
 			return userdb.SetReadingProgress(w.db, bookID, ctx.Identity.UserID, progress)

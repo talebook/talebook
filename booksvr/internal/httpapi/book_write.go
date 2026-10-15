@@ -108,6 +108,11 @@ func (w *bookWiring) markReadingIfNeeded(ctx *Context, bookID int64) {
 	}
 	if err := userdb.SetReadingState(w.db, bookID, ctx.Identity.UserID, 1, nil, nil); err != nil {
 		log.Printf("booksvr: 自动标记在读失败 book=%d reader=%d: %v", bookID, ctx.Identity.UserID, err)
+		return
+	}
+	// 在读的书自动加入书架（用户要求）：与手动置为在读同语义。
+	if err := userdb.SetReadingWants(w.db, bookID, ctx.Identity.UserID, true); err != nil {
+		log.Printf("booksvr: 自动加入书架失败 book=%d reader=%d: %v", bookID, ctx.Identity.UserID, err)
 	}
 }
 
