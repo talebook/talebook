@@ -5,7 +5,7 @@ import datetime
 import logging
 from dataclasses import asdict
 
-from webserver.models import Annotation, AnnotationSource
+from webserver.models import Annotation, AnnotationSource, PluginConnection
 from webserver.plugins.runtime.domains import Annotation as PluginAnnotation
 from webserver.plugins.runtime.domains import PushReceipt, SourceState
 from webserver.services import AsyncService
@@ -63,6 +63,56 @@ class AnnotationSyncService(AsyncService):
             self.session.add(source)
         return source
 
+    def _instance_key(self, source_connection_id):
+        """同一来源下的实例身份：配置了 endpoint 的连接按 endpoint 区分，没有 endpoint 的视为同一实例。"""
+        try:
+            connection = self.session.get(PluginConnection, int(source_connection_id))
+        except (TypeError, ValueError):
+            connection = None
+        config = (connection.config if connection else None) or {}
+        return str(config.get("endpoint") or "").strip().rstrip("/").lower()
+
+    def _remote_source(self, annotation_id, source_name, source_connection_id):
+        """某条记录在同一来源、同一实例中的副本；优先同一连接，其次指向同一实例的其他连接。
+
+        每位读者的连接可以指向不同实例，别的实例上的 id 不能拿来请求当前连接。
+        """
+        sources = (
+            self.session.query(AnnotationSource)
+            .filter(
+                AnnotationSource.annotation_id == annotation_id,
+                AnnotationSource.source_name == source_name,
+                AnnotationSource.source_annotation_id.isnot(None),
+            )
+            .order_by(AnnotationSource.id)
+            .all()
+        )
+        source_connection_id = str(source_connection_id or "")
+        for item in sources:
+            if item.source_connection_id == source_connection_id:
+                return item
+        instance = self._instance_key(source_connection_id)
+        for item in sources:
+            if self._instance_key(item.source_connection_id) == instance:
+                return item
+        return None
+
+    def _remote_id(self, annotation_id, source_name, source_connection_id):
+        source = self._remote_source(annotation_id, source_name, source_connection_id)
+        return source.source_annotation_id if source else None
+
+    def _withdrawn(self, annotation_id, source_id):
+        """外部写入期间，本站记录是否已被删除、改为私有，或副本映射已被解除。"""
+        self.session.expire_all()
+        annotation = self.session.query(Annotation).filter(Annotation.id == annotation_id).first()
+        if annotation is None or annotation.is_private:
+            return True
+        if annotation.root_id:
+            root = self.session.query(Annotation).filter(Annotation.id == annotation.root_id).first()
+            if root is None or root.is_private:
+                return True
+        return self.session.query(AnnotationSource).filter(AnnotationSource.id == source_id).first() is None
+
     def _typed_writers(self, annotation, registry, settings):
         runtime = PluginRuntime(self.session, settings, registry=registry)
         writers = {}
@@ -108,6 +158,10 @@ class AnnotationSyncService(AsyncService):
         annotation = self.session.get(Annotation, int(annotation_id))
         if annotation is None or annotation.is_private:
             return
+        root = self.session.get(Annotation, annotation.root_id) if annotation.root_id else annotation
+        # 回复跟随主评论的公开范围：主评论私有或已删除时不外发。
+        if root is None or root.is_private:
+            return
 
         if settings is None:
             from webserver.loader import get_settings
@@ -127,10 +181,53 @@ class AnnotationSyncService(AsyncService):
             source.update_time = now
             self.session.commit()
 
+            data = annotation_data
+            if annotation.root_id:
+                # 回复要带上主评论与回复对象在该来源中的 id；主评论还没同步过去时记为失败，之后可重试。
+                remote_root_id = self._remote_id(annotation.root_id, source_name, source_connection_id)
+                if not remote_root_id:
+                    source.source_sync_status = "failed"
+                    source.source_sync_error = "主评论尚未同步到该来源"
+                    source.update_time = datetime.datetime.now()
+                    self.session.commit()
+                    continue
+                remote_reply_to_id = (
+                    self._remote_id(annotation.reply_to_id, source_name, source_connection_id)
+                    if annotation.reply_to_id
+                    else remote_root_id
+                )
+                data = {
+                    **annotation_data,
+                    "remote_root_id": remote_root_id,
+                    "remote_reply_to_id": remote_reply_to_id or remote_root_id,
+                }
+
+            source_id = source.id
+            previous_remote_id = source.source_annotation_id
             try:
-                result = writer(annotation_data, source.to_api_dict()) or {}
+                result = writer(data, source.to_api_dict()) or {}
                 if not isinstance(result, dict):
                     raise TypeError("annotation source writer must return a dict or None")
+                if self._withdrawn(annotation.id, source_id):
+                    # 写入途中本站已删除或改为私有：刚写出去的副本立即撤回，不再保留映射。
+                    # 其余来源也不再扇出；之后重新公开时会重新入队。
+                    remote_id = result.get("source_annotation_id") or previous_remote_id
+                    leftover = self.session.query(AnnotationSource).filter(AnnotationSource.id == source_id).first()
+                    if leftover is not None:
+                        self.session.delete(leftover)
+                        self.session.commit()
+                    if remote_id:
+                        self._delete_states(
+                            self._runtime(registry, settings),
+                            [
+                                {
+                                    "source_name": source_name,
+                                    "source_connection_id": source_connection_id,
+                                    "source_annotation_id": remote_id,
+                                }
+                            ],
+                        )
+                    return
                 for field in (
                     "source_annotation_id",
                     "source_run_id",
@@ -150,3 +247,63 @@ class AnnotationSyncService(AsyncService):
                 source.source_sync_error = str(err)[:2000]
             source.update_time = datetime.datetime.now()
             self.session.commit()
+
+    def _runtime(self, registry, settings):
+        if settings is None:
+            from webserver.loader import get_settings
+
+            settings = get_settings()
+        return PluginRuntime(self.session, settings, registry=registry or REGISTRY)
+
+    @AsyncService.register_service
+    def delete_remote(self, sources, registry=None, settings=None):
+        """撤回外部副本：本站删除记录或改为私有后，按提交前记下的副本身份删除外部记录。
+
+        只处理插件连接写入的副本；来源未实现 delete_annotation 或调用失败时只记录日志，不影响本站。
+        """
+        self._delete_states(self._runtime(registry, settings), sources)
+
+    def _delete_states(self, runtime, sources):
+        for state in sources or []:
+            try:
+                connection = self.session.get(PluginConnection, int(state.get("source_connection_id")))
+            except (TypeError, ValueError):
+                connection = None
+            if connection is None or not state.get("source_annotation_id"):
+                continue
+            try:
+                runtime.sync(
+                    connection,
+                    "delete_annotation",
+                    SourceState.from_dict(state),
+                    required_scopes=("annotations.write",),
+                )
+            except Exception:
+                logging.exception("annotation remote delete failed: %s", state.get("source_name"))
+
+    @AsyncService.register_service
+    def sync_vote(self, annotation_id, reader_id, value, registry=None, settings=None):
+        """把读者的赞踩推送到他自己的外部连接；目标还没同步到该来源时跳过。"""
+        annotation = self.session.get(Annotation, int(annotation_id))
+        if annotation is None:
+            return
+        root = self.session.get(Annotation, annotation.root_id) if annotation.root_id else annotation
+        if root is None or root.is_private:
+            return
+        runtime = self._runtime(registry, settings)
+        for connection in runtime.connections_for("annotations.push", user_id=reader_id):
+            source_name = source_name_for(self.session, connection)
+            source = self._remote_source(annotation.id, source_name, str(connection.id))
+            if source is None:
+                logging.info("annotation %s not synced to %s yet, vote skipped", annotation.id, source_name)
+                continue
+            try:
+                runtime.sync(
+                    connection,
+                    "push_vote",
+                    SourceState.from_dict(source.to_api_dict()),
+                    int(value),
+                    required_scopes=("annotations.write",),
+                )
+            except Exception:
+                logging.exception("annotation vote sync failed: %s", source_name)

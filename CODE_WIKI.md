@@ -255,8 +255,7 @@ talebook/
 ├── .github/                      # GitHub 配置
 │   ├── workflows/               # GitHub Actions
 │   │   ├── build.yml           # Docker 构建
-│   │   ├── ci.yml              # CI 测试
-│   │   └── update-candle-reader.yml
+│   │   └── ci.yml              # CI 测试
 │   └── ISSUE_TEMPLATE/          # Issue 模板
 │
 ├── .planning/                    # 项目规划

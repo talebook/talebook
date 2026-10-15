@@ -79,6 +79,11 @@ class AnnotationProvider(Protocol):
 
     def push_annotation(self, item: Annotation, state: SourceState, context: dict[str, Any]) -> PushReceipt: ...
 
+    # 可选能力：本站删除记录或改为私有时撤回外部副本；读者赞踩时推送投票（value 为 1、-1 或 0）。
+    # 未实现的来源由同步服务直接跳过。
+    # def delete_annotation(self, state: SourceState, context: dict[str, Any]) -> None: ...
+    # def push_vote(self, state: SourceState, value: int, context: dict[str, Any]) -> None: ...
+
 
 @runtime_checkable
 class ReviewProvider(Protocol):
