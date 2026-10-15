@@ -46,8 +46,8 @@ class BRSProvider:
         "protocol_version": PROTOCOL_VERSION,
         "id": "talebook.annotation.brs",
         "name": "talebook-brs 章评服务器",
-        "description": "连接一个 talebook-brs 实例，导入公开章评，并同步 Talebook 中的公开笔记。",
-        "version": "1.1.0",
+        "description": "连接一个 talebook-brs 实例，导入公开章评，并同步 Talebook 中的公开评论、回复、赞踩与删除。",
+        "version": "1.2.0",
         "categories": ["annotations"],
         "capabilities": ["annotations.chapter_reviews", "annotations.push"],
         "runtime_kind": "builtin",
@@ -166,9 +166,8 @@ class BRSProvider:
         del context
         return Page(items=[], health_message="BRS annotation connection is write-only")
 
-    def push_annotation(self, item, state, context):
-        """把 Talebook 的公开批注写入当前用户绑定的 BRS 账号。"""
-        del state
+    def _signed_in(self, context):
+        """登录当前用户绑定的 BRS 账号，返回本次调用专用的请求函数与 endpoint。"""
         config = context.get("config") or {}
         secrets = context.get("secrets") or {}
         endpoint = str(config.get("endpoint") or "").rstrip("/")
@@ -178,8 +177,43 @@ class BRSProvider:
             raise UpstreamError("BRS endpoint is required")
         if not email or not password:
             raise UpstreamError("BRS credentials are required")
+        # 登录 cookie 只能存在于本次同步调用的独立会话中，不能跨用户复用。
+        transport = SafeHttpClient().json if self.transport is None else self.transport
+        login = transport("POST", endpoint + "/api/user/sign_in", data={"email": email, "password": password})
+        if login.get("err") != "ok":
+            raise UpstreamError(str(login.get("msg") or login.get("err") or "BRS login failed"))
+        return transport, endpoint
 
+    @staticmethod
+    def _checked(result, fallback):
+        if result.get("err") != "ok":
+            raise UpstreamError(str(result.get("msg") or result.get("err") or fallback))
+        return result.get("data") or {}
+
+    def push_annotation(self, item, state, context):
+        """把 Talebook 的公开评论或回复写入当前用户绑定的 BRS 账号；已有副本时更新，不重复新增。"""
+        config = context.get("config") or {}
         annotation = item.to_dict()
+        transport, endpoint = self._signed_in(context)
+
+        remote_id = str(
+            (state.to_dict() if hasattr(state, "to_dict") else dict(state or {})).get("source_annotation_id") or ""
+        )
+        if remote_id:
+            remote = self._checked(
+                transport(
+                    "POST",
+                    endpoint + "/api/review/update",
+                    json={"review_id": remote_id, "content": str(annotation.get("content") or "")},
+                ),
+                "BRS annotation update failed",
+            )
+            return PushReceipt(
+                source_annotation_id=remote_id,
+                source_position=str(annotation.get("cfi") or ""),
+                source_updated_at=str(remote.get("updateTime") or ""),
+            )
+
         local_book_id = str(annotation.get("book_id") or "")
         remote_book_id = next(
             (
@@ -189,33 +223,15 @@ class BRSProvider:
             ),
             "",
         )
-
-        # 登录 cookie 只能存在于本次同步调用的独立会话中，不能跨用户复用。
-        if self.transport is None:
-            client = SafeHttpClient()
-            transport = client.json
-        else:
-            transport = self.transport
-        login = transport(
-            "POST",
-            endpoint + "/api/user/sign_in",
-            data={"email": email, "password": password},
-        )
-        if login.get("err") != "ok":
-            raise UpstreamError(str(login.get("msg") or login.get("err") or "BRS login failed"))
-
         if not remote_book_id:
             book_title = str(annotation.get("book_title") or "").strip()
             if not book_title:
                 raise UpstreamError("Talebook book title is required before syncing annotations")
-            remote_book = transport(
-                "GET",
-                endpoint + "/api/review/book",
-                params={"title": book_title},
+            remote_book = self._checked(
+                transport("GET", endpoint + "/api/review/book", params={"title": book_title}),
+                "BRS book lookup failed",
             )
-            if remote_book.get("err") != "ok":
-                raise UpstreamError(str(remote_book.get("msg") or remote_book.get("err") or "BRS book lookup failed"))
-            remote_book_id = str((remote_book.get("data") or {}).get("id") or "")
+            remote_book_id = str(remote_book.get("id") or "")
             if not remote_book_id:
                 raise UpstreamError("BRS book lookup returned no id")
 
@@ -226,21 +242,45 @@ class BRSProvider:
             "cfi": str(annotation.get("cfi") or ""),
             "content": str(annotation.get("content") or annotation.get("quote_text") or ""),
             "refer_text": str(annotation.get("quote_text") or "")[:80],
-            "type": 1,
+            "kind": "book_comment" if annotation.get("annotation_type") == "book_comment" else "note",
         }
-        result = transport(
-            "POST",
-            endpoint + "/api/review/add",
-            json=payload,
+        if annotation.get("remote_root_id"):
+            # 回复：挂到主评论下，并记下回复对象。
+            payload["root_id"] = str(annotation["remote_root_id"])
+            payload["quote_id"] = str(annotation.get("remote_reply_to_id") or annotation["remote_root_id"])
+        remote = self._checked(
+            transport("POST", endpoint + "/api/review/add", json=payload),
+            "BRS annotation sync failed",
         )
-        if result.get("err") != "ok":
-            raise UpstreamError(str(result.get("msg") or result.get("err") or "BRS annotation sync failed"))
-        remote = result.get("data") or {}
         return PushReceipt(
             source_annotation_id=str(remote.get("reviewId") or remote.get("id") or ""),
             source_position=str(annotation.get("cfi") or ""),
             source_updated_at=str(remote.get("updateTime") or remote.get("createTime") or ""),
         )
+
+    def delete_annotation(self, state, context):
+        """删除 BRS 上的副本；BRS 会连同其下回复与投票一起删除。"""
+        remote_id = str(state.get("source_annotation_id") or "")
+        if not remote_id:
+            return None
+        transport, endpoint = self._signed_in(context)
+        self._checked(
+            transport("POST", endpoint + "/api/review/delete", json={"review_id": remote_id}),
+            "BRS annotation delete failed",
+        )
+        return None
+
+    def push_vote(self, state, value, context):
+        """以当前用户的 BRS 账号对副本投票：1 赞、-1 踩、0 取消。"""
+        remote_id = str(state.get("source_annotation_id") or "")
+        if not remote_id:
+            return None
+        transport, endpoint = self._signed_in(context)
+        self._checked(
+            transport("POST", endpoint + "/api/review/vote", json={"review_id": remote_id, "value": int(value)}),
+            "BRS vote sync failed",
+        )
+        return None
 
 
 PROVIDER = BRSProvider()

@@ -1,0 +1,14 @@
+# 只跟踪内置阅读器 candle-reader：它以 npm 包 @talebook/candle-reader 发布，
+# 有新版本时自动提 PR 升级 app/package.json 与 package-lock.json。
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /app
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: "@talebook/candle-reader"
+    commit-message:
+      prefix: "chore"
+    labels:
+      - dependencies

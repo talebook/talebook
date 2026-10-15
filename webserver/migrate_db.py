@@ -205,6 +205,7 @@ def compare_and_migrate(engine):
         logger.info("Database columns are up to date; checking data and constraints")
         backfill_plugin_connection_roles(engine)
         migrate_plugin_connection_unique_constraint(engine)
+        ensure_model_indexes(engine)
         return True
 
     logger.info(f"Found {len(migrations_needed)} columns to migrate:")
@@ -236,8 +237,25 @@ def compare_and_migrate(engine):
         )
         backfill_plugin_connection_roles(engine, include_default=role_added)
         migrate_plugin_connection_unique_constraint(engine)
+        ensure_model_indexes(engine)
 
     return error_count == 0
+
+
+def ensure_model_indexes(engine):
+    """补建模型声明的普通索引。
+
+    ``ADD COLUMN`` 不会带上列的 ``index=True``，存量库升级后需要单独建索引。
+    唯一索引可能撞上存量重复数据，交给各自的专门迁移处理，这里跳过。
+    """
+    for table in models.Base.metadata.sorted_tables:
+        for index in table.indexes:
+            if index.unique:
+                continue
+            try:
+                index.create(bind=engine, checkfirst=True)
+            except Exception as e:
+                logger.error("Failed to create index %s: %s", index.name, e)
 
 
 def backfill_plugin_connection_roles(engine, include_default=False):
