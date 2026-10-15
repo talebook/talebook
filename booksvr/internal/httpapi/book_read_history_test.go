@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	"talebook/booksvr/internal/userdb"
 )
 
 // 本文件覆盖「点阅读 → 我的阅读有书」这条用户可见链路。
@@ -162,6 +164,63 @@ func TestBookReadBookHistoryVisibleInUserInfo(t *testing.T) {
 	h, _ := hist[0].(map[string]any)
 	if h["href"] != "/book/1" {
 		t.Errorf("href = %v, want /book/1", h["href"])
+	}
+}
+
+// TestBookReadBookMarksReading 覆盖打开阅读器自动标记「在读」。
+//
+// 用户要求：读过的书要出现在「我的阅读 → 在读」里。当前状态为
+// 未读/无记录时置 1；已读完（2）不被覆盖。
+func TestBookReadBookMarksReading(t *testing.T) {
+	w := epubBookWiring(t, map[string]any{"EPUB_VIEWER": "creader.html"})
+	readerID := seedHistoryReader(t, w.db, `{}`)
+	ensureReadingStateTable(t, w.db)
+
+	ctx := pluginCtx(t, w.db, http.MethodGet, "/read/1", "", readerID, false)
+	if _, err := w.bookReadBook(ctx, 1); err != nil {
+		t.Fatalf("bookReadBook: %v", err)
+	}
+
+	st, err := userdb.GetReadingState(w.db, 1, readerID)
+	if err != nil {
+		t.Fatalf("GetReadingState: %v", err)
+	}
+	if st == nil || st.ReadState != 1 {
+		t.Fatalf("打开阅读器后 read_state = %+v，期望自动置为 1（在读）", st)
+	}
+}
+
+// TestBookReadBookKeepsFinished 覆盖已读完状态不被自动标记覆盖。
+func TestBookReadBookKeepsFinished(t *testing.T) {
+	w := epubBookWiring(t, map[string]any{"EPUB_VIEWER": "creader.html"})
+	readerID := seedHistoryReader(t, w.db, `{}`)
+	ensureReadingStateTable(t, w.db)
+	if err := userdb.SetReadingState(w.db, 1, readerID, 2, nil, nil); err != nil {
+		t.Fatalf("预置已读完: %v", err)
+	}
+
+	ctx := pluginCtx(t, w.db, http.MethodGet, "/read/1", "", readerID, false)
+	if _, err := w.bookReadBook(ctx, 1); err != nil {
+		t.Fatalf("bookReadBook: %v", err)
+	}
+
+	st, _ := userdb.GetReadingState(w.db, 1, readerID)
+	if st == nil || st.ReadState != 2 {
+		t.Fatalf("已读完被覆盖: %+v，期望保持 2", st)
+	}
+}
+
+// ensureReadingStateTable 建 reading_state 表（单数表名）。
+func ensureReadingStateTable(t *testing.T, db *sql.DB) {
+	t.Helper()
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS reading_state (
+		book_id INTEGER, reader_id INTEGER, favorite INTEGER DEFAULT 0,
+		favorite_date TEXT, wants INTEGER DEFAULT 0, wants_date TEXT,
+		read_state INTEGER DEFAULT 0, read_date TEXT, online_read INTEGER DEFAULT 0,
+		download INTEGER DEFAULT 0, progress TEXT DEFAULT '{}',
+		progress_update_time TEXT,
+		PRIMARY KEY (book_id, reader_id))`); err != nil {
+		t.Fatalf("建 reading_state 表失败: %v", err)
 	}
 }
 

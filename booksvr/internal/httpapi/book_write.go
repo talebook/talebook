@@ -89,6 +89,28 @@ func (w *bookWiring) recordReadHistory(ctx *Context, bookID int64, title string)
 	w.recordHistory(ctx, bookID, title, "read_history")
 }
 
+// markReadingIfNeeded 打开阅读器时把「未读」自动标记为「在读」。
+//
+// 与 Python 的差异（用户要求）：Python 打开阅读器只写阅读历史，在读
+// 状态只能手动设置；用户反馈「读过的书要出现在我的阅读」，故在当前
+// 状态为未读/无记录时自动置为在读。已读完/想读等手动状态不被覆盖。
+// 失败只记日志，不阻断阅读器渲染。
+func (w *bookWiring) markReadingIfNeeded(ctx *Context, bookID int64) {
+	if ctx == nil || ctx.Identity.UserID == 0 {
+		return
+	}
+	st, err := userdb.GetReadingState(w.db, bookID, ctx.Identity.UserID)
+	if err != nil {
+		return
+	}
+	if st != nil && st.ReadState != 0 {
+		return
+	}
+	if err := userdb.SetReadingState(w.db, bookID, ctx.Identity.UserID, 1, nil, nil); err != nil {
+		log.Printf("booksvr: 自动标记在读失败 book=%d reader=%d: %v", bookID, ctx.Identity.UserID, err)
+	}
+}
+
 // recordHistory 把书追加到当前用户的指定历史记录。
 func (w *bookWiring) recordHistory(ctx *Context, bookID int64, title, action string) {
 	if ctx == nil || ctx.Identity.UserID == 0 {
@@ -446,6 +468,7 @@ func (w *bookWiring) bookReadBook(ctx *Context, bookID int64) (map[string]any, e
 	// 用户点「阅读」打开阅读器后，前端读的是 user.extra.read_history。
 	// 写失败不阻断阅读（Python 同样不因历史写入失败而拒绝渲染）。
 	w.recordReadHistory(ctx, bookID, book.Title)
+	w.markReadingIfNeeded(ctx, bookID)
 	w.countDownload(ctx, bookID)
 
 	if has["epub"] {
