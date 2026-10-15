@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
     <link rel="icon" href="data:," />
-    <title>在 Go 里建完整数据访问层 · WIP</title>
+    <title>在 Go 里建完整数据访问层 · ACTIVE</title>
     <style>
       :root {
         color-scheme: light;
@@ -203,7 +203,7 @@
         <h1>在 Go 里建完整数据访问层：为搬 handler 铺路</h1>
         <p class="sub">把 Calibre <code>LibraryDatabase</code> 的实测调用面（23 个方法）在 Go 里完整实现，作为阶段 6 逐条搬迁 215 条 handler 的基础设施。<b>本阶段不修改任何 Python 代码</b>——Python 注定要删，不给它做数据层优化。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip wip">状态：WIP</span>
+          <span class="chip active">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-10-10</span>
           <span class="chip">所属模块：booksvr</span>
           <span class="chip">影响范围：booksvr/internal/library/、tests/</span>
@@ -323,7 +323,7 @@
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>Go 单元</td><td><code>cd booksvr &amp;&amp; go test ./...</code></td><td>6 包全绿</td><td class="ok">通过（6/6 包 ok）</td></tr>
+                  <tr><td>Go 单元</td><td><code>cd booksvr &amp;&amp; go test ./...</code></td><td>40 包全绿</td><td class="ok">通过（40/40 包 ok）</td></tr>
                   <tr><td>Go 静态</td><td><code>go vet ./... &amp;&amp; gofmt -l .</code></td><td>无输出</td><td class="ok">通过（均无输出）</td></tr>
                   <tr><td>一致性契约</td><td><code>pytest tests/test_library_contract.py</code></td><td>全绿</td><td class="ok">通过（18 passed）</td></tr>
                   <tr><td>回归</td><td><code>pytest tests/test_booksvr_contract.py tests/test_booksvr_serve_contract.py tests/test_deploy_config.py</code></td><td>全绿</td><td class="ok">通过</td></tr>

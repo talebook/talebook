@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
     <link rel="icon" href="data:," />
-    <title>让 booksvr 接管 8000：Talebook 后端流量切换 · WIP</title>
+    <title>让 booksvr 接管 8000：Talebook 后端流量切换 · ACTIVE</title>
     <style>
       :root {
         color-scheme: light;
@@ -203,7 +203,7 @@
         <h1>让 booksvr 接管 8000：Talebook 后端流量切换</h1>
         <p class="sub">新增 <code>booksvr serve</code> 子命令，让 Go 后端成为唯一对外 HTTP 入口：已实现的 3 条路由本地服务，其余 215 条显式反向代理回 Tornado（退到 8001），并以灰度开关与回滚路径保证可逐步接管。</p>
         <div class="chips" aria-label="方案元信息">
-          <span class="chip wip">状态：WIP</span>
+          <span class="chip active">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-10-10</span>
           <span class="chip">所属模块：booksvr</span>
           <span class="chip">影响范围：booksvr/、conf/supervisor/、conf/nginx/、webserver/self_check.py、docker/start.sh、tests/</span>
@@ -375,7 +375,7 @@
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>Go 单元</td><td><code>cd booksvr &amp;&amp; go test ./...</code></td><td>6 包全绿</td><td class="ok">通过（6/6 包 ok）</td></tr>
+                  <tr><td>Go 单元</td><td><code>cd booksvr &amp;&amp; go test ./...</code></td><td>40 包全绿</td><td class="ok">通过（40/40 包 ok）</td></tr>
                   <tr><td>Go 静态</td><td><code>go vet ./... &amp;&amp; gofmt -l .</code></td><td>无输出</td><td class="ok">通过（均无输出）</td></tr>
                   <tr><td>Python 契约</td><td><code>pytest tests/test_booksvr_serve_contract.py tests/test_deploy_config.py tests/test_booksvr_contract.py</code></td><td>全绿</td><td class="ok">通过（76 passed）</td></tr>
                   <tr><td>实际运行</td><td>真实 Docker 镜像 <code>talebook/talebook:stage2-verify</code>，容器内 curl 验证</td><td>路由分发、@auth、502、回滚均符合预期</td><td class="ok">通过（见下方明细）</td></tr>
