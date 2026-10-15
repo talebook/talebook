@@ -166,3 +166,30 @@ func TestReaderResourceRouteAllowsHead(t *testing.T) {
 	}
 	t.Fatalf("未找到路由 %s", rBookReaderRes)
 }
+
+// TestReaderResourceSendsETagAndNoCache 回归：Readest 的在线源校验
+// 要求响应带 ETag（HEAD 与 GET 各取一次并比对，缺失报
+// online.response_invalid），且禁止启发式缓存——否则浏览器会复用
+// 修复前无 ETag 的旧响应，书永远打不开。
+func TestReaderResourceSendsETagAndNoCache(t *testing.T) {
+	w, epub := epubResourceWiring(t)
+
+	want := readerResourceRevision(epub)
+	if want == "" {
+		t.Fatal("readerResourceRevision 返回空")
+	}
+
+	for _, method := range []string{http.MethodHead, http.MethodGet} {
+		rec := serveResource(t, w, method, nil)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s status = %d，期望 200", method, rec.Code)
+		}
+		etag := rec.Header().Get("ETag")
+		if etag != `"`+want+`"` {
+			t.Errorf("%s ETag = %q，期望 %q", method, etag, `"`+want+`"`)
+		}
+		if cc := rec.Header().Get("Cache-Control"); cc != "no-cache" {
+			t.Errorf("%s Cache-Control = %q，期望 no-cache", method, cc)
+		}
+	}
+}

@@ -56,7 +56,17 @@ export function buildReadestReaderUrl(bootstrap, { bookId, origin }) {
   target.searchParams.set('moke', '1');
   target.searchParams.set('mokeBookId', String(bookId));
   target.searchParams.set('mokeSourceServerUrl', origin);
-  target.searchParams.set('mokeReturnTo', '/library');
+  // 不能传 '/library'：Readest 的关闭书籍逻辑里有一段
+  //
+  //   moke === '1' && mokeReturnTo === '/library'
+  //     ? { kind: 'moke', path: '/library' }
+  //     : { kind: 'readest' }
+  //
+  // 命中 moke 分支时会直接调宿主桥 moke_navigate('/library') 并 return，
+  // 根本不打开书（Talebook 没提供该桥，回退成 location.assign('/library')）。
+  // 用户可见现象：点「阅读」后跳到书架，报「无法打开书籍」。
+  // 传书籍详情页路径，既避开该分支，也让「回库」回到这本书的详情页。
+  target.searchParams.set('mokeReturnTo', validated.back);
   return { target: target.href, ...validated };
 }
 

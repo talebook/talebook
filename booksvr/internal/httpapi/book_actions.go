@@ -467,6 +467,17 @@ func serveEPUBResource(ctx *Context, path string) {
 
 	ctx.Writer.Header().Set("Content-Type", "application/epub+zip")
 	ctx.Writer.Header().Set("Accept-Ranges", "bytes")
+	// Readest 用 ETag 做资源变更检测（HEAD 与 GET 各取一次并比对），
+	// 缺失会直接报「Failed to open the book file: online.response_invalid」。
+	// 用 revision（mtime_ns-size 的十六进制）作为 ETag，与 bootstrap
+	// 接口下发的 book.revision 同源，文件一变两者同步失效。
+	if rev := readerResourceRevision(path); rev != "" {
+		ctx.Writer.Header().Set("ETag", `"`+rev+`"`)
+	}
+	// 必须禁止启发式缓存：浏览器会把旧响应（可能没有 ETag）直接复用，
+	// Readest 的 fetch 走默认 cache 模式，拿到陈旧响应就报
+	// online.response_invalid。no-cache 强制带 If-None-Match revalidate。
+	ctx.Writer.Header().Set("Cache-Control", "no-cache")
 	// http.ServeContent 自己处理 Range / If-Modified-Since / HEAD。
 	http.ServeContent(ctx.Writer, ctx.Request, filepath.Base(path), info.ModTime(), f)
 }

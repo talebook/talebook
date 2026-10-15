@@ -5,6 +5,14 @@ import { normalizeBasePath, withBasePath } from './utils/base-path'
 
 const basePath = normalizeBasePath(process.env.TALEBOOK_BASE_PATH || '')
 
+// Readest 运行时用根路径请求自己的资源（i18next 的 loadPath 写死
+// "/locales/{{lng}}/{{ns}}.json"，字体同理），不认 assetPrefix=/readest。
+// 这些文件实际在 /readest/ 下，需要把根路径代理回 /readest/。
+// Nitro 的 proxy 只接受绝对 URL（相对路径会 404），所以这里拼出本机 origin；
+// 端口从 NUXT_PORT/PORT 推导，避免写死。生产环境由 nginx 的 alias 处理。
+const devPort = process.env.NUXT_PORT || process.env.PORT || '3000'
+const devOrigin = `http://127.0.0.1:${devPort}`
+
 export default defineNuxtConfig({
     vite: { define: { 'import.meta.env.TALEBOOK_BASE_PATH': JSON.stringify(basePath) } },
     compatibilityDate: '2024-04-03',
@@ -82,6 +90,24 @@ export default defineNuxtConfig({
                 'X-Content-Type-Options': 'nosniff',
             },
         },
+        // Readest 的「关闭书籍 / 回库」执行 router.replace("/library")，
+        // 因 assetPrefix=/readest 解析成 /readest/library。导出产物里只有
+        // reader.html，没有 library.html，该路径会落到 Nuxt 的 catch-all，
+        // 返回 Nuxt 应用壳；壳的 CSP 拦掉 Readest 的内联启动脚本，
+        // 应用挂载失败 → 空白页。
+        //
+        // 必须让 URL 保持无扩展名的 /readest/library（用 proxy 而不是
+        // redirect）：Next 的 router 从 **URL 路径**（经 removeBasePath
+        // 去掉 /readest）推导 pathname，再拿它去 components[pathname]
+        // 找页面组件。若 307 跳到 /readest/library.html，推导出的
+        // pathname 是 "/library.html"，与 manifest 里的 "/library" 不匹配。
+        // 注：Nitro 的 rewrite 对静态文件不生效（实测仍返回 Nuxt 壳）。
+        '/readest/library': { proxy: devOrigin + '/readest/library.html' },
+        // 根路径资源回写到 /readest/（详见文件顶部 devOrigin 的说明）。
+        '/locales/**': { proxy: devOrigin + '/readest/locales/**' },
+        '/fonts/**': { proxy: devOrigin + '/readest/fonts/**' },
+        '/workers/**': { proxy: devOrigin + '/readest/workers/**' },
+        '/vendor/**': { proxy: devOrigin + '/readest/vendor/**' },
         '/api/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/api/**' },
         '/get/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/get/**' },
         '/read-comic/**': { proxy: (process.env.API_URL || 'http://127.0.0.1:8080') + '/read-comic/**' },
