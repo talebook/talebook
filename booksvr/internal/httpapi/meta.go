@@ -375,20 +375,7 @@ func MetaBooksHandler(cfg MetaConfig) HandlerFunc {
 			return nil, err
 		}
 
-		books, err := metaLoadBooks(cfg, ids)
-		if err != nil {
-			return nil, err
-		}
-		// 按评分降序、id 降序排列。
-		sort.SliceStable(books, func(i, j int) bool {
-			ri, rj := int64Of(books[i]["rating"]), int64Of(books[j]["rating"])
-			if ri != rj {
-				return ri > rj
-			}
-			return int64Of(books[i]["id"]) > int64Of(books[j]["id"])
-		})
-
-		rsp, err := metaRenderBookList(ctx, cfg, books, title)
+		rsp, err := metaRenderBookIDs(ctx, cfg, ids, title)
 		if err != nil {
 			return nil, err
 		}
@@ -402,24 +389,7 @@ func MetaBooksHandler(cfg MetaConfig) HandlerFunc {
 
 // metaFormatBookIDs 取指定格式的全部书籍 id。
 func metaFormatBookIDs(db *sql.DB, format string) ([]int64, error) {
-	rows, err := db.Query(`SELECT book FROM data WHERE format = ?`, format)
-	if err != nil {
-		return nil, fmt.Errorf("httpapi: 查询格式书籍失败: %w", err)
-	}
-	defer rows.Close()
-
-	out := []int64{}
-	for rows.Next() {
-		var id int64
-		if err := rows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("httpapi: 扫描格式书籍失败: %w", err)
-		}
-		out = append(out, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("httpapi: 遍历格式书籍失败: %w", err)
-	}
-	return out, nil
+	return library.BooksForFormat(db, format)
 }
 
 // metaRatingBookIDs 取指定评分值的全部书籍 id。

@@ -738,17 +738,12 @@ func BookLibraryHandler(cfg BookConfig) HandlerFunc {
 		}
 		// 按格式过滤。
 		if format := ctx.Query("format"); format != "" && format != "全部" {
-			booksMap, err := bookLoadBooks(cfg, ids)
+			matched, err := library.BooksForFormat(cfg.LibraryDB, format)
 			if err != nil {
 				return nil, err
 			}
-			filtered := []int64{}
-			for _, id := range ids {
-				if b, ok := booksMap[id]; ok && bookHasFormat(b, format) {
-					filtered = append(filtered, id)
-				}
-			}
-			ids = filtered
+			ids = bookIntersect(ids, matched)
+
 		}
 		return bookRenderList(cfg, ctx, ids, "书库", true)
 	}

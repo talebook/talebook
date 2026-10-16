@@ -208,3 +208,21 @@ func FieldFor(db *sql.DB, field string, bookID int64) (any, error) {
 	}
 	return v, nil
 }
+
+// BooksForFormat retrieves IDs without loading unrelated book metadata.
+func BooksForFormat(db *sql.DB, format string) ([]int64, error) {
+	rows, err := db.Query(`SELECT DISTINCT book FROM data WHERE UPPER(format)=UPPER(?)`, format)
+	if err != nil {
+		return nil, fmt.Errorf("library: 查询格式书籍失败: %w", err)
+	}
+	defer rows.Close()
+	ids := []int64{}
+	for rows.Next() {
+		var id int64
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}

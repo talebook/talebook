@@ -50,6 +50,25 @@ func GetBooksData(db *sql.DB, ids []int64) ([]BookData, error) {
 		}
 	}
 
+	const batchSize = 500
+	out := make([]BookData, 0, len(ordered))
+	for start := 0; start < len(ordered); start += batchSize {
+		end := start + batchSize
+		if end > len(ordered) {
+			end = len(ordered)
+		}
+		batch, err := getBooksDataBatch(db, ordered[start:end])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, batch...)
+	}
+	return out, nil
+}
+
+// getBooksDataBatch bounds every book and metadata query to the same batch.
+func getBooksDataBatch(db *sql.DB, ordered []int64) ([]BookData, error) {
+
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ordered)), ",")
 	args := make([]any, len(ordered))
 	for i, id := range ordered {
