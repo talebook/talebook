@@ -54,6 +54,7 @@
                                     name="introduce"
                                     :book="book"
                                 />
+                                <BookFileSizes :sizes="book.format_sizes" />
                                 <div class="book-comments">
                                     <p
                                         v-if="book.comments"
@@ -100,6 +101,7 @@
 </template>
 
 <script setup>
+import BookFileSizes from '@/components/BookFileSizes.vue';
 import { computed } from 'vue';
 import BookReadBadge from '@/components/BookReadBadge.vue';
 

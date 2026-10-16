@@ -147,7 +147,11 @@ func readEntry(reader *zip.Reader, name string) ([]byte, error) {
 			return nil, err
 		}
 		defer func() { _ = rc.Close() }()
-		return io.ReadAll(rc)
+		data, err := io.ReadAll(io.LimitReader(rc, (32<<20)+1))
+		if len(data) > 32<<20 {
+			return nil, fmt.Errorf("zip: entry exceeds metadata limit")
+		}
+		return data, err
 	}
 	return nil, fmt.Errorf("zip: 条目不存在: %s", name)
 }

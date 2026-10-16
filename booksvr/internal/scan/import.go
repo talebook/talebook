@@ -2,15 +2,18 @@
 package scan
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"talebook/booksvr/internal/sourcefile"
 	"time"
 
+	"talebook/booksvr/internal/coverart"
 	"talebook/booksvr/internal/docmeta"
 	"talebook/booksvr/internal/epubmeta"
 	"talebook/booksvr/internal/importmeta"
@@ -534,56 +537,14 @@ func (s *Service) bookStorageRoot() string {
 // extractCover 从书籍文件里提取内嵌封面并写入书库。
 //
 // 对应 Calibre import_book 的封面提取：把封面写成
-// <libraryRoot>/<books.path>/cover.jpg，并把 books.has_cover 置 1。
+// <libraryRoot>/.talebook-covers/<bookID>.jpg，并把 books.has_cover 置 1。
 // 任何一步失败都静默跳过（与 Calibre 一致，不阻断导入）。
 func (s *Service) extractCover(bookID int64, fpath, format string) {
 	if s.LibraryDB == nil || s.LibraryRoot == "" {
 		return
 	}
-	data, ok := coverBytes(fpath, format)
-	if !ok {
-		return
-	}
-
-	// 封面写到书籍目录下。books.path 可能是相对书库根目录的 Calibre 路径，
-	// 也可能是原地登记时的外部绝对目录。
-	var rel string
-	if err := s.LibraryDB.QueryRow(`SELECT COALESCE(path,'') FROM books WHERE id = ?`, bookID).Scan(&rel); err != nil {
-		return
-	}
-	dir := filepath.FromSlash(rel)
-	if !filepath.IsAbs(dir) {
-		root := s.LibraryRoot
-		if s.BookStorageRoot != "" && strings.HasPrefix(filepath.ToSlash(dir), "Talebook Imports/") {
-			root = s.BookStorageRoot
-		}
-		dir = filepath.Join(root, dir)
-	}
-	if dir == "" {
-		return
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return
-	}
-	if err := os.WriteFile(filepath.Join(dir, "cover.jpg"), data, 0o644); err != nil {
-		return
-	}
-	_, _ = s.LibraryDB.Exec(`UPDATE books SET has_cover = 1 WHERE id = ?`, bookID)
-}
-
-// coverBytes 按格式分派到对应的封面提取器。
-func coverBytes(fpath, format string) ([]byte, bool) {
-	data, err := os.ReadFile(fpath)
-	if err != nil {
-		return nil, false
-	}
-	switch strings.ToLower(format) {
-	case "epub":
-		return epubmeta.Cover(data)
-	case "mobi", "azw", "azw3":
-		return mobimeta.Cover(data)
-	default:
-		return nil, false
+	if err := coverart.Ensure(context.Background(), s.LibraryDB, s.LibraryRoot, bookID, fpath, format); err != nil {
+		log.Printf("scan: cover for book %d: %v", bookID, err)
 	}
 }
 
@@ -680,6 +641,7 @@ func (s *Service) libraryFormatExists(bookID int64, format string) bool {
 func (s *Service) markIndexed(row *userdb.ScanFile, mi importmeta.Metadata, fpath, format string,
 	importID, userID int64, mediaType string, sameAuthorBookID int64) (string, int64, error) {
 
+	physicalPath := fpath
 	if archive, _ := row.Data["archive_path"].(string); archive != "" {
 		info, err := os.Stat(fpath)
 		if err != nil {
@@ -706,6 +668,7 @@ func (s *Service) markIndexed(row *userdb.ScanFile, mi importmeta.Metadata, fpat
 		return row.Status, 0, saveScanFile(s.DB, row)
 	}
 
+	s.extractCover(bookID, physicalPath, format)
 	row.ImportID = importID
 	row.BookID = bookID
 	row.Status = userdb.ScanStatusIndexed

@@ -60,6 +60,7 @@
                                     name="introduce"
                                     :book="book"
                                 />
+                                <BookFileSizes :sizes="book.format_sizes" />
                                 <div class="book-comments">
                                     <p
                                         v-if="book.comments"
@@ -106,6 +107,7 @@
 </template>
 
 <script setup>
+import BookFileSizes from '@/components/BookFileSizes.vue';
 import { computed } from 'vue';
 import BookReadBadge from '@/components/BookReadBadge.vue';
 
@@ -164,12 +166,13 @@ const render_books = computed(() => {
     margin-bottom: 0px;
 }
 .book-card-shell {
-    height: 150px;
-    overflow: hidden;
+    min-height: 150px;
+    height: auto;
+    overflow: visible;
     box-shadow: 0 0 6px rgb(0 0 0 / 24%);
 }
 .book-card-shell > .v-row {
-    height: 100%;
+    min-height: 150px;
     margin: 0;
     flex-wrap: nowrap;
 }
@@ -182,10 +185,10 @@ const render_books = computed(() => {
     margin-bottom: 20px;
 }
 .col-book-img {
-    flex: 0 0 auto;
-    width: auto;
-    max-width: none;
-    height: 100%;
+    flex: 0 0 110px;
+    width: 110px;
+    max-width: 32%;
+    height: 150px;
     padding: 0;
     aspect-ratio: 11 / 15;
 }

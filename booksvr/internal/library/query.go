@@ -28,7 +28,8 @@ type BookData struct {
 	HasCover   bool     `json:"has_cover"`
 	Path       string   `json:"path"`
 	// Formats 是该书已登记的格式（大写，如 EPUB/MOBI）。
-	Formats []string `json:"formats"`
+	Formats     []string         `json:"formats"`
+	FormatSizes map[string]int64 `json:"format_sizes"`
 }
 
 // GetBooksData 按 id 批量取书数据。
@@ -102,6 +103,7 @@ func getBooksDataBatch(db *sql.DB, ordered []int64) ([]BookData, error) {
 		b.Authors = []string{}
 		b.Tags = []string{}
 		b.Formats = []string{}
+		b.FormatSizes = map[string]int64{}
 		byID[b.ID] = b
 	}
 	if err := rows.Err(); err != nil {
@@ -331,7 +333,7 @@ func attachIdentifiers(db *sql.DB, byID map[int64]*BookData, ph string, args []a
 // attachFormats 填充格式列表（来自 Calibre 的 data 表）。
 func attachFormats(db *sql.DB, byID map[int64]*BookData, ph string, args []any) error {
 	rows, err := db.Query(fmt.Sprintf(`
-		SELECT book, format FROM data WHERE book IN (%s) ORDER BY book, format`, ph), args...)
+		SELECT book, UPPER(format), MAX(uncompressed_size) FROM data WHERE book IN (%s) GROUP BY book, UPPER(format) ORDER BY book, UPPER(format)`, ph), args...)
 	if err != nil {
 		return fmt.Errorf("library: 查询格式失败: %w", err)
 	}
@@ -339,11 +341,15 @@ func attachFormats(db *sql.DB, byID map[int64]*BookData, ph string, args []any) 
 	for rows.Next() {
 		var bookID int64
 		var format string
-		if err := rows.Scan(&bookID, &format); err != nil {
+		var size sql.NullInt64
+		if err := rows.Scan(&bookID, &format, &size); err != nil {
 			return fmt.Errorf("library: 扫描格式失败: %w", err)
 		}
 		if b, ok := byID[bookID]; ok {
 			b.Formats = append(b.Formats, strings.ToUpper(format))
+			if size.Valid && size.Int64 >= 0 {
+				b.FormatSizes[strings.ToUpper(format)] = size.Int64
+			}
 		}
 	}
 	return rows.Err()

@@ -170,6 +170,7 @@ func filesHasID(db *sql.DB, id int64) bool {
 
 // filesGetCover 取封面（可选缩略图），并设置 Last-Modified。
 func filesGetCover(cfg FilesConfig, ctx *Context, id int64, thumbnail bool, width, height int) ([]byte, error) {
+	ctx.Writer.Header().Set("Cache-Control", "private, no-cache")
 	ctx.Writer.Header().Set("Content-Type", "image/jpeg")
 
 	cover, err := library.Cover(cfg.DB, id, cfg.LibraryRoot)

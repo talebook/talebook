@@ -43,15 +43,13 @@ const (
 	exthPublishDt = 106
 	exthTitle     = 503
 	exthLanguage  = 524
-	// exthCoverOffset 是封面在图片列表中的序号（从 first_image_index 起算）。
+	// exthCoverOffset 是相对 first_image_index 的记录偏移。
 	exthCoverOffset = 201
-	// exthFirstImage 是第一条图片记录的记录号。
-	exthFirstImage = 125
 )
 
 // Cover 从 MOBI 字节流里取出内嵌封面图片。
 //
-// 返回 (图片字节, 是否找到)。MOBI 用 EXTH 201 记录封面图片相对记录 1 的
+// 返回 (图片字节, 是否找到)。MOBI 用 EXTH 201 记录封面相对首张图片记录的
 // 偏移；图片本身是 PalmDB 里的一条独立记录，通常为 JPEG 或 GIF。
 // 没有封面、偏移越界或记录为空时返回 ok=false，不报错。
 func Cover(data []byte) ([]byte, bool) {
@@ -67,38 +65,32 @@ func Cover(data []byte) ([]byte, bool) {
 		return nil, false
 	}
 
-	// 复刻 Calibre 的定位算法（mobi6.py extract_images）：
-	// 从 first_image_index（EXTH 125）开始遍历记录，**跳过非图片记录**，
-	// 只对真正的图片计数；cover_offset（EXTH 201）是图片序号，不是记录号。
-	//
-	// 曾错误地把 cover_offset 当成记录号（1+offset），或回退到「第一条图片」，
-	// 两者都会取到正文插图而不是封面。
+	// Calibre BookHeader: first image record is record-0 offset 0x6c.
+	// EXTH 201 is a record offset from that base (including non-image records).
+	rec0Off := recordOffset(data, 0)
+	if rec0Off < indexEnd || rec0Off+0x70 > len(data) {
+		return nil, false
+	}
+	first := uint64(binary.BigEndian.Uint32(data[rec0Off+0x6c : rec0Off+0x70]))
 	coverOffset, hasCover := exthIntValue(data, indexEnd, exthCoverOffset)
-	firstImage, hasFirst := exthIntValue(data, indexEnd, exthFirstImage)
-	if hasCover {
-		start := 0
-		if hasFirst && int(firstImage) <= numRecords {
-			start = int(firstImage)
+	if hasCover && coverOffset != ^uint32(0) {
+		record := first + uint64(coverOffset)
+		if record < uint64(numRecords) {
+			return imageAtRecord(data, numRecords, int(record))
 		}
-		if img, ok := imageByIndex(data, numRecords, start, int(coverOffset)); ok {
-			return img, true
-		}
+		return nil, false
+	}
+	// Legacy books without a declared cover may use the first image as cover.
+	if first < uint64(numRecords) {
+		return imageByIndex(data, numRecords, int(first), 0)
 	}
 
-	// 回退：没有可用的 EXTH 201 时，取 first_image_index 之后的第一张图片。
-	start := 0
-	if hasFirst && int(firstImage) <= numRecords {
-		start = int(firstImage)
-	}
-	if img, ok := imageByIndex(data, numRecords, start, 0); ok {
-		return img, true
-	}
 	return nil, false
 }
 
 // imageByIndex 返回从 start 记录起第 n 张图片（n 从 0 开始）。
 //
-// 与 Calibre 一致：遍历记录时跳过非图片记录，只对图片计数。
+// 仅用于缺少封面声明的旧文件回退，声明偏移使用 imageAtRecord。
 func imageByIndex(data []byte, numRecords, start, n int) ([]byte, bool) {
 	if n < 0 {
 		return nil, false
@@ -181,7 +173,13 @@ func exthIntValue(data []byte, indexEnd int, want uint32) (uint32, bool) {
 	if rec0Off < indexEnd || rec0Off+24 > len(data) {
 		return 0, false
 	}
-	rec0 := data[rec0Off:]
+	return exthIntValueRecord0(data[rec0Off:], want)
+}
+
+func exthIntValueRecord0(rec0 []byte, want uint32) (uint32, bool) {
+	if len(rec0) < 24 {
+		return 0, false
+	}
 	if string(rec0[16:20]) != "MOBI" {
 		return 0, false
 	}

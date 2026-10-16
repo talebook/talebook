@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"net/url"
 	"path"
 	"strings"
 )
@@ -21,6 +22,22 @@ func Cover(archiveBytes []byte) ([]byte, bool) {
 	if err != nil {
 		return nil, false
 	}
+
+	return coverFromArchive(reader)
+}
+
+// CoverFile uses ZIP's central directory rather than reading the ebook body.
+func CoverFile(filename string) ([]byte, bool, error) {
+	reader, err := zip.OpenReader(filename)
+	if err != nil {
+		return nil, false, err
+	}
+	defer reader.Close()
+	data, ok := coverFromArchive(&reader.Reader)
+	return data, ok, nil
+}
+
+func coverFromArchive(reader *zip.Reader) ([]byte, bool) {
 
 	containerData, err := readEntry(reader, "META-INF/container.xml")
 	if err != nil {
@@ -66,7 +83,7 @@ func Cover(archiveBytes []byte) ([]byte, bool) {
 	// 1. EPUB 3：properties 含 cover-image。
 	for _, it := range items {
 		if strings.Contains(it.props, "cover-image") {
-			if data, ok := readImage(reader, joinPath(base, it.href)); ok {
+			if data, ok := readCoverResource(reader, joinPath(base, it.href)); ok {
 				return data, true
 			}
 		}
@@ -78,7 +95,7 @@ func Cover(archiveBytes []byte) ([]byte, bool) {
 			continue
 		}
 		if href, ok := hrefByID[meta.attr("content")]; ok {
-			if data, ok := readImage(reader, joinPath(base, href)); ok {
+			if data, ok := readCoverResource(reader, joinPath(base, href)); ok {
 				return data, true
 			}
 		}
@@ -90,11 +107,29 @@ func Cover(archiveBytes []byte) ([]byte, bool) {
 			continue
 		}
 		if strings.EqualFold(it.id, "cover") || strings.Contains(strings.ToLower(it.href), "cover") {
-			if data, ok := readImage(reader, joinPath(base, it.href)); ok {
+			if data, ok := readCoverResource(reader, joinPath(base, it.href)); ok {
 				return data, true
 			}
 		}
 	}
+	// Explicit EPUB 2 guide references can point to an HTML/SVG cover wrapper.
+	for _, ref := range findAll(pkg, "reference") {
+		if strings.EqualFold(ref.attr("type"), "cover") {
+			if data, ok := readCoverResource(reader, joinPath(base, ref.attr("href"))); ok {
+				return data, true
+			}
+		}
+	}
+	// Some converted EPUBs omit all cover metadata. Only accept a pure image
+	// first spine page: never select an arbitrary illustration from body text.
+	if first := findFirst(pkg, "itemref"); first != nil {
+		if href := hrefByID[first.attr("idref")]; href != "" {
+			if data, ok := coverFromPage(reader, joinPath(base, href), true); ok {
+				return data, true
+			}
+		}
+	}
+
 	return nil, false
 }
 
@@ -109,10 +144,51 @@ func isImage(href string) bool {
 
 // joinPath 拼接 OPF 所在目录与条目相对路径。
 func joinPath(base, href string) string {
-	if base == "" {
-		return href
+	value, err := url.Parse(href)
+	if err != nil || value.IsAbs() || value.Host != "" {
+		return ""
 	}
-	return path.Join(base, href)
+	if strings.HasPrefix(value.Path, "/") {
+		return path.Clean(strings.TrimPrefix(value.Path, "/"))
+	}
+	return path.Join(base, value.Path)
+}
+
+func readCoverResource(reader *zip.Reader, name string) ([]byte, bool) {
+	if isImage(name) {
+		return readImage(reader, name)
+	}
+	return coverFromPage(reader, name, false)
+}
+
+func coverFromPage(reader *zip.Reader, name string, requireEmpty bool) ([]byte, bool) {
+	raw, err := readEntry(reader, name)
+	if err != nil {
+		return nil, false
+	}
+	page, err := parseXML(raw)
+	if err != nil {
+		return nil, false
+	}
+	body := findFirst(page, "body")
+	if body == nil {
+		body = page
+	}
+	if requireEmpty && strings.TrimSpace(body.text()) != "" {
+		return nil, false
+	}
+	images := append(findAll(body, "img"), findAll(body, "image")...)
+	if len(images) != 1 {
+		return nil, false
+	}
+	href := images[0].attr("src")
+	if href == "" {
+		href = images[0].attr("href")
+	}
+	if href == "" {
+		return nil, false
+	}
+	return readImage(reader, joinPath(path.Dir(name), href))
 }
 
 // readImage 读取归档内的图片条目，并确认内容非空。

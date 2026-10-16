@@ -27,12 +27,14 @@
                 >
                     {{ book.title }}
                 </v-card-subtitle>
+                <BookFileSizes :sizes="book.format_sizes" class="px-2 pb-2" />
             </v-card>
         </v-col>
     </v-row>
 </template>
 
 <script setup>
+import BookFileSizes from '@/components/BookFileSizes.vue';
 defineProps({
     books: {
         type: Array,

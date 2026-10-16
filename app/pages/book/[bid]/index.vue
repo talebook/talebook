@@ -909,6 +909,7 @@
 </template>
 
 <script setup>
+import { formatFileSize } from '@/utils/file-size';
 import { withBasePath } from '@/utils/base-path';
 import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -1491,14 +1492,7 @@ const confirmUploadFormat = async () => {
     }
 };
 
-const formatFileSize = (size) => {
-    if (size >= 1048576) {
-        return parseInt(size / 1048576) + 'MB';
-    } else if (size >= 1024) {
-        return parseInt(size / 1024) + 'KB';
-    }
-    return size + 'B';
-};
+
 
 const seperate_book = () => {
     selectedSeparateFormat.value = '';

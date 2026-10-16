@@ -137,4 +137,14 @@ describe('BookCards.vue', () => {
         expect(wrapper.findAll('.read-chip').length).toBe(1);
         expect(wrapper.text()).toContain('已读');
     });
+    it('shows sizes for every format on a book card', () => {
+        const wrapper = mount(BookCards, {
+            props: { books: [{ id: 1, title: 'Multi format', format_sizes: { EPUB: 1024, MOBI: 1572864, TXT: 100 } }] },
+            global: { plugins: [vuetify], mocks: { $t: (key: string) => key } },
+        });
+        expect(wrapper.text()).toContain('EPUB · 1.0 KiB');
+        expect(wrapper.text()).toContain('MOBI · 1.5 MiB');
+        expect(wrapper.text()).toContain('TXT · 100 B');
+    });
+
 });

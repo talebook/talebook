@@ -1,6 +1,8 @@
 package mobimeta
 
 import (
+	"bytes"
+	"encoding/binary"
 	"os"
 	"testing"
 )
@@ -56,5 +58,30 @@ func TestCoverOffsetOutOfRange(t *testing.T) {
 	data := buildMOBI("越界书", map[uint32]string{503: "越界书", 201: "\x00\x00\x27\x0f"})
 	if _, ok := Cover(data); ok {
 		t.Error("越界偏移不应返回封面")
+	}
+}
+
+func TestCoverUsesHeaderImageBaseAndRecordOffset(t *testing.T) {
+	record0 := make([]byte, 16+232+24)
+	copy(record0[16:], "MOBI")
+	binary.BigEndian.PutUint32(record0[20:], 232)
+	binary.BigEndian.PutUint32(record0[0x6c:], 2)
+	copy(record0[248:], "EXTH")
+	binary.BigEndian.PutUint32(record0[252:], 24)
+	binary.BigEndian.PutUint32(record0[256:], 1)
+	binary.BigEndian.PutUint32(record0[260:], 201)
+	binary.BigEndian.PutUint32(record0[264:], 12)
+	binary.BigEndian.PutUint32(record0[268:], 2)
+	wanted := []byte{0xff, 0xd8, 0xff, 0x42}
+	records := [][]byte{record0, []byte("text"), {0xff, 0xd8, 0xff, 0x10}, []byte("RESC non-image"), wanted}
+	data := make([]byte, 78+8*len(records))
+	binary.BigEndian.PutUint16(data[76:], uint16(len(records)))
+	for i, r := range records {
+		binary.BigEndian.PutUint32(data[78+8*i:], uint32(len(data)))
+		data = append(data, r...)
+	}
+	got, ok := Cover(data)
+	if !ok || !bytes.Equal(got, wanted) {
+		t.Fatalf("wrong cover: %x %v", got, ok)
 	}
 }

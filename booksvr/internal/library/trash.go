@@ -12,32 +12,44 @@ import (
 // Cover 返回某本书的封面图片字节。
 //
 // 无封面时返回 nil（不报错），与 Calibre 的 cover() 语义一致。
-// 封面文件位于 <libraryRoot>/<book.path>/cover.jpg。
+// 优先读取按书号独立保存的托管封面，兼容原 Calibre cover.jpg。
 func Cover(db *sql.DB, bookID int64, libraryRoot string) ([]byte, error) {
-	var bookPath string
-	var hasCover int64
-	err := db.QueryRow(
-		`SELECT COALESCE(path,''), COALESCE(has_cover,0) FROM books WHERE id = ?`,
-		bookID).Scan(&bookPath, &hasCover)
-	if err == sql.ErrNoRows {
-		return nil, nil
+	p, err := coverFile(db, bookID, libraryRoot)
+	if err != nil || p == "" {
+		return nil, err
 	}
-	if err != nil {
-		return nil, fmt.Errorf("library: 查询封面路径失败: %w", err)
-	}
-	if hasCover == 0 || bookPath == "" {
-		return nil, nil
-	}
-
-	coverPath := filepath.Join(bookDirFromPath(libraryRoot, bookPath), "cover.jpg")
-	data, err := os.ReadFile(coverPath)
+	data, err := os.ReadFile(p)
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, fmt.Errorf("library: 读取封面失败: %w", err)
+	return data, err
+}
+
+func coverFile(db *sql.DB, id int64, root string) (string, error) {
+	var bookPath string
+	var hasCover int64
+	err := db.QueryRow(`SELECT COALESCE(path,''),COALESCE(has_cover,0) FROM books WHERE id=?`, id).Scan(&bookPath, &hasCover)
+	if err == sql.ErrNoRows {
+		return "", nil
 	}
-	return data, nil
+	if err != nil {
+		return "", err
+	}
+	// Managed artwork is per book; legacy external directories may be shared.
+	paths := []string{ManagedCoverPath(root, id)}
+	if hasCover != 0 && bookPath != "" {
+		paths = append(paths, filepath.Join(bookDirFromPath(root, bookPath), "cover.jpg"))
+	}
+	for _, p := range paths {
+		info, err := os.Stat(p)
+		if err == nil && info.Mode().IsRegular() {
+			return p, nil
+		}
+		if err != nil && !os.IsNotExist(err) {
+			return "", err
+		}
+	}
+	return "", nil
 }
 
 // bookDirFromPath 把 books.path 解析成磁盘目录。
@@ -57,27 +69,16 @@ func bookDirFromPath(libraryRoot, bookPath string) string {
 //
 // 无封面时返回 0。
 func CoverLastModified(db *sql.DB, bookID int64, libraryRoot string) (int64, error) {
-	var bookPath string
-	var hasCover int64
-	err := db.QueryRow(
-		`SELECT COALESCE(path,''), COALESCE(has_cover,0) FROM books WHERE id = ?`,
-		bookID).Scan(&bookPath, &hasCover)
-	if err == sql.ErrNoRows {
-		return 0, nil
+	p, err := coverFile(db, bookID, libraryRoot)
+	if err != nil || p == "" {
+		return 0, err
 	}
-	if err != nil {
-		return 0, fmt.Errorf("library: 查询封面路径失败: %w", err)
-	}
-	if hasCover == 0 || bookPath == "" {
-		return 0, nil
-	}
-
-	info, err := os.Stat(filepath.Join(bookDirFromPath(libraryRoot, bookPath), "cover.jpg"))
+	info, err := os.Stat(p)
 	if os.IsNotExist(err) {
 		return 0, nil
 	}
 	if err != nil {
-		return 0, fmt.Errorf("library: 读取封面时间失败: %w", err)
+		return 0, err
 	}
 	return info.ModTime().Unix(), nil
 }

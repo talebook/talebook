@@ -815,14 +815,19 @@ func AdminBookListHandler(cfg AdminConfig) HandlerFunc {
 
 // adminSimpleBook 组装简化的书籍字典。
 func adminSimpleBook(cfg AdminConfig, b library.BookData) map[string]any {
+	coverURL := fmt.Sprintf("%s/get/cover/%d.jpg", cfg.CDNURL, b.ID)
+	if b.HasCover {
+		coverURL += "?cover=1"
+	}
 	return map[string]any{
-		"id":      b.ID,
-		"title":   b.Title,
-		"authors": b.Authors,
-		"tags":    b.Tags,
-		"img":     fmt.Sprintf("%s/get/cover/%d.jpg", cfg.CDNURL, b.ID),
-		"href":    fmt.Sprintf("/book/%d", b.ID),
-		"fmt":     b.Formats,
+		"id":           b.ID,
+		"title":        b.Title,
+		"authors":      b.Authors,
+		"tags":         b.Tags,
+		"img":          coverURL,
+		"href":         fmt.Sprintf("/book/%d", b.ID),
+		"fmt":          b.Formats,
+		"format_sizes": b.FormatSizes,
 	}
 }
 

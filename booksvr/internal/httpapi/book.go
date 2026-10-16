@@ -259,6 +259,14 @@ func bookDict(cfg BookConfig, b library.BookData) map[string]any {
 	// 前端用 href 跳详情页，用 fmt 渲染格式列表；这两个不在 Formatter 里。
 	d["href"] = fmt.Sprintf("/book/%d", b.ID)
 	d["fmt"] = b.Formats
+	d["format_sizes"] = b.FormatSizes
+	if b.HasCover {
+		for _, key := range []string{"img", "thumb"} {
+			if value, ok := d[key].(string); ok {
+				d[key] = value + "&cover=1"
+			}
+		}
+	}
 	for k, v := range formats {
 		d[k] = v
 	}

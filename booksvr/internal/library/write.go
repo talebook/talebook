@@ -123,11 +123,37 @@ func findOrCreateItem(tx *sql.Tx, table, nameCol, value string) (int64, error) {
 // 与 Calibre 的容错行为一致。
 func DeleteBookToTrash(db *sql.DB, bookID int64, libraryRoot string) error {
 	if libraryRoot != "" {
+		managed := isManagedBookPath(db, bookID)
 		if err := moveBookDirToTrash(db, bookID, libraryRoot); err != nil {
 			return err
 		}
+		cover := ManagedCoverPath(libraryRoot, bookID)
+		if managed {
+			if _, err := os.Stat(cover); err == nil {
+				dst, err := trashBookDir(libraryRoot, bookID)
+				if err != nil {
+					return err
+				}
+				if err = os.MkdirAll(dst, 0755); err != nil {
+					return err
+				}
+				if err = os.Rename(cover, filepath.Join(dst, "cover.jpg")); err != nil {
+					return err
+				}
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+		}
 	}
-	return DeleteBook(db, bookID)
+	if err := DeleteBook(db, bookID); err != nil {
+		return err
+	}
+	if libraryRoot != "" {
+		if err := os.Remove(ManagedCoverPath(libraryRoot, bookID)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // moveBookDirToTrash 把书籍目录移到回收站。

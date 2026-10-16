@@ -167,6 +167,7 @@
                 >
                     {{ item.title }}
                 </div>
+                <BookFileSizes :sizes="item.format_sizes" />
             </template>
 
             <template #item.authors="{ item }">
@@ -498,6 +499,7 @@
 </template>
 
 <script setup>
+import BookFileSizes from '@/components/BookFileSizes.vue';
 import { withBasePath } from '@/utils/base-path';
 import { ref, computed, watch, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n';

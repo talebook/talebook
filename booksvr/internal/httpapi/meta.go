@@ -470,6 +470,7 @@ func bookDataToDict(b library.BookData) map[string]any {
 		"has_cover":    b.HasCover,
 		"path":         b.Path,
 		"fmt":          b.Formats,
+		"format_sizes": b.FormatSizes,
 	}
 }
 
