@@ -99,8 +99,8 @@ func TestScanListHandler(t *testing.T) {
 	if summary.Total != 2 {
 		t.Errorf("summary.total = %d, want 2", summary.Total)
 	}
-	if got["import_mode"] != importModeCopy {
-		t.Errorf("import_mode = %v, want copy", got["import_mode"])
+	if got["import_mode"] != importModeIndex {
+		t.Errorf("import_mode = %v, want index", got["import_mode"])
 	}
 }
 
@@ -386,8 +386,8 @@ func TestImportRunHandler(t *testing.T) {
 	if got["err"] != "ok" || got["msg"] != "导入任务已提交" {
 		t.Errorf("得到 (%v,%v), want (ok,导入任务已提交)", got["err"], got["msg"])
 	}
-	if gotMode != importModeCopy {
-		t.Errorf("import_mode = %q, want copy", gotMode)
+	if gotMode != importModeIndex {
+		t.Errorf("import_mode = %q, want index", gotMode)
 	}
 	if gotUser != 7 {
 		t.Errorf("user_id = %d, want 7", gotUser)

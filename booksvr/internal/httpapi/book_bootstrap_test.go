@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"talebook/booksvr/internal/convert"
 	"testing"
 )
 
@@ -233,6 +234,8 @@ func TestReaderBootstrapConversionPending(t *testing.T) {
 	}
 
 	w := newBookWiring(db, db, map[string]any{})
+	w.convert = convert.NewService(db, t.TempDir())
+	w.convert.Converter = func(string, string) error { return nil }
 	rec := serveBootstrap(t, w, "engine=readest")
 
 	if rec.Code != http.StatusConflict {

@@ -61,8 +61,8 @@ func TestImportSettingsGet(t *testing.T) {
 	if settings["scan_upload_path"] != importdir.NormalizePath(root) {
 		t.Errorf("scan_upload_path = %v", settings["scan_upload_path"])
 	}
-	if settings["import_mode"] != importModeCopy {
-		t.Errorf("import_mode = %v, want copy", settings["import_mode"])
+	if settings["import_mode"] != importModeIndex {
+		t.Errorf("import_mode = %v, want index", settings["import_mode"])
 	}
 	if settings["auto_watch_enabled"] != false {
 		t.Errorf("auto_watch_enabled = %v", settings["auto_watch_enabled"])
@@ -388,8 +388,8 @@ func TestNormalizeImportMode(t *testing.T) {
 		{"显式 move", importdir.Config{ImportMode: "move"}, "move"},
 		{"delete_after 转 move", importdir.Config{DeleteAfter: true}, "move"},
 		{"配置值生效", importdir.Config{SavedImportMode: "index"}, "index"},
-		{"非法配置退回 copy", importdir.Config{SavedImportMode: "bogus"}, "copy"},
-		{"全空退回 copy", importdir.Config{}, "copy"},
+		{"非法配置退回 index", importdir.Config{SavedImportMode: "bogus"}, "index"},
+		{"全空退回 index", importdir.Config{}, "index"},
 		{"显式优先于配置", importdir.Config{ImportMode: "index", SavedImportMode: "move"}, "index"},
 	}
 	for _, tc := range cases {

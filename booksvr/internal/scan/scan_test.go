@@ -116,8 +116,8 @@ func TestNormalizeImportMode(t *testing.T) {
 		{"显式 move", "move", false, "", "move"},
 		{"delete_after 转 move", "", true, "", "move"},
 		{"已保存模式生效", "", false, "index", "index"},
-		{"非法已保存退回 copy", "", false, "bogus", "copy"},
-		{"全空退回 copy", "", false, "", "copy"},
+		{"非法已保存退回 index", "", false, "bogus", "index"},
+		{"全空退回 index", "", false, "", "index"},
 		{"显式优先于已保存", "index", false, "move", "index"},
 		{"显式优先于 delete_after", "copy", true, "", "copy"},
 	}

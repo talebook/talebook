@@ -591,7 +591,7 @@
 </template>
 
 <script setup>
-import { allowedRootsFromSettings, validateAllowedRoots } from '@/composables/useImportRoots';
+import { DEFAULT_IMPORT_MODE, allowedRootsFromSettings, validateAllowedRoots } from '@/composables/useImportRoots';
 import { activeImportTask } from '@/composables/useImportTask';
 import { withBasePath } from '@/utils/base-path';
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
@@ -620,7 +620,7 @@ const options = ref({ page: 1, itemsPerPage: 100, sortBy: [{ key: 'create_time',
 const count_todo = ref(0);
 const count_done = ref(0);
 const count_failed = ref(0);
-const import_mode = ref('copy');
+const import_mode = ref(DEFAULT_IMPORT_MODE);
 const auto_watch_enabled = ref(false);
 const directory_check = ref(null);
 const watch_status = ref({ state: 'off', queued: 0, running: 0, failed: 0, last_scan_at: null });
@@ -633,7 +633,7 @@ const settingsError = ref('');
 const settingsDraft = ref({
     scan_upload_path: '/data/books/imports/',
     import_allowed_roots: ['/data/books/imports/'],
-    import_mode: 'copy',
+    import_mode: DEFAULT_IMPORT_MODE,
     auto_watch_enabled: false,
     directory_check: null,
 });
@@ -674,7 +674,7 @@ const importModeDefinitions = computed(() => ({
     },
 }));
 
-const importModeLabel = (mode) => importModeDefinitions.value[mode]?.label || importModeDefinitions.value.copy.label;
+const importModeLabel = (mode) => importModeDefinitions.value[mode]?.label || importModeDefinitions.value.index.label;
 
 const moveModeUnavailable = computed(() => {
     const check = settingsDraft.value.directory_check;
@@ -848,7 +848,7 @@ const applyImportSettings = (settings) => {
     if (!settings) return;
     allowed_roots.value = allowedRootsFromSettings(settings);
     scan_dir.value = allowed_roots.value[0] || settings.scan_upload_path || scan_dir.value;
-    import_mode.value = settings.import_mode || 'copy';
+    import_mode.value = settings.import_mode || DEFAULT_IMPORT_MODE;
     auto_watch_enabled.value = Boolean(settings.auto_watch_enabled);
     directory_check.value = settings.directory_check || null;
     watch_status.value = settings.watch_status || watch_status.value;
@@ -947,7 +947,7 @@ const checkDraftDirectory = (path) => {
         }
         settingsDraft.value.directory_check = rsp.directory;
         if (settingsDraft.value.import_mode === 'move' && rsp.directory?.writable === false) {
-            settingsDraft.value.import_mode = 'copy';
+            settingsDraft.value.import_mode = DEFAULT_IMPORT_MODE;
         }
     }).finally(() => {
         directoryChecking.value = false;

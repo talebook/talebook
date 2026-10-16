@@ -12,6 +12,9 @@
 /** 容器内导入目录必须是绝对路径。 */
 export const IMPORT_ROOT_PREFIX = '/';
 
+/** 新配置默认只登记源文件，避免复制占用书库磁盘。 */
+export const DEFAULT_IMPORT_MODE = 'index';
+
 /**
  * 归一化目录列表：去首尾空白、丢弃空项、按首次出现顺序去重。
  *

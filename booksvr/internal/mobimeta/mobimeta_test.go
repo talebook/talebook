@@ -58,9 +58,9 @@ func buildMOBI(title string, fields map[uint32]string) []byte {
 	// full name 放在 EXTH 之后。
 	fullNameOff := len(rec0)
 	rec0 = append(rec0, []byte(title)...)
-	// 回填 full name 偏移/长度（相对 MOBI 起点 0x54 / 0x58）。
-	binary.BigEndian.PutUint32(rec0[16+0x54:16+0x58], uint32(fullNameOff))
-	binary.BigEndian.PutUint32(rec0[16+0x58:16+0x5C], uint32(len(title)))
+	// 回填 full name 偏移/长度（相对记录 0 起点 0x54 / 0x58）。
+	binary.BigEndian.PutUint32(rec0[0x54:0x58], uint32(fullNameOff))
+	binary.BigEndian.PutUint32(rec0[0x58:0x5C], uint32(len(title)))
 
 	// PalmDB 头。
 	pdb := make([]byte, 78)

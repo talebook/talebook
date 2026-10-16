@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
     IMPORT_ROOT_PREFIX,
+    DEFAULT_IMPORT_MODE,
     allowedRootsFromSettings,
     isWithinDataPrefix,
     normalizeAllowedRoots,
@@ -149,5 +150,11 @@ describe('allowedRootsFromSettings', () => {
         expect(
             allowedRootsFromSettings({ allowed_roots: ['  /data/a  ', '/data/a', ''] }),
         ).toEqual(['/data/a']);
+    });
+});
+
+describe('default import storage', () => {
+    it('uses source indexing rather than copying by default', () => {
+        expect(DEFAULT_IMPORT_MODE).toBe('index');
     });
 });

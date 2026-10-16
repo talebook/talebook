@@ -24,6 +24,15 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SMALL = b'{"err": "ok"}'
+OLD_READER = b"""<script>
+const resp = await fetch(API + "/api/book/" + BOOK_ID + "/reader-bootstrap")
+if (data && data.epub_ready) {
+          startReader()
+}
+if (IS_READY) {
+    startReader()
+}
+</script>"""
 LARGE = json.dumps(
     {
         "meta": "tag",
@@ -35,9 +44,10 @@ LARGE = json.dumps(
 
 class Upstream(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
-        payload = SMALL if self.path == "/api/welcome" else LARGE
+        reader = self.path == "/read/123"
+        payload = OLD_READER if reader else SMALL if self.path == "/api/welcome" else LARGE
         self.send_response(200)
-        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Type", "text/html" if reader else "application/json")
         self.send_header("Content-Length", str(len(payload)))
         self.end_headers()
         try:
@@ -159,6 +169,21 @@ class TestNginxLargeResponse(unittest.TestCase):
             self.assertIn("Permission denied", log.read_text())
             self.assertIn("/proxy/", log.read_text())
             print(f"negative control: expected={length}, received={len(body)}, proxy temp Permission denied")
+
+    def test_old_reader_compatibility_preserves_ready_branch(self):
+        with self.proxy("talebook.conf", 0) as (port, _log):
+            connection = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            self.addCleanup(connection.close)
+            connection.request("GET", "/read/123")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            body = response.read().decode()
+            self.assertIn("/reader-bootstrap?engine=readest", body)
+            self.assertIn("resp.ok && data.err === 'ok' && data.resource", body)
+            self.assertIn("window.location.replace('/read/' + BOOK_ID + window.location.search)", body)
+            self.assertIn("if (IS_READY) {\n    startReader()", body)
+            self.assertNotIn("data.epub_ready", body)
+            self.assertEqual(self.request(port, "/api/welcome")[1], SMALL)
 
     def test_original_config_transmits_identical_json_with_writable_proxy_temp(self):
         with self.proxy("talebook.conf", 0, original=True, writable=True) as (port, log):

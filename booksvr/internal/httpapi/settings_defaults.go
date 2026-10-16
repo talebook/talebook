@@ -141,7 +141,7 @@ var builtinSettingsDefaults = map[string]any{
 	"i18n_path":                                "/var/www/talebook/webserver/i18n",
 	"import_allowed_roots":                     []any{"/data/books/imports/"},
 	"import_auto_watch_enabled":                false,
-	"import_mode":                              "copy",
+	"import_mode":                              "index",
 	"import_scan_batch_size":                   500,
 	"import_watch_interval_seconds":            30,
 	"installed":                                false,

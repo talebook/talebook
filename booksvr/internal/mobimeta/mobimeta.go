@@ -2,7 +2,7 @@
 //
 // 对应 Calibre 的 calibre.ebooks.metadata.mobi.get_metadata：
 // MOBI 是 Palm Database（PDB）容器，元数据分布在两处：
-//   - PalmDOC 头（偏移 0x00 起）：name 字段存书名
+//   - PalmDB 容器头（偏移 0x00 起）：name 字段可作为书名回退
 //   - MOBI 头（PalmDOC 头之后）：full name 偏移与 EXTH 记录区
 //   - EXTH 记录：100=作者、101=出版社、103=简介、104=ISBN、
 //     105=主题、106=出版日期、503=更新书名
@@ -254,9 +254,9 @@ func Extract(data []byte) (*Metadata, error) {
 	if len(mobi) < 116 {
 		return nil, ErrInvalidContainer
 	}
-	// full name 偏移与长度位于 MOBI 头 0x54 / 0x58（相对 MOBI 起点）。
-	fullNameOff := int(binary.BigEndian.Uint32(mobi[0x54:0x58]))
-	fullNameLen := int(binary.BigEndian.Uint32(mobi[0x58:0x5C]))
+	// full name 偏移与长度位于记录 0 的 0x54 / 0x58（包含 16 字节 PalmDOC 头）。
+	fullNameOff := int(binary.BigEndian.Uint32(rec0[0x54:0x58]))
+	fullNameLen := int(binary.BigEndian.Uint32(rec0[0x58:0x5C]))
 
 	// 书名：优先 EXTH 503，其次 MOBI full name，最后 PDB name。
 	if fullNameLen > 0 && fullNameOff > 0 && fullNameOff+fullNameLen <= len(rec0) {

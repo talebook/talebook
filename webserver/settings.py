@@ -20,7 +20,7 @@ settings = {
     "convert_path"  : "/data/books/convert/",
     "upload_path"   : "/data/books/upload/",
     "scan_upload_path"   : "/data/books/imports/",
-    "import_mode"   : "copy",
+    "import_mode"   : "index",
     "import_auto_watch_enabled": False,
     "import_allowed_roots": ["/data/books/imports/"],
     "import_watch_interval_seconds": 30,

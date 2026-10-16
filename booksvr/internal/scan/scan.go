@@ -36,7 +36,7 @@ const (
 // NormalizeImportMode 复刻 normalize_import_mode。
 //
 // 显式模式优先；否则 deleteAfter 为真时用 move；再否则用已保存的模式；
-// 已保存模式非法时退回 copy。
+// 已保存模式非法时退回 index。
 func NormalizeImportMode(importMode string, deleteAfter bool, savedMode string) string {
 	if isImportMode(importMode) {
 		return importMode
@@ -47,7 +47,7 @@ func NormalizeImportMode(importMode string, deleteAfter bool, savedMode string) 
 	if isImportMode(savedMode) {
 		return savedMode
 	}
-	return ModeCopy
+	return ModeIndex
 }
 
 // isImportMode 报告模式是否合法。

@@ -72,7 +72,31 @@ func newImportService(t *testing.T, db, lib *sql.DB) *Service {
 	s.Clock = fixedClock
 	s.LibraryDB = lib
 	s.LibraryRoot = t.TempDir()
+	// Existing import cases exercise explicitly requested copy behavior.
+	s.SavedImportMode = ModeCopy
 	return s
+}
+
+func TestDefaultImportIndexesSourceWithoutCopy(t *testing.T) {
+	db, lib := importTestDB(t), importLibraryDB(t)
+	s := newImportService(t, db, lib)
+	s.SavedImportMode = ""
+	p := makeValidEpub(t, t.TempDir(), "只索引.epub")
+	seedReadyRow(t, db, p, "default-index-source")
+	res, err := s.Import(nil, 1, false, "")
+	if err != nil || res.Indexed != 1 || res.Imported != 0 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	var path string
+	if err := lib.QueryRow(`SELECT path FROM book_formats WHERE book_id=?`, res.BookIDs[0]).Scan(&path); err != nil || path != p {
+		t.Fatalf("source path %q: %v", path, err)
+	}
+	if _, err := os.Stat(filepath.Join(s.LibraryRoot, "Talebook Imports")); !os.IsNotExist(err) {
+		t.Fatal("default created copied book storage")
+	}
+	if _, err := os.Stat(p); err != nil {
+		t.Fatal("source changed", err)
+	}
 }
 
 // seedReadyRow 插入一条 READY 记录。

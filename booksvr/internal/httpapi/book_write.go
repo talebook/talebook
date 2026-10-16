@@ -542,10 +542,7 @@ func (w *bookWiring) bookReadBook(ctx *Context, bookID int64) (map[string]any, e
 
 	// 其余格式（mobi/azw/azw3）：触发后台转 EPUB，先渲染「转换中」页面。
 	if w.convert != nil {
-		if _, err := w.convert.ConvertAll([]int64{bookID}); err != nil {
-			// 转换启动失败不阻断页面渲染：页面会轮询等待。
-			_ = err
-		}
+		w.convert.StartForReading(bookID)
 	}
 	w.writeReaderPage(ctx, bookID, book.Title, false)
 	return nil, nil
@@ -612,14 +609,16 @@ func readerHTML(d readerPageData) string {
 </head>
 <body>
 <div id="app"></div>
-<div id="converting" style="display:none;position:fixed;inset:0;align-items:center;justify-content:center;font-family:sans-serif">
-  <p>本书正在转换为 EPUB，请稍候…</p>
+<div id="converting" style="display:none;position:fixed;inset:0;flex-direction:column;align-items:center;justify-content:center;font-family:sans-serif;padding:24px;text-align:center;overflow:auto">
+  <p id="conversion-status" role="status" aria-live="polite">本书正在转换为 EPUB，请稍候…</p>
+  <a id="conversion-back">返回书籍详情</a>
 </div>
 <script type="module">
   import { Reader } from "./candle-reader.es.js"
   const BOOK_ID = %d
   const IS_READY = %s
   const API = %q
+  document.getElementById('conversion-back').href = '/book/' + BOOK_ID
   function startReader() {
     document.getElementById('converting').style.display = 'none'
     new Reader('#app', {
@@ -635,22 +634,26 @@ func readerHTML(d readerPageData) string {
     startReader()
   } else {
     document.getElementById('converting').style.display = 'flex'
-    let retries = 180
+    let checking = false
     const timer = setInterval(async () => {
-      retries -= 1
+      if (checking) return
+      checking = true
       try {
-        const resp = await fetch(API + "/api/book/" + BOOK_ID + "/reader-bootstrap")
+        const resp = await fetch(API + "/api/book/" + BOOK_ID + "/reader-bootstrap?engine=readest", { cache: 'no-store' })
         const data = await resp.json()
-        if (data && data.epub_ready) {
+        if (resp.ok && data.err === 'ok' && data.schema === 'talebook.reader.bootstrap.v1' && data.resource) {
           clearInterval(timer)
-          startReader()
+          window.location.replace('/read/' + BOOK_ID + window.location.search)
           return
         }
-      } catch (e) { /* 继续轮询 */ }
-      if (retries <= 0) {
-        clearInterval(timer)
-        document.getElementById('converting').innerHTML =
-          '<p>转换超时，请稍后重试或下载后本地阅读。</p>'
+        if (data.err && data.err !== 'reader.conversion_pending') {
+          clearInterval(timer)
+          document.getElementById('conversion-status').textContent = data.msg || '无法打开此书，请返回详情页重试或下载原文件。'
+        }
+      } catch (e) {
+        document.getElementById('conversion-status').textContent = '连接中断，正在重新检查转换进度…'
+      } finally {
+        checking = false
       }
     }, 2000)
   }
@@ -717,6 +720,18 @@ func (w *bookWiring) bookReaderBootstrap(ctx *Context, bookID int64) (map[string
 		// 有 mobi/azw3 但还没转出 EPUB：返回 409 让前端提示等待；
 		// 否则 404（对齐 Python 的 conversion_pending / format_unsupported）。
 		if w.hasKindleFormat(bookID) {
+			if w.convert == nil || w.convert.Converter == nil {
+				if ctx.Writer != nil {
+					ctx.Writer.WriteHeader(http.StatusServiceUnavailable)
+				}
+				return map[string]any{"err": "reader.converter_unavailable", "msg": "格式转换服务不可用，请下载原文件。"}, nil
+			}
+			if message := w.convert.ReadingError(bookID); message != "" {
+				if ctx.Writer != nil {
+					ctx.Writer.WriteHeader(http.StatusUnprocessableEntity)
+				}
+				return map[string]any{"err": "reader.conversion_failed", "msg": message}, nil
+			}
 			if ctx.Writer != nil {
 				ctx.Writer.WriteHeader(http.StatusConflict)
 			}

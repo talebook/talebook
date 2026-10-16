@@ -4,9 +4,81 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
+	"talebook/booksvr/internal/convert"
 	"testing"
+	"time"
 )
+
+func TestMobiReadingReturnsImmediatelyAndUsesBootstrapContract(t *testing.T) {
+	db := netSchemaDB(t)
+	createCalibreTables(t, db)
+	createFormatTables(t, db)
+	dir := t.TempDir()
+	src := filepath.Join(dir, "source.mobi")
+	if err := os.WriteFile(src, []byte("mobi"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO books(id,title,author_sort,path) VALUES(1,'书','作者','')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`INSERT INTO book_formats(book_id,format,path,size,mtime) VALUES(1,'MOBI',?,4,0)`, src); err != nil {
+		t.Fatal(err)
+	}
+	w := newBookWiring(db, db, map[string]any{})
+	w.convert = convert.NewService(db, dir)
+	started := make(chan struct{})
+	release := make(chan struct{})
+	finished := make(chan struct{})
+	w.convert.Converter = func(_, dst string) error {
+		close(started)
+		<-release
+		defer close(finished)
+		return os.WriteFile(dst, []byte("epub"), 0600)
+	}
+	cfg := w.Config("")
+	cfg.CanViewBook = func(*Context, int64) bool { return true }
+	srv, err := NewServer(BookRouteSpecs(cfg))
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv.DB = db
+	begin := time.Now()
+	rec := serveReadAsAdmin(t, srv, 1)
+	if time.Since(begin) > time.Second {
+		t.Error("HTTP waited for conversion")
+	}
+	body := rec.Body.String()
+	for _, want := range []string{"/reader-bootstrap?engine=readest", "data.schema === 'talebook.reader.bootstrap.v1'", "window.location.replace('/read/' + BOOK_ID + window.location.search)", `role="status"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %s", want)
+		}
+	}
+	if strings.Contains(body, "data.epub_ready") || strings.Contains(body, "retries = 180") {
+		t.Error("obsolete timeout contract")
+	}
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		close(release)
+		t.Fatal("conversion did not start")
+	}
+	if pending := serveBootstrap(t, w, "engine=readest"); pending.Code != 409 {
+		t.Errorf("pending=%d", pending.Code)
+	}
+	close(release)
+	<-finished
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		if ready := serveBootstrap(t, w, "engine=readest"); ready.Code == 200 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("registered EPUB did not become ready")
+}
 
 // 缺陷 10 回归：/read/<id> 必须返回阅读器 **HTML 页面**，不是 JSON。
 //
@@ -149,6 +221,8 @@ func TestReaderBootstrapReportsConversionPending(t *testing.T) {
 	}
 
 	w := newBookWiring(db, db, map[string]any{})
+	w.convert = convert.NewService(db, t.TempDir())
+	w.convert.Converter = func(string, string) error { return nil }
 	rec := httptest.NewRecorder()
 	ctx := &Context{
 		Identity: Identity{UserID: 1, IsAdmin: true},

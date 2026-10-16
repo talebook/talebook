@@ -86,7 +86,7 @@ func importSettingsPayload(cfg ImportConfig, check *importdir.DirectoryResult) m
 // normalizeImportMode 复刻 normalize_import_mode。
 //
 // 显式模式优先；否则 delete_after 为真时用 move；再否则用配置值；
-// 配置值非法时退回 copy。
+// 配置值非法时退回 index。
 func normalizeImportMode(cfg importdir.Config) string {
 	if isImportMode(cfg.ImportMode) {
 		return cfg.ImportMode
@@ -97,7 +97,7 @@ func normalizeImportMode(cfg importdir.Config) string {
 	if isImportMode(cfg.SavedImportMode) {
 		return cfg.SavedImportMode
 	}
-	return importModeCopy
+	return importModeIndex
 }
 
 // 导入模式常量，对齐 Python 的 IMPORT_MODE_*。

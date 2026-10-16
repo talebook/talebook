@@ -2,7 +2,9 @@ package convert
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +20,8 @@ type ConversionTarget struct {
 	Target  string
 	Sources []string
 }
+
+var ErrBusy = errors.New("convert: 已有转换任务在运行")
 
 // ConversionTargets 复刻 Python CONVERSION_TARGETS。
 var ConversionTargets = []ConversionTarget{
@@ -52,9 +56,12 @@ type Service struct {
 	// Converter 执行实际格式转换；为 nil 时只做同族文件复制。
 	Converter func(src, dst string) error
 
-	mu      sync.Mutex
-	status  Progress
-	started time.Time
+	mu           sync.Mutex
+	status       Progress
+	started      time.Time
+	readerJobs   map[int64]string
+	readerQueue  []int64
+	readerWorker bool
 }
 
 // NewService 构造转换服务。
@@ -125,8 +132,9 @@ func (s *Service) Progress() Progress {
 func (s *Service) ConvertAll(idlist []int64) (Progress, error) {
 	s.mu.Lock()
 	if s.status.Running {
+		out := s.status
 		s.mu.Unlock()
-		return s.status, fmt.Errorf("convert: 已有转换任务在运行")
+		return out, ErrBusy
 	}
 	s.status = Progress{Running: true}
 	s.started = time.Now()
@@ -152,6 +160,7 @@ func (s *Service) ConvertAll(idlist []int64) (Progress, error) {
 			continue
 		}
 		if err := s.convertOne(id, kindleFormat, kindlePath); err != nil {
+			log.Printf("convert book %d: %v", id, err)
 			s.bumpFail()
 			continue
 		}
@@ -185,6 +194,8 @@ func (s *Service) kindleSource(bookID int64) (string, string, bool) {
 		kindle = "azw3"
 	case lower["mobi"]:
 		kindle = "mobi"
+	case lower["azw"]:
+		kindle = "azw"
 	default:
 		return "", "", false
 	}

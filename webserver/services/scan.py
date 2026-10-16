@@ -41,8 +41,8 @@ def normalize_import_mode(import_mode=None, delete_after=False):
         return import_mode
     if delete_after:
         return IMPORT_MODE_MOVE
-    saved_mode = CONF.get("import_mode", IMPORT_MODE_COPY)
-    return saved_mode if saved_mode in IMPORT_MODES else IMPORT_MODE_COPY
+    saved_mode = CONF.get("import_mode", IMPORT_MODE_INDEX)
+    return saved_mode if saved_mode in IMPORT_MODES else IMPORT_MODE_INDEX
 
 
 def collect_scan_tasks(path_dir, limit, done_paths):
