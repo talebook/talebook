@@ -7,16 +7,17 @@ package comic
 
 import (
 	"archive/zip"
+	"context"
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"os"
 	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"talebook/booksvr/internal/sourcefile"
 	"unicode"
 	"unicode/utf8"
 )
@@ -427,7 +428,7 @@ func cacheKey(p, archiveFormat string) (string, string, error) {
 	if err != nil {
 		return "", "", NewError("comic.container_unavailable", "漫画容器不存在或无法读取", 404)
 	}
-	info, err := os.Stat(realPath)
+	info, err := sourcefile.Stat(realPath)
 	if err != nil || info.IsDir() {
 		return "", "", NewError("comic.container_unavailable", "漫画容器不存在或无法读取", 404)
 	}
@@ -437,6 +438,9 @@ func cacheKey(p, archiveFormat string) (string, string, error) {
 
 // realPathOf 返回绝对路径（解析符号链接失败时退回绝对路径）。
 func realPathOf(p string) (string, error) {
+	if sourcefile.IsReference(p) {
+		return p, nil
+	}
 	if p == "" {
 		return "", fmt.Errorf("empty path")
 	}
@@ -460,7 +464,15 @@ func (s *Service) GetManifest(p, archiveFormat string) (*Manifest, error) {
 	}
 	s.mu.Unlock()
 
-	manifest, err := s.buildManifest(realPath, archiveFormat)
+	physical, release, err := sourcefile.Acquire(context.Background(), realPath)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	manifest, err := s.buildManifest(physical, archiveFormat)
+	if manifest != nil {
+		manifest.ArchivePath = realPath
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -629,7 +641,12 @@ func (s *Service) ReadPage(p, archiveFormat string, pageIndex int, revision stri
 	}
 
 	page := manifest.Pages[pageIndex]
-	data, err := readEntry(manifest.ArchivePath, manifest.ArchiveFormat, page.EntryName, MaxPageBytes)
+	physical, release, err := sourcefile.Acquire(context.Background(), manifest.ArchivePath)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	data, err := readEntry(physical, manifest.ArchiveFormat, page.EntryName, MaxPageBytes)
 	if err != nil {
 		return nil, err
 	}

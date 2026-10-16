@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 	"time"
 
 	"talebook/booksvr/internal/library"
@@ -415,6 +416,11 @@ func EpubReader(cfg FilesConfig) HandlerFunc {
 			http.Error(ctx.Writer, "not found", http.StatusNotFound)
 			return nil, nil
 		}
+		fpath, release, err := sourcefile.Acquire(sourceContext(ctx), fpath)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 		info, err := os.Stat(fpath)
 		if err != nil || info.IsDir() {
 			http.Error(ctx.Writer, "not found", http.StatusNotFound)

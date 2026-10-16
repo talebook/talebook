@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 	"unicode/utf8"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -30,17 +31,7 @@ type zipBudget struct {
 	bytes   uint64
 }
 
-func archiveFingerprint(file string) (string, error) {
-	info, err := os.Stat(file)
-	if err != nil {
-		return "", err
-	}
-	if !info.Mode().IsRegular() {
-		return "", fmt.Errorf("ZIP 来源不是普通文件")
-	}
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", file, info.Size(), info.ModTime().UnixNano())))
-	return hex.EncodeToString(sum[:]), nil
-}
+func archiveFingerprint(file string) (string, error) { return sourcefile.Fingerprint(file) }
 
 func zipDisplayName(raw string) string {
 	if utf8.ValidString(raw) {
@@ -106,45 +97,10 @@ func (r contextReader) Read(p []byte) (int, error) {
 // Every member is written to a newly created temporary directory. Archive paths
 // are never used as destination directories, even after validation.
 func unzipMember(ctx context.Context, file *zip.File) (string, func(), error) {
-	noop := func() {}
 	if err := safeZIPEntry(file); err != nil {
-		return "", noop, err
+		return "", func() {}, err
 	}
-	dir, err := os.MkdirTemp("", "talebook-zip-")
-	if err != nil {
-		return "", noop, err
-	}
-	clean := func() { _ = os.RemoveAll(dir) }
-	name := path.Base(strings.ReplaceAll(zipDisplayName(file.Name), `\`, "/"))
-	if name == "." || name == "/" || name == "" {
-		clean()
-		return "", noop, fmt.Errorf("ZIP 文件名无效")
-	}
-	dest := filepath.Join(dir, name)
-	src, err := file.Open()
-	if err != nil {
-		clean()
-		return "", noop, fmt.Errorf("ZIP 无法解压：%w", err)
-	}
-	defer src.Close()
-	out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		clean()
-		return "", noop, err
-	}
-	n, copyErr := io.Copy(out, io.LimitReader(contextReader{ctx, src}, maxZIPFileBytes+1))
-	closeErr := out.Close()
-	if copyErr != nil || closeErr != nil || n > maxZIPFileBytes || uint64(n) != file.UncompressedSize64 {
-		clean()
-		if copyErr != nil {
-			return "", noop, copyErr
-		}
-		if closeErr != nil {
-			return "", noop, closeErr
-		}
-		return "", noop, fmt.Errorf("ZIP 解压大小校验失败")
-	}
-	return dest, clean, nil
+	return sourcefile.Extract(ctx, file, path.Base(strings.ReplaceAll(zipDisplayName(file.Name), `\`, "/")))
 }
 
 // walkZIP materializes nested containers only while they are being visited.
@@ -385,8 +341,7 @@ func (s *Service) archiveCacheRoot() string {
 	return filepath.Join(os.TempDir(), "talebook-import-cache")
 }
 
-// resolveImportSource returns a temporary extracted file for copy/move, or a
-// durable content-addressed cache file for index. The source archive is retained.
+// resolveImportSource always returns a temporary file. ZIP bodies are never retained by indexing.
 func (s *Service) resolveImportSource(row *userdb.ScanFile, mode string) (string, func(), error) {
 	noop := func() {}
 	archive, _ := row.Data["archive_path"].(string)
@@ -456,25 +411,5 @@ func (s *Service) resolveImportSource(row *userdb.ScanFile, mode string) (string
 		cleanup()
 		return "", func() {}, fmt.Errorf("ZIP 内书籍内容校验失败")
 	}
-	if mode != ModeIndex {
-		return current, cleanup, nil
-	}
-	digest := strings.TrimPrefix(hash, "sha256:")
-	if len(digest) != 64 {
-		cleanup()
-		return "", func() {}, fmt.Errorf("ZIP 内书籍哈希无效")
-	}
-	dir := filepath.Join(s.archiveCacheRoot(), digest)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		cleanup()
-		return "", func() {}, err
-	}
-	dest := filepath.Join(dir, filepath.Base(current))
-	// The cache filename is derived from a validated member basename and hash.
-	if err := copyImportedFile(current, dest); err != nil {
-		cleanup()
-		return "", func() {}, err
-	}
-	cleanup()
-	return dest, func() {}, nil
+	return current, cleanup, nil
 }

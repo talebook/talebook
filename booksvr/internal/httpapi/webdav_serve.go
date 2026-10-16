@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 	"time"
 
 	"talebook/booksvr/internal/library"
@@ -173,11 +174,11 @@ func (s *webdavService) resolveBookFile(ctx *Context, section, category, filenam
 	if !s.canView(ctx, bookID) {
 		return nil
 	}
-	path, missing, err := library.ResolvePath(s.db, bookID, format)
+	path, missing, err := library.ResolvePath(s.libraryDB, bookID, format)
 	if err != nil || missing {
 		return nil
 	}
-	info, err := os.Stat(path)
+	info, err := sourcefile.Stat(path)
 	if err != nil {
 		return nil
 	}
@@ -453,7 +454,13 @@ func (s *webdavService) handleGet(ctx *Context, path string) {
 		ctx.Writer.WriteHeader(http.StatusNotFound)
 		return
 	}
-	body, err := os.ReadFile(res.FilePath)
+	file, release, err := sourcefile.Acquire(sourceContext(ctx), res.FilePath)
+	if err != nil {
+		http.Error(ctx.Writer, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer release()
+	body, err := os.ReadFile(file)
 	if err != nil {
 		ctx.Writer.WriteHeader(http.StatusNotFound)
 		return

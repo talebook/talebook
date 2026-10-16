@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 )
 
 // Format is one physical file registered for a book.
@@ -33,6 +34,10 @@ func RegisterFormat(db *sql.DB, bookID int64, format, path string, size, mtime i
 	format = NormalizeFormatName(format)
 
 	abs, err := filepath.Abs(path)
+	if sourcefile.IsReference(path) {
+		abs = path
+		err = nil
+	}
 	if err != nil {
 		return fmt.Errorf("resolve absolute path for %q: %w", path, err)
 	}
@@ -66,7 +71,7 @@ func ResolvePath(db *sql.DB, bookID int64, format string) (path string, missing 
 	if err != nil {
 		return "", false, fmt.Errorf("resolve path for book %d format %s: %w", bookID, format, err)
 	}
-	if _, statErr := os.Stat(path); statErr != nil {
+	if _, statErr := sourcefile.Stat(path); statErr != nil {
 		if os.IsNotExist(statErr) {
 			return path, true, nil
 		}

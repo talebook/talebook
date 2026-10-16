@@ -899,7 +899,7 @@
         "emptyDirectorySelectable": "此目录下没有可选择的子目录。可以选择当前目录。",
         "mode": "模式",
         "modeIndex": "仅索引",
-        "modeIndexDescription": "普通书籍直接读取源文件；ZIP 内的书籍会解压到持久缓存供阅读。原目录和压缩包应保留。",
+        "modeIndexDescription": "普通书籍直接读取源文件；ZIP 只记录包内位置，阅读时按需解压，用完即删。临时解压总量最多 512 MiB。请保留原目录和压缩包。",
         "modeCopy": "复制到书库",
         "modeCopyDescription": "导入到书库后保留源文件。",
         "modeMove": "剪切到书库",

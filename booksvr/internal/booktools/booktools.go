@@ -7,6 +7,7 @@
 package booktools
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"fmt"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 	"time"
 
 	"talebook/booksvr/internal/library"
@@ -85,6 +87,9 @@ func GetFormatPath(db *sql.DB, bookID int64, format string) (string, error) {
 	if missing || path == "" {
 		return "", NewError("找不到 %s 文件，可能已被移除", format)
 	}
+	if sourcefile.IsReference(path) {
+		return "", NewError("ZIP 内书籍只读，请先导出为普通文件再编辑")
+	}
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", NewError("找不到 %s 文件，可能已被移除", format)
@@ -140,6 +145,9 @@ func replaceFormat(db *sql.DB, bookID int64, format, outPath string) error {
 	target, missing, err := library.ResolvePath(db, bookID, format)
 	if err != nil || missing || target == "" {
 		return NewError("找不到 %s 文件，可能已被移除", format)
+	}
+	if sourcefile.IsReference(target) {
+		return NewError("ZIP 内书籍只读，请先导出为普通文件再编辑")
 	}
 	if err := copyFile(outPath, target); err != nil {
 		return err
@@ -435,4 +443,12 @@ func GetTitleSort(title string) string {
 		}
 	}
 	return strings.ToLower(strings.TrimSpace(cleaned))
+}
+
+func AcquireFormatPath(ctx context.Context, db *sql.DB, bookID int64, format string) (string, func(), error) {
+	path, missing, err := library.ResolvePath(db, bookID, format)
+	if err != nil || missing {
+		return "", func() {}, NewError("格式文件不存在")
+	}
+	return sourcefile.Acquire(ctx, path)
 }

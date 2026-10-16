@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 	"time"
 
 	"talebook/booksvr/internal/docmeta"
@@ -384,7 +385,7 @@ func (s *Service) addFormatToBook(bookID int64, format, fpath string) error {
 	if s.LibraryDB == nil {
 		return fmt.Errorf("scan: 添加格式需要书库句柄")
 	}
-	info, err := os.Stat(fpath)
+	info, err := sourcefile.Stat(fpath)
 	var size, mtime int64
 	if err == nil {
 		size = info.Size()
@@ -679,6 +680,25 @@ func (s *Service) libraryFormatExists(bookID int64, format string) bool {
 func (s *Service) markIndexed(row *userdb.ScanFile, mi importmeta.Metadata, fpath, format string,
 	importID, userID int64, mediaType string, sameAuthorBookID int64) (string, int64, error) {
 
+	if archive, _ := row.Data["archive_path"].(string); archive != "" {
+		info, err := os.Stat(fpath)
+		if err != nil {
+			return "", 0, err
+		}
+		var chain []string
+		switch values := row.Data["archive_chain"].(type) {
+		case []string:
+			chain = values
+		case []any:
+			for _, v := range values {
+				value, _ := v.(string)
+				chain = append(chain, value)
+			}
+		}
+		fp, _ := row.Data["archive_fingerprint"].(string)
+		fpath = sourcefile.Encode(sourcefile.Reference{Archive: archive, Fingerprint: fp, Chain: chain, Hash: row.Hash, Name: row.Name, Size: info.Size()})
+	}
+
 	bookID, created, err := s.addExternalIndexRecord(mi, fpath, format, sameAuthorBookID)
 	if err != nil {
 		row.Status = userdb.ScanStatusFailed
@@ -693,6 +713,9 @@ func (s *Service) markIndexed(row *userdb.ScanFile, mi importmeta.Metadata, fpat
 		return "", 0, err
 	}
 	abs, _ := filepath.Abs(fpath)
+	if sourcefile.IsReference(fpath) {
+		abs = fpath
+	}
 	setRowData(row,
 		"import_mode", ModeIndex,
 		"source_path", abs,
@@ -729,7 +752,7 @@ func (s *Service) addExternalIndexRecord(mi importmeta.Metadata, fpath, format s
 		Pubdate:   mi.Pubdate,
 		Tags:      mi.Tags,
 		Comments:  mi.Comments,
-		Path:      filepath.Dir(fpath),
+		Path:      indexedBookDirectory(fpath),
 	})
 	if err != nil {
 		return 0, false, fmt.Errorf("scan: 建立索引记录失败: %w", err)
@@ -746,6 +769,10 @@ func (s *Service) ensureIndexedItem(bookID, userID int64, fpath, mediaType strin
 		return err
 	}
 	abs, err := filepath.Abs(fpath)
+	if sourcefile.IsReference(fpath) {
+		abs = fpath
+		err = nil
+	}
 	if err != nil {
 		abs = fpath
 	}
@@ -835,3 +862,13 @@ func (s *Service) ClockTime() time.Time { return s.clock() }
 
 // 确保 sql 包被使用（scanRow 依赖 sql.ErrNoRows 语义）。
 var _ = sql.ErrNoRows
+
+func indexedBookDirectory(source string) string {
+	if sourcefile.IsReference(source) {
+		r, e := sourcefile.Decode(source)
+		if e == nil {
+			return filepath.Dir(r.Archive)
+		}
+	}
+	return filepath.Dir(source)
+}

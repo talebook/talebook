@@ -56,11 +56,12 @@ func (w *bookWiring) bookSendToDevice(ctx *Context, bookID int64, args map[strin
 	if format == "" {
 		return map[string]any{"err": "format.not_found", "msg": "书籍没有可推送的格式"}, nil
 	}
-	path, err := booktools.GetFormatPath(w.libraryDB, bookID, format)
+	path, release, err := booktools.AcquireFormatPath(sourceContext(ctx), w.libraryDB, bookID, format)
 	if err != nil {
 		return map[string]any{"err": "file.missing", "msg": "格式文件不存在"}, nil
 	}
 
+	defer release()
 	if _, err := provider.Push(path, target, map[string]any{
 		"device_type": deviceType,
 		"format":      format,
@@ -109,11 +110,12 @@ func (w *bookWiring) bookSendToMail(ctx *Context, bookID int64, args map[string]
 	if format == "" {
 		return map[string]any{"err": "format.not_found", "msg": "书籍没有可推送的格式"}, nil
 	}
-	path, err := booktools.GetFormatPath(w.libraryDB, bookID, format)
+	path, release, err := booktools.AcquireFormatPath(sourceContext(ctx), w.libraryDB, bookID, format)
 	if err != nil {
 		return map[string]any{"err": "file.missing", "msg": "格式文件不存在"}, nil
 	}
 
+	defer release()
 	if _, err := provider.Push(path, mailbox, map[string]any{
 		"device_type": "mail",
 		"format":      format,

@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"talebook/booksvr/internal/sourcefile"
 	"time"
 
 	"talebook/booksvr/internal/userdb"
@@ -144,6 +145,9 @@ type ServiceSet struct {
 //
 // 数据库以 WAL + busy_timeout 打开，降低与 Tornado 并发访问的锁冲突。
 func Serve(ctx context.Context, opts ServeOptions) error {
+	if err := sourcefile.Init(); err != nil {
+		return err
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 	"testing"
 
 	"golang.org/x/text/encoding/simplifiedchinese"
@@ -117,7 +118,7 @@ func TestZIPCollectionImportsAllBooksAndPreservesSource(t *testing.T) {
 			if err != nil || imported.Imported+imported.Indexed != 3 {
 				t.Fatalf("import: %+v %v", imported, err)
 			}
-			if files, err := os.ReadDir(work); err != nil || len(files) != 0 {
+			if files, err := filepath.Glob(filepath.Join(work, "**", "**", "member-*")); err != nil || len(files) != 0 {
 				t.Fatalf("temporary files leaked: %v %v", files, err)
 			}
 			if got, err := os.ReadFile(archive); err != nil || !bytes.Equal(got, data) {
@@ -128,11 +129,16 @@ func TestZIPCollectionImportsAllBooksAndPreservesSource(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				body, err := os.ReadFile(file)
+				physical, release, err := sourcefile.Acquire(context.Background(), file)
+				if err != nil {
+					t.Fatal(err)
+				}
+				body, err := os.ReadFile(physical)
+				release()
 				if err != nil || !bytes.Contains(body, []byte("第一章")) {
 					t.Fatalf("unreadable imported book %s: %v", file, err)
 				}
-				if mode == ModeIndex && !strings.HasPrefix(file, svc.archiveCacheRoot()+string(filepath.Separator)) {
+				if mode == ModeIndex && !sourcefile.IsReference(file) {
 					t.Fatalf("index is temporary: %s", file)
 				}
 				if mode != ModeIndex && !strings.HasPrefix(file, svc.LibraryRoot+string(filepath.Separator)) {

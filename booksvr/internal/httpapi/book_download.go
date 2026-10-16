@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 
 	"talebook/booksvr/internal/library"
 )
@@ -42,6 +43,11 @@ func BookDownloadHandler(cfg BookConfig) HandlerFunc {
 		if err != nil || missing || path == "" {
 			return nil, notFound(ctx, fmt.Sprintf("%s格式无法下载", strings.ToLower(format)))
 		}
+		path, release, err := sourcefile.Acquire(sourceContext(ctx), path)
+		if err != nil {
+			return nil, err
+		}
+		defer release()
 		info, err := os.Stat(path)
 		if err != nil || info.IsDir() {
 			return nil, notFound(ctx, "格式文件不存在")

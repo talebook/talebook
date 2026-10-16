@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"talebook/booksvr/internal/sourcefile"
 	"time"
 
 	"talebook/booksvr/internal/library"
@@ -225,6 +227,11 @@ func (s *Service) convertOne(bookID int64, kindleFormat, kindlePath string) erro
 		// 宁可明确报错，让调用方回退到「请下载后本地阅读」。
 		return fmt.Errorf("convert: 未配置格式转换器，无法把 %s 转为 EPUB", kindleFormat)
 	}
+	kindlePath, release, err := sourcefile.Acquire(context.Background(), kindlePath)
+	if err != nil {
+		return err
+	}
+	defer release()
 	if err := s.Converter(kindlePath, outPath); err != nil {
 		return fmt.Errorf("convert: 转换失败: %w", err)
 	}

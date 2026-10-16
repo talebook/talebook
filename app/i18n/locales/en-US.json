@@ -879,7 +879,7 @@
         "emptyDirectorySelectable": "No subdirectories are available here. You can choose the current directory.",
         "mode": "Mode",
         "modeIndex": "Index only",
-        "modeIndexDescription": "Read ordinary books from their source files. Books inside ZIPs are extracted to a persistent reading cache. Retain source directories and archives.",
+        "modeIndexDescription": "Read ordinary books from their source files. ZIP members are extracted only when needed and removed after use, with a shared 512 MiB temporary limit. Retain source directories and archives.",
         "modeCopy": "Copy to library",
         "modeCopyDescription": "Import into the library and keep source files.",
         "modeMove": "Move to library",

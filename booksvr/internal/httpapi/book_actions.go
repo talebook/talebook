@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 
 	"talebook/booksvr/internal/convert"
 	"talebook/booksvr/internal/library"
@@ -463,6 +464,13 @@ func BookReaderResourceHandler(cfg BookConfig) HandlerFunc {
 // 且只注册了 GET 路由。Readest 会先发 HEAD 探测（拿 Content-Length 与
 // Accept-Ranges），405 会让它报「Failed to open the book file: online.network」。
 func serveEPUBResource(ctx *Context, path string) {
+	logicalSource := path
+	path, release, err := sourcefile.Acquire(sourceContext(ctx), path)
+	if err != nil {
+		http.Error(ctx.Writer, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer release()
 	info, err := os.Stat(path)
 	if err != nil || info.IsDir() {
 		http.Error(ctx.Writer, "Not Found", http.StatusNotFound)
@@ -481,7 +489,7 @@ func serveEPUBResource(ctx *Context, path string) {
 	// 缺失会直接报「Failed to open the book file: online.response_invalid」。
 	// 用 revision（mtime_ns-size 的十六进制）作为 ETag，与 bootstrap
 	// 接口下发的 book.revision 同源，文件一变两者同步失效。
-	if rev := readerResourceRevision(path); rev != "" {
+	if rev := readerResourceRevision(logicalSource); rev != "" {
 		ctx.Writer.Header().Set("ETag", `"`+rev+`"`)
 	}
 	// 必须禁止启发式缓存：浏览器会把旧响应（可能没有 ETag）直接复用，

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"talebook/booksvr/internal/sourcefile"
 
 	"talebook/booksvr/internal/library"
 	"talebook/booksvr/internal/userdb"
@@ -249,6 +250,9 @@ func (w *bookWiring) epubPath(bookID int64) string {
 		for _, f := range formats {
 			if !strings.EqualFold(f.Format, "epub") || f.Path == "" {
 				continue
+			}
+			if sourcefile.IsReference(f.Path) {
+				return f.Path
 			}
 			if filepath.IsAbs(f.Path) {
 				return f.Path
@@ -677,7 +681,7 @@ const readerBootstrapSchema = "talebook.reader.bootstrap.v1"
 // readerResourceRevision 复刻 Python 的 reader_resource_revision：
 // 用 mtime(ns) 与 size 的十六进制拼出版本标识，文件一变版本就变。
 func readerResourceRevision(path string) string {
-	fi, err := os.Stat(path)
+	fi, err := sourcefile.Stat(path)
 	if err != nil {
 		return ""
 	}
@@ -825,6 +829,11 @@ func (w *bookWiring) bookReadTxt(ctx *Context, bookID int64) (map[string]any, er
 	if path == "" {
 		return map[string]any{"err": "file.missing", "msg": "TXT 文件不存在"}, nil
 	}
+	path, release, err := sourcefile.Acquire(sourceContext(ctx), path)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	body, err := os.ReadFile(path)
 	if err != nil {
 		return map[string]any{"err": "file.missing", "msg": "TXT 文件读取失败"}, nil
@@ -878,7 +887,7 @@ func (w *bookWiring) bookReadResource(ctx *Context, bookID int64, name string) (
 	if path == "" {
 		return "", fmt.Errorf("httpapi: EPUB 文件不存在")
 	}
-	if _, err := os.Stat(path); err != nil {
+	if _, err := sourcefile.Stat(path); err != nil {
 		return "", fmt.Errorf("httpapi: EPUB 文件不存在: %w", err)
 	}
 	// 资源名做路径穿越防护。
