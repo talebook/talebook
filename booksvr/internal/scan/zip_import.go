@@ -229,7 +229,7 @@ func (s *Service) walkZIP(ctx context.Context, file string, chain []string, budg
 	return found, nil
 }
 
-func (s *Service) scanZIP(ctx context.Context, archive string, result *Result, done map[string]bool) error {
+func (s *Service) scanZIP(ctx context.Context, archive string, result *Result, done map[string]bool, checkpoints ...func() error) error {
 	fingerprint, err := archiveFingerprint(archive)
 	if err != nil {
 		return err
@@ -314,6 +314,12 @@ func (s *Service) scanZIP(ctx context.Context, archive string, result *Result, d
 				p.Failed++
 			}
 		})
+		for _, checkpoint := range checkpoints {
+			if err := checkpoint(); err != nil {
+				visitErr = err
+				return err
+			}
+		}
 		return nil
 	})
 	if ctx.Err() != nil {

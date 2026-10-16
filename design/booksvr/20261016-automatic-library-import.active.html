@@ -1,0 +1,149 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>一次启动自动扫描并导入 · ACTIVE</title><style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    main{max-width:1100px;margin:auto;padding:24px}section{padding:24px;margin:20px 0}</style></head><body><main><h1>一次启动自动扫描并导入全部书籍</h1><p>创建日期：2026-10-16 · 模块：booksvr · 状态：ACTIVE · 需求来源：用户反馈扫描中勾选后导入灰色，并要求取消选择、全部自动导入。</p><section class="card"><h2>原始诉求与目标</h2><p>保留导入列表及可选勾选；根据用户最新补充，固定显示“全部导入”，不因勾选与否隐藏。一次“全部导入”处理全部配置来源，已发现待导入项先入库，新扫描普通书和 ZIP 按批次自动入库。任务运行期间明确显示阶段、数量及重复启动禁用原因；独立扫描时“全部导入”保持可用，可提交接续任务，关闭或刷新页面不影响任务。</p></section><section class="card"><h2>设计决策</h2><p>用户已明确要全部自动导入；grill skill 不在项目中，按该决定实现，无需另问。沿用现有来源目录、导入模式和内置书库位置；定时监控仍是可选设置。单次任务复用管理员身份与串行写入锁；同一任务重复启动合并，不排队重复全量工作。显式 hashlist 保留旧单独导入语义，hashlist=all 扩展为扫描并自动导入的完整任务，页面允许按需逐本选择，但全量任务不依赖选择。移动模式保留明确确认。</p><p>扫描器添加批次完成回调，在普通书批次以及 ZIP 成员批次完成后执行有界 ready 游标导入。后台统一任务从已有待处理开始，然后扫描各根目录并逐批导入，按路径范围过滤；同一文件单项错误记录后继续。目录错误汇报并继续其他有效目录，严重数据库写入错误终止。支持任务取消；重启后已完成记录仍保留，重新启动按现有查重继续。</p></section><section class="card"><h2>方案与影响范围</h2><p>增加后台完整任务回调与状态（running / phase / error）；import/run 的 hashlist=all 一次提交完整工作，scan/run 保留兼容扫描，状态接口跟随两个阶段直到全部结束。前端保留选择并固定显示全部导入，勾选与否都不改变该按钮；展示阶段及已入库/待处理计数；共享任务识别优先完整任务阶段。涉及 spec/书库.md、spec/系统设置.md 和 app 导入页面，保留已有设置与 OPDS 独立导入能力。</p></section><section class="card"><h2>测试结果</h2><p>验证范围：单请求两目录超过 500 本与 ZIP 自动入库；已存在 ready 恢复、重复启动去重、关闭页面/刷新阶段恢复、错误及取消；不选书和已选书时均可见且可用的全部导入按钮；真实 Docker 隔离实例完整流程，正式任务接续；interface-review full 当前分支相对默认分支全部变更；Go、前端单测、构建、规格和方案检查。</p></section><section class="card"><h2>验证进展</h2><p>前端 useImportTask 单测 4 passed，导入页 ESLint 0 errors / 4 个模板换行警告。Go 定向测试覆盖无选择/无 ready 时启动、显式选择兼容、两目录共 1,207 条有界入库、已有 ready 接续、目录局部错误、任务重复合并、两阶段状态及 ZIP 边扫描边入库；全部通过。最初队列用例未创建持久目录设置，worker 正确读取了出厂目录并返回不存在；修正测试初始化、明确保存目录后重跑通过，未放松路径检查。</p><p>两项 root 权限敏感测试分别用 UID 911 运行，PASS / PASS。Go 全包回归通过（httpapi 130.711 秒），SPA client/server 编译、静态 prerender 与镜像导出通过。真实隔离 Docker 浏览器在只勾选 1 本时点击一次“全部导入”，1,113 本全部入库（605 本 ZIP 成员与 3 本先前待处理），失败 0；未单独点击扫描或导入第二次。过程中刷新，恢复运行状态；结束后待处理 0、按钮恢复可用，浏览器无 error 日志。隔离卷 /tmp/talebook-auto-audit 已标记 .talebook-automatic-import-audit；准备 3 本已有 ready 和其余普通书、ZIP、嵌套 ZIP，共 1,113 本。所有测试数据与正式卷隔离。</p></section><section class="card"><h2>interface-review full · Scope and Coverage</h2><table><tr><th>字段</th><th>范围</th></tr><tr><td>Target</td><td>当前分支相对默认分支的完整变更，加全部未提交和新增源文件。</td></tr><tr><td>Base / Head</td><td>origin/master d5d21dda160d65d29cc0c9ab8a13ae6b4deb69d2；HEAD ca0589e；28 个已提交提交、19 个未提交文件。</td></tr><tr><td>Source / Excluded</td><td>22 个生产界面源文件；排除生成 _next chunk/manifest、锁文件、vendor、二进制、测试快照。测试脚本用于验证，不作为可视表面。</td></tr><tr><td>Consumers</td><td>最多展开导入页、图书管理、GeneralSettingsContent、书籍详情和编辑五个主要消费者。另七个组件/布局/导航/退出/阅读器消费者检查源码差异，不宣称全部主题及全部运行状态重新验收。</td></tr></table><p>遵循根 AGENTS.md、app/CLAUDE.md，使用 Nuxt 4 / Vue 3 / Vuetify 与现有 i18n、backend()、主题令牌。已加载并应用 interface-review、better-interface 与 accessibility/layout/writing/typography/colors/ui 六个领域 skill；检查增删两侧、调用方和文案消费者，未切换或暂存工作树。</p><table><tr><th>Domain</th><th>Evidence inspected</th><th>当前结论</th></tr><tr><td>Accessibility</td><td>原生 Vuetify 按钮/选择框、名称、状态 live region、移动模式确认</td><td>Clear：真实浏览器已验证名称、选择、加载/禁用、刷新/完成与可读正文</td></tr><tr><td>Layout</td><td>固定显示全部导入、flex-wrap、长路径与设置表单</td><td>源码 Clear；320px 运行时未验证</td></tr><tr><td>Writing</td><td>全部/选中作用域、排队、扫描/导入、三语言及模式说明</td><td>Clear</td></tr><tr><td>Typography</td><td>进度 tabular-nums、文本换行和原有层级</td><td>Clear：真实浏览器已验证名称、选择、加载/禁用、刷新/完成与可读正文</td></tr><tr><td>Colors</td><td>继承主题与 text-high-emphasis，不以颜色独立承载状态</td><td>Clear：真实浏览器已验证名称、选择、加载/禁用、刷新/完成与可读正文</td></tr><tr><td>UI</td><td>空选择/已选择、排队/运行/完成/错误、关闭/刷新恢复</td><td>Clear：真实完整任务已验收</td></tr></table>
+<h2>Findings</h2><p>No actionable interface findings in this change. 已复查真实浏览器与源码，无未解决的 Introduced / Regression HIGH、MEDIUM 或 LOW 问题。旧版勾选后“导入全部书籍”消失已在真实 Docker 浏览器中复现；本次移出 v-else，调用显式 hashlist=all，不依赖选择。</p><h2>Considered but Rejected</h2><table><tr><th>位置</th><th>候选</th><th>不采用原因</th></tr><tr><td>导入列表</td><td>删除所有选择能力</td><td>用户随后明确允许保留界面并增加无需选择的全部导入，按最新要求保留按需选择。</td></tr><tr><td>后台任务</td><td>仅让前端在扫描完后再发一次导入请求</td><td>关闭页面会中断后续步骤；完整流程由服务端持有。</td></tr><tr><td>任务计数</td><td>增加百分比</td><td>尚未遍历完成时总数未知，保留真实数量及当前路径。</td></tr></table><h2>Verification</h2><p>执行 git ls-remote --symref origin HEAD（默认 master，SHA 同上）、git rev-list --count 基点..HEAD（28）、git diff 基点 -- 指定源文件、git diff --name-only、git status --short（19）、git diff --check。逐项查看 AnnotationPanel、CaptchaWidget、布局、导航、退出、store、Nuxt 配置、设置、书籍详情/编辑、管理删除、导入、共享 composable、三语言与 Readest 手写桥接的完整差异；生成 Readest library 页面仅检查入口关系。审查未写 .git、未 fetch、checkout、stash 或创建 worktree。</p><p>Not verified：320px / 200% 缩放，其他页面全主题运行状态，外部第三方服务及独立 SSR 部署目标；这些限制不写成已通过。</p><h2>Verdict</h2><p>Approve：在上述完整源码审查范围及明确的运行验收范围内，无未解决的本次界面问题。</p></section><section class="card"><h2>实际命令与部署</h2><ul><li><code>go test ./internal/httpapi ./internal/scan ./cmd/booksvr -run "TestImportAll|TestFullLibraryImport|TestLibraryImport|TestFullScanCallbacks|TestAutomaticFullScan|TestFullScanWorker" -count=1 -timeout=90s</code>：通过。</li><li><code>go test ./... -skip "TestFileThemeStoreWriteFileError|TestBackupCreateFailsOnReadOnlyDir" -timeout=300s</code>：全包通过；这两例分别编译后用 <code>docker exec -u 911:911</code> 执行，均 PASS。</li><li><code>npx vitest run test/composables/useImportTask.spec.ts</code>：4 passed；<code>npx eslint pages/admin/imports.vue</code>：0 errors / 4 warnings。新增 E2E 用例未通过独立 Playwright 驱动重复执行，改用 CUA 对真实 Docker 后端验收相同的无选择/已选择按钮与完整任务。</li><li><code>python3 /tmp/verify_automatic_import.py setup</code> 与 <code>verify</code>：隔离卷中通过；任务由真实页面点击启动。验证原 ZIP 存在、内层书籍在内置书库实际可读。</li><li><code>python -X utf8 -m ruff check scripts/verify_automatic_import.py</code>、<code>ruff format --check</code>、<code>python -X utf8 scripts/check_spec.py</code> 和 <code>git diff --check</code>：通过。</li></ul><p>镜像：<code>docker build -f /tmp/talebook-spa.Dockerfile --target production-spa --build-arg BUILD_COUNTRY=CN -t talebook:auto-import-ui .</code> 完成。沿用前次仅跳过独立 SSR 目标的临时 Dockerfile；SPA 自身 client/server 构建与 prerender 均完成。基础镜像 be8abc01577354f753f6a3787db1676cc180914fc2ef0dc11102d03f17f022c7；添加已通过实际验收的最终 Go 二进制，生成 <code>talebook:feat-booksvr-calibre-rewrite</code>，SHA-256 <code>c3adc6bab6421095dac70c21b742b4649cc2fad85172fc1403b3920025536f20</code>。</p><p>正式 talebook 原地更新并重启后端一次；不重建容器，原 /books、/books1 和 /data 挂载及 /data/books/library 位置保持。正式二进制与隔离验收版本 SHA-256 均为 <code>2406f8a0c1f99a42bc3b56ee4e9bdcd76764cfc73a71912132441bef192a229b</code>，回滚二进制保留 /tmp/booksvr-before-auto-import 。更新前已发现 92,378 本 ready、773 条 drop、14 条失败、6 条已导入；773 条重复/丢弃记录仍沿用旧版待处理列表统计，不作为本轮有效 ready 入库。已在正式页无选择点击一次“全部导入”，由服务端后台接续；观察已入库从 6 增至 180、待处理从 93,151 降至 92,977，历史失败仍为 14 条，未新增失败；不声称真实 9 万余本已全部完成。OPDS 复查 HTTP 200。</p><p>截图：C:/Users/leon/talebook-import-all-selection-proof.png （勾选后全部按钮仍可用）、C:/Users/leon/talebook-import-all-completed-proof.png （隔离完整入库），正式运行状态另保存 C:/Users/leon/talebook-import-all-live-proof.png 。浏览器验收为 1280px 浅色；未把未验证的窄屏、缩放和深色状态写成通过。</p></section></main></body></html>

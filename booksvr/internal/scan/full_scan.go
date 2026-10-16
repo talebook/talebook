@@ -36,7 +36,13 @@ func (s *Service) setProgress(fn func(*Progress)) {
 
 // ScanAll streams the entire tree. batchSize bounds temporary registrations;
 // it never limits the number of books processed by this task.
-func (s *Service) ScanAll(ctx context.Context, root string, batchSize int) (result Result, err error) {
+func (s *Service) ScanAll(ctx context.Context, root string, batchSize int) (Result, error) {
+	return s.ScanAllWithCallback(ctx, root, batchSize, nil)
+}
+
+// ScanAllWithCallback calls afterBatch after bounded batches, including ZIP
+// members. The callback runs synchronously, so imports share the scan writer.
+func (s *Service) ScanAllWithCallback(ctx context.Context, root string, batchSize int, afterBatch func() error) (result Result, err error) {
 	result.ScanID = s.clock().Unix()
 	if batchSize <= 0 || batchSize > 1000 {
 		batchSize = 500
@@ -67,6 +73,18 @@ func (s *Service) ScanAll(ctx context.Context, root string, batchSize int) (resu
 		return result, err
 	}
 	result.Done = len(done)
+	lastCheckpoint := 0
+	checkpoint := func(force bool) error {
+		processed := s.Progress().Processed
+		if afterBatch == nil || processed == lastCheckpoint || (!force && processed-lastCheckpoint < batchSize) {
+			return nil
+		}
+		if err := afterBatch(); err != nil {
+			return err
+		}
+		lastCheckpoint = processed
+		return ctx.Err()
+	}
 	batch := make([]Task, 0, batchSize)
 	flush := func() error {
 		if err := ctx.Err(); err != nil {
@@ -95,7 +113,7 @@ func (s *Service) ScanAll(ctx context.Context, root string, batchSize int) (resu
 			})
 		}
 		batch = batch[:0]
-		return nil
+		return checkpoint(true)
 	}
 	// Ebooks first, generic archives second. Each pass is a single tree walk.
 	for _, archivePass := range []bool{false, true} {
@@ -131,7 +149,10 @@ func (s *Service) ScanAll(ctx context.Context, root string, batchSize int) (resu
 				if err := flush(); err != nil {
 					return err
 				}
-				return s.scanZIP(ctx, path, &result, done)
+				if err := s.scanZIP(ctx, path, &result, done, func() error { return checkpoint(false) }); err != nil {
+					return err
+				}
+				return checkpoint(true)
 			}
 			if done[path] {
 				result.Skipped++

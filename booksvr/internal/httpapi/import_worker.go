@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -62,6 +63,9 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 	enqueue := func(kind string, run func() error) error {
 		statusMu.Lock()
 		defer statusMu.Unlock()
+		if kind == "library_import" && pending[kind] > 0 {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -72,6 +76,9 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 			pending[kind]++
 			status["manual_"+kind+"_running"] = true
 			status["manual_"+kind+"_error"] = ""
+			if kind == "library_import" {
+				status["manual_library_import_phase"] = "queued"
+			}
 			return nil
 		default:
 			return fmt.Errorf("已有过多导入任务排队，请等待当前任务完成")
@@ -111,6 +118,13 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 		selected := append([]string(nil), hashes...)
 		return enqueue("import", func() error { return startImport(selected, id, deleteAfter, mode) })
 	}
+	opts.StartLibraryImport = func(id int64, mode string) error {
+		return enqueue("library_import", func() error {
+			phase := func(value string) { statusMu.Lock(); status["manual_library_import_phase"] = value; statusMu.Unlock() }
+			settings := LoadSettings(opts.SettingsPath)
+			return runLibraryImport(ctx, opts, db, settings, id, mode, startScan, startImport, phase)
+		})
+	}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -141,7 +155,7 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 			err := runAutoImport(ctx, opts, db, settings, startScan, func(hashes []string, id int64, remove bool, mode string) error {
 				update("importing", "", 1, 0)
 				return startImport(hashes, id, remove, mode)
-			})
+			}, func(phase string) { update(phase, "", 1, 0) })
 			workMu.Unlock()
 			next = time.Now().Add(time.Duration(interval) * time.Second)
 			if err != nil {
@@ -155,54 +169,113 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 }
 
 func runAutoImport(ctx context.Context, opts ServeOptions, db *sql.DB, settings map[string]any,
-	startScan func(string, int) error, startImport func([]string, int64, bool, string) error) error {
+	startScan func(string, int) error, startImport func([]string, int64, bool, string) error, phases ...func(string)) error {
 	id := int64(toIntSetting(settings, "import_watch_user_id", 0))
 	if id <= 0 {
 		return fmt.Errorf("请重新保存自动监控设置以确认导入管理员")
 	}
+	var phase func(string)
+	if len(phases) > 0 {
+		phase = phases[0]
+	}
+	return runLibraryImport(ctx, opts, db, settings, id, "", startScan, startImport, phase)
+}
+
+// runLibraryImport drains existing discoveries and imports each scan batch, all
+// under the caller's writer lock. The UI is not part of this task's lifetime.
+func runLibraryImport(ctx context.Context, opts ServeOptions, db *sql.DB, settings map[string]any, id int64, mode string,
+	startScan func(string, int) error, startImport func([]string, int64, bool, string) error, phase func(string)) error {
 	reader, err := userdb.GetReaderByID(db, id)
 	if err != nil || reader == nil || !reader.Admin {
-		return fmt.Errorf("自动导入的管理员账号不可用")
+		return fmt.Errorf("导入的管理员账号不可用")
 	}
 	dir := LiveImportDir(opts.ImportDir, opts.SettingsPath)
+	if mode != "" {
+		dir.ImportMode, dir.SavedImportMode = mode, mode
+	}
 	roots := importdir.ConfiguredAllowedRoots(dir)
+	setPhase := func(value string) {
+		if phase != nil {
+			phase(value)
+		}
+	}
+	drain := func() error {
+		var afterID int64
+		for {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			rows, err := opts.ScanService().ReadyBatch(afterID, 500)
+			if err != nil {
+				return err
+			}
+			if len(rows) == 0 {
+				return nil
+			}
+			var hashes []string
+			for _, row := range rows {
+				afterID = row.ID
+				for _, root := range roots {
+					if importdir.IsWithin(row.Path, root) {
+						hashes = append(hashes, row.Hash)
+						break
+					}
+				}
+			}
+			if len(hashes) > 0 {
+				setPhase("importing")
+				if err := startImport(hashes, id, false, normalizeImportMode(dir)); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	// The injected legacy scanner may not support checkpoints. Its compatibility
+	// path scans once then drains once; production always wires the callback.
+	if opts.StartScanBatchContext != nil {
+		if err := drain(); err != nil {
+			return err
+		}
+	}
+	var problems []error
+	scanned := make([]string, 0, len(roots))
 	for _, root := range roots {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
+		covered := false
+		for _, previous := range scanned {
+			if importdir.IsWithin(root, previous) {
+				covered = true
+				break
+			}
+		}
+		if covered {
+			continue
+		}
 		if check := importdir.CheckImportDirectory(root, dir); check.Status == "error" {
-			return fmt.Errorf("%s: %s", root, check.Msg)
+			problems = append(problems, fmt.Errorf("%s: %s", root, check.Msg))
+			continue
 		}
-		if err := startScan(root, dir.ScanBatchSize); err != nil {
-			return err
+		scanned = append(scanned, root)
+		setPhase("scanning")
+		if opts.StartScanBatchContext != nil {
+			err = opts.StartScanBatchContext(ctx, root, dir.ScanBatchSize, func() error {
+				if err := drain(); err != nil {
+					return err
+				}
+				setPhase("scanning")
+				return nil
+			})
+		} else {
+			err = startScan(root, dir.ScanBatchSize)
 		}
-	}
-	var afterID int64
-	for {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		rows, err := opts.ScanService().ReadyBatch(afterID, 500)
 		if err != nil {
 			return err
 		}
-		if len(rows) == 0 {
-			return nil
-		}
-		var hashes []string
-		for _, row := range rows {
-			afterID = row.ID
-			for _, root := range roots {
-				if importdir.IsWithin(row.Path, root) {
-					hashes = append(hashes, row.Hash)
-					break
-				}
-			}
-		}
-		if len(hashes) > 0 {
-			if err := startImport(hashes, id, false, normalizeImportMode(dir)); err != nil {
-				return err
-			}
-		}
 	}
+	if err := drain(); err != nil {
+		return err
+	}
+	return errors.Join(problems...)
 }

@@ -68,13 +68,16 @@ type ServeOptions struct {
 	CaptchaSettings captcha.Settings
 	// ImportDir 是导入目录配置，对齐 CONF 的 scan_upload_path 等项。
 	ImportDir importdir.Config
+	// StartLibraryImport queues a complete scan-and-import task.
+	StartLibraryImport func(int64, string) error
 	// ImportWatchStatus 返回自动监控状态；为 nil 时返回「关闭」。
 	ImportWatchStatus func() map[string]any
 	// ScanService 返回扫描服务；为 nil 时扫描/导入接口返回服务不可用。
 	ScanService func() *scan.Service
 	// StartScan 启动一次异步扫描；为 nil 时返回服务不可用。
-	StartScan        func(path string, limit int) error
-	StartScanContext func(context.Context, string, int) error
+	StartScan             func(path string, limit int) error
+	StartScanContext      func(context.Context, string, int) error
+	StartScanBatchContext func(context.Context, string, int, func() error) error
 	// StartImport 启动一次异步导入；为 nil 时返回服务不可用。
 	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
 	// Settings 是 Talebook 配置（CONF），供网络书库与插件运行时读取。
@@ -118,8 +121,9 @@ type ServiceSet struct {
 	// ScanService 返回扫描服务。
 	ScanService func() *scan.Service
 	// StartScan 启动一次异步扫描。
-	StartScan        func(path string, limit int) error
-	StartScanContext func(context.Context, string, int) error
+	StartScan             func(path string, limit int) error
+	StartScanContext      func(context.Context, string, int) error
+	StartScanBatchContext func(context.Context, string, int, func() error) error
 	// StartImport 启动一次异步导入。
 	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
 	// ImportWatchStatus 返回自动监控状态。
@@ -188,6 +192,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 		if set.StartScanContext != nil {
 			opts.StartScanContext = set.StartScanContext
+		}
+		if set.StartScanBatchContext != nil {
+			opts.StartScanBatchContext = set.StartScanBatchContext
 		}
 		if set.StartImport != nil {
 			opts.StartImport = set.StartImport
@@ -554,13 +561,14 @@ func newServeDispatcher(opts ServeOptions, db, userDB *sql.DB) (*Dispatcher, err
 		WatchStatus: opts.ImportWatchStatus,
 	})...)
 	specs = append(specs, ScanRouteSpecs(ScanConfig{
-		Dir:          opts.ImportDir,
-		SettingsPath: opts.SettingsPath,
-		Service:      opts.ScanService,
-		WatchStatus:  opts.ImportWatchStatus,
-		StartScan:    opts.StartScan,
-		StartImport:  opts.StartImport,
-		UserID:       func(ctx *Context) int64 { return ctx.Identity.UserID },
+		Dir:                opts.ImportDir,
+		SettingsPath:       opts.SettingsPath,
+		Service:            opts.ScanService,
+		WatchStatus:        opts.ImportWatchStatus,
+		StartScan:          opts.StartScan,
+		StartImport:        opts.StartImport,
+		StartLibraryImport: opts.StartLibraryImport,
+		UserID:             func(ctx *Context) int64 { return ctx.Identity.UserID },
 	})...)
 	// FilesConfig.DB 是 Calibre 元数据库（data / book_formats 等表）。
 	// DefaultCover 必须接线：书籍无封面时回退到它，否则 /get/cover 返回 0 字节，

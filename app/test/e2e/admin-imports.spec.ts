@@ -51,3 +51,22 @@ test.describe('Admin import directories', () => {
         await expect(page.getByTestId('import-root-0').locator('input')).toHaveValue('/data/books/imports/incoming');
     });
 });
+
+
+test.describe('Import all without selecting books', () => {
+    test('keeps the all action visible alongside selected actions', async ({ request, page }) => {
+        await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
+        await page.goto('/admin/imports');
+        const all = page.getByTestId('import-all-books');
+        await expect(all).toBeVisible();
+        await expect(all).toBeEnabled();
+        const boxes = page.getByRole('checkbox');
+        expect(await boxes.count()).toBeGreaterThan(1);
+        await boxes.nth(1).check();
+        await expect(all).toBeVisible();
+        await expect(all).toBeEnabled();
+        const sent = page.waitForRequest(r => r.url().includes('/api/admin/import/run') && r.method() === 'POST');
+        await all.click();
+        expect((await sent).postDataJSON().hashlist).toBe('all');
+    });
+});

@@ -97,6 +97,10 @@ func (w *serviceWiring) serviceSet() httpapi.ServiceSet {
 			_, err := w.scanService.ScanAll(ctx, path, batchSize)
 			return err
 		},
+		StartScanBatchContext: func(ctx context.Context, path string, batchSize int, afterBatch func() error) error {
+			_, err := w.scanService.ScanAllWithCallback(ctx, path, batchSize, afterBatch)
+			return err
+		},
 		StartImport: func(hashlist []string, userID int64, deleteAfter bool, importMode string) error {
 			_, err := w.scanService.Import(hashlist, userID, deleteAfter, importMode)
 			return err

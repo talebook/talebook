@@ -323,3 +323,46 @@ func TestZIPRescanFindsMembersWhoseBooksWereDeleted(t *testing.T) {
 		t.Fatalf("deleted ZIP member not rediscovered: %+v %v", result, err)
 	}
 }
+
+func TestFullScanCallbacksImportOrdinaryAndZIPBeforeTraversalEnds(t *testing.T) {
+	root := t.TempDir()
+	svc := newImportService(t, importTestDB(t), importLibraryDB(t))
+	svc.SupportedFormats["zip"] = true
+	for i := 0; i < 7; i++ {
+		writeBook(t, root, fmt.Sprintf("plain-%d.txt", i), []byte(fmt.Sprintf("第一章\n普通正文%d", i)))
+	}
+	var entries []zipTestEntry
+	for i := 0; i < 13; i++ {
+		entries = append(entries, zipTestEntry{name: fmt.Sprintf("zip-%d.txt", i), body: []byte(fmt.Sprintf("第一章\nZIP正文%d", i))})
+	}
+	writeZIPFixture(t, root, "books.zip", zipTestBytes(t, entries...))
+	calls, imported := 0, 0
+	_, err := svc.ScanAllWithCallback(context.Background(), root, 5, func() error {
+		calls++
+		ready, err := svc.ReadyBatch(0, 500)
+		if err != nil {
+			return err
+		}
+		if len(ready) > 5 {
+			t.Fatalf("callback batch too large: %d", len(ready))
+		}
+		hashes := make([]string, 0, len(ready))
+		for _, row := range ready {
+			hashes = append(hashes, row.Hash)
+		}
+		if len(hashes) > 0 {
+			result, err := svc.Import(hashes, 7, false, "copy")
+			if err != nil {
+				return err
+			}
+			imported += result.Imported
+		}
+		return nil
+	})
+	if err != nil || calls < 4 || imported != 20 {
+		t.Fatalf("calls=%d imported=%d err=%v", calls, imported, err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "books.zip")); err != nil {
+		t.Fatal("archive removed")
+	}
+}

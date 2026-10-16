@@ -80,17 +80,20 @@
                 role="status"
                 aria-live="polite"
             >
-                <div class="text-high-emphasis">{{ t(backgroundTask === 'scan' ? 'admin.imports.message.fullScanRunning' : 'admin.imports.message.importRunning') }}</div>
+                <div class="text-high-emphasis">{{ t(watch_status.manual_library_import_phase === 'queued' && watch_status.manual_library_import_running ? 'admin.imports.message.fullImportQueued' : backgroundTask === 'scan' ? 'admin.imports.message.fullScanRunning' : 'admin.imports.message.importRunning') }}</div>
                 <div
-                    v-if="backgroundTask === 'scan' && watch_status.scan_progress"
+                    v-if="watch_status.scan_progress?.directory"
                     class="text-high-emphasis imports-progress"
                 >
                     {{ t('admin.imports.message.scanProgress', [watch_status.scan_progress.processed || 0, watch_status.scan_progress.archives || 0, watch_status.scan_progress.failed || 0]) }}
                     <div class="directory-path">{{ watch_status.scan_progress.current || watch_status.scan_progress.directory }}</div>
                 </div>
+                <div class="text-high-emphasis imports-progress">
+                    {{ t('admin.imports.message.importProgress', [count_done, count_todo, count_failed]) }}
+                </div>
             </v-alert>
         </v-card-text>
-        <v-card-actions>
+        <v-card-actions class="imports-actions">
             <v-btn
                 :disabled="loading"
                 variant="outlined"
@@ -126,7 +129,7 @@
                     :disabled="loading || backgroundTask !== null || importActionsDisabled"
                     variant="elevated"
                     color="#424242"
-                    @click="import_books"
+                    @click="import_books(selected)"
                 >
                     <v-icon start>
                         mdi-import
@@ -143,18 +146,17 @@
                     </v-icon>{{ t('common.delete') }}
                 </v-btn>
             </template>
-            <template v-else>
-                <v-btn
-                    :disabled="loading || backgroundTask !== null || importActionsDisabled"
-                    variant="elevated"
-                    color="warning"
-                    @click="import_books"
-                >
-                    <v-icon start>
-                        mdi-import
-                    </v-icon>{{ t('admin.imports.button.importAllBooks') }}
-                </v-btn>
-            </template>
+            <v-btn
+                :disabled="loading || Boolean(watch_status.manual_library_import_running) || importActionsDisabled"
+                variant="elevated"
+                color="primary"
+                data-testid="import-all-books"
+                @click="import_books('all')"
+            >
+                <v-icon start>
+                    mdi-import
+                </v-icon>{{ t('admin.imports.button.importAllBooks') }}
+            </v-btn>
         </v-card-actions>
         <v-card-text>
             <div v-if="selected.length == 0">
@@ -1059,12 +1061,11 @@ const scan_books = () => {
     });
 };
 
-const import_books = () => {
+const import_books = (hashlist = 'all') => {
     if (import_mode.value === 'move' && !window.confirm(t('admin.imports.settings.moveImportConfirm'))) {
         return;
     }
     loading.value = true;
-    const hashlist = selected.value.length > 0 ? selected.value : 'all';
 
     $backend('/admin/import/run', {
         method: 'POST',
@@ -1079,7 +1080,7 @@ const import_books = () => {
             return;
         }
 
-        watch_status.value = { ...watch_status.value, manual_import_running: true };
+        watch_status.value = rsp.watch_status || { ...watch_status.value, manual_import_running: true };
         observeTask('import');
     }).catch((error) => {
         loading.value = false;
@@ -1120,6 +1121,11 @@ useHead(() => ({
 </script>
 
 <style scoped>
+.imports-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
 .imports-titlebar {
     display: flex;
     flex-wrap: wrap;

@@ -36,7 +36,8 @@ type ScanConfig struct {
 	// StartScan 启动一次异步扫描；为 nil 时返回服务不可用。
 	StartScan func(path string, limit int) error
 	// StartImport 启动一次异步导入；为 nil 时返回服务不可用。
-	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
+	StartImport        func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
+	StartLibraryImport func(int64, string) error
 	// UserID 从请求上下文取当前用户 ID。
 	UserID func(ctx *Context) int64
 }
@@ -259,6 +260,19 @@ func ImportRunHandler(cfg ScanConfig) HandlerFunc {
 			SavedImportMode: cfg.Dir.SavedImportMode,
 		})
 
+		if len(hashlist) == 0 && cfg.StartLibraryImport != nil {
+			var userID int64
+			if cfg.UserID != nil {
+				userID = cfg.UserID(ctx)
+			}
+			if userID <= 0 {
+				return map[string]any{"err": "auth.required", "msg": "请登录管理员账号"}, nil
+			}
+			if err := cfg.StartLibraryImport(userID, mode); err != nil {
+				return nil, err
+			}
+			return map[string]any{"err": "ok", "msg": "全部导入任务已提交，后台将扫描并自动入库", "import_mode": mode, "watch_status": cfg.watchStatus()}, nil
+		}
 		total, err := svc.CountReady(hashlist)
 		if err != nil {
 			return nil, err
@@ -305,7 +319,13 @@ func taskStatusResponse(cfg ScanConfig, kind string, status, summary any) map[st
 	if watch["state"] == "scanning" && kind == "scan" || watch["state"] == "importing" && kind == "import" {
 		running = true
 	}
+	if active, _ := watch["manual_library_import_running"].(bool); active {
+		running = true
+	}
 	message, _ := watch["manual_"+kind+"_error"].(string)
+	if pipelineError, _ := watch["manual_library_import_error"].(string); pipelineError != "" {
+		message = pipelineError
+	}
 	response := map[string]any{"err": "ok", "msg": "成功", "status": status, "summary": summary, "running": running}
 	response["watch_status"] = watch
 	if message != "" && !running {
