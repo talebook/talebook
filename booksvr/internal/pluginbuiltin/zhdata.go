@@ -1,0 +1,509 @@
+package pluginbuiltin
+
+import (
+	"os"
+	"regexp"
+	"embed"
+	"encoding/json"
+	"fmt"
+	"sort"
+	"strings"
+)
+
+// zhData 内嵌 OpenCC 字典与配置（来自 webserver/plugins/tool/zh_converter）。
+//
+//go:embed zhdata/config/*.json zhdata/dictionary/*.txt zhdata/a5_phrases.txt
+var zhData embed.FS
+
+// beautifyData 内嵌 EPUB 美化预设与纹理（来自 webserver/plugins/tool/epub_beautify/styles）。
+//
+//go:embed beautifydata/*.css beautifydata/presets.json beautifydata/textures/*.jpg
+var beautifyData embed.FS
+
+// openCCDict 是一份已解析的 OpenCC 字典（key → 变体列表，首项为默认）。
+type openCCDict struct {
+	// items 按词长降序存放，供最长匹配。
+	maxLen int
+	words  map[string][]string
+}
+
+// openCCConverter 复刻 OpenCC：字典链 + 最长匹配。
+type openCCConverter struct {
+	// chains 是每个分组（group）的字典列表；组内按序匹配一次。
+	chains [][]*openCCDict
+}
+
+// dictCache 是进程级字典缓存（复刻 _class_dict_cache）。
+var dictCache = map[string]*openCCDict{}
+
+// loadOpenCCDict 加载一份字典文件（key\tvalue[ value...]）。
+func loadOpenCCDict(name string) (*openCCDict, error) {
+	if cached, ok := dictCache[name]; ok {
+		return cached, nil
+	}
+	raw, err := zhData.ReadFile("zhdata/dictionary/" + name)
+	if err != nil {
+		return nil, fmt.Errorf("opencc: 字典 %s 不存在", name)
+	}
+	dict := &openCCDict{words: map[string][]string{}}
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		parts := strings.Split(line, "\t")
+		if len(parts) < 2 {
+			continue
+		}
+		key := parts[0]
+		values := strings.Fields(parts[1])
+		if len(values) == 0 {
+			continue
+		}
+		dict.words[key] = values
+		if len([]rune(key)) > dict.maxLen {
+			dict.maxLen = len([]rune(key))
+		}
+	}
+	dictCache[name] = dict
+	return dict, nil
+}
+
+// loadA5Dict 加载 a5 增强词表为字典。
+func loadA5Dict() *openCCDict {
+	dict := &openCCDict{words: map[string][]string{}}
+	for _, line := range a5PhraseLines {
+		parts := strings.Split(line, "\t")
+		if len(parts) < 2 {
+			continue
+		}
+		dict.words[parts[0]] = strings.Fields(parts[1])
+		if len([]rune(parts[0])) > dict.maxLen {
+			dict.maxLen = len([]rune(parts[0]))
+		}
+	}
+	return dict
+}
+
+// a5PhraseLines 是 a5_phrases.txt 的非空行（init 时加载）。
+var a5PhraseLines = loadA5PhraseLines()
+
+// loadA5PhraseLines 读取内嵌的 a5 增强词表。
+func loadA5PhraseLines() []string {
+	raw, err := zhData.ReadFile("zhdata/a5_phrases.txt")
+	if err != nil {
+		return nil
+	}
+	var lines []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line != "" && !strings.HasPrefix(line, "#") {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+// conversionConfig 复刻 config/*.json 的结构。
+type conversionConfig struct {
+	ConversionChain [][]struct {
+		Dictionary struct {
+			Type   string   `json:"type"`
+			File   string   `json:"file"`
+			Files  []string `json:"files"`
+			Dict   *struct {
+				File string `json:"file"`
+			} `json:"dict"`
+		} `json:"dictionary"`
+	} `json:"conversion_chain"`
+}
+
+// newOpenCCConverter 复刻 OpenCC.__init__：按 config 组装字典链。
+//
+// extraDicts 注入每个 group 的最前位置（增强词表优先匹配）。
+func newOpenCCConverter(direction string, extraDicts []*openCCDict) (func(string) string, error) {
+	raw, err := zhData.ReadFile("zhdata/config/" + direction + ".json")
+	if err != nil {
+		return nil, fmt.Errorf("opencc: 方向 %s 的配置不存在", direction)
+	}
+	var config conversionConfig
+	if err := json.Unmarshal(raw, &config); err != nil {
+		return nil, fmt.Errorf("opencc: 方向 %s 的配置解析失败: %w", direction, err)
+	}
+	converter := &openCCConverter{}
+	for _, group := range config.ConversionChain {
+		var dicts []*openCCDict
+		dicts = append(dicts, extraDicts...)
+		for _, link := range group {
+			var names []string
+			if link.Dictionary.Type == "group" {
+				names = link.Dictionary.Files
+			} else if link.Dictionary.Dict != nil && link.Dictionary.Dict.File != "" {
+				names = []string{link.Dictionary.Dict.File}
+			} else if link.Dictionary.File != "" {
+				names = []string{link.Dictionary.File}
+			}
+			for _, name := range names {
+				dict, err := loadOpenCCDict(name)
+				if err != nil {
+					return nil, err
+				}
+				dicts = append(dicts, dict)
+			}
+		}
+		if len(dicts) > 0 {
+			converter.chains = append(converter.chains, dicts)
+		}
+	}
+	return converter.Convert, nil
+}
+
+// convertSegment 对单个片段执行字典链转换（组内每本字典只匹配一次）。
+func (c *openCCConverter) convertSegment(text string) string {
+	for _, group := range c.chains {
+		var out strings.Builder
+		runes := []rune(text)
+		i := 0
+		for i < len(runes) {
+			matched := false
+			for _, dict := range group {
+				maxLen := dict.maxLen
+				if maxLen > len(runes)-i {
+					maxLen = len(runes) - i
+				}
+				for l := maxLen; l >= 1; l-- {
+					if values, ok := dict.words[string(runes[i:i+l])]; ok {
+						out.WriteString(values[0])
+						i += l
+						matched = true
+						break
+					}
+				}
+				if matched {
+					break
+				}
+			}
+			if !matched {
+				out.WriteRune(runes[i])
+				i++
+			}
+		}
+		text = out.String()
+	}
+	return text
+}
+
+// openCCSplitRe 复刻 split_chars_re 的分隔符集合（按 rune 判断）。
+func isOpenCCSeparator(ch rune) bool {
+	switch {
+	case ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r':
+		return true
+	case strings.ContainsRune("-,.?!*，。、；：？！…“”‘’『』「」﹁﹂—－（）《》〈〉～．／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼", ch):
+		return true
+	}
+	return false
+}
+
+// Convert 复刻 OpenCC.convert：按分隔符切分后逐段转换。
+func (c *openCCConverter) Convert(text string) string {
+	var out strings.Builder
+	var segment strings.Builder
+	for _, ch := range text {
+		if isOpenCCSeparator(ch) {
+			out.WriteString(c.convertSegment(segment.String()))
+			segment.Reset()
+			out.WriteRune(ch)
+		} else {
+			segment.WriteRune(ch)
+		}
+	}
+	out.WriteString(c.convertSegment(segment.String()))
+	return out.String()
+}
+
+
+
+// ---- 繁简转换的 EPUB / TXT 处理（复刻 zh_converter/transform.py）----
+
+// zhConvertTxt 复刻 convert_txt_file：检测编码 → 转换 → UTF-8 输出。
+func zhConvertTxt(srcPath, outPath string, converter func(string) string) (string, error) {
+	data, err := os.ReadFile(srcPath)
+	if err != nil {
+		return "", err
+	}
+	text, report := decodeWithReport(data)
+	encoding, _ := report["encoding"].(string)
+	if err := os.WriteFile(outPath, []byte(converter(text)), 0o644); err != nil {
+		return "", err
+	}
+	return encoding, nil
+}
+
+// zhConvertEpub 复刻 convert_epub：正文条目文本节点转换，其余原样保留。
+func zhConvertEpub(srcPath, outPath string, converter func(string) string, convertMetadata bool) error {
+	entries, order, err := readZipEntries(srcPath)
+	if err != nil {
+		return err
+	}
+	for _, name := range findTextEntries(entries) {
+		text, encoding := decodeEpubEntry(entries[name])
+		converted := zhConvertHTMLText(text, converter)
+		if converted != text {
+			entries[name] = encodeEpubEntry(converted, encoding)
+		}
+	}
+	if convertMetadata {
+		for _, name := range order {
+			ext := lower(name)
+			if strings.HasSuffix(ext, ".opf") || strings.HasSuffix(ext, ".ncx") {
+				text, encoding := decodeEpubEntry(entries[name])
+				converted := zhConvertXMLTitles(text, converter)
+				if converted != text {
+					entries[name] = encodeEpubEntry(converted, encoding)
+				}
+			}
+		}
+	}
+	return writeEpubZip(entries, order, outPath)
+}
+
+// zhConvertHTMLText 转换 HTML 文本节点（跳过 script/style/noscript 子树）。
+//
+// 采用轻量标签扫描而非完整 HTML 解析：与 Python 的 BeautifulSoup 文本节点
+// 语义对齐（标签内属性不转换），且不引入重序列化损耗。
+func zhConvertHTMLText(html string, converter func(string) string) string {
+	var out strings.Builder
+	skipTag := ""
+	for {
+		lt := strings.IndexByte(html, '<')
+		if lt < 0 {
+			out.WriteString(converter(html))
+			return out.String()
+		}
+		out.WriteString(converter(html[:lt]))
+		rest := html[lt:]
+		gt := strings.IndexByte(rest, '>')
+		if gt < 0 {
+			out.WriteString(rest)
+			return out.String()
+		}
+		tag := rest[:gt+1]
+		lowerTag := lower(tag)
+		if skipTag == "" {
+			if strings.HasPrefix(lowerTag, "<script") || strings.HasPrefix(lowerTag, "<style") ||
+				strings.HasPrefix(lowerTag, "<noscript") {
+				name := strings.TrimPrefix(strings.TrimPrefix(lowerTag, "</"), "<")
+				name = strings.TrimRight(name, "/>")
+				skipTag = strings.TrimSpace(name)
+			}
+			out.WriteString(tag)
+		} else {
+			out.WriteString(tag)
+			if strings.HasPrefix(lowerTag, "</"+skipTag) {
+				skipTag = ""
+			}
+		}
+		html = rest[gt+1:]
+	}
+}
+
+// zhConvertXMLTitles 转换 OPF/NCX 的标题类文本（dc:title / navLabel / text）。
+func zhConvertXMLTitles(xml string, converter func(string) string) string {
+	for _, tag := range []string{"dc:title", "navLabel", "text"} {
+		xml = zhConvertTagText(xml, tag, converter)
+	}
+	return xml
+}
+
+// zhConvertTagText 转换指定标签内的文本。
+func zhConvertTagText(xml, tag string, converter func(string) string) string {
+	open := "<" + tag
+	close := "</" + tag + ">"
+	var out strings.Builder
+	for {
+		start := strings.Index(xml, open)
+		if start < 0 {
+			out.WriteString(xml)
+			return out.String()
+		}
+		gt := strings.Index(xml[start:], ">")
+		if gt < 0 {
+			out.WriteString(xml)
+			return out.String()
+		}
+		gt += start
+		end := strings.Index(xml[gt:], close)
+		if end < 0 {
+			out.WriteString(xml)
+			return out.String()
+		}
+		end += gt
+		out.WriteString(xml[:gt+1])
+		inner := xml[gt+1 : end]
+		if strings.HasPrefix(strings.TrimSpace(inner), "<") {
+			// 含子元素（如 navLabel><text>）：递归处理 text 标签。
+			out.WriteString(zhConvertTagText(inner, "text", converter))
+		} else {
+			out.WriteString(converter(inner))
+		}
+		out.WriteString(close)
+		xml = xml[end+len(close):]
+	}
+}
+
+// ---- EPUB 美化的样式加载（复刻 styles/__init__.py）----
+
+// tocStyles 复刻 TOC_STYLES 与 list_toc_styles。
+var tocStyles = []map[string]any{
+	{"id": "elegant", "name": "精致", "name_en": "Elegant"},
+	{"id": "cool", "name": "酷炫", "name_en": "Cool"},
+	{"id": "seal", "name": "朱印", "name_en": "Seal"},
+	{"id": "minimal", "name": "极简", "name_en": "Minimal"},
+}
+
+// listTocStyles 复刻 list_toc_styles。
+func listTocStyles() []any {
+	out := make([]any, 0, len(tocStyles))
+	for _, item := range tocStyles {
+		out = append(out, item)
+	}
+	return out
+}
+
+// listPresets 复刻 list_presets。
+func listPresets() map[string]any {
+	raw, err := beautifyData.ReadFile("beautifydata/presets.json")
+	if err != nil {
+		return map[string]any{}
+	}
+	var presets map[string]any
+	if err := json.Unmarshal(raw, &presets); err != nil {
+		return map[string]any{}
+	}
+	return presets
+}
+
+// builtinTextures 复刻内置纹理清单。
+var builtinTextures = []string{
+	"tex_caojing", "tex_daolin", "tex_gaobai", "tex_xuanzhi", "tex_yangpi", "tex_yunwen",
+}
+
+// listBuiltinTextures 复刻 list_builtin_textures。
+func listBuiltinTextures() []any {
+	out := make([]any, 0, len(builtinTextures))
+	for _, name := range builtinTextures {
+		out = append(out, map[string]any{"id": name, "name": name})
+	}
+	return out
+}
+
+// getTextureBytes 复刻 get_texture_bytes。
+func getTextureBytes(name string) ([]byte, string, error) {
+	for _, known := range builtinTextures {
+		if known == name {
+			raw, err := beautifyData.ReadFile("beautifydata/textures/" + name + ".jpg")
+			if err != nil {
+				return nil, "", err
+			}
+			return raw, "image/jpeg", nil
+		}
+	}
+	return nil, "", fmt.Errorf("unknown texture: %s", name)
+}
+
+// placeholderMap 复刻 _PLACEHOLDER_MAP。
+var placeholderMap = map[string]string{
+	"FONT_BODY": "font_body", "FONT_HEAD": "font_head", "FONT_KAI": "font_kai",
+	"FONT_CODE": "font_code", "LINE_HEIGHT": "line_height", "TITLE_SIZE": "title_size",
+	"ACCENT": "accent", "ACCENT_LIGHT": "accent_light", "ACCENT_DARK": "accent_dark",
+	"MUTED": "muted", "BORDER": "border", "QUOTE_BG": "quote_bg",
+	"CODE_BG": "code_bg", "TOC_GRADIENT": "toc_gradient",
+}
+
+// placeholderRe 复刻 _PLACEHOLDER_RE。
+var placeholderRe = regexp.MustCompile(`\{\{\s*([A-Z_]+)\s*\}\}`)
+
+// getPresetCSS 复刻 get_preset_css：读模板 → 插值 → 嵌入目录与响应式样式。
+func getPresetCSS(preset string, useSystemFonts bool, tocStyle string,
+	overrides map[string]bool, paletteOverrides, pageTint, bgImage any,
+	paraIndent bool, paraGap any, tocColumns bool) (string, error) {
+	presets := listPresets()
+	meta, ok := presets[preset].(map[string]any)
+	if !ok {
+		return "", fmt.Errorf("unknown preset: %s", preset)
+	}
+	if tocStyle == "" {
+		tocStyle = "elegant"
+	}
+	known := false
+	for _, item := range tocStyles {
+		if item["id"] == tocStyle {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return "", fmt.Errorf("unknown toc style: %s", tocStyle)
+	}
+	template, err := beautifyData.ReadFile("beautifydata/" + preset + ".css")
+	if err != nil {
+		return "", fmt.Errorf("preset css missing: %s", preset)
+	}
+	tocCSS, err := beautifyData.ReadFile("beautifydata/toc_" + tocStyle + ".css")
+	if err != nil {
+		return "", err
+	}
+	responsiveCSS, err := beautifyData.ReadFile("beautifydata/responsive.css")
+	if err != nil {
+		return "", err
+	}
+	// 先对 toc/responsive 插值，再整体插值。
+	tocFilled := interpolateCSS(string(tocCSS), meta, useSystemFonts, overrides)
+	responsiveFilled := interpolateCSS(string(responsiveCSS), meta, useSystemFonts, overrides)
+	merged := strings.ReplaceAll(string(template), "{{TOC_STYLE}}", tocFilled)
+	merged = strings.ReplaceAll(merged, "{{RESPONSIVE}}", responsiveFilled)
+	return interpolateCSS(merged, meta, useSystemFonts, overrides), nil
+}
+
+// interpolateCSS 复刻 _interpolate。
+func interpolateCSS(template string, params map[string]any, useSystemFonts bool,
+	overrides map[string]bool) string {
+	return placeholderRe.ReplaceAllStringFunc(template, func(match string) string {
+		sub := placeholderRe.FindStringSubmatch(match)
+		if sub == nil {
+			return match
+		}
+		key := sub[1]
+		paramKey, ok := placeholderMap[key]
+		if !ok {
+			return match
+		}
+		if strings.HasPrefix(key, "FONT_") {
+			suffix := lower(key[len("FONT_"):])
+			use := useSystemFonts
+			if v, ok := overrides[suffix]; ok {
+				use = v
+			}
+			if !use {
+				return ""
+			}
+			return "font-family: " + stringOr(params[paramKey], "") + ";"
+		}
+		return stringOr(params[paramKey], "")
+	})
+}
+
+// validateNoteMark 复刻 validate_note_mark（合法标注样式集合）。
+func validateNoteMark(noteMark string) error {
+	switch noteMark {
+	case "orig", "sup", "bracket", "dot", "none":
+		return nil
+	}
+	return fmt.Errorf("unknown note mark: %s", noteMark)
+}
+
+// sortStrings 是 sort.Strings 的本地封装。
+func sortStrings(list []string) []string {
+	sort.Strings(list)
+	return list
+}

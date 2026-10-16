@@ -1,0 +1,150 @@
+/* ── 目录页精致版（elegant）──
+   精排手法：标题字体/主题色/顶部装饰线/中西双行副题/收尾符。
+   装饰全部用真实元素与常规属性（不依赖 ::before/::after content 与 flex，
+   兼容手机阅读器渲染引擎）。 */
+body.mb-toc-page {
+    margin: 0 !important;
+    {{FONT_BODY}}
+}
+/* 实色卡片（用户选型：白底正文 + 目录卡片背景） */
+body.mb-toc-page .mb-toc {
+    background: {{ACCENT_LIGHT}} !important;
+    border: 1px solid {{BORDER}} !important;
+    border-radius: 8px;
+    padding: 2.4em 2em 1.9em 2em !important;
+    margin: 3em 1.5em !important;
+}
+body.mb-toc-page div.mulu,
+body.mb-toc-page table.mulu {
+    margin: 3em 1.5em;
+}
+/* 标题：标题字体 + 主题色 + 字距 + 顶部装饰线（.mb-toc-title = 书内平铺目录页
+   的 p/div 标题兜底类，由 _decorate_toc_page 打标） */
+body.mb-toc-page h1,
+body.mb-toc-page h2,
+body.mb-toc-page .mb-toc-title {
+    {{FONT_HEAD}}
+    text-align: center !important;
+    font-weight: bold;
+    font-size: 1.6em !important;
+    line-height: 1.5;
+    letter-spacing: 0.2em;
+    text-indent: 0 !important;
+    color: {{ACCENT}};
+    border-top: 2px solid {{ACCENT}};
+    padding-top: 0.7em;
+    margin: 1.2em auto 2.8em auto !important;
+    orphans: 2;
+    widows: 2;
+}
+/* 英文副题（V的福音式双行标题）— MUTED */
+body.mb-toc-page .mb-toc-sub {
+    display: block;
+    font-size: 0.38em;
+    font-weight: normal;
+    letter-spacing: 0.5em;
+    color: {{MUTED}};
+    margin-top: 0.7em;
+}
+/* 条目：正文字体、行距、链接主题色下划线 */
+body.mb-toc-page ol,
+body.mb-toc-page ul {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+body.mb-toc-page li {
+    margin: 0.7em 0 !important;
+    line-height: 1.9 !important;
+    color: #333;
+    orphans: 2;
+    widows: 2;
+}
+body.mb-toc-page li a,
+body.mb-toc-page p a,
+body.mb-toc-page div a {
+    text-decoration: none !important;
+    color: inherit;
+    border-bottom: 1px solid {{ACCENT}};
+    padding-bottom: 0.1em;
+}
+/* 生成页编号（真实 span）— 徽章式：主题色小圆角块 + 白字 */
+body.mb-toc-page .mb-toc-num {
+    display: inline-block;
+    min-width: 1.9em;
+    margin-right: 0.6em;
+    font-size: 0.72em;
+    font-weight: bold;
+    color: #FFFFFF;
+    background-color: {{ACCENT}};
+    text-align: center;
+    padding: 0.12em 0.4em;
+    border-radius: 3px;
+}
+/* 二级条目：缩进、小号、MUTED + 淡引导线 */
+body.mb-toc-page li li {
+    margin-left: 2em !important;
+    font-size: 0.92em;
+    color: {{MUTED}};
+    border-bottom: 1px dotted {{BORDER}};
+    padding-bottom: 0.2em;
+}
+/* 平铺式目录（p/div 条目）兜底；标题块走 .mb-toc-title 的标题样式不在此列 */
+body.mb-toc-page p,
+body.mb-toc-page div {
+    text-indent: 0 !important;
+}
+body.mb-toc-page p:not(.mb-toc-title) {
+    margin: 0.7em 0 !important;
+    line-height: 1.9 !important;
+}
+/* 表格式目录（table.mulu 双栏） */
+body.mb-toc-page table.mulu {
+    width: 85%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+}
+body.mb-toc-page table.mulu td {
+    padding: 0.45em 0.2em;
+    text-align: left;
+    vertical-align: middle;
+}
+body.mb-toc-page table.mulu a {
+    text-decoration: none !important;
+    color: inherit;
+    border-bottom: 1px solid {{ACCENT}};
+    padding-bottom: 0.1em;
+}
+/* 收尾装饰符（真实元素） */
+body.mb-toc-page .mb-toc-end {
+    text-align: center;
+    color: {{ACCENT}};
+    font-size: 0.7em;
+    letter-spacing: 1.5em;
+    margin: 2.5em 0 0 0 !important;
+}
+/* 目录截断提示 — MUTED */
+body.mb-toc-page .mb-toc-truncated {
+    text-align: center;
+    color: {{MUTED}};
+    margin-top: 1.5em !important;
+}
+
+/* ── 目录移动端优化 ── */
+@media (max-width: 600px) {
+  body.mb-toc-page .mb-toc,
+  body.mb-toc-page div.mulu,
+  body.mb-toc-page table.mulu {
+    margin: 1.5em 0.8em !important;
+  }
+  body.mb-toc-page h1,
+  body.mb-toc-page h2,
+  body.mb-toc-page .mb-toc-title {
+    font-size: 1.3em !important;
+    margin: 0.8em auto 1.5em auto !important;
+  }
+  body.mb-toc-page li {
+    line-height: 1.7 !important;
+    margin: 0.5em 0 !important;
+  }
+}

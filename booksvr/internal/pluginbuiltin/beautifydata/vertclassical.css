@@ -1,0 +1,368 @@
+/* mb-beauty.css — 竖排古籍：右翻竖排原本形制
+   设计要点：
+   1) 分两层——先给出「横排兜底层」（=古籍观感），再用 @supports 渐进增强为竖排；
+      不支持 writing-mode 的老阅读器只会看到干净的横排古籍，不会破版；
+   2) 竖排下的方向语义转换：块方向变为「自右向左」，故段距用 margin-left/right、
+      装饰线用 border-left/right（与文字列平行的竖线才是界栏）；
+   3) 目录页与正文共用本样式表，body 竖排会自然继承到目录页，
+      此处再把目录卡片/条目的横排装饰（上下线、下边框分隔）转成竖排语义。
+   {{RESPONSIVE}} / {{TOC_STYLE}} 均前置，保证本预设规则位于层叠末端可反制。 */
+@page {
+    margin: 6% 5%;
+}
+
+{{RESPONSIVE}}
+{{TOC_STYLE}}
+
+/* ══════════════ 横排兜底层（古籍观感）══════════════ */
+body {
+    {{FONT_BODY}}
+    background-color: {{ACCENT_LIGHT}};
+    line-height: {{LINE_HEIGHT}} !important;
+    text-align: justify;
+    orphans: 2;
+    widows: 2;
+}
+
+p {
+    text-indent: 2em !important;
+    duokan-text-indent: 2em;
+    text-align: justify !important;
+    text-justify: inter-ideograph;
+    line-height: {{LINE_HEIGHT}} !important;
+    font-size: 1em !important;
+    margin: 0 !important;
+    orphans: 2;
+    widows: 2;
+}
+
+p[data-mb-first] {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+}
+
+/* 回目式章节标题：楷体、上下双细线、宣纸底 */
+.mb-ch {
+    page-break-before: always;
+    break-before: page;
+    text-align: center !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    {{FONT_HEAD}}
+    font-weight: bold;
+    font-size: {{TITLE_SIZE}} !important;
+    line-height: 1.8;
+    color: {{ACCENT}};
+    margin: 4.5em 0 0.8em 0 !important;
+    padding: 1.2em 0.8em 1.1em 0.8em !important;
+    background: {{ACCENT_LIGHT}} !important;
+    border-top: 1px solid {{BORDER}} !important;
+    border-bottom: 1px solid {{BORDER}} !important;
+    letter-spacing: 0.2em;
+    orphans: 2;
+    widows: 2;
+}
+
+.mb-ch span {
+    font-size: 0.78em;
+    color: {{MUTED}};
+    font-weight: normal;
+    letter-spacing: 0.3em;
+}
+
+h1, h2, h3 {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 诗词/引文：楷体居中，纸色底 */
+blockquote {
+    {{FONT_KAI}}
+    font-size: 1em;
+    line-height: 1.85;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    text-align: center;
+    margin: 1.2em 0 !important;
+    padding: 0.7em 0;
+    color: #241F1A;
+    background: {{QUOTE_BG}};
+    border-left: 2px solid {{BORDER}};
+    orphans: 2;
+    widows: 2;
+}
+blockquote p {
+    text-indent: 0 !important;
+    text-align: center;
+    margin: 0.3em 0 !important;
+}
+
+strong { font-weight: bold; }
+em { font-style: italic; }
+
+img {
+    max-width: 100% !important;
+    height: auto;
+    margin: 1.2em auto !important;
+    display: block;
+}
+p img { display: inline; margin: 0 !important; vertical-align: baseline; }
+
+hr {
+    border: none !important;
+    border-top: 1px solid {{BORDER}} !important;
+    width: 40% !important;
+    margin: 1.6em auto !important;
+}
+
+sup { font-size: 0.72em !important; line-height: 1; }
+.footnote, .duokan-footnote-content {
+    {{FONT_KAI}}
+    font-size: 0.88em;
+    line-height: 1.7;
+    text-align: left !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    color: {{MUTED}};
+}
+
+table {
+    border-collapse: collapse;
+    margin: 1.2em auto !important;
+    font-size: 0.9em;
+}
+td, th {
+    border: 1px solid {{BORDER}};
+    padding: 0.45em 0.6em;
+    text-indent: 0;
+}
+
+pre, code {
+    {{FONT_CODE}}
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* 标题下方长线 — 横排兜底：双线 46% */
+.mb-ch-sep {
+    width: 46% !important;
+    height: 3px !important;
+    background: transparent !important;
+    border-top: 1px solid {{BORDER}} !important;
+    border-bottom: 1px solid {{BORDER}} !important;
+    opacity: 0.9;
+}
+
+/* ══════════════ 竖排增强（@supports 渐进增强）══════════════
+   支持 writing-mode 的引擎（多看、Apple Books、KOReader、微信读书、
+   Kindle KFX、各 Chromium/WebKit 内核阅读器）走这一段。 */
+@supports (writing-mode: vertical-rl) {
+    /* 选择器 body 前缀（0-0-2 / 0-1-1）：responsive 手机块同为 body 前缀但
+       前置注入，本块在后方按源序取胜，窄屏竖排不被手机横排值覆盖（A4）；
+       夜间章节卡用 html body 前缀（0-1-2）仍压过本块，夜间正常转深 */
+
+    /* 根元素与 body 同时声明：部分引擎只认其一 */
+    html {
+        -epub-writing-mode: vertical-rl;
+        -webkit-writing-mode: vertical-rl;
+        writing-mode: vertical-rl;
+        height: 100%;
+    }
+
+    body {
+        -epub-writing-mode: vertical-rl;
+        -webkit-writing-mode: vertical-rl;
+        writing-mode: vertical-rl;
+        -webkit-text-orientation: mixed;
+        text-orientation: mixed;
+        /* 标点竖式字形（依赖字体 vert/vrt2 特性，缺失时回退横式，不影响可读） */
+        font-feature-settings: "vert" 1;
+        -epub-line-break: strict;
+        line-break: strict;
+        /* 反制 responsive.css 的横排行长限制（否则限制列数导致排版异常） */
+        max-width: none !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        height: 100%;
+        /* 竖排下 line-height 即列宽（字距外的列间距） */
+        line-height: {{LINE_HEIGHT}} !important;
+    }
+
+    /* 段落：块方向变为自右向左，段距改用左右外边距 */
+    body p {
+        margin: 0 !important;
+        text-indent: 2em !important;
+        duokan-text-indent: 2em;
+    }
+
+    /* 章节标题：界栏式——左右竖线夹住标题列，块方向留白改左右 */
+    body .mb-ch {
+        text-align: center !important;
+        margin: 0 3.2em 0 1em !important;
+        padding: 1em 1.1em 1em 1.1em !important;
+        background: {{ACCENT_LIGHT}} !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        border-left: 1px solid {{BORDER}} !important;
+        border-right: 1px solid {{BORDER}} !important;
+        line-height: 1.5;
+        letter-spacing: 0.24em;
+    }
+    .mb-ch span {
+        letter-spacing: 0.3em;
+    }
+
+    /* 标题下方长线 → 竖排界栏竖线（width 为列厚、height 为行长） */
+    body .mb-ch-sep {
+        width: 3px !important;
+        height: 46% !important;
+        background: transparent !important;
+        border-top: none !important;
+        border-bottom: none !important;
+        border-left: 1px solid {{BORDER}} !important;
+        border-right: 1px solid {{BORDER}} !important;
+        margin: 0 2.2em 0 0 !important;
+        opacity: 0.9;
+    }
+
+    /* 引文：装饰线改为与文字列平行的竖线（置于起读侧＝右） */
+    body blockquote {
+        margin: 0 1.2em !important;
+        padding: 0.8em 0.7em;
+        border-left: none;
+        border-right: 2px solid {{BORDER}};
+        text-align: center;
+    }
+    blockquote p {
+        margin: 0 0.3em !important;
+    }
+
+    /* 分割线：竖排下应为一段短竖线 */
+    hr {
+        border: none !important;
+        border-right: 1px solid {{BORDER}} !important;
+        width: 1px !important;
+        height: 34% !important;
+        margin: 0 1.4em !important;
+    }
+
+    /* 插图：竖排下由高度约束，避免超出单屏 */
+    img {
+        max-width: none !important;
+        max-height: 100% !important;
+        width: auto;
+        height: auto;
+        margin: 0 1.2em !important;
+    }
+    p img {
+        margin: 0 !important;
+    }
+
+    /* 注释与代码块保持横排（竖排代码不可读），用独立书写模式隔离 */
+    pre {
+        -webkit-writing-mode: horizontal-tb;
+        writing-mode: horizontal-tb;
+        max-height: 90%;
+        margin: 0 1.2em !important;
+    }
+    .footnote, .duokan-footnote-content {
+        text-align: start !important;
+    }
+
+    /* 表格：竖排下不做横向滚动假设 */
+    table {
+        display: table;
+        margin: 0 1.2em !important;
+    }
+
+    /* ── 目录页竖排适配（目录页共用本样式表，body 已竖排）── */
+    body.mb-toc-page {
+        max-width: none !important;
+        height: 100%;
+    }
+    /* 卡片：块方向留白改左右；去掉横排语义的上边框装饰 */
+    body.mb-toc-page .mb-toc {
+        margin: 0 1.2em !important;
+        padding: 1.6em 1.4em !important;
+        overflow: visible !important;
+    }
+    /* 目录标题：横排的顶部装饰线 → 竖排的右侧界线 */
+    body.mb-toc-page h1,
+    body.mb-toc-page h2 {
+        border-top: none !important;
+        border-bottom: none !important;
+        border-right: 2px solid {{ACCENT}} !important;
+        padding-top: 0 !important;
+        padding-right: 0.8em !important;
+        margin: 0 1em 0 2em !important;
+        text-align: center !important;
+        background-image: none !important;
+    }
+    /* 条目区：cool 的左侧色条 → 顶部；去掉块方向的上边线 */
+    body.mb-toc-page ol,
+    body.mb-toc-page ul {
+        border-top: none !important;
+        border-left: none !important;
+        border-right: 1px solid {{BORDER}};
+        padding: 0 0.4em !important;
+    }
+    /* 条目分隔：下边框（横排语义）→ 列间竖线 */
+    body.mb-toc-page li {
+        border-bottom: none !important;
+        border-left: 1px dotted {{BORDER}};
+        padding: 0.2em 0.5em !important;
+        margin: 0 !important;
+        line-height: 2 !important;
+    }
+    body.mb-toc-page li:last-child {
+        border-left: none !important;
+    }
+    body.mb-toc-page li li {
+        margin: 0 1.6em 0 0 !important;
+        border-left: none !important;
+    }
+    /* 编号徽章：竖排下贴于列首 */
+    body.mb-toc-page .mb-toc-num {
+        display: inline-block;
+        min-width: auto;
+        margin: 0 0 0.5em 0;
+    }
+    /* 表格式目录（朱印风）：竖排下宽度自适应 */
+    body.mb-toc-page table.mulu {
+        width: auto !important;
+        margin: 0 1.2em !important;
+    }
+    body.mb-toc-page table.mulu td {
+        border-bottom: none !important;
+        padding: 0.3em 0.4em !important;
+    }
+    /* 收尾装饰：块方向留白改左右 */
+    body.mb-toc-page .mb-toc-end {
+        margin: 0 1.6em 0 0 !important;
+        letter-spacing: 0.5em;
+    }
+    body.mb-toc-page .mb-toc-truncated {
+        margin: 0 1.2em 0 0 !important;
+    }
+
+    /* 窄屏（手机竖持）：收紧列间留白 */
+    @media (max-width: 600px) {
+        .mb-ch {
+            margin: 0 2em 0 0.6em !important;
+            padding: 0.8em 0.8em !important;
+        }
+        .mb-ch-sep {
+            height: 62% !important;
+            margin: 0 1.4em 0 0 !important;
+        }
+        blockquote {
+            margin: 0 0.8em !important;
+        }
+        body.mb-toc-page .mb-toc {
+            margin: 0 0.6em !important;
+            padding: 1em 0.8em !important;
+        }
+    }
+}

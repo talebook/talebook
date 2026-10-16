@@ -1,0 +1,157 @@
+/* ── 目录页酷炫版（cool）──
+   杂志封面式：深色渐变标题栏 + 白色大字 + 金色副题与细线、大号主题色编号、
+   卡片底纹条目区 + 分隔线。渐变有纯色兜底（background-color），
+   编号/副题/收尾均为真实元素，兼容移动阅读器。 */
+body.mb-toc-page {
+    margin: 0 !important;
+    {{FONT_BODY}}
+}
+/* 实色卡片外框（目录页） */
+body.mb-toc-page .mb-toc {
+    background: {{ACCENT_LIGHT}} !important;
+    border: 1px solid {{BORDER}} !important;
+    border-radius: 8px;
+    padding: 0 0 1.2em 0 !important;
+    margin: 2.5em 1.2em !important;
+    overflow: hidden;
+}
+body.mb-toc-page div.mulu,
+body.mb-toc-page table.mulu {
+    margin: 2.5em 1.2em;
+}
+/* 标题：深色渐变标题栏 + 白色大字 + 金色细线（不支持渐变时回落纯色；
+   .mb-toc-title = 书内平铺目录页的 p/div 标题兜底类） */
+body.mb-toc-page h1,
+body.mb-toc-page h2,
+body.mb-toc-page .mb-toc-title {
+    {{FONT_HEAD}}
+    text-align: center !important;
+    font-weight: bold;
+    font-size: 1.7em !important;
+    line-height: 1.4;
+    letter-spacing: 0.25em;
+    text-indent: 0 !important;
+    color: #F5E6D0;
+    background-color: {{ACCENT}};
+    background-image: {{TOC_GRADIENT}};
+    border-bottom: 2px solid #C9A96A;
+    padding: 1.6em 0.5em 1.2em;
+    margin: 0 0 2.6em 0 !important;
+    orphans: 2;
+    widows: 2;
+}
+/* 金色英文副题（酷炫风格固定金色签名） */
+body.mb-toc-page .mb-toc-sub {
+    display: block;
+    font-size: 0.36em;
+    font-weight: normal;
+    letter-spacing: 0.55em;
+    color: #D8BC8A;
+    margin-top: 0.8em;
+}
+/* 条目区：卡片底纹 + 左缘主题色细边 + 分隔线（QUOTE_BG/BORDER 跟随预设色板） */
+body.mb-toc-page ol,
+body.mb-toc-page ul {
+    list-style: none !important;
+    padding: 0 0.5em !important;
+    margin: 0 !important;
+    background-color: {{QUOTE_BG}};
+    border-top: 1px solid {{BORDER}};
+    border-left: 3px solid {{ACCENT}};
+}
+body.mb-toc-page li {
+    margin: 0 !important;
+    line-height: 1.9 !important;
+    color: #333;
+    border-bottom: 1px dashed {{BORDER}};
+    padding: 0.75em 0.3em;
+    orphans: 2;
+    widows: 2;
+}
+body.mb-toc-page li:last-child {
+    border-bottom: none;
+}
+/* 大号主题色编号（生成页真实 span；书内自带编号的原样显示） */
+body.mb-toc-page .mb-toc-num {
+    display: inline-block;
+    min-width: 2.2em;
+    margin-right: 0.7em;
+    font-size: 1.1em;
+    font-weight: bold;
+    color: {{ACCENT}};
+    line-height: inherit;
+}
+body.mb-toc-page li a,
+body.mb-toc-page p a,
+body.mb-toc-page div a {
+    text-decoration: none !important;
+    color: inherit;
+}
+/* 二级条目 — MUTED */
+body.mb-toc-page li li {
+    margin-left: 1.8em !important;
+    font-size: 0.92em;
+    color: {{MUTED}};
+}
+/* 平铺式目录（p/div 条目）兜底；标题块走 .mb-toc-title 的标题样式不在此列 */
+body.mb-toc-page p,
+body.mb-toc-page div {
+    text-indent: 0 !important;
+}
+body.mb-toc-page p:not(.mb-toc-title) {
+    margin: 0.7em 0 !important;
+    line-height: 1.9 !important;
+}
+/* 表格式目录 */
+body.mb-toc-page table.mulu {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92em;
+}
+body.mb-toc-page table.mulu td {
+    padding: 0.5em 0.2em;
+    border-bottom: 1px dashed {{BORDER}};
+    text-align: left;
+    vertical-align: middle;
+}
+body.mb-toc-page table.mulu a {
+    text-decoration: none !important;
+    color: inherit;
+}
+/* 收尾装饰符 */
+body.mb-toc-page .mb-toc-end {
+    text-align: center;
+    color: #C9A96A;
+    font-size: 1em;
+    letter-spacing: 1.5em;
+    margin: 2em 0 0 0 !important;
+}
+/* 目录截断提示 — MUTED */
+body.mb-toc-page .mb-toc-truncated {
+    text-align: center;
+    color: {{MUTED}};
+    margin-top: 1.5em !important;
+}
+
+/* ── 目录移动端优化 ── */
+@media (max-width: 600px) {
+  body.mb-toc-page .mb-toc,
+  body.mb-toc-page div.mulu,
+  body.mb-toc-page table.mulu {
+    margin: 1.2em 0.6em !important;
+  }
+  body.mb-toc-page h1,
+  body.mb-toc-page h2,
+  body.mb-toc-page .mb-toc-title {
+    font-size: 1.35em !important;
+    padding: 1.2em 0.4em 1em !important;
+  }
+  body.mb-toc-page li {
+    padding: 0.6em 0.2em !important;
+    line-height: 1.7 !important;
+  }
+  body.mb-toc-page .mb-toc-num {
+    min-width: 1.8em !important;
+    font-size: 1em !important;
+  }
+}

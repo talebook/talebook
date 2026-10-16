@@ -426,6 +426,13 @@ func NewNeoDBProvider(source *NeoDBSource) *NeoDBProvider {
 	return p
 }
 
+// SearchBooks 用接口精确签名覆盖 mixin 的宽签名，使 provider 满足
+// pluginiface.MetadataProvider（DispatchInvoke 按此接口断言分派）。
+func (p *NeoDBProvider) SearchBooks(query plugindomain.MetadataQuery,
+	context map[string]any) ([]plugindomain.BookMetadata, error) {
+	return p.MetaSourceMixin.SearchBooks(query, context)
+}
+
 // Manifest 实现 metabase.MetaSource。
 func (p *NeoDBProvider) Manifest() map[string]any { return p.ManifestDict }
 
