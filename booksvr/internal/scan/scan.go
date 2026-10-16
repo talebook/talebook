@@ -18,6 +18,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"talebook/booksvr/internal/importmeta"
@@ -178,7 +179,7 @@ func FileSHA256(path string) (string, error) {
 // 判定条件与扫描第二阶段对已知路径的跳过条件严格一致：
 // NEW 状态行、中断残留的 `fstat:` 临时哈希行都不算 done。
 func DonePaths(db *sql.DB, pathDir string) (map[string]bool, error) {
-	prefix := pathDir + string(filepath.Separator)
+	prefix := strings.TrimRight(pathDir, string(filepath.Separator)) + string(filepath.Separator)
 	rows, err := db.Query(`SELECT path FROM scanfiles
 		WHERE path LIKE ? ESCAPE '\' AND status != ? AND hash NOT LIKE 'fstat:%'`,
 		escapeLike(prefix)+"%", userdb.ScanStatusNew)
@@ -241,7 +242,9 @@ type Service struct {
 	// SavedImportMode 是配置中已保存的导入模式（index/copy/move）。
 	SavedImportMode string
 	// Clock 可注入，便于测试；为 nil 时用 time.Now。
-	Clock func() time.Time
+	Clock      func() time.Time
+	progressMu sync.RWMutex
+	progress   Progress
 	// Now 返回当前时间字符串。
 	now func() string
 }
@@ -338,7 +341,7 @@ func (s *Service) registerTasks(tasks []Task, scanID int64) ([]*userdb.ScanFile,
 			ScanID:     scanID,
 			Name:       task.Name,
 			Path:       task.Path,
-			Hash:       TempHash(task.Name, info.Size()),
+			Hash:       TempHash(task.Path, info.Size()),
 			Status:     userdb.ScanStatusNew,
 			CreateTime: s.now(),
 			UpdateTime: s.now(),
@@ -356,7 +359,13 @@ func (s *Service) registerTasks(tasks []Task, scanID int64) ([]*userdb.ScanFile,
 //
 // 返回最终状态。
 func (s *Service) processRow(row *userdb.ScanFile) (string, error) {
-	realHash, err := FileSHA256(row.Path)
+	return s.processFileRow(row, row.Path)
+}
+
+// processFileRow keeps the original source reference in the database while
+// inspecting a temporary file materialized from an archive.
+func (s *Service) processFileRow(row *userdb.ScanFile, filePath string) (string, error) {
+	realHash, err := FileSHA256(filePath)
 	if err != nil {
 		// 文件已不存在：标记 drop。
 		row.Status = userdb.ScanStatusDrop
@@ -380,7 +389,7 @@ func (s *Service) processRow(row *userdb.ScanFile) (string, error) {
 
 	// 媒体分析：签名、容器结构与资源预算。
 	format := strings.ToLower(strings.TrimPrefix(filepath.Ext(row.Path), "."))
-	analysis, err := media.AnalyzeFile(row.Path, format)
+	analysis, err := media.AnalyzeFile(filePath, format)
 	if err != nil {
 		row.Status = userdb.ScanStatusFailed
 		if me, ok := err.(*media.Error); ok {
@@ -397,7 +406,7 @@ func (s *Service) processRow(row *userdb.ScanFile) (string, error) {
 	}
 
 	// 元数据：受管文档与漫画容器用文件名，其余尝试解析。
-	mi := s.extractMetadata(row.Path, format)
+	mi := s.extractMetadata(filePath, format)
 
 	row.Title = mi.Title
 	if len(mi.Authors) > 0 {

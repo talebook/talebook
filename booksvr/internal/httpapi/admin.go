@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -73,6 +74,9 @@ type AdminConfig struct {
 	OpdsImportRetry func(ctx *Context, args map[string]any) (map[string]any, error)
 	// DeleteBook 删除一本书（permanent 为真时跳过回收站）。
 	DeleteBook func(bookID int64, permanent bool) error
+	// DeleteManagedBook shares the single-book deletion path, including scope,
+	// external indexes, trash handling and import bookkeeping.
+	DeleteManagedBook func(*Context, int64) (map[string]any, error)
 	// IsExternalIndexBook 判定是否为外部索引书籍。
 	IsExternalIndexBook func(bookID int64) bool
 	// DeleteExternalIndexBook 删除外部索引书籍记录。
@@ -431,7 +435,7 @@ func adminInt64List(v any) ([]int64, error) {
 	out := make([]int64, 0, len(items))
 	for _, item := range items {
 		n, ok := item.(float64)
-		if !ok {
+		if !ok || n <= 0 || n > 9007199254740991 || math.Trunc(n) != n {
 			return nil, fmt.Errorf("httpapi: 元素应为整数")
 		}
 		out = append(out, int64(n))
@@ -888,20 +892,47 @@ func AdminBookDeleteHandler(cfg AdminConfig) HandlerFunc {
 		}
 
 		deleted := 0
+		deletedIDs := []int64{}
+		failures := []map[string]any{}
+		seen := map[int64]bool{}
 		aliasSvc := userdb.NewAliasService(cfg.DB)
 		for _, id := range ids {
-			if err := adminDeleteOneBook(cfg, aliasSvc, id); err != nil {
+			if seen[id] {
+				continue
+			}
+			seen[id] = true
+			var deleteErr error
+			if cfg.DeleteManagedBook != nil {
+				result, err := cfg.DeleteManagedBook(ctx, id)
+				deleteErr = err
+				if deleteErr == nil && result["err"] != "ok" {
+					deleteErr = fmt.Errorf("%v", result["msg"])
+				}
+			} else {
+				deleteErr = adminDeleteOneBook(cfg, aliasSvc, id)
+			}
+			if deleteErr != nil {
+				failures = append(failures, map[string]any{"id": id, "msg": deleteErr.Error()})
 				continue
 			}
 			deleted++
+			deletedIDs = append(deletedIDs, id)
 		}
-		return map[string]any{"err": "ok", "msg": fmt.Sprintf("成功删除 %d 本书籍", deleted)}, nil
+		response := map[string]any{"err": "ok", "msg": fmt.Sprintf("成功删除 %d 本书籍", deleted), "deleted": deletedIDs, "failed": failures}
+		if len(failures) > 0 {
+			response["err"] = "delete.partial"
+			response["msg"] = fmt.Sprintf("已删除 %d 本，%d 本删除失败", deleted, len(failures))
+		}
+		return response, nil
 	}
 }
 
 // adminDeleteOneBook 删除单本书（外部索引书走专用路径）。
 func adminDeleteOneBook(cfg AdminConfig, aliasSvc *userdb.AliasService, bookID int64) error {
 	if cfg.IsExternalIndexBook != nil && cfg.IsExternalIndexBook(bookID) {
+		if cfg.DeleteExternalIndexBook == nil {
+			return errNotWired
+		}
 		if cfg.DeleteExternalIndexBook != nil {
 			if err := cfg.DeleteExternalIndexBook(bookID); err != nil {
 				return err
@@ -914,6 +945,9 @@ func adminDeleteOneBook(cfg AdminConfig, aliasSvc *userdb.AliasService, bookID i
 			return err
 		}
 	} else {
+		if cfg.DeleteBook == nil {
+			return errNotWired
+		}
 		// 私藏书不进入回收站，避免管理员在回收站中看到私藏内容。
 		permanent := adminIsPrivateBook(cfg.DB, bookID)
 		if cfg.DeleteBook != nil {
@@ -1475,7 +1509,9 @@ func adminSettingsSave(cfg AdminConfig, ctx *Context) (map[string]any, error) {
 		rsp[k] = v
 	}
 	for k, v := range next {
-		if cfg.SettingsPath == "" { rsp[k] = v }
+		if cfg.SettingsPath == "" {
+			rsp[k] = v
+		}
 	}
 	return map[string]any{"err": "ok", "rsp": rsp}, nil
 }

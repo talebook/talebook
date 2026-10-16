@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"os"
 	"path/filepath"
@@ -89,7 +90,11 @@ func (w *serviceWiring) serviceSet() httpapi.ServiceSet {
 	return httpapi.ServiceSet{
 		ScanService: func() *scan.Service { return w.scanService },
 		StartScan: func(path string, limit int) error {
-			_, err := w.scanService.Scan(path, limit)
+			_, err := w.scanService.ScanAll(context.Background(), path, limit)
+			return err
+		},
+		StartScanContext: func(ctx context.Context, path string, batchSize int) error {
+			_, err := w.scanService.ScanAll(ctx, path, batchSize)
 			return err
 		},
 		StartImport: func(hashlist []string, userID int64, deleteAfter bool, importMode string) error {

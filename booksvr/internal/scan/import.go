@@ -131,7 +131,13 @@ func (s *Service) readyRows(hashlist []string) ([]*userdb.ScanFile, error) {
 //
 // 返回 (最终状态, 书籍 ID)。
 func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, importID int64) (string, int64, error) {
-	fpath := row.Path
+	fpath, cleanup, err := s.resolveImportSource(row, mode)
+	if err != nil {
+		row.Status = userdb.ScanStatusFailed
+		setRowData(row, "import_error", err.Error())
+		return row.Status, 0, saveScanFile(s.DB, row)
+	}
+	defer cleanup()
 	format := strings.ToLower(strings.TrimPrefix(filepath.Ext(fpath), "."))
 
 	row.Status = userdb.ScanStatusImporting

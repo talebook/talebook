@@ -73,7 +73,8 @@ type ServeOptions struct {
 	// ScanService 返回扫描服务；为 nil 时扫描/导入接口返回服务不可用。
 	ScanService func() *scan.Service
 	// StartScan 启动一次异步扫描；为 nil 时返回服务不可用。
-	StartScan func(path string, limit int) error
+	StartScan        func(path string, limit int) error
+	StartScanContext func(context.Context, string, int) error
 	// StartImport 启动一次异步导入；为 nil 时返回服务不可用。
 	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
 	// Settings 是 Talebook 配置（CONF），供网络书库与插件运行时读取。
@@ -117,7 +118,8 @@ type ServiceSet struct {
 	// ScanService 返回扫描服务。
 	ScanService func() *scan.Service
 	// StartScan 启动一次异步扫描。
-	StartScan func(path string, limit int) error
+	StartScan        func(path string, limit int) error
+	StartScanContext func(context.Context, string, int) error
 	// StartImport 启动一次异步导入。
 	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
 	// ImportWatchStatus 返回自动监控状态。
@@ -183,6 +185,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 		if set.StartScan != nil {
 			opts.StartScan = set.StartScan
+		}
+		if set.StartScanContext != nil {
+			opts.StartScanContext = set.StartScanContext
 		}
 		if set.StartImport != nil {
 			opts.StartImport = set.StartImport
@@ -256,15 +261,18 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 // 系统设置页的「测试连接」「迁移数据库」「测试邮件」都返回「未接线」。
 func newAdminConfig(opts ServeOptions, userDB, libraryDB *sql.DB) AdminConfig {
 	opdsWiring := newAdminOpdsWiring(userDB, opts.Settings)
+	bookWiring := newBookWiring(userDB, libraryDB, opts.Settings)
+	bookWiring.libraryRoot = opts.LibraryRoot
 	return AdminConfig{
-		DB:           userDB,
-		LibraryDB:    libraryDB,
-		LibraryRoot:  opts.LibraryRoot,
-		Settings:     opts.Settings,
-		SettingsPath: opts.SettingsPath,
-		CDNURL:       opts.CDNURL,
-		APIURL:       opts.APIURL,
-		BasePath:     opts.BasePath,
+		DeleteManagedBook: bookWiring.bookDelete,
+		DB:                userDB,
+		LibraryDB:         libraryDB,
+		LibraryRoot:       opts.LibraryRoot,
+		Settings:          opts.Settings,
+		SettingsPath:      opts.SettingsPath,
+		CDNURL:            opts.CDNURL,
+		APIURL:            opts.APIURL,
+		BasePath:          opts.BasePath,
 		// 系统设置页保存配置：写回 conf/auto.py（对应 Python 的 dumpfile）。
 		SaveSettings: func(next map[string]any) error {
 			return SaveSettings(opts.SettingsPath, next)

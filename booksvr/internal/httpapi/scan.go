@@ -302,8 +302,12 @@ func ImportStatusHandler(cfg ScanConfig) HandlerFunc {
 func taskStatusResponse(cfg ScanConfig, kind string, status, summary any) map[string]any {
 	watch := cfg.watchStatus()
 	running, _ := watch["manual_"+kind+"_running"].(bool)
+	if watch["state"] == "scanning" && kind == "scan" || watch["state"] == "importing" && kind == "import" {
+		running = true
+	}
 	message, _ := watch["manual_"+kind+"_error"].(string)
 	response := map[string]any{"err": "ok", "msg": "成功", "status": status, "summary": summary, "running": running}
+	response["watch_status"] = watch
 	if message != "" && !running {
 		response["err"], response["msg"] = "task.failed", message
 	}

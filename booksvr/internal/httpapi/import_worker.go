@@ -43,9 +43,15 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 		for k, v := range status {
 			copy[k] = v
 		}
+		if service := opts.ScanService(); service != nil {
+			copy["scan_progress"] = service.Progress()
+		}
 		return copy
 	}
 	startScan, startImport := opts.StartScan, opts.StartImport
+	if opts.StartScanContext != nil {
+		startScan = func(path string, batchSize int) error { return opts.StartScanContext(ctx, path, batchSize) }
+	}
 	type job struct {
 		kind string
 		run  func() error
@@ -132,7 +138,10 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 			interval, _ := scan.WatchInterval(toIntSetting(settings, "import_watch_interval_seconds", 30), 500, 30, 500)
 			update("scanning", "", 1, 0)
 			workMu.Lock()
-			err := runAutoImport(ctx, opts, db, settings, startScan, startImport)
+			err := runAutoImport(ctx, opts, db, settings, startScan, func(hashes []string, id int64, remove bool, mode string) error {
+				update("importing", "", 1, 0)
+				return startImport(hashes, id, remove, mode)
+			})
 			workMu.Unlock()
 			next = time.Now().Add(time.Duration(interval) * time.Second)
 			if err != nil {
@@ -168,27 +177,32 @@ func runAutoImport(ctx context.Context, opts ServeOptions, db *sql.DB, settings 
 			return err
 		}
 	}
-	rows, _, err := opts.ScanService().List(scan.ListOptions{Filter: scan.ListFilter("all")})
-	if err != nil {
-		return err
-	}
-	var hashes []string
-	for _, row := range rows {
-		if row.Status != userdb.ScanStatusReady {
-			continue
+	var afterID int64
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		for _, root := range roots {
-			if importdir.IsWithin(row.Path, root) {
-				hashes = append(hashes, row.Hash)
-				break
+		rows, err := opts.ScanService().ReadyBatch(afterID, 500)
+		if err != nil {
+			return err
+		}
+		if len(rows) == 0 {
+			return nil
+		}
+		var hashes []string
+		for _, row := range rows {
+			afterID = row.ID
+			for _, root := range roots {
+				if importdir.IsWithin(row.Path, root) {
+					hashes = append(hashes, row.Hash)
+					break
+				}
+			}
+		}
+		if len(hashes) > 0 {
+			if err := startImport(hashes, id, false, normalizeImportMode(dir)); err != nil {
+				return err
 			}
 		}
 	}
-	if len(hashes) == 0 {
-		return nil
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return startImport(hashes, id, false, normalizeImportMode(dir))
 }

@@ -72,6 +72,23 @@
             <div class="imports-help text-medium-emphasis mt-3">
                 {{ t('admin.imports.message.importAsyncInfo') }}
             </div>
+            <v-alert
+                v-if="backgroundTask"
+                class="mt-3"
+                type="info"
+                variant="tonal"
+                role="status"
+                aria-live="polite"
+            >
+                <div class="text-high-emphasis">{{ t(backgroundTask === 'scan' ? 'admin.imports.message.fullScanRunning' : 'admin.imports.message.importRunning') }}</div>
+                <div
+                    v-if="backgroundTask === 'scan' && watch_status.scan_progress"
+                    class="text-high-emphasis imports-progress"
+                >
+                    {{ t('admin.imports.message.scanProgress', [watch_status.scan_progress.processed || 0, watch_status.scan_progress.archives || 0, watch_status.scan_progress.failed || 0]) }}
+                    <div class="directory-path">{{ watch_status.scan_progress.current || watch_status.scan_progress.directory }}</div>
+                </div>
+            </v-alert>
         </v-card-text>
         <v-card-actions>
             <v-btn
@@ -85,7 +102,7 @@
                 </v-icon>{{ t('admin.imports.button.refresh') }}
             </v-btn>
             <v-btn
-                :disabled="loading || importActionsDisabled"
+                :disabled="loading || backgroundTask !== null || importActionsDisabled"
                 variant="elevated"
                 color="primary"
                 @click="scan_books"
@@ -106,7 +123,7 @@
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
-                    :disabled="loading || importActionsDisabled"
+                    :disabled="loading || backgroundTask !== null || importActionsDisabled"
                     variant="elevated"
                     color="#424242"
                     @click="import_books"
@@ -116,7 +133,7 @@
                     </v-icon>{{ t('admin.imports.button.importSelectedBooks') }}
                 </v-btn>
                 <v-btn
-                    :disabled="loading"
+                    :disabled="loading || backgroundTask !== null"
                     variant="outlined"
                     color="primary"
                     @click="delete_record"
@@ -128,7 +145,7 @@
             </template>
             <template v-else>
                 <v-btn
-                    :disabled="loading || importActionsDisabled"
+                    :disabled="loading || backgroundTask !== null || importActionsDisabled"
                     variant="elevated"
                     color="warning"
                     @click="import_books"
@@ -277,6 +294,9 @@
                 >
                     {{ item.status }}
                 </v-chip>
+            </template>
+            <template #item.path="{ item }">
+                <span class="directory-path">{{ item.data?.archive_source || item.data?.source_path || item.path }}</span>
             </template>
             <template #item.title="{ item }">
                 {{ t('admin.imports.label.bookTitle') }}：<span v-if="item.book_id == 0"> {{ item.title }} </span>
@@ -570,6 +590,7 @@
 
 <script setup>
 import { allowedRootsFromSettings, validateAllowedRoots } from '@/composables/useImportRoots';
+import { activeImportTask } from '@/composables/useImportTask';
 import { withBasePath } from '@/utils/base-path';
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -601,6 +622,7 @@ const import_mode = ref('copy');
 const auto_watch_enabled = ref(false);
 const directory_check = ref(null);
 const watch_status = ref({ state: 'off', queued: 0, running: 0, failed: 0, last_scan_at: null });
+const backgroundTask = computed(() => activeImportTask(watch_status.value));
 const opdsImportDialogVisible = ref(false);
 const settingsDialogVisible = ref(false);
 const settingsLoading = ref(false);
@@ -724,7 +746,7 @@ const onFilterChange = () => {
     getDataFromApi();
 };
 
-const getDataFromApi = () => {
+const getDataFromApi = (resume = true) => {
     loading.value = true;
     const { page, itemsPerPage, sortBy } = options.value;
 
@@ -738,7 +760,7 @@ const getDataFromApi = () => {
     data.append('desc', sortOrder);
     if (itemsPerPage != undefined) data.append('num', itemsPerPage);
 
-    $backend('/admin/scan/list?' + data.toString())
+    return $backend('/admin/scan/list?' + data.toString())
         .then((rsp) => {
             if (rsp.err != 'ok') {
                 items.value = [];
@@ -755,6 +777,10 @@ const getDataFromApi = () => {
             count_done.value = rsp.summary.done;
             count_todo.value = rsp.summary.todo;
             count_failed.value = rsp.summary.failed || 0;
+            if (resume !== false) resumeBackgroundTask();
+        })
+        .catch((error) => {
+            if ($alert) $alert('error', error.message || t('errors.networkError'));
         })
         .finally(() => {
             loading.value = false;
@@ -762,6 +788,7 @@ const getDataFromApi = () => {
 };
 
 let statusTimer = null;
+let observedTask = null;
 let pageDisposed = false;
 onBeforeUnmount(() => {
     pageDisposed = true;
@@ -776,20 +803,43 @@ const loop_check_status = (url, callback) => {
             if (pageDisposed) return;
             if (rsp.err !== 'ok') {
                 loading.value = false;
+                observedTask = null;
                 if ($alert) $alert('error', rsp.msg);
+                getDataFromApi(false);
                 return;
             }
             if (callback(rsp)) {
                 loop_check_status(url, callback);
             } else {
+                observedTask = null;
                 getDataFromApi();
                 if ($alert) $alert('info', '处理完毕！');
             }
         } catch (error) {
+            observedTask = null;
             loading.value = false;
             if (!pageDisposed && $alert) $alert('error', error.message || '状态查询失败');
         }
     }, 2000);
+};
+
+const observeTask = (kind) => {
+    observedTask = kind;
+    loop_check_status(`/admin/${kind}/status`, (rsp) => {
+        watch_status.value = rsp.watch_status || watch_status.value;
+        count_done.value = rsp.summary.done;
+        count_todo.value = rsp.summary.todo;
+        count_failed.value = rsp.summary.failed || 0;
+        if (kind === 'scan') scan_status.value = rsp.status;
+        else import_status.value = rsp.status;
+        loading.value = false;
+        return Boolean(rsp.running);
+    });
+};
+
+const resumeBackgroundTask = () => {
+    const kind = backgroundTask.value;
+    if (kind && !observedTask) observeTask(kind);
 };
 
 const applyImportSettings = (settings) => {
@@ -850,6 +900,7 @@ const getImportSettings = () => {
                 return;
             }
             applyImportSettings(rsp.settings);
+            resumeBackgroundTask();
         })
         .finally(() => {
             settingsLoading.value = false;
@@ -1000,21 +1051,8 @@ const scan_books = () => {
             return;
         }
 
-        loop_check_status('/admin/scan/status', (rsp) => {
-            scan_status.value = rsp.status;
-            count_done.value = rsp.summary.done;
-            count_todo.value = rsp.summary.todo;
-            count_failed.value = rsp.summary.failed || 0;
-            if (!rsp.running && (scan_status.value.new || 0) === 0) {
-                loading.value = false;
-                if (scan_status.value.new === 0 && scan_status.value.total > 0) {
-                    $alert('success', '扫描完成！请查看"待处理"列表中的书籍。');
-                }
-                return false;
-            }
-            loading.value = true;
-            return true;
-        });
+        watch_status.value = { ...watch_status.value, manual_scan_running: true };
+        observeTask('scan');
     }).catch((error) => {
         loading.value = false;
         if ($alert) $alert('error', error.message || t('admin.imports.settings.directoryCheckFailed'));
@@ -1041,19 +1079,8 @@ const import_books = () => {
             return;
         }
 
-        loop_check_status('/admin/import/status', (rsp) => {
-            import_status.value = rsp.status;
-            count_done.value = rsp.summary.done;
-            count_todo.value = rsp.summary.todo;
-            count_failed.value = rsp.summary.failed || 0;
-            // 本轮请求已完成；未选择的 ready 记录不应让页面无限轮询。
-            if (!rsp.running && (import_status.value.importing || 0) === 0) {
-                loading.value = false;
-                return false;
-            }
-            loading.value = true;
-            return true;
-        });
+        watch_status.value = { ...watch_status.value, manual_import_running: true };
+        observeTask('import');
     }).catch((error) => {
         loading.value = false;
         if ($alert) $alert('error', error.message || t('admin.imports.settings.directoryCheckFailed'));
@@ -1128,6 +1155,11 @@ useHead(() => ({
 
 .imports-help {
     font-size: 0.875rem;
+}
+
+.imports-progress {
+    font-variant-numeric: tabular-nums;
+    min-width: 0;
 }
 
 .imports-dialog-title {

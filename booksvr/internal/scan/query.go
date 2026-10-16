@@ -49,7 +49,7 @@ var countStatuses = []string{
 // Summary 复刻 Scanner.summary()。
 func (s *Service) Summary() (Summary, error) {
 	var out Summary
-	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM scanfiles`).Scan(&out.Total); err != nil {
+	if err := s.DB.QueryRow(`SELECT COUNT(*) FROM scanfiles WHERE status != 'expanded'`).Scan(&out.Total); err != nil {
 		return out, fmt.Errorf("scan: 统计总数失败: %w", err)
 	}
 	doneQ := `SELECT COUNT(*) FROM scanfiles WHERE status IN (` + placeholders(len(doneStatuses)) + `)`
@@ -76,7 +76,7 @@ func (s *Service) CountByStatus(scanID, importID int64, byImport bool) (map[stri
 	if byImport {
 		col = "import_id"
 	}
-	rows, err := s.DB.Query(`SELECT status FROM scanfiles WHERE `+col+` = ?`, scanID)
+	rows, err := s.DB.Query(`SELECT status FROM scanfiles WHERE status != 'expanded' AND `+col+` = ?`, scanID)
 	if err != nil {
 		return nil, fmt.Errorf("scan: 查询状态失败: %w", err)
 	}
@@ -189,6 +189,28 @@ type ListOptions struct {
 	Filter ListFilter
 }
 
+// ReadyBatch returns a stable cursor page, allowing automatic imports to process
+// arbitrarily many books without exceeding SQLite's placeholder limit.
+func (s *Service) ReadyBatch(afterID int64, limit int) ([]*userdb.ScanFile, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 500
+	}
+	rows, err := s.DB.Query(`SELECT `+scanFileColumns+` FROM scanfiles WHERE status = ? AND id > ? ORDER BY id LIMIT ?`, userdb.ScanStatusReady, afterID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []*userdb.ScanFile{}
+	for rows.Next() {
+		row, err := scanRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
 // sortColumns 复刻 ScanList 的 order 映射。
 var sortColumns = map[string]string{
 	"id":          "id",
@@ -209,18 +231,18 @@ func (s *Service) List(opts ListOptions) ([]*userdb.ScanFile, int64, error) {
 		order = "ASC"
 	}
 
-	where := ""
+	where := " WHERE status != 'expanded'"
 	var args []any
 	switch opts.Filter {
 	case FilterTodo:
 		all := append(append([]string{}, doneStatuses...), failedStatuses...)
-		where = ` WHERE status NOT IN (` + placeholders(len(all)) + `)`
+		where += ` AND status NOT IN (` + placeholders(len(all)) + `)`
 		args = toArgs(all)
 	case FilterDone:
-		where = ` WHERE status IN (` + placeholders(len(doneStatuses)) + `)`
+		where += ` AND status IN (` + placeholders(len(doneStatuses)) + `)`
 		args = toArgs(doneStatuses)
 	case FilterFailed:
-		where = ` WHERE status IN (` + placeholders(len(failedStatuses)) + `)`
+		where += ` AND status IN (` + placeholders(len(failedStatuses)) + `)`
 		args = toArgs(failedStatuses)
 	}
 

@@ -477,7 +477,7 @@
                 <v-card-text class="pt-4">
                     <p>{{ t('admin.books.message.confirmDeleteSelected', [books_selected.length]) }}</p>
                     <p class="text-medium-emphasis">
-                        {{ t('admin.books.message.operationIrreversible') }}
+                        {{ t('admin.books.message.bulkDeleteDescription') }}
                     </p>
                 </v-card-text>
                 <v-card-actions>
@@ -664,16 +664,15 @@ const confirm_delete_books = () => {
     loading.value = true;
     delete_dialog.value = false;
 
-    // v-data-table-server v-model returns IDs if item-value is set? 
-    // Vuetify 3: if return-object is false (default), it returns values.
-    // Wait, let's check. item-value="id". So books_selected should be array of IDs.
-    const selectedIds = books_selected.value;
+    const selectedIds = books_selected.value.slice();
 
     $backend('/admin/book/delete', {
         method: 'POST',
         body: JSON.stringify({ idlist: selectedIds }),
     })
         .then((rsp) => {
+            const deleted = new Set(rsp.deleted || []);
+            books_selected.value = books_selected.value.filter((id) => !deleted.has(id));
             if (rsp.err != 'ok') {
                 if ($alert) $alert('error', rsp.msg);
             } else {
@@ -681,8 +680,11 @@ const confirm_delete_books = () => {
                 snackColor.value = 'success';
                 snackText.value = rsp.msg;
                 books_selected.value = [];
-                getDataFromApi();
             }
+            getDataFromApi();
+        })
+        .catch((error) => {
+            if ($alert) $alert('error', error.message || t('errors.networkError'));
         })
         .finally(() => {
             loading.value = false;
