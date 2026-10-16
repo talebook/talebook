@@ -13,11 +13,11 @@ func TestBookWiringAutoLogin(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
 
-	off := newBookWiring(db, db, map[string]any{})
+	off := newBookWiring(db, db, map[string]any{}, nil)
 	if off.autoLogin() {
 		t.Fatalf("默认应为 false")
 	}
-	on := newBookWiring(db, db, map[string]any{"auto_login": 1})
+	on := newBookWiring(db, db, map[string]any{"auto_login": 1}, nil)
 	if !on.autoLogin() {
 		t.Fatalf("auto_login=1 应为 true")
 	}

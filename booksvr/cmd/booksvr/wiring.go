@@ -2,12 +2,14 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"talebook/booksvr/internal/comic"
 	"talebook/booksvr/internal/httpapi"
+	"talebook/booksvr/internal/pluginbuiltin"
 	"talebook/booksvr/internal/pluginruntime"
 	"talebook/booksvr/internal/scan"
 )
@@ -59,6 +61,13 @@ func newServiceWiring(userDB, libraryDB *sql.DB, opts *serveOptions) *serviceWir
 		comicService:   comic.NewService(),
 		settings:       httpapi.LoadSettings(opts.SettingsFile),
 		libraryRoot:    opts.LibraryRoot,
+	}
+	// 内置插件必须在启动期注册：注册表为空时插件中心返回空列表，
+	// 且 OPDS 开关、推送设备等能力全部不可用。
+	// 注册失败是编程错误（manifest 非法或契约违反），与 Python 在模块导入期
+	// 抛错一致——启动即失败优于静默空转。
+	if err := pluginbuiltin.Register(w.pluginRegistry); err != nil {
+		panic(fmt.Sprintf("booksvr: 注册内置插件失败: %v", err))
 	}
 	// 重复检测要查 Calibre 的 books 表，必须用书库句柄。
 	w.scanService.LibraryDB = libraryDB

@@ -21,7 +21,7 @@ func newToolsFixture(t *testing.T) (*bookWiring, string) {
 		"upload_path":        dir,
 		"ALLOW_GUEST_PUSH":   true,
 		"ALLOW_GUEST_UPLOAD": true,
-	})
+	}, nil)
 	return w, dir
 }
 

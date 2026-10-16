@@ -103,7 +103,7 @@ func TestBookSendToMailUnsupported(t *testing.T) {
 func TestCheckPushPermissionGuestDenied(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 
 	resp := w.checkPushPermission(&Context{Identity: Identity{UserID: 0}})
 	if resp == nil || resp["err"] != "user.need_login" {
@@ -115,7 +115,7 @@ func TestCheckPushPermissionGuestDenied(t *testing.T) {
 func TestCheckPushPermissionGuestAllowed(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{"ALLOW_GUEST_PUSH": true})
+	w := newBookWiring(db, db, map[string]any{"ALLOW_GUEST_PUSH": true}, nil)
 
 	if resp := w.checkPushPermission(&Context{Identity: Identity{UserID: 0}}); resp != nil {
 		t.Errorf("resp = %v，期望 nil", resp)
@@ -126,7 +126,7 @@ func TestCheckPushPermissionGuestAllowed(t *testing.T) {
 func TestPluginRegistryNonNil(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	if w.pluginRegistry() == nil {
 		t.Error("pluginRegistry 为 nil")
 	}

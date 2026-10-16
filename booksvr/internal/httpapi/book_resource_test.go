@@ -47,7 +47,7 @@ func epubResourceWiring(t *testing.T) (*bookWiring, string) {
 		t.Fatal(err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	w.libraryRoot = root
 	return w, epub
 }

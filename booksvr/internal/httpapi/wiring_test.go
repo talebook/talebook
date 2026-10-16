@@ -20,7 +20,7 @@ func newWiringFixture(t *testing.T) (*bookWiring, *audioWiring, *sql.DB) {
 		"DEFAULT_PAGE_SIZE": 60,
 		"ALLOW_GUEST_READ":  true,
 	}
-	return newBookWiring(db, db, settings), newAudioWiring(db, db, settings, t.TempDir()), db
+	return newBookWiring(db, db, settings, nil), newAudioWiring(db, db, settings, t.TempDir()), db
 }
 
 // ---- bookPublicURL ----
@@ -240,7 +240,7 @@ func TestBookWiringAllowGuestRead(t *testing.T) {
 	if !w.Config("").AllowGuestRead {
 		t.Fatalf("ALLOW_GUEST_READ=true 应生效")
 	}
-	w2 := newBookWiring(nil, nil, map[string]any{})
+	w2 := newBookWiring(nil, nil, map[string]any{}, nil)
 	if w2.Config("").AllowGuestRead {
 		t.Fatalf("默认应为 false")
 	}

@@ -16,7 +16,7 @@ func newUploadFixture(t *testing.T) (*bookWiring, string) {
 	w := newBookWiring(db, db, map[string]any{
 		"upload_path":        dir,
 		"ALLOW_GUEST_UPLOAD": true,
-	})
+	}, nil)
 	return w, dir
 }
 
@@ -115,7 +115,7 @@ func TestBookUploadMissingFile(t *testing.T) {
 func TestBookUploadGuestDenied(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{"upload_path": t.TempDir()})
+	w := newBookWiring(db, db, map[string]any{"upload_path": t.TempDir()}, nil)
 
 	resp, err := w.bookUpload(&Context{Identity: Identity{UserID: 0}}, map[string]any{
 		"filename": "book.epub",

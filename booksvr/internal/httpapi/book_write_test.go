@@ -42,7 +42,7 @@ func newWriteFixture(t *testing.T) (*bookWiring, *sql.DB) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
 	createFormatTables(t, db)
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	return w, db
 }
 

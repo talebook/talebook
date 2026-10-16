@@ -32,7 +32,7 @@ func TestBookReadReturnsHTML(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	cfg := w.Config("")
 	cfg.CanViewBook = func(*Context, int64) bool { return true }
 
@@ -83,7 +83,7 @@ func TestBookReadEPUBIsReady(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	cfg := w.Config("")
 	cfg.CanViewBook = func(*Context, int64) bool { return true }
 
@@ -114,7 +114,7 @@ func TestBookReadUnsupportedFormat(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	cfg := w.Config("")
 	cfg.CanViewBook = func(*Context, int64) bool { return true }
 
@@ -148,7 +148,7 @@ func TestReaderBootstrapReportsConversionPending(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	rec := httptest.NewRecorder()
 	ctx := &Context{
 		Identity: Identity{UserID: 1, IsAdmin: true},

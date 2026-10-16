@@ -33,7 +33,7 @@ func epubBookWiring(t *testing.T, settings map[string]any) *bookWiring {
 		`INSERT INTO book_formats (book_id, format, path, size, mtime) VALUES (1, 'EPUB', '/tmp/x.epub', 1, 0)`); err != nil {
 		t.Fatalf("insert format: %v", err)
 	}
-	return newBookWiring(db, db, settings)
+	return newBookWiring(db, db, settings, nil)
 }
 
 // serveRead 以管理员身份请求 /read/1，可带 query。
@@ -158,12 +158,12 @@ func TestBookReadViewerFollowsLiveSettings(t *testing.T) {
 
 // TestBookConfigEPUBViewerFromSettings 回归：Config 必须从 settings 读 EPUBViewer。
 func TestBookConfigEPUBViewerFromSettings(t *testing.T) {
-	w := newBookWiring(nil, nil, map[string]any{"EPUB_VIEWER": "readest"})
+	w := newBookWiring(nil, nil, map[string]any{"EPUB_VIEWER": "readest"}, nil)
 	if got := w.Config("").EPUBViewer; got != "readest" {
 		t.Errorf("EPUBViewer = %q，期望从 settings 读到 readest（写死会导致设置不生效）", got)
 	}
 
-	w2 := newBookWiring(nil, nil, map[string]any{})
+	w2 := newBookWiring(nil, nil, map[string]any{}, nil)
 	if got := w2.Config("").EPUBViewer; got != "" {
 		t.Errorf("EPUBViewer = %q，settings 无该键时应为空", got)
 	}
