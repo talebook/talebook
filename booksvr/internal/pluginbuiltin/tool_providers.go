@@ -84,16 +84,12 @@ type TxtFixerProvider struct {
 }
 
 // txtFixerConfigSchema 复刻 trigger 配置（TRIGGER_SCHEMA 的 object 包装）。
+// txtFixerConfigSchema 复刻 TRIGGER_SCHEMA（字符串枚举，默认 manual）。
 var txtFixerConfigSchema = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
 		"trigger": map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"kind":     map[string]any{"type": "string", "enum": []any{"manual", "auto"}},
-				"enabled":  map[string]any{"type": "boolean"},
-				"schedule": map[string]any{"type": "string"},
-			},
+			"type": "string", "enum": []any{"manual", "auto"}, "default": "manual",
 		},
 	},
 }

@@ -886,12 +886,13 @@ func isAllDigits(s string) bool {
 	return true
 }
 
-// truncate 按字节截断。
+// truncate 按字符（码点）截断，对齐 Python str[:n]。
 func truncate(s string, limit int) string {
-	if len(s) <= limit {
+	runes := []rune(s)
+	if len(runes) <= limit {
 		return s
 	}
-	return s[:limit]
+	return string(runes[:limit])
 }
 
 // tomatoTokenURLSafe 复刻 secrets.token_urlsafe(32)。

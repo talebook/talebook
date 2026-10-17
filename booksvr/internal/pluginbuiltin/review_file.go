@@ -117,11 +117,12 @@ func parseReviewFile(content, source, fileFormat string, mapping map[string]any)
 		aliases = storygraphAliases
 	}
 
+	// Python：float(mapping.get("scale") or 5)——scale 为 0/空时回退 5。
 	scale := 5.0
-	if v, ok := mapping["scale"].(float64); ok {
+	if v, ok := mapping["scale"].(float64); ok && v != 0 {
 		scale = v
-	} else if v, ok := mapping["scale"].(string); ok {
-		if parsed, err := strconv.ParseFloat(v, 64); err == nil {
+	} else if v, ok := mapping["scale"].(string); ok && v != "" {
+		if parsed, err := strconv.ParseFloat(v, 64); err == nil && parsed != 0 {
 			scale = parsed
 		}
 	}

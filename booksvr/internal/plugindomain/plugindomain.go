@@ -175,12 +175,12 @@ type ReviewOptions struct {
 
 // truncateSummary 复刻 `" ".join(str(summary or "").split())[:500]`。
 //
-// 先按空白切分再以单空格连接（折叠连续空白），最后截断到 500 字符。
+// 先按空白切分再以单空格连接（折叠连续空白），最后按字符（码点）截断。
 func truncateSummary(summary string, limit int) string {
 	fields := strings.Fields(summary)
 	joined := strings.Join(fields, " ")
-	if len(joined) > limit {
-		return joined[:limit]
+	if runes := []rune(joined); len(runes) > limit {
+		return string(runes[:limit])
 	}
 	return joined
 }

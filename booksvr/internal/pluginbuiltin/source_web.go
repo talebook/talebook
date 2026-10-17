@@ -156,7 +156,11 @@ func (p *gutenbergProvider) discover(context map[string]any) ([]map[string]any, 
 		if i >= 200 {
 			break
 		}
-		bookID := fmt.Sprintf("%v", book.ID)
+		// Python str(None) 得 "None"（book.id 缺失时的 identity 形态）。
+		bookID := "None"
+		if book.ID != nil {
+			bookID = fmt.Sprintf("%v", book.ID)
+		}
 		for mime, rawURL := range book.Formats {
 			if rawURL == "" {
 				continue
@@ -536,7 +540,11 @@ func (p *webdavProvider) discover(context map[string]any) ([]map[string]any, map
 		}
 		prop := item.PropStat[0].Prop
 		href := strings.TrimPrefix(item.Href, "http://")
-		full := joinURL(endpoint, href)
+		// Python urljoin(endpoint, '') 得 endpoint（href 为空继续走格式过滤）。
+		full := endpoint
+		if href != "" {
+			full = joinURL(endpoint, href)
+		}
 		fmtName := sourcebase.FormatFrom(full, "")
 		if fmtName == "" || !formats[fmtName] {
 			continue

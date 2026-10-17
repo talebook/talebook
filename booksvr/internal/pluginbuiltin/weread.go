@@ -483,9 +483,13 @@ func (p *WereadProvider) SearchBooks(query plugindomain.MetadataQuery, context m
 	if apiKey == "" {
 		return nil, pluginproto.NewUpstreamAuthError("WeRead API key is required", "auth", nil)
 	}
-	value := query.Title
+	value := strings.TrimSpace(query.Title)
 	if value == "" {
-		value = query.ISBN
+		value = strings.TrimSpace(query.ISBN)
+	}
+	if value == "" {
+		// Python：title 与 isbn 均空时返回空列表。
+		return nil, nil
 	}
 	payload, err := p.Query(apiKey, "search", map[string]any{"keyword": value, "scope": 10})
 	if err != nil {
@@ -704,8 +708,8 @@ func parseWereadExport(payload any) ([]pluginproto.ProviderItem, error) {
 		return nil, pluginproto.NewUpstreamError("WeRead export must be a JSON object or array", "other", nil)
 	}
 
-	items := []pluginproto.ProviderItem{}
-	byID := map[string]bool{}
+	acc := newWereadItemAcc()
+
 	for _, entryRaw := range books {
 		entry, ok := entryRaw.(map[string]any)
 		if !ok {
@@ -748,13 +752,13 @@ func parseWereadExport(payload any) ([]pluginproto.ProviderItem, error) {
 			externalID := wereadStableID("bookmark", bookID, raw)
 			updatedAt := wereadTimestamp(firstOfAny(raw["updateTime"], raw["createTime"]))
 			chapter := stringOr(raw["chapterName"], chapters[chapterUID])
-			items = append(items, makeWereadItem(byID, externalID, updatedAt, map[string]any{
+			acc.add(externalID, updatedAt, map[string]any{
 				"source_book_id": bookID, "book": book, "annotation_type": "highlight",
 				"chapter": chapter, "quote_text": stringOr(raw["markText"], ""),
 				"content": "", "color": stringOr(raw["colorStyle"], ""),
 				"user_modified_at": updatedAt,
 				"source_position":  "chapterUid=" + chapterUID + ";range=" + stringOr(raw["range"], ""),
-			}))
+			})
 		}
 
 		for _, wrapped := range reviews {
@@ -785,31 +789,50 @@ func parseWereadExport(payload any) ([]pluginproto.ProviderItem, error) {
 			if star, ok := raw["star"].(float64); ok && star != -1 {
 				rating = star
 			}
-			items = append(items, makeWereadItem(byID, externalID, updatedAt, map[string]any{
+			acc.add(externalID, updatedAt, map[string]any{
 				"source_book_id": bookID, "book": book, "annotation_type": annotationType,
 				"chapter": chapter, "quote_text": quote, "content": content, "color": "",
 				"rating": rating, "user_modified_at": updatedAt,
 				"source_position": "chapterUid=" + chapterUID + ";range=" + stringOr(raw["range"], ""),
-			}))
+			})
 		}
 	}
-	return items, nil
+	return acc.list(), nil
 }
 
 // makeWereadItem 构造去重后的 ProviderItem。
-func makeWereadItem(seen map[string]bool, externalID, updatedAt string, data map[string]any) pluginproto.ProviderItem {
-	if seen[externalID] {
-		return pluginproto.ProviderItem{}
-	}
-	seen[externalID] = true
+// wereadItemAcc 按 external_id 去重：保留首次出现位置、末次出现内容
+// （对齐 Python {external_id: item} 字典推导的语义）。
+type wereadItemAcc struct {
+	order []string
+	items map[string]pluginproto.ProviderItem
+}
+
+func newWereadItemAcc() *wereadItemAcc {
+	return &wereadItemAcc{items: map[string]pluginproto.ProviderItem{}}
+}
+
+func (a *wereadItemAcc) add(externalID, updatedAt string, data map[string]any) {
 	var remote *string
 	if updatedAt != "" {
 		remote = &updatedAt
 	}
-	return pluginproto.ProviderItem{
+	item := pluginproto.ProviderItem{
 		ExternalID: externalID, EntityType: "annotation",
 		RemoteUpdatedAt: remote, Data: data,
 	}
+	if _, exists := a.items[externalID]; !exists {
+		a.order = append(a.order, externalID)
+	}
+	a.items[externalID] = item
+}
+
+func (a *wereadItemAcc) list() []pluginproto.ProviderItem {
+	out := make([]pluginproto.ProviderItem, 0, len(a.order))
+	for _, id := range a.order {
+		out = append(out, a.items[id])
+	}
+	return out
 }
 
 // toIntAny 把 JSON 数值（float64/int）转成 int。

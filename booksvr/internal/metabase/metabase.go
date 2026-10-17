@@ -145,11 +145,11 @@ func isEmptyValue(v any) bool {
 // whitespaceRe 复刻 re.sub(r"\s+", " ", ...)。
 var whitespaceRe = regexp.MustCompile(`\s+`)
 
-// Summary 复刻 _summary：折叠空白、去首尾、截断到 500。
+// Summary 复刻 _summary：折叠空白、去首尾、按字符（码点）截断到 500。
 func Summary(value any) string {
 	text := strings.TrimSpace(whitespaceRe.ReplaceAllString(asString(value), " "))
-	if len(text) > SummaryLimit {
-		return text[:SummaryLimit]
+	if runes := []rune(text); len(runes) > SummaryLimit {
+		return string(runes[:SummaryLimit])
 	}
 	return text
 }

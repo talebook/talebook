@@ -326,14 +326,19 @@ func hardcoverParse(spec reviewSourceSpec, query map[string]any, externalID stri
 	if rating == nil {
 		return nil, fmt.Errorf("rating is missing")
 	}
-	slug, _ := value["slug"].(string)
-	if slug == "" {
-		slug = fmt.Sprintf("%v", value["id"])
+	// Python：slug 键存在时原样使用（含空串），缺失时才回退 id。
+	slug, hasSlug := value["slug"]
+	if !hasSlug {
+		slug = value["id"]
+	}
+	slugStr, _ := slug.(string)
+	if slugStr == "" {
+		slugStr = fmt.Sprintf("%v", slug)
 	}
 	sampleCount := orValue(value["rating_count"], value["users_read_count"])
 	return plugindomain.ReviewFromRating(spec.Key, externalID, rating, spec.Scale, plugindomain.ReviewOptions{
 		SampleCount: sampleCount,
-		SourceURL:   "https://hardcover.app/books/" + slug,
+		SourceURL:   "https://hardcover.app/books/" + slugStr,
 		BookID:      query["book_id"],
 		DomainID:    reviewQueryValue(query, "domain_id"),
 		SeriesID:    reviewQueryValue(query, "series_id"),
@@ -462,7 +467,8 @@ func anilistFetch(context map[string]any, query map[string]any) (string, map[str
 	mediaID := reviewQueryValue(query, "domain_id")
 	numericID, err := strconv.Atoi(strings.TrimSpace(mediaID))
 	if err != nil {
-		numericID = 0
+		// Python int(media_id) 抛 ValueError 且 execute 不捕获（整个 run 失败）。
+		return "", nil, err
 	}
 	body := map[string]any{
 		"query":     "query($id:Int){Media(id:$id,type:MANGA){id siteUrl averageScore popularity updatedAt}}",
@@ -522,7 +528,8 @@ func isEmptyAny(v any) bool {
 	return false
 }
 
-// unixToISO 复刻 datetime.fromtimestamp(ts, timezone.utc).isoformat()。
+// unixToISO 复刻 datetime.fromtimestamp(ts, timezone.utc).isoformat()
+// （Python 恒保留 6 位微秒，含尾零）。
 func unixToISO(ts int64) string {
-	return time.Unix(ts, 0).UTC().Format("2006-01-02T15:04:05.999999+00:00")
+	return time.Unix(ts, 0).UTC().Format("2006-01-02T15:04:05.000000+00:00")
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/textproto"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -266,6 +267,9 @@ func pushNetworkTimeout(context map[string]any) (time.Duration, error) {
 }
 
 // pushMultipartBody 构造 multipart/form-data 请求体。
+//
+// 文件分部携带探测出的 Content-Type（CreateFormFile 会硬编码
+// application/octet-stream，这里用 CreatePart 显式设头，对齐 requests）。
 func pushMultipartBody(fields []pushFormField) (*bytes.Buffer, string, error) {
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
@@ -276,7 +280,14 @@ func pushMultipartBody(fields []pushFormField) (*bytes.Buffer, string, error) {
 			}
 			continue
 		}
-		part, err := writer.CreateFormFile(field.Name, field.Filename)
+		header := textproto.MIMEHeader{}
+		header.Set("Content-Disposition",
+			fmt.Sprintf(`form-data; name="%s"; filename="%s"`,
+				escapeMultipartQuotes(field.Name), escapeMultipartQuotes(field.Filename)))
+		if field.ContentType != "" {
+			header.Set("Content-Type", field.ContentType)
+		}
+		part, err := writer.CreatePart(header)
 		if err != nil {
 			return nil, "", err
 		}
@@ -290,6 +301,11 @@ func pushMultipartBody(fields []pushFormField) (*bytes.Buffer, string, error) {
 	return body, writer.FormDataContentType(), nil
 }
 
+// escapeMultipartQuotes 转义 Content-Disposition 里的双引号。
+func escapeMultipartQuotes(s string) string {
+	return strings.ReplaceAll(s, `"`, `%22`)
+}
+
 // pushFormField 是 multipart 的一个字段。
 type pushFormField struct {
 	Name        string
@@ -300,11 +316,13 @@ type pushFormField struct {
 }
 
 // pushPost 发送 multipart 上传并返回结果 dict（复刻各 upload() 的公共骨架）。
-func pushPost(target string, fields []pushFormField, timeout time.Duration,
+//
+// serverURL 是设备基础地址（connection 失败消息用它，对齐 Python）。
+func pushPost(serverURL, target string, fields []pushFormField, timeout time.Duration,
 	check func(map[string]any) error) map[string]any {
 	body, contentType, err := pushMultipartBody(fields)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	resp, err := pushHTTPClient.Request(nil, "POST", target, safehttp.RequestOptions{
 		Headers:    map[string]string{"Content-Type": contentType},
@@ -315,18 +333,18 @@ func pushPost(target string, fields []pushFormField, timeout time.Duration,
 	if err != nil {
 		if os.IsTimeout(err) || strings.Contains(err.Error(), "timeout") ||
 			strings.Contains(err.Error(), "deadline exceeded") {
-			return pushFailure("timeout", nil, "Upload timeout")
+			return pushFailure("timeout", nil, "Upload timeout", err.Error())
 		}
-		return pushFailure("connection", nil, "Connection failed: "+target)
+		return pushFailure("connection", nil, "Connection failed: "+serverURL, err.Error())
 	}
 	defer resp.Body.Close()
 	raw, readErr := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
 		return pushFailure("http", &resp.StatusCode,
-			fmt.Sprintf("HTTP error: %d", resp.StatusCode))
+			fmt.Sprintf("HTTP error: %d", resp.StatusCode), string(raw))
 	}
 	if readErr != nil {
-		return pushFailure("other", nil, "Upload failed: response read error")
+		return pushFailure("other", nil, "Upload failed: response read error", readErr.Error())
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(raw, &payload); err != nil {
@@ -334,7 +352,7 @@ func pushPost(target string, fields []pushFormField, timeout time.Duration,
 	}
 	if check != nil {
 		if checkErr := check(payload); checkErr != nil {
-			return pushFailure("other", nil, checkErr.Error())
+			return pushFailure("other", nil, checkErr.Error(), string(raw))
 		}
 	}
 	if payload != nil {
@@ -343,9 +361,12 @@ func pushPost(target string, fields []pushFormField, timeout time.Duration,
 	return map[string]any{"success": true, "data": string(raw)}
 }
 
-// pushFailure 构造失败结果 dict。
-func pushFailure(errorType string, statusCode *int, message string) map[string]any {
-	out := map[string]any{"success": false, "error_type": errorType, "message": message}
+// pushFailure 构造失败结果 dict（复刻 handle_exception：含 response_text）。
+func pushFailure(errorType string, statusCode *int, message, responseText string) map[string]any {
+	out := map[string]any{
+		"success": false, "error_type": errorType,
+		"message": message, "response_text": responseText,
+	}
 	if statusCode != nil {
 		out["status_code"] = *statusCode
 	}
@@ -359,10 +380,10 @@ func duokanUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filename
 	contentType string, timeout time.Duration) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/files"
-	return pushPost(target, []pushFormField{
+	return pushPost(serverURL, target, []pushFormField{
 		{Name: "newfile", Filename: filename, Content: content, ContentType: contentType},
 	}, timeout, nil)
 }
@@ -372,10 +393,10 @@ func booxUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filename,
 	contentType string, timeout time.Duration) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/api/library/upload"
-	return pushPost(target, []pushFormField{
+	return pushPost(serverURL, target, []pushFormField{
 		{Name: "parent", Value: "null"},
 		{Name: "sender", Value: "web"},
 		{Name: "file", Filename: filename, Content: content, ContentType: contentType},
@@ -394,10 +415,10 @@ func hanwangUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filenam
 	contentType string, timeout time.Duration) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/files"
-	return pushPost(target, []pushFormField{
+	return pushPost(serverURL, target, []pushFormField{
 		{Name: "fileName", Value: url.PathEscape(filename)},
 		{Name: "newfile", Filename: filename, Content: content, ContentType: contentType},
 	}, timeout, nil)
@@ -408,10 +429,10 @@ func ireaderUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filenam
 	contentType string, timeout time.Duration) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/?action=addBook"
-	return pushPost(target, []pushFormField{
+	return pushPost(serverURL, target, []pushFormField{
 		{Name: "Filename", Value: filename},
 		{Name: "Filedata", Filename: filename, Content: content, ContentType: contentType},
 		{Name: "Upload", Value: "Submit Query"},
@@ -423,9 +444,9 @@ func dangdangUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filena
 	contentType string, timeout time.Duration) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
-	return pushPost(serverURL, []pushFormField{
+	return pushPost(serverURL, serverURL, []pushFormField{
 		{Name: "files[]", Filename: filename, Content: content, ContentType: contentType},
 	}, timeout, nil)
 }
@@ -435,10 +456,10 @@ func purelibroUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filen
 	contentType string, timeout time.Duration) map[string]any {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return pushFailure("other", nil, "Upload failed: "+err.Error())
+		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/upload"
-	return pushPost(target, []pushFormField{
+	return pushPost(serverURL, target, []pushFormField{
 		{Name: "path", Value: "/"},
 		{Name: "files[]", Filename: filename, Content: content, ContentType: contentType},
 	}, timeout, nil)

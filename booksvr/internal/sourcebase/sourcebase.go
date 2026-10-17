@@ -459,8 +459,9 @@ func (b *Base) Normalize(context map[string]any, identity any, title string, opt
 	if displayTitle == "" {
 		displayTitle = "未知标题"
 	}
-	if len(displayTitle) > 500 {
-		displayTitle = displayTitle[:500]
+	// Python str[:500] 按字符（码点）截断，避免切断多字节字符。
+	if runes := []rune(displayTitle); len(runes) > 500 {
+		displayTitle = string(runes[:500])
 	}
 
 	return plugindomain.SourceBookFromDict(map[string]any{

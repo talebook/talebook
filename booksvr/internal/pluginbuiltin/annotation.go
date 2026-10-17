@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"talebook/booksvr/internal/safehttp"
@@ -133,7 +134,7 @@ func brsChapterReview(row map[string]any, endpoint, externalID string,
 	summary := stringOr(row["summary"], stringOr(row["content"], ""))
 	summary = strings.Join(strings.Fields(summary), " ")
 	if len(summary) > 500 {
-		summary = summary[:500]
+		summary = string([]rune(summary)[:500])
 	}
 	scale := row["rating_scale"]
 	if scale == nil {
@@ -233,7 +234,8 @@ func (p *BRSProvider) Execute(context map[string]any) (pluginproto.ProviderResul
 	}
 	nextCursor := payload["next_cursor"]
 	next := map[string]any{}
-	if nextCursor != nil {
+	// Python：next_cursor 为 falsy（含空串）时回退保留原 cursor。
+	if nextCursor != nil && nextCursor != "" && nextCursor != false {
 		next = map[string]any{"cursor": nextCursor}
 	} else if cursorMap, ok := context["cursor"].(map[string]any); ok {
 		for k, v := range cursorMap {
@@ -386,11 +388,11 @@ func (p *BRSProvider) PushAnnotation(item plugindomain.Annotation, state plugind
 	}
 	chapterName := stringOr(annotation["chapter"], "未命名章节")
 	if len(chapterName) > 255 {
-		chapterName = chapterName[:255]
+		chapterName = string([]rune(chapterName)[:255])
 	}
 	referText := stringOr(annotation["quote_text"], "")
 	if len(referText) > 80 {
-		referText = referText[:80]
+		referText = string([]rune(referText)[:80])
 	}
 	payload := map[string]any{
 		"book_id": remoteBookID, "chapter_name": chapterName,
@@ -414,10 +416,18 @@ func (p *BRSProvider) PushAnnotation(item plugindomain.Annotation, state plugind
 	}, nil
 }
 
-// intOf 复刻 int(x or 0)。
+// intOf 复刻 int(x or 0)：兼容 JSON 数字与数字字符串。
 func intOf(value any) int {
-	if n, ok := value.(float64); ok {
-		return int(n)
+	switch v := value.(type) {
+	case float64:
+		return int(v)
+	case int:
+		return v
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(v))
+		if err == nil {
+			return n
+		}
 	}
 	return 0
 }
