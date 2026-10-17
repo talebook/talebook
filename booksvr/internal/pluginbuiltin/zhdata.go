@@ -105,16 +105,20 @@ func loadA5PhraseLines() []string {
 }
 
 // conversionConfig 复刻 config/*.json 的结构。
+//
+// OpenCC 配置的 conversion_chain 是对象数组，每项形如
+// {"dict": {"type": "group", "dicts": [{"type": "txt", "file": ...}, ...]}}
+// 或单字典 {"dict": {"type": "txt", "file": ...}}。
 type conversionConfig struct {
-	ConversionChain [][]struct {
-		Dictionary struct {
-			Type   string   `json:"type"`
-			File   string   `json:"file"`
-			Files  []string `json:"files"`
-			Dict   *struct {
+	ConversionChain []struct {
+		Dict *struct {
+			Type  string `json:"type"`
+			File  string `json:"file"`
+			Dicts []struct {
+				Type string `json:"type"`
 				File string `json:"file"`
-			} `json:"dict"`
-		} `json:"dictionary"`
+			} `json:"dicts"`
+		} `json:"dict"`
 	} `json:"conversion_chain"`
 }
 
@@ -131,17 +135,19 @@ func newOpenCCConverter(direction string, extraDicts []*openCCDict) (func(string
 		return nil, fmt.Errorf("opencc: 方向 %s 的配置解析失败: %w", direction, err)
 	}
 	converter := &openCCConverter{}
-	for _, group := range config.ConversionChain {
+	for _, link := range config.ConversionChain {
 		var dicts []*openCCDict
 		dicts = append(dicts, extraDicts...)
-		for _, link := range group {
+		if link.Dict != nil {
 			var names []string
-			if link.Dictionary.Type == "group" {
-				names = link.Dictionary.Files
-			} else if link.Dictionary.Dict != nil && link.Dictionary.Dict.File != "" {
-				names = []string{link.Dictionary.Dict.File}
-			} else if link.Dictionary.File != "" {
-				names = []string{link.Dictionary.File}
+			if link.Dict.Type == "group" {
+				for _, item := range link.Dict.Dicts {
+					if item.File != "" {
+						names = append(names, item.File)
+					}
+				}
+			} else if link.Dict.File != "" {
+				names = []string{link.Dict.File}
 			}
 			for _, name := range names {
 				dict, err := loadOpenCCDict(name)

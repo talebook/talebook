@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"talebook/booksvr/internal/plugindomain"
@@ -836,13 +837,17 @@ func TestSecondsToDuration(t *testing.T) {
 	}
 }
 
-// TestHeaders 覆盖请求头构造。
+// TestHeaders 覆盖请求头构造（对齐 Python SourceBase._headers：默认 Accept）。
 func TestHeaders(t *testing.T) {
 	b := NewBase("demo", nil, nil)
-	if got := b.headers(map[string]any{}); len(got) != 0 {
-		t.Errorf("无配置应返回空头，得到 %v", got)
+	got := b.headers(map[string]any{})
+	if !strings.Contains(got["Accept"], "application/opds+json") {
+		t.Errorf("无配置应含默认 Accept，得到 %v", got)
 	}
-	got := b.headers(map[string]any{"config": map[string]any{"user_agent": "UA"}})
+	if len(got) != 1 {
+		t.Errorf("无配置应只有 Accept 一项，得到 %v", got)
+	}
+	got = b.headers(map[string]any{"config": map[string]any{"user_agent": "UA"}})
 	if got["User-Agent"] != "UA" {
 		t.Errorf("得到 %v", got)
 	}
