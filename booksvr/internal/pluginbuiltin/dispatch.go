@@ -124,6 +124,28 @@ func dispatchCapability(p any, method string, args []any, context map[string]any
 			return nil, contractError(method)
 		}
 		return provider.PushAnnotation(annotationArg(args, 0), sourceStateArg(args, 1), context)
+	case "delete_annotation":
+		// 可选能力：本站删除/转私有时撤回外部副本（Python 注释声明的可选方法）。
+		deleter, ok := p.(interface {
+			DeleteAnnotation(state plugindomain.SourceState, context map[string]any) error
+		})
+		if !ok {
+			return nil, contractError(method)
+		}
+		return nil, deleter.DeleteAnnotation(sourceStateArg(args, 0), context)
+	case "push_vote":
+		// 可选能力：读者赞踩时推送投票（value 为 1、-1 或 0）。
+		voter, ok := p.(interface {
+			PushVote(state plugindomain.SourceState, value int, context map[string]any) error
+		})
+		if !ok {
+			return nil, contractError(method)
+		}
+		value := 0
+		if n, ok := argAt(args, 1).(float64); ok {
+			value = int(n)
+		}
+		return nil, voter.PushVote(sourceStateArg(args, 0), value, context)
 	case "search":
 		provider, ok := p.(pluginiface.SourceProvider)
 		if !ok {

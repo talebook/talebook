@@ -430,6 +430,36 @@ func mustMap(m map[string]any, err error) map[string]any {
 	return m
 }
 
+// DeleteAnnotation 复刻 delete_annotation：删除 BRS 上的副本（连同回复与投票）。
+func (p *BRSProvider) DeleteAnnotation(state plugindomain.SourceState, context map[string]any) error {
+	remoteID := stringOr(state.Get("source_annotation_id"), "")
+	if remoteID == "" {
+		return nil
+	}
+	endpoint, err := p.brsSignedIn(context)
+	if err != nil {
+		return err
+	}
+	_, err = brsChecked(mustMap(brsHTTPJSON("POST", endpoint+"/api/review/delete", nil, nil, nil,
+		map[string]any{"review_id": remoteID})), "BRS annotation delete failed")
+	return err
+}
+
+// PushVote 复刻 push_vote：以当前用户的 BRS 账号对副本投票（1 赞、-1 踩、0 取消）。
+func (p *BRSProvider) PushVote(state plugindomain.SourceState, value int, context map[string]any) error {
+	remoteID := stringOr(state.Get("source_annotation_id"), "")
+	if remoteID == "" {
+		return nil
+	}
+	endpoint, err := p.brsSignedIn(context)
+	if err != nil {
+		return err
+	}
+	_, err = brsChecked(mustMap(brsHTTPJSON("POST", endpoint+"/api/review/vote", nil, nil, nil,
+		map[string]any{"review_id": remoteID, "value": value})), "BRS vote sync failed")
+	return err
+}
+
 // 编译期断言。
 var (
 	_ pluginiface.AnnotationProvider = (*BRSProvider)(nil)

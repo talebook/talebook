@@ -499,10 +499,18 @@ func interpolateCSS(template string, params map[string]any, useSystemFonts bool,
 	})
 }
 
-// validateNoteMark 复刻 validate_note_mark（合法标注样式集合）。
+// noteMarkModes 复刻 NOTE_MARK_MODES。
+var noteMarkModes = map[string]bool{"orig": true, "sym": true, "num": true, "zhu": true}
+
+// noteMarkSVGs 复刻 NOTE_MARK_SVGS 的模板 id 集合。
+var noteMarkSVGs = map[string]bool{"circle": true, "square": true, "asterisk": true}
+
+// validateNoteMark 复刻 validate_note_mark：orig/sym/num/zhu 或 svg:<模板id>。
 func validateNoteMark(noteMark string) error {
-	switch noteMark {
-	case "orig", "sup", "bracket", "dot", "none":
+	if noteMarkModes[noteMark] {
+		return nil
+	}
+	if strings.HasPrefix(noteMark, "svg:") && noteMarkSVGs[strings.TrimPrefix(noteMark, "svg:")] {
 		return nil
 	}
 	return fmt.Errorf("unknown note mark: %s", noteMark)

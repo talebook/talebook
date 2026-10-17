@@ -107,6 +107,51 @@ func validateWereadQuery(operation string, params map[string]any) (string, map[s
 			safe[name] = strings.TrimSpace(s)
 			continue
 		}
+		if kind == "reviews" {
+			list, ok := value.([]any)
+			if !ok || len(list) < 1 || len(list) > 20 {
+				return "", nil, pluginproto.NewUpstreamError(
+					"WeRead reviews must contain between 1 and 20 ranges", "other", nil)
+			}
+			result := make([]any, 0, len(list))
+			for _, item := range list {
+				range0bj, ok := item.(map[string]any)
+				if !ok {
+					return "", nil, pluginproto.NewUpstreamError(
+						"Each WeRead review range must be a non-empty string", "other", nil)
+				}
+				rangeValue, _ := range0bj["range"].(string)
+				if strings.TrimSpace(rangeValue) == "" {
+					return "", nil, pluginproto.NewUpstreamError(
+						"Each WeRead review range must be a non-empty string", "other", nil)
+				}
+				allowed := map[string]bool{"range": true, "maxIdx": true, "count": true, "synckey": true}
+				for key := range range0bj {
+					if !allowed[key] {
+						return "", nil, pluginproto.NewUpstreamError(
+							"Unknown WeRead review range parameters: "+key, "other", nil)
+					}
+				}
+				if len(rangeValue) > 100 {
+					return "", nil, pluginproto.NewUpstreamError(
+						"WeRead review range is too long", "other", nil)
+				}
+				safeItem := map[string]any{"range": strings.TrimSpace(rangeValue)}
+				for _, key := range []string{"maxIdx", "count", "synckey"} {
+					if raw, present := range0bj[key]; present {
+						number, ok := toIntAny(raw)
+						if !ok {
+							return "", nil, pluginproto.NewUpstreamError(
+								"WeRead query parameter "+key+" must be an integer", "other", nil)
+						}
+						safeItem[key] = number
+					}
+				}
+				result = append(result, safeItem)
+			}
+			safe[name] = result
+			continue
+		}
 		if kind == "mode" {
 			mode, _ := value.(string)
 			switch mode {
@@ -765,6 +810,17 @@ func makeWereadItem(seen map[string]bool, externalID, updatedAt string, data map
 		ExternalID: externalID, EntityType: "annotation",
 		RemoteUpdatedAt: remote, Data: data,
 	}
+}
+
+// toIntAny 把 JSON 数值（float64/int）转成 int。
+func toIntAny(value any) (int, bool) {
+	switch v := value.(type) {
+	case float64:
+		return int(v), true
+	case int:
+		return v, true
+	}
+	return 0, false
 }
 
 // firstOfAny 复刻 _first。

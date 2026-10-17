@@ -360,12 +360,31 @@ func iaAuthors(creator any) []string {
 	return nil
 }
 
-// asStringOr 复刻 str(value or default)。
+// asStringOr 复刻 str(value or default)，并兼容 JSON 布尔
+// （Python str(True)=='True'，可被 lower()=='true' 识别）。
 func asStringOr(value any, def string) string {
-	if s, ok := value.(string); ok && s != "" {
-		return s
+	switch v := value.(type) {
+	case string:
+		if v != "" {
+			return v
+		}
+	case bool:
+		if v {
+			return "True"
+		}
+		return "False"
+	case float64:
+		return trimFloatIA(v)
 	}
 	return def
+}
+
+// trimFloatIA 复刻 Python str(float) 的整数形态。
+func trimFloatIA(f float64) string {
+	if f == float64(int64(f)) {
+		return itoa(int(f))
+	}
+	return fmt.Sprintf("%v", f)
 }
 
 // firstString 返回第一个非空字符串。

@@ -77,7 +77,8 @@ func beautifyEpub(srcPath, outPath, presetCSS string, kwargs map[string]any) (ma
 	}
 	opfText, opfEncoding := decodeEpubEntry(opfRaw)
 
-	// 幂等：已注册则替换内容，否则新增 manifest + spine 条目。
+	// 幂等：已注册则替换内容，否则新增 manifest 条目（不进 spine，
+	// 复刻 Python：CSS 经正文 <head> 的 <link> 生效）。
 	alreadyRegistered := strings.Contains(opfText, mbCSSName)
 	entries[mbCSSName] = []byte(presetCSS)
 	if !alreadyRegistered {
@@ -91,33 +92,83 @@ func beautifyEpub(srcPath, outPath, presetCSS string, kwargs map[string]any) (ma
 	}
 	entries[opfPath] = encodeEpubEntry(opfText, opfEncoding)
 
+	// 向每个正文条目的 <head> 注入 <link>（幂等），使 CSS 真正被阅读器应用。
+	injected := 0
+	for _, name := range findTextEntries(entries) {
+		text, encoding := decodeEpubEntry(entries[name])
+		if strings.Contains(text, mbCSSName) {
+			continue
+		}
+		converted, ok := injectCSSLink(text, mbCSSName)
+		if !ok {
+			continue
+		}
+		entries[name] = encodeEpubEntry(converted, encoding)
+		injected++
+	}
+
+	// 背景纹理：写入包体并注册 manifest（复刻 extra_assets）。
+	extraAssets := 0
+	if textureID, _ := kwargs["bg_texture"].(string); textureID != "" {
+		if data, mediaType, err := getTextureBytes(textureID); err == nil {
+			assetName := "mb-bg.jpg"
+			entries[assetName] = data
+			if !containsString(order, assetName) {
+				order = append(order, assetName)
+			}
+			opfRaw := entries[opfPath]
+			opfText, opfEncoding := decodeEpubEntry(opfRaw)
+			if !strings.Contains(opfText, assetName) {
+				opfText = strings.Replace(opfText, "</manifest>",
+					"    <item id=\"mb-bg\" href=\""+assetName+"\" media-type=\""+mediaType+"\"/>\n  </manifest>", 1)
+				entries[opfPath] = encodeEpubEntry(opfText, opfEncoding)
+			}
+			extraAssets++
+		}
+	}
+
 	if err := writeEpubZip(entries, order, outPath); err != nil {
 		return nil, err
 	}
 	return map[string]any{
-		"css_registered": true,
+		"css_registered":     true,
 		"already_registered": alreadyRegistered,
-		"entries": len(order),
+		"css_injected":       injected,
+		"extra_assets":       extraAssets,
+		"entries":            len(order),
 	}, nil
 }
 
-// registerCSSInOPF 把 CSS 条目注册进 OPF 的 manifest 与 spine（幂等）。
+// injectCSSLink 向 XHTML 的 head 注入 mb-beauty.css 的 link（幂等）。
+func injectCSSLink(html, cssName string) (string, bool) {
+	link := fmt.Sprintf(`<link rel="stylesheet" type="text/css" href="%s"/>`, cssName)
+	if strings.Contains(html, cssName) {
+		return html, false
+	}
+	lowered := strings.ToLower(html)
+	if idx := strings.Index(lowered, "</head>"); idx >= 0 {
+		return html[:idx] + link + html[idx:], true
+	}
+	// 无 head：在 html 开标签后插入。
+	if idx := strings.Index(lowered, "<body"); idx >= 0 {
+		return html[:idx] + link + html[idx:], true
+	}
+	return html, false
+}
+
+// registerCSSInOPF 把 CSS 条目注册进 OPF 的 manifest（幂等，不进 spine——
+// spine 条目必须指向 XHTML 文档，CSS 经正文 <head> 的 link 生效）。
 func registerCSSInOPF(opfText, cssName string) (string, error) {
 	manifestItem := fmt.Sprintf(
 		`<item id="mb-beauty-css" href="%s" media-type="text/css"/>`, cssName)
-	spineItem := `<itemref idref="mb-beauty-css"/>`
 	if strings.Contains(opfText, "mb-beauty-css") {
 		return opfText, nil
 	}
 	manifestEnd := strings.Index(opfText, "</manifest>")
-	spineEnd := strings.Index(opfText, "</spine>")
-	if manifestEnd < 0 || spineEnd < 0 {
-		return "", fmt.Errorf("epub beautify: OPF 缺少 manifest 或 spine")
+	if manifestEnd < 0 {
+		return "", fmt.Errorf("epub beautify: OPF 缺少 manifest")
 	}
 	opfText = opfText[:manifestEnd] + "    " + manifestItem + "\n  " + opfText[manifestEnd:]
-	// spineEnd 因插入而偏移。
-	spineEnd = strings.Index(opfText, "</spine>")
-	opfText = opfText[:spineEnd] + "    " + spineItem + "\n  " + opfText[spineEnd:]
 	return opfText, nil
 }
 

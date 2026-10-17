@@ -424,6 +424,7 @@ func (p *EpubBeautifyProvider) beautifyPlan(src plugindomain.ToolInput) (string,
 		"toc_depth": src.Get("toc_depth"), "cleanup": src.Get("cleanup"),
 		"dialogue": mustBool(src.Get("dialogue")), "split_title": mustBool(src.Get("title_split")),
 		"notes": notes, "note_mark": noteMark,
+		"bg_texture": bgTexture,
 	}
 	return preset, presetCSS, kwargs, nil
 }

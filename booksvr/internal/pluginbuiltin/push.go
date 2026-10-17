@@ -26,6 +26,9 @@ const pushCapability = "integrations.push"
 var pushHTTPClient = &safehttp.SafeHttpClient{}
 
 // pushManifest 复刻 push/base.py:_manifest。
+//
+// defaultPort 由 DevicePushProvider 构造后写入 ui（复刻
+// DevicePushProvider.__init__ 的 manifest["ui"]["default_port"] 注入）。
 func pushManifest(pluginID, name, description, icon, homepage, brandIcon string) map[string]any {
 	ui := map[string]any{
 		"icon":           icon,
@@ -118,8 +121,13 @@ type DevicePushProvider struct {
 // newDevicePushProvider 构造设备推送 provider。
 func newDevicePushProvider(pluginID, name, description, icon, homepage, brandIcon string,
 	port int, upload uploaderFunc) *DevicePushProvider {
+	manifest := pushManifest(pluginID, name, description, icon, homepage, brandIcon)
+	// 复刻 DevicePushProvider.__init__：把上传器端口写进 ui.default_port。
+	if ui, ok := manifest["ui"].(map[string]any); ok {
+		ui["default_port"] = port
+	}
 	return &DevicePushProvider{
-		ManifestDict: pushManifest(pluginID, name, description, icon, homepage, brandIcon),
+		ManifestDict: manifest,
 		Port:         port,
 		Upload:       upload,
 	}

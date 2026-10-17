@@ -369,20 +369,41 @@ func (s *tomatoDownloaderSession) start() error {
 
 	s.password = tomatoTokenURLSafe()
 	s.endpoint = fmt.Sprintf("http://127.0.0.1:%d", port)
-	s.http = &safehttp.SafeHttpClient{}
+	// 复刻 Python：本地 HTTP 钉在回环地址，不读代理环境变量。
+	s.http = &safehttp.SafeHttpClient{AllowedHosts: []string{"127.0.0.1"}}
 	s.process = exec.Command(binaryPath, "--server", "--data-dir", root)
 	s.process.Dir = root
 	s.process.Stdout = nil
 	s.process.Stderr = nil
+	// 复刻 Python 的环境裁剪：只继承白名单变量并注入下载器所需项，
+	// 不继承应用凭据；端口与密码经环境变量下发给子进程。
+	env := []string{
+		"CARGO=talebook-pinned-release",
+		"TOMATO_WEB_ADDR=127.0.0.1:" + itoa(port),
+		"TOMATO_WEB_PASSWORD=" + s.password,
+		"TMPDIR=" + root,
+	}
+	for _, key := range []string{"PATH", "LANG", "SSL_CERT_FILE", "SSL_CERT_DIR"} {
+		if value, ok := os.LookupEnv(key); ok {
+			env = append(env, key+"="+value)
+		}
+	}
+	s.process.Env = env
 	if err := s.process.Start(); err != nil {
 		return pluginproto.NewUpstreamError(
 			"无法启动番茄下载器；请检查可执行权限与系统架构", "other", nil)
 	}
+	// 复刻 poll()：后台 Wait 使 ProcessState 可读，进程秒退可即时检测。
+	go func() { _, _ = s.process.Process.Wait() }()
 	for {
 		if _, err := s.remainingOrError(); err != nil {
 			return err
 		}
 		if s.process.ProcessState != nil && s.process.ProcessState.Exited() {
+			return pluginproto.NewUpstreamError(
+				"番茄下载器启动失败，请检查安装与运行环境", "other", nil)
+		}
+		if s.process.Process == nil {
 			return pluginproto.NewUpstreamError(
 				"番茄下载器启动失败，请检查安装与运行环境", "other", nil)
 		}

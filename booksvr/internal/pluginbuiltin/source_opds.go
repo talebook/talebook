@@ -215,12 +215,14 @@ func (p *opdsPresetProvider) Invoke(method string, args []any, context map[strin
 	return DispatchInvoke(p, method, args, context)
 }
 
-// InitialEnabled 复刻缺省行为：未覆写时恒为 True（与 OPDS 基类一致）。
+// InitialEnabled 复刻注册期语义：Python 侧仅显式定义 initial_enabled 的
+// 预设（Generic OPDS / Standard Ebooks）为 True，其余（Kavita/Komga/BookLore）
+// 未定义时 plugin_runtime 注册为 enabled=False。
 func (p *opdsPresetProvider) InitialEnabled(settings map[string]any) bool {
 	if p.InitialEnabledOverride != nil {
 		return p.InitialEnabledOverride(settings)
 	}
-	return true
+	return false
 }
 
 // InitialConfig 复刻缺省行为：空配置。
