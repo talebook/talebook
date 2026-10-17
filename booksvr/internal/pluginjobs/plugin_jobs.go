@@ -150,7 +150,7 @@ func (e *Executor) releaseLease(connectionID int64, token string) {
 // 对应 Python 的 _load_secrets + _call_provider + _apply_result。
 func (e *Executor) callProvider(run *userdb.PluginRun, connection *userdb.PluginConnection) error {
 	prepared, failures, err := e.cfg.Runtime.PrepareRead(
-		[]*userdb.PluginConnection{connection}, 0, nil, nil, run.Action, &run.RequestedBy)
+		[]*userdb.PluginConnection{connection}, 0, nil, nil, run.Action, &run.RequestedBy, "")
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func invokeAction(unit *pluginruntime.PreparedCall, run *userdb.PluginRun) (any,
 // 对应 Python 的 _rollback：把 run 标记为 rolled_back。
 func (e *Executor) rollback(run *userdb.PluginRun, connection *userdb.PluginConnection) error {
 	prepared, failures, err := e.cfg.Runtime.PrepareRead(
-		[]*userdb.PluginConnection{connection}, 0, nil, nil, "rollback", &run.RequestedBy)
+		[]*userdb.PluginConnection{connection}, 0, nil, nil, "rollback", &run.RequestedBy, "")
 	if err != nil {
 		return err
 	}

@@ -3,6 +3,7 @@ package pluginbuiltin
 import (
 	gocontext "context"
 	"database/sql"
+	"encoding/json"
 	"regexp"
 
 	"talebook/booksvr/internal/booksource"
@@ -419,10 +420,74 @@ func (p *LegadoProvider) SelfCheck(context map[string]any) (plugindomain.CheckRe
 	}, nil
 }
 
+// PrepareContext 复刻 prepare_context：只为元数据接口收集已启用书源；
+// 网络 worker 不持有数据库句柄，注入结果随 context.platform 下发。
+func (p *LegadoProvider) PrepareContext(db *sql.DB, settings map[string]any,
+	method string) map[string]any {
+	if method != "search_books" || db == nil {
+		return map[string]any{}
+	}
+	settingsMap := settings
+	if settingsMap == nil {
+		settingsMap = map[string]any{}
+	}
+	topK := 10
+	if v, ok := settingsMap["BOOKSOURCE_METADATA_TOP_K"].(float64); ok {
+		topK = int(v)
+	}
+	if topK < 0 {
+		topK = 0
+	}
+	// 只取用户显式启用的文本书源（source_type=0），weight DESC, id ASC。
+	rows, err := db.Query(`SELECT id, COALESCE(name,''), COALESCE(raw,'{}')
+		FROM book_sources WHERE enabled = 1 AND source_type = 0
+		ORDER BY weight DESC, id ASC LIMIT ?`, topK)
+	if err != nil {
+		return map[string]any{}
+	}
+	defer rows.Close()
+	var sources []booksource.SourceRow
+	for rows.Next() {
+		var row booksource.SourceRow
+		var raw string
+		if err := rows.Scan(&row.ID, &row.Name, &raw); err != nil {
+			return map[string]any{}
+		}
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil || parsed == nil {
+			parsed = map[string]any{}
+		}
+		row.Raw = parsed
+		sources = append(sources, row)
+	}
+	cookieSecret := "talebook"
+	if v, ok := settingsMap["cookie_secret"].(string); ok && v != "" {
+		cookieSecret = v
+	}
+	booksourceConfig := map[string]any{}
+	for _, key := range legadoMetadataConfigKeys {
+		if v, ok := settingsMap[key]; ok {
+			booksourceConfig[key] = v
+		}
+	}
+	return map[string]any{
+		"metadata_sources": booksource.CollectMetadataSources(sources),
+		"cookie_secret":    cookieSecret,
+		"booksource_config": booksourceConfig,
+	}
+}
+
+// legadoMetadataConfigKeys 复刻 BOOKSOURCE_METADATA_CONFIG_KEYS。
+var legadoMetadataConfigKeys = []string{
+	"BOOKSOURCE_HTTP_TIMEOUT", "BOOKSOURCE_MAX_TOC_PAGES",
+	"BOOKSOURCE_MAX_CONTENT_PAGES", "BOOKSOURCE_AD_PATTERNS",
+	"BOOKSOURCE_CLEAN_ENABLED", "BOOKSOURCE_METADATA_WORKERS",
+	"BOOKSOURCE_METADATA_TOKEN_TTL",
+}
+
 // SearchBooks 复刻 search_books：委托书源元数据服务。
 //
-// Python 侧依赖 prepare_context 注入 metadata_sources；Go 侧由调用方把
-// platform.metadata_sources 放进 context，缺失时返回空列表。
+// platform.metadata_sources 由 PrepareContext 注入；缺失时返回空列表。
 func (p *LegadoProvider) SearchBooks(query plugindomain.MetadataQuery, context map[string]any) ([]plugindomain.BookMetadata, error) {
 	if query.IsEmpty() {
 		return nil, nil
@@ -447,7 +512,7 @@ func (p *LegadoProvider) SearchBooks(query plugindomain.MetadataQuery, context m
 	service := &booksource.BookSourceMetadataService{
 		Sources: sources,
 		Secret:  stringOr(platform["cookie_secret"], "talebook"),
-		Config:  metadataConfigFrom(config),
+		Config:  metadataConfigFrom(config, platform),
 	}
 	author := ""
 	if len(query.Authors) > 0 {
@@ -500,15 +565,50 @@ func (p *LegadoProvider) GetCover(coverURL string, context map[string]any) (*plu
 	return nil, nil
 }
 
-// metadataConfigFrom 把插件配置映射为元数据服务配置。
-func metadataConfigFrom(config map[string]any) booksource.MetadataConfig {
+// metadataConfigFrom 把插件配置与 booksource_config 映射为元数据服务配置。
+//
+// 对齐 Python：引擎级配置（HTTP 超时、TOC/正文页数上限、广告规则、清洗开关）
+// 与 token TTL 均从 booksource_config 透传；workers 默认 20。
+func metadataConfigFrom(config, platform map[string]any) booksource.MetadataConfig {
 	cfg := booksource.DefaultMetadataConfig()
+	cfg.Workers = legadoDefaultSearchConcurrency
 	if v, ok := config["BOOKSOURCE_METADATA_WORKERS"].(float64); ok {
 		cfg.Workers = int(v)
 	}
-	if v, ok := config["BOOKSOURCE_SEARCH_RESULT_LIMIT"].(float64); ok {
+	if v, ok := config[legadoSearchConcurrencyKey].(float64); ok {
+		cfg.Workers = int(v)
+	}
+	cfg.SearchLimit = legadoDefaultSearchResultLimit
+	if v, ok := config[legadoSearchResultLimitKey].(float64); ok {
 		cfg.SearchLimit = int(v)
 	}
+	booksourceConfig, _ := platform["booksource_config"].(map[string]any)
+	if v, ok := booksourceConfig["BOOKSOURCE_METADATA_TOKEN_TTL"].(float64); ok {
+		cfg.TokenTTL = int(v)
+	}
+	engine := booksource.DefaultEngineConfig()
+	if v, ok := booksourceConfig["BOOKSOURCE_HTTP_TIMEOUT"].(float64); ok {
+		engine.HTTPTimeout = v
+	}
+	if v, ok := booksourceConfig["BOOKSOURCE_MAX_TOC_PAGES"].(float64); ok {
+		engine.MaxTocPages = int(v)
+	}
+	if v, ok := booksourceConfig["BOOKSOURCE_MAX_CONTENT_PAGES"].(float64); ok {
+		engine.MaxContentPages = int(v)
+	}
+	if patterns, ok := booksourceConfig["BOOKSOURCE_AD_PATTERNS"].([]any); ok {
+		var list []string
+		for _, item := range patterns {
+			if s, ok := item.(string); ok {
+				list = append(list, s)
+			}
+		}
+		engine.ADPatterns = list
+	}
+	if v, ok := booksourceConfig["BOOKSOURCE_CLEAN_ENABLED"].(bool); ok {
+		engine.CleanEnabled = v
+	}
+	cfg.Engine = engine
 	return cfg
 }
 

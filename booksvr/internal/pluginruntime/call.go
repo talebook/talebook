@@ -52,7 +52,7 @@ func (r *Runtime) CallOne(connection *userdb.PluginConnection, mode, method stri
 		}()
 
 		prepared, failures, err := r.PrepareRead([]*userdb.PluginConnection{connection},
-			timeout, overrides, opts.RequiredScopes, mode, opts.RequestedBy)
+			timeout, overrides, opts.RequiredScopes, mode, opts.RequestedBy, method)
 		if err != nil {
 			outcomeErr = err
 			return
