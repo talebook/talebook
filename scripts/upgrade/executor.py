@@ -96,9 +96,13 @@ def summary(manifest):
 def prepare():
     # A writable parent could rename/replace the entire root-owned release directory.
     # Disable upgrades gracefully on insecure bind mounts; keep the image application usable.
-    RUN.mkdir(parents=True, exist_ok=True)
-    if RUN.is_symlink() or RUN.stat().st_uid != 0 or RUN.stat().st_mode & 0o022:
+    RUN.mkdir(mode=0o755, parents=True, exist_ok=True)
+    if RUN.is_symlink() or RUN.stat().st_uid != 0:
         raise UpgradeError("storage")
+    # The runtime directory is container-private and root-owned; a group-writable mode only comes from a
+    # non-default umask (some NAS Docker engines use 0002), so tighten it instead of looping the container.
+    if RUN.stat().st_mode & 0o022:
+        RUN.chmod(0o755)
     storage_secure = ROOT.parent.stat().st_uid == 0 and not ROOT.parent.stat().st_mode & 0o022
     if ROOT.exists() or ROOT.is_symlink():
         storage_secure = (
@@ -725,6 +729,8 @@ class Handler(socketserver.StreamRequestHandler):
 
 
 def main():
+    # Releases, backups and the control socket must never inherit a group-writable umask from the engine.
+    os.umask(0o022)
     if len(sys.argv) > 1 and sys.argv[1] == "prepare":
         prepare()
         return

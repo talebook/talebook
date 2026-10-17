@@ -3,6 +3,8 @@
 import base64
 import io
 import json
+import os
+import shutil
 import sqlite3
 import sys
 import tarfile
@@ -589,3 +591,31 @@ def test_retention_disk_error_is_reported_without_changing_application(engine, m
     assert result["status"]["cleanup_error"] == "disk"
     assert (ex.RUN / "current").resolve() == ex.BUILTIN
     assert not engine.lock.locked()
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_group_writable_umask_does_not_block_startup(engine, existing):
+    # Some NAS Docker engines start containers with umask 0002 (issue #1086).
+    shutil.rmtree(ex.RUN)
+    if existing:
+        ex.RUN.mkdir(mode=0o775)
+        ex.RUN.chmod(0o775)
+    previous = os.umask(0o002)
+    try:
+        ex.prepare()
+    finally:
+        os.umask(previous)
+    assert not ex.RUN.stat().st_mode & 0o022
+    assert (ex.RUN / "current").resolve() == ex.BUILTIN
+    assert not (ex.RUN / "disabled.json").exists()
+
+
+def test_executor_resets_umask_before_creating_files(engine, monkeypatch):
+    monkeypatch.setattr(ex.sys, "argv", ["executor.py", "prepare"])
+    previous = os.umask(0o002)
+    try:
+        ex.main()
+        current = os.umask(previous)
+    finally:
+        os.umask(previous)
+    assert current == 0o022
