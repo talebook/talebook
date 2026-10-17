@@ -53,6 +53,8 @@ type BookToolsConfig struct {
 	Runtime func(ctx *Context) *pluginruntime.Runtime
 	// CanViewBook 判断当前访问者是否可见某本书。
 	CanViewBook func(ctx *Context, bookID int64) (bool, error)
+	// FilterVisibleBookIDs applies the same policy in bulk for the book picker.
+	FilterVisibleBookIDs func(ctx *Context, ids []int64) ([]int64, error)
 	// WorkDir 创建一次工具运行的临时目录；为 nil 时用 os.MkdirTemp。
 	WorkDir func() (string, error)
 	// BackupDir 返回持久备份目录；为 nil 时用 convert_path/texttools-backups。
@@ -298,44 +300,98 @@ func UserBookToolsBooksHandler(cfg BookToolsConfig) HandlerFunc {
 		}
 
 		keyword := strings.ToLower(strings.TrimSpace(ctx.Query("query")))
-		ids, err := library.AllBookIDs(toolLibraryDB(ctx))
+		// Filter with lightweight title/author rows; never hydrate the entire
+		// catalog merely to return a hundred picker entries.
+
+		rows, err := toolLibraryDB(ctx).Query(`SELECT b.id, COALESCE(b.title,''), COALESCE(b.timestamp,0)
+            FROM books b WHERE b.id IN (
+                SELECT d.book FROM data d WHERE UPPER(d.format) IN ('TXT','EPUB'))
+            ORDER BY b.id`)
 		if err != nil {
 			return nil, err
 		}
-		all, err := library.GetBooksData(toolLibraryDB(ctx), ids)
+		ids := []int64{}
+		stamps := map[int64]string{}
+		titles := map[int64]string{}
+		for rows.Next() {
+			var id int64
+			var title string
+			var stamp sql.RawBytes
+			if err := rows.Scan(&id, &title, &stamp); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			ids = append(ids, id)
+			stamps[id] = fmt.Sprintf("%d", library.ParseCalibreTimestamp(stamp))
+			titles[id] = title
+		}
+		err = rows.Err()
+		rows.Close()
 		if err != nil {
 			return nil, err
 		}
-		items := []map[string]any{}
-		for i := range all {
-			if cfg.CanViewBook != nil {
-				allowed, err := cfg.CanViewBook(ctx, all[i].ID)
+		if keyword != "" {
+			// One ordered author scan replaces a correlated lookup per book.
+			rows, err = toolLibraryDB(ctx).Query(`SELECT l.book,a.name FROM books_authors_link l
+                JOIN authors a ON a.id=l.author ORDER BY l.book,l.id`)
+			if err != nil {
+				return nil, err
+			}
+			authors := map[int64][]string{}
+			for rows.Next() {
+				var id int64
+				var name string
+				if err := rows.Scan(&id, &name); err != nil {
+					rows.Close()
+					return nil, err
+				}
+				if _, exists := titles[id]; exists {
+					authors[id] = append(authors[id], name)
+				}
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return nil, err
+			}
+			matches := make([]int64, 0, len(ids))
+			for _, id := range ids {
+				if strings.Contains(strings.ToLower(titles[id]+" "+strings.Join(authors[id], " ")), keyword) {
+					matches = append(matches, id)
+				}
+			}
+			ids = matches
+		}
+		sort.SliceStable(ids, func(i, j int) bool { return stamps[ids[i]] > stamps[ids[j]] })
+		if cfg.FilterVisibleBookIDs != nil {
+			ids, err = cfg.FilterVisibleBookIDs(ctx, ids)
+			if err != nil {
+				return nil, err
+			}
+		} else if cfg.CanViewBook != nil {
+			visible := make([]int64, 0, len(ids))
+			for _, id := range ids {
+				allowed, err := cfg.CanViewBook(ctx, id)
 				if err != nil {
 					return nil, err
 				}
-				if !allowed {
-					continue
+				if allowed {
+					visible = append(visible, id)
 				}
 			}
-			item := bookOption(&all[i])
-			if len(item["formats"].([]string)) == 0 {
-				continue
-			}
-			if keyword != "" {
-				haystack := fmt.Sprintf("%s %s", item["title"], strings.Join(item["authors"].([]string), " "))
-				if !strings.Contains(strings.ToLower(haystack), keyword) {
-					continue
-				}
-			}
-			items = append(items, item)
+			ids = visible
 		}
-		// 按 timestamp 降序（字符串比较，与 Python 的 str 排序一致）。
-		sort.SliceStable(items, func(i, j int) bool {
-			return pluginStr(items[i]["timestamp"]) > pluginStr(items[j]["timestamp"])
-		})
-		total := len(items)
-		if len(items) > 100 {
-			items = items[:100]
+		total := len(ids)
+		if len(ids) > 100 {
+			ids = ids[:100]
+		}
+		books, err := library.GetBooksData(toolLibraryDB(ctx), ids)
+		if err != nil {
+			return nil, err
+		}
+		items := make([]map[string]any, 0, len(books))
+		for i := range books {
+			items = append(items, bookOption(&books[i]))
 		}
 		return map[string]any{"err": "ok", "books": items, "total": total}, nil
 	}

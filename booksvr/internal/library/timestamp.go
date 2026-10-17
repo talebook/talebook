@@ -48,3 +48,7 @@ func parseCalibreTimestamp(raw []byte) int64 {
 	}
 	return 0
 }
+
+// ParseCalibreTimestamp normalizes Calibre datetime text and legacy Unix values
+// for lightweight catalog consumers using the same ordering as full book data.
+func ParseCalibreTimestamp(raw []byte) int64 { return parseCalibreTimestamp(raw) }

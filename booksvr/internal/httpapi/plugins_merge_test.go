@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -143,5 +144,93 @@ func TestBuiltinBeautifyPresetsWired(t *testing.T) {
 	}
 	if len(out["presets"].([]any)) < 12 {
 		t.Fatal("preset options not wired", out)
+	}
+}
+
+// Metadata outside the returned page must not be loaded, even if malformed.
+func TestBuiltinToolPickerHydratesOnlyVisiblePage(t *testing.T) {
+	fx := newToolFixture(t, TextReplaceRoute, nil)
+	tx, err := fx.DB.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 1; i <= 122; i++ {
+		series := any(1.0)
+		if i == 1 {
+			series = "invalid-unselected-metadata"
+		}
+		if _, err := tx.Exec(`INSERT INTO books(id,title,author_sort,path,timestamp,pubdate,series_index,has_cover) VALUES(?,?,'a','p',?,'2020-01-01',?,0)`, i, fmt.Sprintf("Book %d", i), i, series); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(`INSERT INTO data(book,format,uncompressed_size,name) VALUES(?,'TXT',1,'sample.txt')`, i); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/plugins/tools/books", "", 1, true)
+	got, err := UserBookToolsBooksHandler(fx.Cfg)(ctx)
+	if err != nil || got["err"] != "ok" {
+		t.Fatal(got, err)
+	}
+	if len(got["books"].([]map[string]any)) != 100 || got["total"] != 122 {
+		t.Fatalf("picker page = %v", got)
+	}
+}
+
+func TestBuiltinToolPickerMixedTimestampOrder(t *testing.T) {
+	fx := newToolFixture(t, TextReplaceRoute, nil)
+	fx.seedBook(t, "ISO older", "TXT", "body")
+	old := fx.BookID
+	fx.seedBook(t, "Unix newer", "TXT", "body")
+	latest := fx.BookID
+	if _, err := fx.DB.Exec(`UPDATE books SET timestamp='2026-10-01T00:00:00Z' WHERE id=?`, old); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.DB.Exec(`UPDATE books SET timestamp=2000000000 WHERE id=?`, latest); err != nil {
+		t.Fatal(err)
+	}
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/plugins/tools/books", "", 1, true)
+	got, err := UserBookToolsBooksHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	books := got["books"].([]map[string]any)
+	if len(books) != 2 || pluginInt(books[0]["id"], 0) != latest {
+		t.Fatalf("normalized ordering lost: %v", books)
+	}
+}
+
+func TestBuiltinToolPickerUnicodeAuthorAndBulkVisibility(t *testing.T) {
+	fx := newToolFixture(t, TextReplaceRoute, nil)
+	fx.seedBook(t, "First title", "TXT", "body")
+	hidden := fx.BookID
+	fx.seedBook(t, "Second title", "TXT", "body")
+	visible := fx.BookID
+	if _, err := fx.DB.Exec(`INSERT INTO authors(id,name) VALUES(1,'Михаил Булгаков')`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fx.DB.Exec(`INSERT INTO books_authors_link(book,author) VALUES(?,1),(?,1)`, hidden, visible); err != nil {
+		t.Fatal(err)
+	}
+	fx.Cfg.CanViewBook = func(*Context, int64) (bool, error) { t.Fatal("picker should use bulk policy"); return false, nil }
+	fx.Cfg.FilterVisibleBookIDs = func(_ *Context, ids []int64) ([]int64, error) {
+		out := []int64{}
+		for _, id := range ids {
+			if id != hidden {
+				out = append(out, id)
+			}
+		}
+		return out, nil
+	}
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/api/plugins/tools/books?query="+url.QueryEscape("БУЛГАКОВ"), "", 1, false)
+	got, err := UserBookToolsBooksHandler(fx.Cfg)(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	books := got["books"].([]map[string]any)
+	if len(books) != 1 || pluginInt(books[0]["id"], 0) != visible || got["total"] != 1 {
+		t.Fatalf("author query or visibility lost: %v", got)
 	}
 }

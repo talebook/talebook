@@ -550,6 +550,19 @@ func newServeDispatcher(opts ServeOptions, db, userDB *sql.DB) (*Dispatcher, err
 		CanViewBook: func(ctx *Context, id int64) (bool, error) {
 			return userdb.CanViewBook(userDB, id, ctx.Identity.UserID, ctx.Identity.IsAdmin)
 		},
+		FilterVisibleBookIDs: func(ctx *Context, ids []int64) ([]int64, error) {
+			hidden, err := userdb.PrivateBookIDsFor(userDB, ctx.Identity.UserID, ctx.Identity.IsAdmin)
+			if err != nil {
+				return nil, err
+			}
+			visible := make([]int64, 0, len(ids))
+			for _, id := range ids {
+				if !hidden[id] {
+					visible = append(visible, id)
+				}
+			}
+			return visible, nil
+		},
 	})...)
 	specs = append(specs, BookSourceAdminRouteSpecs(BookSourceAdminConfig{
 		Settings: opts.Settings,
