@@ -619,3 +619,11 @@ def test_executor_resets_umask_before_creating_files(engine, monkeypatch):
     finally:
         os.umask(previous)
     assert current == 0o022
+
+
+def test_group_writable_runtime_with_entries_is_still_rejected(engine):
+    # Entries inside a writable runtime directory could be planted, so only an empty one is repaired.
+    ex.RUN.chmod(0o775)
+    with pytest.raises(p.UpgradeError, match="storage"):
+        ex.prepare()
+    ex.RUN.chmod(0o755)

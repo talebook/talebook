@@ -99,9 +99,11 @@ def prepare():
     RUN.mkdir(mode=0o755, parents=True, exist_ok=True)
     if RUN.is_symlink() or RUN.stat().st_uid != 0:
         raise UpgradeError("storage")
-    # The runtime directory is container-private and root-owned; a group-writable mode only comes from a
-    # non-default umask (some NAS Docker engines use 0002), so tighten it instead of looping the container.
     if RUN.stat().st_mode & 0o022:
+        # A non-default umask (some NAS Docker engines use 0002) leaves an empty group-writable directory behind
+        # from earlier failed boots. Only that empty directory is repaired; anything inside could be planted.
+        if any(RUN.iterdir()):
+            raise UpgradeError("storage")
         RUN.chmod(0o755)
     storage_secure = ROOT.parent.stat().st_uid == 0 and not ROOT.parent.stat().st_mode & 0o022
     if ROOT.exists() or ROOT.is_symlink():
