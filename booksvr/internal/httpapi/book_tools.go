@@ -196,9 +196,7 @@ func (w *bookWiring) bookSaveMeta(ctx *Context, bookID int64, args map[string]an
 	}, nil
 }
 
-// bookRefer 复刻 Python BookRefer.post 的本地部分：返回书籍的来源引用信息。
-//
-// 在线元数据源查询依赖插件运行时；无插件时返回空结果集而非报错。
+// bookRefer 通过插件运行时检索候选，并按用户选择套用元数据或封面。
 func (w *bookWiring) bookRefer(ctx *Context, bookID int64, args map[string]any) (map[string]any, error) {
 	book, err := bookGetOne(w.Config(""), bookID)
 	if err != nil {
@@ -211,15 +209,10 @@ func (w *bookWiring) bookRefer(ctx *Context, bookID int64, args map[string]any) 
 		return map[string]any{"err": "permission", "msg": "无权操作"}, nil
 	}
 
-	return map[string]any{
-		"err":     "ok",
-		"book_id": bookID,
-		"title":   book.Title,
-		"authors": book.Authors,
-		"isbn":    book.ISBN,
-		"results": []any{},
-		"total":   0,
-	}, nil
+	if ctx.Request != nil && ctx.Request.Method == "POST" {
+		return w.applyBookReference(ctx, book, args)
+	}
+	return w.searchBookReferences(ctx, book)
 }
 
 // ---- 内部辅助 ----

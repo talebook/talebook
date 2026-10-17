@@ -63,6 +63,8 @@ func (w *bookWiring) bookSendToDevice(ctx *Context, bookID int64, args map[strin
 
 	defer release()
 	if _, err := provider.Push(path, target, map[string]any{
+		"platform": map[string]any{"user_id": ctx.Identity.UserID, "site_url": settingString(w.settings, "site_url"),
+			"book": map[string]any{"title": book.Title, "fmt_" + format: path}},
 		"device_type": deviceType,
 		"format":      format,
 		"title":       book.Title,
@@ -117,6 +119,8 @@ func (w *bookWiring) bookSendToMail(ctx *Context, bookID int64, args map[string]
 
 	defer release()
 	if _, err := provider.Push(path, mailbox, map[string]any{
+		"platform": map[string]any{"user_id": ctx.Identity.UserID, "site_url": settingString(w.settings, "site_url"),
+			"book": map[string]any{"title": book.Title, "fmt_" + format: path}},
 		"device_type": "mail",
 		"format":      format,
 		"title":       book.Title,
@@ -152,6 +156,9 @@ func (w *bookWiring) checkPushPermission(ctx *Context) map[string]any {
 
 // pushProvider 按设备类型解析 push provider。
 func (w *bookWiring) pushProvider(deviceType string) (pluginiface.PushProvider, error) {
+	if deviceType == "mail" {
+		deviceType = "kindle"
+	}
 	registry := w.pluginRegistry()
 	if registry == nil {
 		return nil, fmt.Errorf("httpapi: 插件注册表不可用")

@@ -10,6 +10,7 @@ import (
 
 	"talebook/booksvr/internal/comic"
 	"talebook/booksvr/internal/httpapi"
+	"talebook/booksvr/internal/metasource"
 	"talebook/booksvr/internal/pluginbuiltin"
 	"talebook/booksvr/internal/pluginruntime"
 	"talebook/booksvr/internal/scan"
@@ -72,6 +73,7 @@ func newServiceWiring(userDB, libraryDB *sql.DB, opts *serveOptions) *serviceWir
 	if err := pluginbuiltin.Register(w.pluginRegistry); err != nil {
 		panic(fmt.Sprintf("booksvr: 注册内置插件失败: %v", err))
 	}
+	pluginbuiltin.BindCalibre(w.pluginRegistry, &metasource.ProcessCalibreIdentifier{})
 	// 重复检测要查 Calibre 的 books 表，必须用书库句柄。
 	w.scanService.LibraryDB = libraryDB
 	// 封面提取需要书库根目录：封面写到 <libraryRoot>/<books.path>/cover.jpg。

@@ -87,3 +87,13 @@ def test_nginx_public_redirect_and_nuxt_upstream():
     assert 'absolute_redirect off;' in result
     assert 'rewrite ^ /team/books$uri break;' in result
     assert configure(original, '') == original
+
+
+def test_plugin_routes_allow_bounded_conversion_before_smtp_delivery():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    for name in ('talebook.conf', 'dev.conf', 'server-side-render.conf'):
+        text = (root / 'conf/nginx' / name).read_text(encoding='utf-8')
+        route = text.split('location ~ ^/(api|get|read|read-comic|opds|auth|books|media)/ {', 1)[1]
+        assert route.split('}', 1)[0].count('proxy_read_timeout 5m;') == 1

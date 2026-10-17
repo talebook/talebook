@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,8 +37,8 @@ const (
 
 // tomatoReleaseHashes 复刻 RELEASE_HASHES。
 var tomatoReleaseHashes = map[string]string{
-	"x86_64":  "d9db872448e3cda78a18eaa3c7ee162ce631251ed51eb789f8e6676abe118722",
-	"aarch64": "3df139fd891ebcf88c6c8b476c755b45e61b3c31075e0b465fc9d14c46800201",
+	"amd64": "d9db872448e3cda78a18eaa3c7ee162ce631251ed51eb789f8e6676abe118722",
+	"arm64": "3df139fd891ebcf88c6c8b476c755b45e61b3c31075e0b465fc9d14c46800201",
 }
 
 // tomatoBookIDRe 复刻 book_id 的正则。
@@ -236,15 +237,16 @@ func readZipEntry(archive *zip.Reader, name string) ([]byte, error) {
 
 // tomatoDownloaderSession 复刻 DownloaderSession。
 type tomatoDownloaderSession struct {
-	config   map[string]any
-	format   string
-	deadline time.Time
-	root     string
-	output   string
-	endpoint string
-	password string
-	process  *exec.Cmd
-	http     *safehttp.SafeHttpClient
+	config      map[string]any
+	format      string
+	deadline    time.Time
+	root        string
+	output      string
+	endpoint    string
+	password    string
+	process     *exec.Cmd
+	processDone chan struct{}
+	http        *safehttp.SafeHttpClient
 }
 
 // newTomatoDownloaderSession 复刻 __init__。
@@ -391,15 +393,19 @@ func (s *tomatoDownloaderSession) start() error {
 		return pluginproto.NewUpstreamError(
 			"无法启动番茄下载器；请检查可执行权限与系统架构", "other", nil)
 	}
-	// 复刻 poll()：后台 Wait 使 ProcessState 可读，进程秒退可即时检测。
-	go func() { _, _ = s.process.Process.Wait() }()
+	// A channel observes exit without racing exec.Cmd.ProcessState. Wait must
+	// run exactly once so shutdown cannot leave an unreaped child behind.
+	s.processDone = make(chan struct{})
+	go func() { _ = s.process.Wait(); close(s.processDone) }()
 	for {
 		if _, err := s.remainingOrError(); err != nil {
 			return err
 		}
-		if s.process.ProcessState != nil && s.process.ProcessState.Exited() {
+		select {
+		case <-s.processDone:
 			return pluginproto.NewUpstreamError(
 				"番茄下载器启动失败，请检查安装与运行环境", "other", nil)
+		default:
 		}
 		if s.process.Process == nil {
 			return pluginproto.NewUpstreamError(
@@ -422,6 +428,10 @@ func (s *tomatoDownloaderSession) start() error {
 
 // isConnectionRefused 判断是否为连接未就绪。
 func isConnectionRefused(err error) bool {
+	var upstream *pluginproto.UpstreamError
+	if errors.As(err, &upstream) && upstream.ErrorType == "connection" {
+		return true
+	}
 	return strings.Contains(err.Error(), "connection refused") ||
 		strings.Contains(err.Error(), "connect: connection refused")
 }
@@ -603,6 +613,10 @@ func (s *tomatoDownloaderSession) download(identity string) (plugindomain.BookFi
 		return plugindomain.BookFile{}, pluginproto.NewUpstreamError(
 			"番茄下载器未生成唯一的 "+strings.ToUpper(s.format)+" 文件，未入库", "other", nil)
 	}
+	info, err := os.Lstat(matched)
+	if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > tomatoMaxBookBytes {
+		return plugindomain.BookFile{}, pluginproto.NewUpstreamError("番茄下载文件不是有效的有界普通文件，未入库", "other", nil)
+	}
 	content, err := os.ReadFile(matched)
 	if err != nil {
 		return plugindomain.BookFile{}, err
@@ -643,7 +657,9 @@ func recordValueOrZero(record map[string]any, key string) int {
 func (s *tomatoDownloaderSession) close() {
 	if s.process != nil && s.process.Process != nil {
 		_ = s.process.Process.Kill()
-		_, _ = s.process.Process.Wait()
+		if s.processDone != nil {
+			<-s.processDone
+		}
 	}
 	if s.root != "" {
 		_ = os.RemoveAll(s.root)

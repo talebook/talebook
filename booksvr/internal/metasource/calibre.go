@@ -93,6 +93,12 @@ type CalibreIdentifyResult struct {
 	Rating      *int
 	CoverURL    string
 	Identifiers map[string]string
+	Publisher   string
+	Comments    string
+	PubDate     string
+	Tags        []string
+	Series      string
+	Language    string
 	// ProviderKey / ProviderValue / AuthorSort 由 _normalize_results 写入。
 	ProviderKey   string
 	ProviderValue string

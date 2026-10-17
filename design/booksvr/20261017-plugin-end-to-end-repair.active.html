@@ -1,0 +1,179 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>内置插件运行时修复与 OPDS 验收 · ACTIVE</title><style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style></head><body><main class="page"><header class="hero"><span class="label">BOOKSVR · ACTIVE</span><h1>内置插件运行时修复与 OPDS 验收</h1><p>创建日期：2026-10-17 · 所属模块：booksvr · 状态：ACTIVE</p><p class="sub">需求来源：用户连续反馈插件不可用、阅读设备为空、静读天下显示 XML，要求修复、实测、部署、清理调试容器并提交推送。</p></header>
+<section class="card"><h2>原始诉求与发布边界</h2><p>启用的发送插件必须出现在阅读设备列表，实际检索与投递要接入运行服务；OPDS 必须在静读天下显示可点击目录与书目。书库原文件、账号、站点设置和挂载保持不变，不复制现有书籍正文。</p><p>本方案记录已落地并验证的运行时接线与兼容性修复，不宣称所有外部账号、设备或公共服务已完整通过。未改动公共下载路径的既有失败与外部条件缺口明确列在下方。</p></section>
+<section class="card"><h2>目标与方案</h2><div class="table-wrap"><table><thead><tr><th>问题</th><th>实现</th><th>验证</th></tr></thead><tbody>
+<tr><td>Calibre 没有实际检索器</td><td>绑定有时限的独立 Python 进程，使用镜像已有 Calibre 模块，保留作者、ISBN、出版信息、简介、封面等来源字段。</td><td>真实检索及 HTTP 候选返回通过。</td></tr>
+<tr><td>Kindle 未绑定邮件/转换服务</td><td>实例绑定 SMTP、临时格式转换和调用上下文；附件限量，转换失败或发送结束回收临时目录；连接使用期限，要求 STARTTLS 时拒绝降级。</td><td>隔离 SMTP 实收附件、转换清理与 TLS 负例通过；没有向个人设备发送。</td></tr>
+<tr><td>阅读设备类型为空</td><td>注入注册表，按实时启用安装列举七种设备，不依赖 SMTP 或现有设备；普通读取不重复写插件定义。切换类型更新默认端口并保留自定义端口。</td><td>七种类型、禁用/重启用 7→6→7、BOOX 8085、真实页面通过。</td></tr>
+<tr><td>元数据结果与书籍同步未贯通</td><td>支持类型化候选序列化；GET 逐行返回候选/进度/摘要，总时限 30 秒、每来源最多五条；POST 核验启用来源与精确标识，应用有效信息或原子替换有效封面，不改书籍格式路径。</td><td>真实 dispatcher、流式候选、部分失败、仅封面、无效图像保持原封面与源文件保持用例通过。</td></tr>
+<tr><td>番茄详情失败/下载器不可启动</td><td>固定版本与摘要安装 amd64/arm64 下载器；详情网页失败时使用同一标识的结构化搜索记录；修复架构命名、启动连接重试、进程等待与目录回收。</td><td>真实 EPUB 下载 4,045,329 字节并回收临时目录。</td></tr>
+<tr><td>Google Books 查询条件/配额身份</td><td>ISBN 优先，缺失时使用书名；可选项目 API key 加密保存并随请求传递。</td><td>受控查询参数与凭据用例通过；没有项目密钥时真实上游仍可能限流。</td></tr>
+<tr><td>静读天下显示 XML</td><td>通用 Atom HTTP MIME，链接声明 OPDS profile/type/kind；补 XHTML 容器、标准 artwork 关系及导航类型。</td><td>生产目录、翻页、搜索、附件下载通过；手机新条目实际显示可点击目录和书目。</td></tr>
+</tbody></table></div><p>通用 Nginx 代理等待时间为五分钟，与有界转换/检索调用配合。同步规格：插件/发送到设备、元数据源、外部书库源、评价源及外部访问；Docker 与下载器文档同步更新。</p></section>
+<section class="card"><h2>静读天下反馈与定位</h2><p>首轮仅修 MIME 后，用户 21:41 截图仍显示新版 XML；日志显示根目录 200 和 favicon 请求，说明手机进入网页路径。静态核对 Moon+ Reader 10.7 免费版目录逻辑：识别得到零条目时保存 html=true，之后打开直接进入 WebView，不再解析 OPDS。分析包仅作静态读取，未安装或运行。</p><p>新建“Talebook OPDS 测试”，地址使用 /opds/?reader=moon20261017 绕过旧条目的网页分类；服务端为相同书库返回五个目录项。用户明确确认“显示可点击目录和书目”。reader 参数没有业务作用，不是 OPDS 必需参数。手机端下载/阅读未由此扩大为已通过。</p></section>
+<section class="card"><h2>测试与生产部署结果</h2><ul>
+<li>Go：go test -p 2 ./... -skip 'TestFileThemeStoreWriteFileError|TestBackupCreateFailsOnReadOnlyDir' -count=1 -timeout 300s 全部通过；两项根用户权限负例此前使用 UID 911 单独通过。go vet ./... 通过。最终 OPDS 修改后另跑 go test ./internal/httpapi -run TestOpds -count=1，通过（1.816 秒）。</li>
+<li>前端：设备默认端口 Vitest 六例通过；全项目 lint 零错误（572 条已有警告），SSR 与 SPA 生产构建通过。本次提交前六例重跑通过，改动 Vue 文件 eslint 零错误。</li>
+<li>Python：基础路径用例 33 通过；Linux 下载器安装用例三例通过。规格检查 25 篇通过。</li>
+<li>实连：Calibre HTTP 返回一条 Pride and Prejudice、Open Library 返回 20 条西游记候选、番茄返回一条；番茄完整 EPUB 下载通过；Venera 完整取得章节、32 页列表与 2,320,549 字节 PNG。</li>
+<li>正式部署镜像 sha256:41235556dae236e47e4fc85082a95000940f417b7906f1a31431cab03c0f361a，容器 0bfc7841；bootstrap 正常退出，booksvr/nginx/upgrade 正常。部署时无正在导入的任务，挂载、端口、重启策略不变。feature 镜像标签同步为当前运行镜像。</li>
+<li>生产书库 89,173 本；OPDS 每页 50 条、末页 23 条、相邻页不重叠、末页无 next、标题/作者/搜索/附件下载通过。复制导入路径为零。阅读设备真实页面显示全部类型，Kindle 切换 BOOX 填入 8085；测试表单未保存。</li>
+<li>截图证据：本地 talebook-devices-boox-fixed-20261017.png；手机证据为用户提供的 Screenshot_20261017_214144.jpg，后续由用户确认新条目目录/书目显示正常。</li></ul></section>
+<section class="card"><h2>完整界面审查</h2><p>使用 interface-review full；基线为 origin/master 与当前分支的 merge-base d5d21dda160d65d29cc0c9ab8a13ae6b4deb69d2，HEAD 为 10f6872，基线上 45 个提交，加本次全部未提交内容（开始审查时 47 项，tracked 对比清单 786 项）。审查已提交与未提交的完整清单，并读取前端产品源代码的全部正反差异；锁文件、测试夹具、第三方压缩 Readest 产物、图片与生成文件不作手写界面源码审查。新设备工具函数及测试作为未跟踪新增项纳入。</p>
+<p>技术栈为 Nuxt/Vue/Vuetify，沿用 AGENTS.md、app/CLAUDE.md 与既有组件系统。消费者展开限定最多五个：个人设备页、全局设备弹窗、书籍元数据选择、插件中心、OPDS 阅读器。其他历史导入/书卡/阅读器源代码差异已检查，历史实际验收参考既有 ACTIVE 记录，不冒充本轮重新实测。</p>
+<div class="table-wrap"><table><thead><tr><th>领域</th><th>证据与边界</th><th>结论</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>Vuetify select 保留名称/角色/键盘事件；已有关闭/删除按钮名称保留；导入状态文本与 live 区、确认对话框未丢失。</td><td>本次差异无需修正项。</td></tr>
+<tr><td>Layout</td><td>设备类型切换后的字段和 8085 实际截图；全局网格与导入操作换行、长路径换行源代码检查。</td><td>本次差异无需修正项。</td></tr>
+<tr><td>Writing</td><td>默认端口、停用类型提示、流式进度/错误字段及导入/复制/索引说明与实际行为核对。</td><td>本次差异无需修正项。</td></tr>
+<tr><td>Typography</td><td>文件大小单位、数字稳定宽度、路径换行；设备变更没有修改文字样式。</td><td>本次差异无需修正项。</td></tr>
+<tr><td>Colors</td><td>复用 Vuetify 主题与语义状态；本次设备改动无颜色/主题值修改。</td><td>未新增颜色问题；未重测全站对比度。</td></tr>
+<tr><td>UI</td><td>现有设备表单、空状态、加载/保存逻辑与派生类型；没有新动画或图标样式。</td><td>本次差异无需修正项。</td></tr></tbody></table></div>
+<p>考虑但不采纳：为 SMTP 缺失而隐藏 Kindle（会重新引入不能配置设备的问题）；切换类型总覆盖自定义端口（会损坏用户设置）；给 Atom 原文套网页伪装目录（不能替代实际 OPDS 验收）。</p><p>本轮未验证：全站 320px/200% 缩放、屏幕阅读器朗读及全部深色主题；不把源码判断写成这些运行时检查已通过。与本次行为修复有关的真实设备页面和手机目录识别均已验证；审查结论为 Approve，没有尚存 Introduced/Regression HIGH/MEDIUM 问题。</p></section>
+<section class="card"><h2>已知边界与回滚</h2><p>完整公共下载诊断仍发现三个既有失败：Standard Ebooks 与 Gutenberg 在 30 秒读取正文时失败，Internet Archive 下载被跨域 CDN 重定向策略拦截。这些 sourcebase/source_web 路径在本补丁未修改，新增的显式 opt-in 诊断测试保留失败证据，不能写成已完整下载通过。本方案生效表示上表修复已落地，不表示这些既有问题被修复。</p><p>NeoDB/Bangumi 的 TLS 网络条件、Google Books 无项目 key 时的配额、个人账号来源、BOOX/Kindle/WebDAV 的外部连接与真实投递仍受现有条件限制；用户暂缓提供连接信息，没有发真实个人邮件、推送或修改外部书库。</p><p>数据库/设置备份保存在宿主机 books/repairs/20261017-plugin-repair-final 和先前 repair 目录。清理仅移除本次验证/旧版本容器，保留运行中的 Talebook、roon-server、songloft，以及持久化挂载、源书、数据库备份与可回滚镜像。</p></section>
+</main></body></html>

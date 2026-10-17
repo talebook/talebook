@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"talebook/booksvr/internal/pluginiface"
+	"talebook/booksvr/internal/pluginruntime"
 	"talebook/booksvr/internal/userdb"
 )
 
@@ -39,6 +41,8 @@ type UserConfig struct {
 	PublicURL func(path string) string
 	// EnabledPushProviders 返回已启用的推送插件信息。
 	EnabledPushProviders func(ctx *Context) []PushProvider
+	// Registry supplies enabled device types in the production runtime.
+	Registry *pluginruntime.PluginRegistry
 	// CountBooks 等统计函数；为 nil 时返回 0。
 	CountBooks      func() (int64, error)
 	CountTags       func() (int64, error)
@@ -638,6 +642,39 @@ func UserDevicesHandler(cfg UserConfig) HandlerFunc {
 		}
 
 		types := []any{}
+		if cfg.Registry != nil && cfg.EnabledPushProviders == nil {
+			// Normal device-list reads must not rewrite all plugin definitions.
+			// Materialize once only when a registered push provider is missing.
+			for _, provider := range cfg.Registry.Providers() {
+				if _, ok := provider.(pluginiface.PushProvider); !ok {
+					continue
+				}
+				var exists int
+				err := cfg.DB.QueryRow(`SELECT 1 FROM plugin_installations WHERE plugin_key = ? LIMIT 1`, provider.Manifest()["id"]).Scan(&exists)
+				if err == sql.ErrNoRows {
+					if _, err := pluginruntime.EnsureBuiltinInstallations(cfg.DB, ctx.Identity.UserID, cfg.Settings, cfg.Registry); err != nil {
+						return nil, err
+					}
+					break
+				}
+				if err != nil {
+					return nil, err
+				}
+			}
+			providers, err := pluginruntime.NewRuntime(cfg.DB, cfg.Settings, cfg.Registry).EnabledProviders(pushCapability)
+			if err != nil {
+				return nil, err
+			}
+			for _, provider := range providers {
+				manifest := provider.Manifest()
+				ui, _ := manifest["ui"].(map[string]any)
+				value := stringOf(ui["device_type"])
+				if value == "" {
+					continue
+				}
+				types = append(types, map[string]any{"text": manifest["name"], "value": value, "default_port": ui["default_port"]})
+			}
+		}
 		if cfg.EnabledPushProviders != nil {
 			for _, p := range cfg.EnabledPushProviders(ctx) {
 				types = append(types, map[string]any{

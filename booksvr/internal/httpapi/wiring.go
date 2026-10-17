@@ -46,13 +46,15 @@ func newBookWiring(db, libraryDB *sql.DB, settings map[string]any,
 			panic(fmt.Sprintf("httpapi: 注册内置插件失败: %v", err))
 		}
 	}
-	return &bookWiring{
+	w := &bookWiring{
 		db:        db,
 		libraryDB: libraryDB,
 		settings:  settings,
 		aliases:   userdb.NewAliasService(db),
 		registry:  registry,
 	}
+	w.bindKindleServices()
+	return w
 }
 
 // withSettingsPath 设置配置文件路径，使读配置从磁盘重读。

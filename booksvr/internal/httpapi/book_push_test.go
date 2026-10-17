@@ -96,8 +96,8 @@ func TestBookSendToMailUnsupported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("意外错误: %v", err)
 	}
-	if resp["err"] != "device.unsupported" {
-		t.Errorf("err = %v，期望 device.unsupported", resp["err"])
+	if resp["err"] != "push.failed" {
+		t.Errorf("err = %v，期望 push.failed", resp["err"])
 	}
 }
 

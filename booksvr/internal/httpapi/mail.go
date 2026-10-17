@@ -89,6 +89,7 @@ func SendMail(cfg MailConfig, from, to, subject, body string, attachment []byte,
 		if err != nil {
 			return fmt.Errorf("连接 SMTP 服务器失败: %w", err)
 		}
+		_ = conn.SetDeadline(time.Now().Add(timeout))
 		client, err = smtp.NewClient(conn, host)
 		if err != nil {
 			_ = conn.Close()
@@ -99,6 +100,7 @@ func SendMail(cfg MailConfig, from, to, subject, body string, attachment []byte,
 		if err != nil {
 			return fmt.Errorf("连接 SMTP 服务器失败: %w", err)
 		}
+		_ = conn.SetDeadline(time.Now().Add(timeout))
 		client, err = smtp.NewClient(conn, host)
 		if err != nil {
 			_ = conn.Close()
@@ -111,6 +113,9 @@ func SendMail(cfg MailConfig, from, to, subject, body string, attachment []byte,
 					_ = client.Close()
 					return fmt.Errorf("STARTTLS 失败: %w", err)
 				}
+			} else {
+				_ = client.Close()
+				return fmt.Errorf("SMTP 服务器不支持配置要求的 STARTTLS")
 			}
 		}
 	}

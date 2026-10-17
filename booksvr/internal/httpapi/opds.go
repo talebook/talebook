@@ -41,10 +41,13 @@ const (
 )
 
 // opdsContentType 是 OPDS 目录的 Content-Type。
-const opdsContentType = "application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8"
+const opdsContentType = "application/atom+xml;profile=opds-catalog;type=feed;kind=acquisition"
 
 // opdsNavContentType 是导航目录的 Content-Type。
-const opdsNavContentType = "application/atom+xml;profile=opds-catalog;kind=navigation;charset=UTF-8"
+const opdsNavContentType = "application/atom+xml;profile=opds-catalog;type=feed;kind=navigation"
+
+// opdsHTTPContentType preserves compatibility with readers matching the base Atom MIME.
+const opdsHTTPContentType = "application/atom+xml; charset=utf-8"
 
 // ---- Atom XML 结构 ----
 
@@ -262,7 +265,7 @@ func (b *opdsFeedBuilder) withNavLinks(offsets *opdsOffsets, pageURL, upURL stri
 		navType = types[0]
 	}
 	if upURL != "" {
-		b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "up", Href: upURL, Type: navType})
+		b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "up", Href: upURL, Type: opdsNavContentType})
 	}
 	if pageURL != "" {
 		b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "self", Href: pageURL + "?offset=" + strconv.Itoa(offsets.Offset), Type: navType})
@@ -362,8 +365,9 @@ func opdsCatalogGroupEntry(text string, count int, category, baseHref string, up
 		Updated: opdsUpdated(updated),
 		Content: &atomContentXML{Type: "text", Inner: opdsXMLText(fmt.Sprintf("%d items", count))},
 		Links: []atomLinkXML{{
+			Rel:  "subsection",
 			Href: baseHref + "/" + opdsHexlify(text),
-			Type: "application/atom+xml;type=feed;profile=opds-catalog",
+			Type: opdsNavContentType,
 		}},
 	}
 }
@@ -407,7 +411,7 @@ func opdsAcquisitionEntry(cfg OpdsConfig, b library.BookData, updated time.Time,
 		Authors: []atomAuthorXML{{Name: authors}},
 	}
 	if len(extra) > 0 {
-		entry.Content = &atomContentXML{Type: "xhtml", Inner: strings.Join(extra, "\n")}
+		entry.Content = &atomContentXML{Type: "xhtml", Inner: `<div xmlns="http://www.w3.org/1999/xhtml">` + strings.Join(extra, "\n") + `</div>`}
 	}
 
 	for _, format := range b.Formats {
@@ -424,8 +428,8 @@ func opdsAcquisitionEntry(cfg OpdsConfig, b library.BookData, updated time.Time,
 	}
 	cover := fmt.Sprintf("%s/get/cover/%d.jpg", prefix, b.ID)
 	entry.Links = append(entry.Links,
-		atomLinkXML{Rel: "http://opds-spec.org/cover", Type: "image/jpeg", Href: cover},
-		atomLinkXML{Rel: "http://opds-spec.org/thumbnail", Type: "image/jpeg", Href: cover},
+		atomLinkXML{Rel: "http://opds-spec.org/image", Type: "image/jpeg", Href: cover},
+		atomLinkXML{Rel: "http://opds-spec.org/image/thumbnail", Type: "image/jpeg", Href: cover},
 	)
 	return entry
 }
@@ -659,7 +663,7 @@ func opdsAcquisitionFeed(cfg OpdsConfig, ctx *Context, ids []int64, offset int,
 	}
 
 	updated := opdsLastModified(cfg)
-	ctx.Writer.Header().Set("Content-Type", opdsContentType)
+	ctx.Writer.Header().Set("Content-Type", opdsHTTPContentType)
 	ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
 	b := newOpdsFeed(cfg, id, feedTitle, "", updated).withNavLinks(offsets, pageURL, upURL, opdsContentType)
@@ -686,7 +690,7 @@ func opdsTopLevelFeed(cfg OpdsConfig, ctx *Context) ([]byte, error) {
 	}
 
 	updated := opdsLastModified(cfg)
-	ctx.Writer.Header().Set("Content-Type", opdsNavContentType)
+	ctx.Writer.Header().Set("Content-Type", opdsHTTPContentType)
 	ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
 	b := newOpdsFeed(cfg, "urn:calibre:main", "", "Books in your library", updated)
@@ -818,7 +822,7 @@ func opdsCategoryNav(cfg OpdsConfig, ctx *Context, which, pageURL, upURL string,
 		}
 		page := cats[offsets.Offset:end]
 
-		ctx.Writer.Header().Set("Content-Type", opdsNavContentType)
+		ctx.Writer.Header().Set("Content-Type", opdsHTTPContentType)
 		ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
 		b := newOpdsFeed(cfg, id, feedTitle, "", updated).withNavLinks(offsets, pageURL, upURL)
@@ -850,7 +854,7 @@ func opdsCategoryNav(cfg OpdsConfig, ctx *Context, which, pageURL, upURL string,
 	}
 	page := letters[offsets.Offset:end]
 
-	ctx.Writer.Header().Set("Content-Type", opdsNavContentType)
+	ctx.Writer.Header().Set("Content-Type", opdsHTTPContentType)
 	ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
 	b := newOpdsFeed(cfg, id, feedTitle, "", updated).withNavLinks(offsets, pageURL, upURL)
@@ -912,7 +916,7 @@ func opdsCategoryGroup(cfg OpdsConfig, ctx *Context, categoryHex, whichHex strin
 	}
 	page := filtered[offsets.Offset:end]
 
-	ctx.Writer.Header().Set("Content-Type", opdsNavContentType)
+	ctx.Writer.Header().Set("Content-Type", opdsHTTPContentType)
 	ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
 	b := newOpdsFeed(cfg, id, feedTitle, "", updated).withNavLinks(offsets, pageURL, upURL)

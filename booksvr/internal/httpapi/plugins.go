@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"talebook/booksvr/internal/plugindomain"
 	"talebook/booksvr/internal/pluginiface"
 	"talebook/booksvr/internal/pluginproto"
 	"talebook/booksvr/internal/pluginruntime"
@@ -532,6 +533,12 @@ func pluginRecords(value any) []map[string]any {
 		return nil
 	case []map[string]any:
 		return v
+	case []plugindomain.BookMetadata:
+		out := make([]map[string]any, 0, len(v))
+		for _, metadata := range v {
+			out = append(out, metadata.ToDict())
+		}
+		return out
 	case []any:
 		out := make([]map[string]any, 0, len(v))
 		for _, item := range v {
@@ -547,6 +554,11 @@ func pluginRecords(value any) []map[string]any {
 // pluginRecordDict 把单条记录规整成字典。
 func pluginRecordDict(value any) map[string]any {
 	switch v := value.(type) {
+	case *plugindomain.BookMetadata:
+		if v == nil {
+			return map[string]any{}
+		}
+		return v.ToDict()
 	case map[string]any:
 		return v
 	case interface{ ToDict() map[string]any }:

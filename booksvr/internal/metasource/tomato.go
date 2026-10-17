@@ -766,6 +766,7 @@ type TomatoSearchResult struct {
 	Author      string
 	Description string
 	URL         string
+	CoverURL    string
 }
 
 // TomatoSearch 复刻 tomato.Search。
@@ -852,6 +853,7 @@ func (s *TomatoSearch) GetResults() []TomatoSearchResult {
 			Author:      author,
 			Description: description,
 			URL:         TomatoPageBase + bookID,
+			CoverURL:    FindStringByKey(book, tomatoCoverKeys),
 		})
 	}
 	return results

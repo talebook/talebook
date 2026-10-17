@@ -21,6 +21,16 @@ func ManagedCoverPath(root string, id int64) string {
 // StoreCover stores only a bounded JPEG, never an ebook or a source-side file.
 // Existing artwork wins; linking the completed temporary file cannot overwrite it.
 func StoreCover(db *sql.DB, root string, id int64, data []byte) (bool, error) {
+	return storeCover(db, root, id, data, false)
+}
+
+// ReplaceCover is reserved for an explicit user selection. It atomically
+// replaces managed artwork and never writes beside an indexed source book.
+func ReplaceCover(db *sql.DB, root string, id int64, data []byte) (bool, error) {
+	return storeCover(db, root, id, data, true)
+}
+
+func storeCover(db *sql.DB, root string, id int64, data []byte, replace bool) (bool, error) {
 	if id <= 0 || root == "" {
 		return false, fmt.Errorf("invalid cover destination")
 	}
@@ -104,7 +114,11 @@ func StoreCover(db *sql.DB, root string, id int64, data []byte) (bool, error) {
 		return false, err
 	}
 	created := true
-	if err = os.Link(f.Name(), path); err != nil {
+	if replace {
+		if err = os.Rename(f.Name(), path); err != nil {
+			return false, err
+		}
+	} else if err = os.Link(f.Name(), path); err != nil {
 		if !os.IsExist(err) {
 			return false, err
 		}

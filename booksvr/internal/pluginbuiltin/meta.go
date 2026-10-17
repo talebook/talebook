@@ -254,6 +254,12 @@ func calibreResultToMetadata(r *metasource.CalibreIdentifyResult) map[string]any
 		"provider_key":   r.ProviderKey,
 		"provider_value": r.ProviderValue,
 		"author_sort":    r.AuthorSort,
+		"publisher":      r.Publisher,
+		"comments":       r.Comments,
+		"pubdate":        r.PubDate,
+		"tags":           r.Tags,
+		"series":         r.Series,
+		"language":       r.Language,
 	}
 	if len(r.Authors) > 0 {
 		mi["author"] = r.Authors[0]

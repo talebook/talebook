@@ -34,7 +34,7 @@ func reviewHTTPJSON(method, target string, headers map[string]string,
 	}
 	opts := safehttp.RequestOptions{
 		Headers: merged, Timeout: time.Duration(timeout) * time.Second, HasTimeout: true,
-}
+	}
 	if params != nil {
 		opts.Params = params
 	}
@@ -150,29 +150,34 @@ func reviewManifest(spec reviewSourceSpec) map[string]any {
 			"required": []any{"token"},
 		}
 	}
+	if spec.Key == "google_books" {
+		auth = map[string]any{"type": "object", "properties": map[string]any{
+			"api_key": map[string]any{"type": "string", "title": "Google Books API Key（可选）", "writeOnly": true},
+		}}
+	}
 	ui := map[string]any{
 		"icon":           spec.Icon,
 		"brand_icon":     spec.BrandIcon,
 		"primary_action": "configure",
 	}
 	return map[string]any{
-		"protocol_version": pluginproto.ProtocolVersion,
-		"id":               spec.PluginID,
-		"name":             spec.Name,
-		"description":      "保留 " + spec.Name + " 原始评分尺度、样本数、时间和来源链接。",
-		"version":          "1.0.0",
-		"categories":       []any{"reviews"},
-		"capabilities":     []any{"reviews.lookup"},
-		"runtime_kind":     "builtin",
-		"actions":          []any{"test", "preview", "run", "retry", "rollback"},
-		"auth_schema":      auth,
-		"config_schema":    map[string]any{"type": "object", "properties": map[string]any{"queries": map[string]any{"type": "array"}}},
-		"permissions":      []any{"books.read", "plugin_records.write", "network.read"},
-		"data_policy":      map[string]any{"stores_full_text": false, "retention": "rating_summary_and_source_link"},
-		"compatibility":    map[string]any{"talebook": ">=0.1.0"},
-		"homepage":         spec.Homepage,
-		"license":          "GPL-3.0",
-		"ui":               ui,
+		"protocol_version":  pluginproto.ProtocolVersion,
+		"id":                spec.PluginID,
+		"name":              spec.Name,
+		"description":       "保留 " + spec.Name + " 原始评分尺度、样本数、时间和来源链接。",
+		"version":           "1.0.0",
+		"categories":        []any{"reviews"},
+		"capabilities":      []any{"reviews.lookup"},
+		"runtime_kind":      "builtin",
+		"actions":           []any{"test", "preview", "run", "retry", "rollback"},
+		"auth_schema":       auth,
+		"config_schema":     map[string]any{"type": "object", "properties": map[string]any{"queries": map[string]any{"type": "array"}}},
+		"permissions":       []any{"books.read", "plugin_records.write", "network.read"},
+		"data_policy":       map[string]any{"stores_full_text": false, "retention": "rating_summary_and_source_link"},
+		"compatibility":     map[string]any{"talebook": ">=0.1.0"},
+		"homepage":          spec.Homepage,
+		"license":           "GPL-3.0",
+		"ui":                ui,
 		"connection_owners": []any{"instance"},
 	}
 }
@@ -185,10 +190,10 @@ type reviewParseFunc func(spec reviewSourceSpec, query map[string]any, externalI
 
 // CatalogReviewProvider 复刻 CatalogReviewProvider。
 type CatalogReviewProvider struct {
-	Spec       reviewSourceSpec
-	Manifest_  map[string]any
-	Fetch      reviewFetchFunc
-	Parse      reviewParseFunc
+	Spec      reviewSourceSpec
+	Manifest_ map[string]any
+	Fetch     reviewFetchFunc
+	Parse     reviewParseFunc
 }
 
 // newCatalogReviewProvider 构造目录评价源。
@@ -398,9 +403,21 @@ func neodbReviewParse(spec reviewSourceSpec, query map[string]any, externalID st
 
 func googleBooksFetch(context map[string]any, query map[string]any) (string, map[string]any, error) {
 	isbn := reviewQueryValue(query, "isbn")
-	params := url.Values{"q": {"isbn:" + isbn}}
+	keyword := "isbn:" + isbn
+	if isbn == "" {
+		title := strings.TrimSpace(reviewQueryValue(query, "title"))
+		if title == "" {
+			return "", nil, pluginproto.NewUpstreamError("查询 Google Books 评价需要 ISBN 或书名", "other", nil)
+		}
+		keyword = "intitle:" + title
+	}
+	params := url.Values{"q": {keyword}}
+	secrets, _ := context["secrets"].(map[string]any)
+	if key, _ := secrets["api_key"].(string); strings.TrimSpace(key) != "" {
+		params.Set("key", strings.TrimSpace(key))
+	}
 	payload, err := reviewHTTPJSON("GET", "https://www.googleapis.com/books/v1/volumes", nil, params, nil, 30)
-	return "google-books:" + isbn, payload, err
+	return "google-books:" + strings.TrimPrefix(keyword, "isbn:"), payload, err
 }
 
 func googleBooksParse(spec reviewSourceSpec, query map[string]any, externalID string, payload map[string]any) (map[string]any, error) {

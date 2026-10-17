@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"talebook/booksvr/internal/plugindomain"
@@ -478,7 +479,18 @@ var KindleConvertSender func(userID any, siteURL string, book map[string]any, ma
 
 // KindleProvider 复刻 KindleProvider。
 type KindleProvider struct {
-	ManifestDict map[string]any
+	ManifestDict  map[string]any
+	servicesMu    sync.RWMutex
+	mailSender    func(userID any, siteURL string, book map[string]any, mailbox, format, path string) error
+	convertSender func(userID any, siteURL string, book map[string]any, mailbox string) error
+}
+
+// BindServices may run when a new immutable settings snapshot is installed.
+// Requests keep the pair they started with while another snapshot is built.
+func (p *KindleProvider) BindServices(mail func(any, string, map[string]any, string, string, string) error, convert func(any, string, map[string]any, string) error) {
+	p.servicesMu.Lock()
+	defer p.servicesMu.Unlock()
+	p.mailSender, p.convertSender = mail, convert
 }
 
 // newKindleProvider 构造 Kindle 邮箱推送 provider。
@@ -533,7 +545,10 @@ func (p *KindleProvider) DefaultPort() int { return 0 }
 
 // SelfCheck 复刻 self_check。
 func (p *KindleProvider) SelfCheck(context map[string]any) (plugindomain.CheckReport, error) {
-	if KindleMailSender == nil {
+	p.servicesMu.RLock()
+	wired := p.mailSender != nil
+	p.servicesMu.RUnlock()
+	if !wired && KindleMailSender == nil {
 		return plugindomain.CheckReport{Healthy: false, Message: "Kindle 邮件发送服务未接入"}, nil
 	}
 	return plugindomain.CheckReport{
@@ -543,6 +558,15 @@ func (p *KindleProvider) SelfCheck(context map[string]any) (plugindomain.CheckRe
 
 // Push 复刻 push：epub/pdf/txt 走邮件，azw3/mobi 走转换，否则不支持。
 func (p *KindleProvider) Push(bookFile any, target any, context any) (any, error) {
+	p.servicesMu.RLock()
+	mailSender, convertSender := p.mailSender, p.convertSender
+	p.servicesMu.RUnlock()
+	if mailSender == nil {
+		mailSender = KindleMailSender
+	}
+	if convertSender == nil {
+		convertSender = KindleConvertSender
+	}
 	ctx, _ := context.(map[string]any)
 	if ctx == nil {
 		ctx = map[string]any{}
@@ -562,22 +586,22 @@ func (p *KindleProvider) Push(bookFile any, target any, context any) (any, error
 	for _, format := range []string{"epub", "pdf", "txt"} {
 		path := stringOr(book["fmt_"+format], "")
 		if path != "" {
-			if KindleMailSender == nil {
+			if mailSender == nil {
 				return nil, pluginproto.NewUpstreamError(
 					"邮件服务未接线，无法发送 Kindle 邮件", "other", nil)
 			}
-			if err := KindleMailSender(userID, siteURL, book, mailbox, format, path); err != nil {
+			if err := mailSender(userID, siteURL, book, mailbox, format, path); err != nil {
 				return nil, err
 			}
 			return map[string]any{"success": true, "queued": true, "converting": false}, nil
 		}
 	}
 	if stringOr(book["fmt_azw3"], "") != "" || stringOr(book["fmt_mobi"], "") != "" {
-		if KindleConvertSender == nil {
+		if convertSender == nil {
 			return nil, pluginproto.NewUpstreamError(
 				"转换服务未接线，无法转换后发送 Kindle 邮件", "other", nil)
 		}
-		if err := KindleConvertSender(userID, siteURL, book, mailbox); err != nil {
+		if err := convertSender(userID, siteURL, book, mailbox); err != nil {
 			return nil, err
 		}
 		return map[string]any{"success": true, "queued": true, "converting": true}, nil

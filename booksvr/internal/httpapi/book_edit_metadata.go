@@ -27,6 +27,11 @@ func normalizeBookEditArgs(args map[string]any) map[string]any {
 }
 
 func updateAdditionalBookMeta(tx *sql.Tx, bookID int64, args map[string]any) error {
+	if value, ok := args["author_sort"]; ok {
+		if _, err := tx.Exec(`UPDATE books SET author_sort=? WHERE id=?`, strings.TrimSpace(stringOf(value)), bookID); err != nil {
+			return err
+		}
+	}
 	// Table and column names are constants, never supplied by the request.
 	for _, field := range []struct{ key, table, column, link, linkColumn string }{
 		{"publisher", "publishers", "name", "books_publishers_link", "publisher"},

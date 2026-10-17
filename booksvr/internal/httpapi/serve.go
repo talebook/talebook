@@ -272,7 +272,7 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 // 系统设置页的「测试连接」「迁移数据库」「测试邮件」都返回「未接线」。
 func newAdminConfig(opts ServeOptions, userDB, libraryDB *sql.DB) AdminConfig {
 	opdsWiring := newAdminOpdsWiring(userDB, opts.Settings)
-	bookWiring := newBookWiring(userDB, libraryDB, opts.Settings, opts.PluginRegistry)
+	bookWiring := newBookWiring(userDB, libraryDB, opts.Settings, opts.PluginRegistry).withSettingsPath(opts.SettingsPath)
 	bookWiring.libraryRoot = opts.LibraryRoot
 	return AdminConfig{
 		DeleteManagedBook: bookWiring.bookDelete,
@@ -612,6 +612,7 @@ func newServeDispatcher(opts ServeOptions, db, userDB *sql.DB) (*Dispatcher, err
 		},
 	})...)
 	specs = append(specs, UserRouteSpecs(UserConfig{
+		Registry:     opts.PluginRegistry,
 		Auth:         authCfg,
 		DB:           userDB,
 		Settings:     opts.Settings,

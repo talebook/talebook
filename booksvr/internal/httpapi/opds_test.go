@@ -13,6 +13,37 @@ import (
 	"talebook/booksvr/internal/library"
 )
 
+// TestOpdsReaderCompatibility checks legacy MIME discovery and Atom content.
+func TestOpdsReaderCompatibility(t *testing.T) {
+	fx := newOpdsFixture(t)
+	ctx := pluginCtx(t, fx.DB, http.MethodGet, "/opds/", "", 0, false)
+	raw, err := opdsTopLevelFeed(fx.Cfg, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := pluginRecorder(ctx).Header().Get("Content-Type"); got != "application/atom+xml; charset=utf-8" {
+		t.Fatalf("MIME=%s", got)
+	}
+	var feed atomFeedXML
+	if err := xml.Unmarshal(raw, &feed); err != nil {
+		t.Fatal(err)
+	}
+	for _, link := range feed.Links {
+		if link.Rel == "self" || link.Rel == "start" {
+			if !strings.Contains(link.Type, "type=feed") || !strings.Contains(link.Type, "kind=navigation") || strings.Contains(link.Type, "charset") {
+				t.Fatalf("link=%+v", link)
+			}
+		}
+	}
+	entry := opdsAcquisitionEntry(fx.Cfg, library.BookData{ID: 1, Title: "西游记", Comments: "介绍 & 内容", Formats: []string{"EPUB"}}, time.Now(), "")
+	if !strings.HasPrefix(entry.Content.Inner, `<div xmlns="http://www.w3.org/1999/xhtml">`) || !strings.HasSuffix(entry.Content.Inner, "</div>") {
+		t.Fatalf("invalid Atom XHTML=%s", entry.Content.Inner)
+	}
+	if entry.Links[1].Rel != "http://opds-spec.org/image" || entry.Links[2].Rel != "http://opds-spec.org/image/thumbnail" {
+		t.Fatalf("artwork links=%+v", entry.Links)
+	}
+}
+
 // opdsFixture 是一次 OPDS 测试的完整环境。
 type opdsFixture struct {
 	DB  *sql.DB
@@ -233,7 +264,7 @@ func TestOpdsIndexFeed(t *testing.T) {
 	if !strings.Contains(body, "calibre-nav:") {
 		t.Error("应含导航 entry id")
 	}
-	if ct := pluginRecorder(ctx).Header().Get("Content-Type"); ct != opdsNavContentType {
+	if ct := pluginRecorder(ctx).Header().Get("Content-Type"); ct != opdsHTTPContentType {
 		t.Errorf("Content-Type = %q", ct)
 	}
 }
@@ -274,7 +305,7 @@ func TestOpdsAllBooksTitle(t *testing.T) {
 	if strings.Index(body, "A书") > strings.Index(body, "B书") {
 		t.Error("应按标题升序")
 	}
-	if ct := pluginRecorder(ctx).Header().Get("Content-Type"); ct != opdsContentType {
+	if ct := pluginRecorder(ctx).Header().Get("Content-Type"); ct != opdsHTTPContentType {
 		t.Errorf("Content-Type = %q", ct)
 	}
 }
@@ -449,10 +480,10 @@ func TestOpdsCategoryBooks(t *testing.T) {
 	if !strings.Contains(body, "http://opds-spec.org/acquisition") {
 		t.Error("应含 acquisition rel")
 	}
-	if !strings.Contains(body, "http://opds-spec.org/cover") {
+	if !strings.Contains(body, "http://opds-spec.org/image") {
 		t.Error("应含 cover rel")
 	}
-	if !strings.Contains(body, "http://opds-spec.org/thumbnail") {
+	if !strings.Contains(body, "http://opds-spec.org/image/thumbnail") {
 		t.Error("应含 thumbnail rel")
 	}
 }

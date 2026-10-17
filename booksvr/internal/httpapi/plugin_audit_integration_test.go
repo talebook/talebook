@@ -58,7 +58,7 @@ func TestOpdsBulkVisibilityAndNavigationTypes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(ctx.Writer.Header().Get("Content-Type"), "kind=navigation") || !bytes.Contains(nav, []byte(`rel="subsection"`)) || !bytes.Contains(nav, []byte("kind=acquisition")) {
+	if ctx.Writer.Header().Get("Content-Type") != opdsHTTPContentType || !bytes.Contains(nav, []byte("kind=navigation")) || !bytes.Contains(nav, []byte(`rel="subsection"`)) || !bytes.Contains(nav, []byte("kind=acquisition")) {
 		t.Fatalf("invalid OPDS discovery metadata: %s", nav)
 	}
 }

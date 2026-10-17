@@ -142,6 +142,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # 第三阶段，应用服务运行环境
 # 只挂载 wheel 构建产物，编译器和 Python headers 不进入本阶段及其后代镜像。
 FROM application-base AS server
+ARG TARGETARCH
 
 COPY requirements.txt /tmp/
 RUN --mount=from=python-wheel-build,source=/opt/wheels,target=/tmp/talebook-wheels,ro \
@@ -151,6 +152,15 @@ RUN --mount=from=python-wheel-build,source=/opt/wheels,target=/tmp/talebook-whee
         --find-links=/tmp/talebook-wheels \
         psutil cffi "pillow>=10.4.0" && \
     python3 -m pip install -r /tmp/requirements.txt
+
+# Bundle the exact audited downloader on its supported Linux architectures.
+# No downloads or executable installation happen when a user opens a plugin.
+COPY scripts/install_tomato_downloader.py /tmp/talebook-runtime-installer/scripts/
+COPY document/licenses/tomato-novel-downloader-MIT.txt document/licenses/tomato-novel-downloader-NOTICE.md /tmp/talebook-runtime-installer/document/licenses/
+RUN case "$TARGETARCH" in \
+        amd64|arm64) python3 /tmp/talebook-runtime-installer/scripts/install_tomato_downloader.py --directory /opt/tomato --arch "$TARGETARCH" ;; \
+        *) echo "Tomato downloader is unavailable on $TARGETARCH" ;; \
+    esac && rm -rf /tmp/talebook-runtime-installer
 
 
 # ----------------------------------------

@@ -12,7 +12,7 @@
 
 ## 安装与配置
 
-下载器是可选依赖；只支持 Talebook 所在的 Linux amd64 / arm64 环境。使用静态 musl 发行文件，不依赖 glibc 版本，也不要求 Rust、Node 或 Wine。
+Linux amd64 / arm64 镜像在构建时安装固定版本下载器，默认路径为 `/opt/tomato/downloader`。使用静态 musl 发行文件，不依赖 glibc 版本，也不要求 Rust、Node 或 Wine。其他架构不包含此下载器。自定义运行环境或需要单独挂载下载器时使用下列步骤。
 
 在 Talebook 仓库目录执行（Docker Desktop 用户按 **容器** 架构选择）：
 

@@ -48,7 +48,7 @@
                             hide-details
                         />
                         <v-select
-                            v-model="device.type"
+                            :model-value="device.type"
                             :items="typeItemsFor(device)"
                             item-title="title"
                             item-value="value"
@@ -56,7 +56,7 @@
                             density="compact"
                             variant="outlined"
                             hide-details
-                            @update:model-value="applyTypeDefaults(device)"
+                            @update:model-value="applyDeviceTypeDefaults(device, enabledTypeItems, $event)"
                         />
                         <v-text-field
                             v-if="device.type === 'kindle'"
@@ -137,6 +137,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { applyDeviceTypeDefaults } from '@/utils/deviceTypes';
 
 const props = defineProps({
     availableTypes: { type: Array, default: () => [] },
@@ -173,12 +174,6 @@ function typeItemsFor(device) {
         ...enabledTypeItems.value,
         { title: t('pluginManagement.disabledDeviceType', { type: device.type }), value: device.type, props: { disabled: true } },
     ];
-}
-
-function applyTypeDefaults(device) {
-    const selected = enabledTypeItems.value.find(item => item.value === device.type);
-    if (selected && !device.port) device.port = selected.defaultPort;
-    if (!device.schema) device.schema = 'http';
 }
 
 function addDevice() {

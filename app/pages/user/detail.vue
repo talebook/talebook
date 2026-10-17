@@ -175,7 +175,7 @@
                     md="2"
                 >
                     <v-select
-                        v-model="device.type"
+                        :model-value="device.type"
                         :items="deviceTypes"
                         item-title="text"
                         item-value="value"
@@ -183,6 +183,7 @@
                         variant="underlined"
                         density="compact"
                         hide-details
+                        @update:model-value="applyDeviceTypeDefaults(device, availableDeviceTypes, $event)"
                     />
                 </v-col>
                 <template v-if="device.type === 'kindle'">
@@ -309,6 +310,7 @@ import { computed, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
+import { applyDeviceTypeDefaults } from '@/utils/deviceTypes';
 
 const { $backend, $alert } = useNuxtApp();
 const router = useRouter();

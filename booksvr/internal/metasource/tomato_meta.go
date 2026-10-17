@@ -56,24 +56,56 @@ func (s *TomatoSource) GetBook(title, author string, copyImage bool) map[string]
 		if r.Title == title {
 			if author == "" || r.Author == author {
 				if page := s.GetBookByID(r.BookID); page != nil {
-					return s.BuildMetadata(page, copyImage)
+					if metadata := s.BuildMetadata(page, copyImage); metadata != nil {
+						return metadata
+					}
 				}
+				return s.searchResultMetadata(r, copyImage)
 			}
 		}
 	}
 	if page := s.GetBookByID(results[0].BookID); page != nil {
-		return s.BuildMetadata(page, copyImage)
+		if metadata := s.BuildMetadata(page, copyImage); metadata != nil {
+			return metadata
+		}
 	}
-	return nil
+	return s.searchResultMetadata(results[0], copyImage)
 }
 
 // GetBookByIDDirect 复刻 get_book_by_id_direct。
 func (s *TomatoSource) GetBookByIDDirect(bookID string, copyImage bool) map[string]any {
 	page := s.GetBookByID(bookID)
-	if page == nil {
+	if page != nil {
+		if metadata := s.BuildMetadata(page, copyImage); metadata != nil {
+			return metadata
+		}
+	}
+	// The public web page can be withdrawn while the search API still carries a
+	// valid catalog record. Only accept the exact requested ID, never another book.
+	for _, result := range s.SearchBook(bookID, "") {
+		if result.BookID == bookID {
+			return s.searchResultMetadata(result, copyImage)
+		}
+	}
+	return nil
+}
+
+func (s *TomatoSource) searchResultMetadata(result TomatoSearchResult, copyImage bool) map[string]any {
+	if result.BookID == "" || result.Title == "" || result.Title == "未知书名" {
 		return nil
 	}
-	return s.BuildMetadata(page, copyImage)
+	metadata := map[string]any{
+		"title": result.Title, "authors": []any{result.Author}, "author": result.Author,
+		"author_sort": result.Author, "comments": result.Description, "cover_url": result.CoverURL,
+		"website": result.URL, "source": "番茄小说", "provider_key": TomatoKey,
+		"provider_value": result.BookID, "isbn": TomatoISBN, "tags": []any{}, "cover_data": nil,
+	}
+	if copyImage && result.CoverURL != "" {
+		if cover := s.GetCover(result.CoverURL); cover != nil {
+			metadata["cover_data"] = []any{cover.Extension, cover.Content}
+		}
+	}
+	return metadata
 }
 
 // tomatoPromoMarkers 复刻无效推广页面的简介特征。
@@ -83,6 +115,9 @@ var tomatoPromoMarkers = []string{"番茄小说是抖音旗下", "海量正版�
 func (s *TomatoSource) BuildMetadata(page *TomatoPage, copyImage bool) map[string]any {
 	info := page.GetInfo()
 	comments := page.GetSummary()
+	if info.Title == "" || strings.HasPrefix(info.Title, "未知") {
+		return nil
+	}
 
 	// 检测番茄小说无效推广页面。
 	if info.Title != "" && (strings.Contains(info.Title, "番茄小说") || strings.HasPrefix(info.Title, "未知")) {
