@@ -1,0 +1,258 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>全部内置插件逐项验收 · ACTIVE</title><style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style></head><body><main class="page"><header class="hero"><h1>全部内置插件逐项验收与 OPDS 修复</h1><p>创建日期：2026-10-17 · 所属模块：booksvr · 状态：ACTIVE</p><p>来源：Open Library 搜索 EOF；用户要求逐个测试全部插件，并反馈静读天下显示 XML、大书库 OPDS 可能超时。</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>39 个插件全部建立逐项记录，区分受控功能验证、真实服务验证和缺少账号、设备、下载器等实际条件。不得将注册成功、自检静态文案或空结果当作功能通过。保护生产账号、设置、导入任务与书籍正文，默认仅索引原文件。</p></section>
+<section class="card"><h2>方案与实现</h2><ol>
+<li>HTTP 连接错误区分中断与超时，隐藏 URL 查询与凭据。只读失败可以安全重试，写入中断不自动重试；运行时脱敏保留重试属性。</li>
+<li>Open Library 搜索、作品/版本详情、作者与封面加载形成完整路径。封面只允许 HTTPS Open Library 入口以及 Internet Archive 的受限公共 HTTPS 存储跳转，不放宽其他请求的默认同源策略。</li>
+<li>修复 BRS 中文评论截断越界、通用 CSV/JSON 评分字段、WebDAV 绝对地址、番茄下载器重复创建任务与 EPUB 根文件解析。</li>
+<li>规范化运行时分页、书籍详情和正文的值/指针边界，同时接受指针入参，防止真实插件返回值被 HTTP 接口拒绝。</li>
+<li>修复外部书源保存遗漏注册表、目录库和账号库混用、二进制字节/章节结果丢失。新下载文件使用独立文件名；登记真实大小；创建私有归属记录。</li>
+<li>Watch Folder 可选择任意可读目录；读取限制在选定目录内，取得本地书籍返回原路径并仅索引，绝不复制正文。</li>
+<li>OPDS 先加载轻量排序字段，再只读取当前页完整元数据；批量过滤权限；修正稳定降序、末页起点、导航关系与响应类型。Nginx 使用相对跳转，避免丢失对外端口；部署前缀配置避免重复指令。</li>
+<li>Venera 从固定提交的原始文件地址加载脚本，保留 SHA-256 校验，避免 GitHub API 403 配额限制。Calibre 与 Kindle 的服务缺失必须在自检/执行时明确失败。</li>
+</ol><p>规格同步：spec/外部访问.md、spec/插件/插件平台.md、外部书库源.md、元数据源.md、评价源.md、发送到设备.md、Venera.md。</p></section>
+<section class="card"><h2>测试结果</h2><p>Go 全量 42 个有测试的包通过；2 个需要非 root 权限的失败场景另以 UID 911 通过；go vet 与二进制构建通过。Python 部署前缀与 Nginx 模板测试 32 例通过。初期探索中的旧版本失败保留在日志中，最终统一源码回归以 coherent 日志为准。</p>
+<p>受控测试覆盖 39 个插件的适用路径；番茄下载器只验证请求、失败处理与校验组件，完整二进制进程链没有运行。真实服务审计：10 个通过、6 个未通过、6 个本地功能通过、17 个缺少账号/配置/设备/下载器或接线条件。</p>
+<p>Open Library 已从 leonFN 以“西游记”实测返回 20 条候选，加载 /works/OL21004525W 详情，并下载 52,756 字节封面（5.68 秒完整测试）。Venera 真实浏览返回 20 条，Internet Archive 29 条、Project Gutenberg 113 条、Standard Ebooks 15 条；条目数不等于不同图书数量。</p>
+<p>不向真实外部账号、邮箱或设备发送内容；微信读书的个人书架/笔记/扩展操作、BRS 推送/删除/投票、真实硬件接收、所有漫画章节与图片均未实连，不能从受控测试推断这些集成可用。</p>
+<div style="overflow-x:auto" tabindex="0" aria-label="39 个插件逐项结果"><table><thead><tr><th>插件 ID</th><th>名称</th><th>核心检查</th><th>真实环境结果</th><th>条目数</th><th>条件或失败原因</th></tr></thead><tbody><tr><td>talebook.combo.weread</td><td>微信读书</td><td>受控请求、解析与失败路径通过</td><td>缺少测试账号</td><td>—</td><td>未提供测试账号或令牌；仅受控响应测试，不向真实账号写入</td></tr><tr><td>talebook.combo.open-library</td><td>Open Library</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>1</td><td></td></tr><tr><td>talebook.source.opds</td><td>Generic OPDS</td><td>受控请求、解析与失败路径通过</td><td>缺少测试服务配置</td><td>—</td><td>没有独立测试服务或已绑定书源；协议功能以隔离服务验证</td></tr><tr><td>talebook.source.legado</td><td>Legado 在线书源</td><td>受控请求、解析与失败路径通过</td><td>缺少测试服务配置</td><td>—</td><td>没有独立测试服务或已绑定书源；协议功能以隔离服务验证</td></tr><tr><td>talebook.source.kavita</td><td>Kavita</td><td>受控请求、解析与失败路径通过</td><td>缺少测试服务配置</td><td>—</td><td>没有独立测试服务或已绑定书源；协议功能以隔离服务验证</td></tr><tr><td>talebook.source.komga</td><td>Komga</td><td>受控请求、解析与失败路径通过</td><td>缺少测试服务配置</td><td>—</td><td>没有独立测试服务或已绑定书源；协议功能以隔离服务验证</td></tr><tr><td>talebook.source.booklore</td><td>BookLore</td><td>受控请求、解析与失败路径通过</td><td>缺少测试服务配置</td><td>—</td><td>没有独立测试服务或已绑定书源；协议功能以隔离服务验证</td></tr><tr><td>talebook.source.standard-ebooks</td><td>Standard Ebooks · 最新上架</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>15</td><td></td></tr><tr><td>talebook.source.gutenberg</td><td>Project Gutenberg</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>113</td><td></td></tr><tr><td>talebook.source.internet-archive</td><td>Internet Archive</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>26</td><td></td></tr><tr><td>talebook.source.webdav</td><td>WebDAV</td><td>受控请求、解析与失败路径通过</td><td>缺少测试服务配置</td><td>—</td><td>没有独立测试服务或已绑定书源；协议功能以隔离服务验证</td></tr><tr><td>talebook.source.watch-folder</td><td>Watch Folder</td><td>真实运行时链路通过；仅索引入库，无正文副本</td><td>本地文件功能通过</td><td>—</td><td>本地扫描/工具由独立临时文件验证</td></tr><tr><td>talebook.source.tomato-downloader</td><td>番茄小说下载器</td><td>任务请求、失败处理与 EPUB 校验通过；完整进程链受阻</td><td>缺少外部下载器</td><td>—</td><td>当前运行环境没有 /opt/tomato/downloader</td></tr><tr><td>talebook.source.venera</td><td>Venera 漫画源</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>20</td><td></td></tr><tr><td>talebook.meta.douban-v2</td><td>豆瓣</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>1</td><td></td></tr><tr><td>talebook.meta.baike</td><td>百度百科</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>1</td><td></td></tr><tr><td>talebook.meta.calibre</td><td>Calibre 元数据</td><td>受控 Identify 测试通过；生产检索适配器没有接线</td><td>真实服务未通过</td><td>0</td><td>Calibre 元数据检索服务未接入，请选择其他元数据源</td></tr><tr><td>talebook.meta.xhsd</td><td>新华书店</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>1</td><td></td></tr><tr><td>talebook.meta.tomato</td><td>番茄小说</td><td>受控请求、解析与失败路径通过</td><td>真实服务未通过</td><td>0</td><td>搜索 API 可访问，但所抽样详情返回 404 或推广页，未得到可用元数据</td></tr><tr><td>talebook.meta.qimao</td><td>七猫小说</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>1</td><td></td></tr><tr><td>talebook.meta.neodb</td><td>NeoDB</td><td>受控请求、解析与失败路径通过</td><td>真实服务未通过</td><td>0</td><td>leonFN 访问 neodb.social 返回 EOF</td></tr><tr><td>talebook.review.hardcover</td><td>Hardcover</td><td>受控请求、解析与失败路径通过</td><td>缺少测试账号</td><td>—</td><td>未提供测试账号或令牌；仅受控响应测试，不向真实账号写入</td></tr><tr><td>talebook.review.neodb</td><td>NeoDB 评价</td><td>受控请求、解析与失败路径通过</td><td>真实服务未通过</td><td>0</td><td>leonFN 访问 neodb.social 返回 EOF</td></tr><tr><td>talebook.review.google-books</td><td>Google Books 评价</td><td>受控请求、解析与失败路径通过</td><td>真实服务未通过</td><td>0</td><td>Google Books 返回 HTTP 429（配额或限流）</td></tr><tr><td>talebook.review.bangumi</td><td>Bangumi 漫画评价</td><td>受控请求、解析与失败路径通过</td><td>真实服务未通过</td><td>0</td><td>leonFN 访问 api.bgm.tv 返回 EOF</td></tr><tr><td>talebook.review.anilist</td><td>AniList 漫画评价</td><td>受控请求、解析与失败路径通过</td><td>真实服务通过</td><td>1</td><td></td></tr><tr><td>talebook.review.file-import</td><td>评价文件导入</td><td>受控请求、解析与失败路径通过</td><td>本地文件功能通过</td><td>—</td><td>本地扫描/工具由独立临时文件验证</td></tr><tr><td>talebook.annotation.brs</td><td>talebook-brs 章评服务器</td><td>受控请求、解析与失败路径通过</td><td>缺少测试账号</td><td>—</td><td>未提供测试账号或令牌；仅受控响应测试，不向真实账号写入</td></tr><tr><td>talebook.tool.text-replace</td><td>正文查找替换</td><td>实际临时文件输出通过；EPUB 美化覆盖 12×4 个组合</td><td>本地文件功能通过</td><td>—</td><td>本地扫描/工具由独立临时文件验证</td></tr><tr><td>talebook.tool.zh-converter</td><td>繁简转换</td><td>实际临时文件输出通过；EPUB 美化覆盖 12×4 个组合</td><td>本地文件功能通过</td><td>—</td><td>本地扫描/工具由独立临时文件验证</td></tr><tr><td>talebook.tool.txt-fixer</td><td>TXT编码修复</td><td>实际临时文件输出通过；EPUB 美化覆盖 12×4 个组合</td><td>本地文件功能通过</td><td>—</td><td>本地扫描/工具由独立临时文件验证</td></tr><tr><td>talebook.tool.epub-beautify</td><td>EPUB 美化</td><td>实际临时文件输出通过；EPUB 美化覆盖 12×4 个组合</td><td>本地文件功能通过</td><td>—</td><td>本地扫描/工具由独立临时文件验证</td></tr><tr><td>talebook.push.kindle</td><td>Kindle 邮箱推送</td><td>回调分派与拒绝路径通过；生产邮件服务没有接线</td><td>发送服务未接入</td><td>—</td><td>邮件回调未接入；不得将静态自检认作发送成功</td></tr><tr><td>talebook.push.duokan</td><td>多看阅读</td><td>受控请求、解析与失败路径通过</td><td>缺少真实设备</td><td>—</td><td>未提供对应真实设备；已验证独立 multipart 请求和拒绝路径</td></tr><tr><td>talebook.push.boox</td><td>文石 BOOX</td><td>受控请求、解析与失败路径通过</td><td>缺少真实设备</td><td>—</td><td>未提供对应真实设备；已验证独立 multipart 请求和拒绝路径</td></tr><tr><td>talebook.push.hanwang</td><td>汉王电纸书</td><td>受控请求、解析与失败路径通过</td><td>缺少真实设备</td><td>—</td><td>未提供对应真实设备；已验证独立 multipart 请求和拒绝路径</td></tr><tr><td>talebook.push.ireader</td><td>掌阅 iReader</td><td>受控请求、解析与失败路径通过</td><td>缺少真实设备</td><td>—</td><td>未提供对应真实设备；已验证独立 multipart 请求和拒绝路径</td></tr><tr><td>talebook.push.dangdang</td><td>当当阅读器</td><td>受控请求、解析与失败路径通过</td><td>缺少真实设备</td><td>—</td><td>未提供对应真实设备；已验证独立 multipart 请求和拒绝路径</td></tr><tr><td>talebook.push.purelibro</td><td>PureLibro</td><td>受控请求、解析与失败路径通过</td><td>缺少真实设备</td><td>—</td><td>未提供对应真实设备；已验证独立 multipart 请求和拒绝路径</td></tr></tbody></table></div></section>
+<section class="card"><h2>界面审查：interface-review full</h2><p>当前分支相对默认 origin/master 的 merge-base 为 d5d21dda160d65d29cc0c9ab8a13ae6b4deb69d2，44 个提交、767 个已提交变更路径，加当前未提交内容。排除生成产物、锁文件、字典、字体与二进制。前端源码相对 79ef94c 没有改动；继承已完成的 27 个界面源码与 5 个消费者审查证据，补查本次服务端错误文案、元数据候选、书源取得与 OPDS 消费路径。</p>
+<p>六个领域 skill 均已加载：accessibility、layout、writing、typography、colors、ui。页面结构、焦点、排版与配色没有新增变动；中文错误说明服务与可采取的操作，OPDS 保留 XML 协议。未发现本次引入的可操作界面问题。手机静读天下实机识别、320px 与 200% 放大、暗色及屏幕阅读器仍未验证，不以源码检查冒充实机结果。</p>
+<p>曾考虑替换 XML 为 HTML，但这会破坏 OPDS 消费者，拒绝；曾考虑放宽全部跨源跳转，改为仅封面请求的公共 HTTPS 存储规则；“已启用”被中文界面显示为“正常”的既有文案不等于外部服务已实连，逐项报告明确分开。当前变化的界面结论：源码范围无新增问题；手机实机结果待用户复测。</p></section>
+<section class="card"><h2>部署与保护</h2><p>副本启动时，因为源书目录只读挂载，标准 bootstrap 的写入自检失败；随后在隔离副本中直接启动 Go 与 Nginx 完成验收。正式部署使用原有挂载和标准 bootstrap，实际全部自检通过，bootstrap 以预期状态 0 退出，booksvr 与 Nginx 正常运行。</p><p>生产镜像 sha256:6ecb7054dfc86936b18a6196fb3e1dfd1ee04f5bc79639c11c38e00d9c49cdca；二进制 SHA-256 a24dbd1179602470660b9a5bbe247597dbea49312171413a2547643457c19df5。生产副本保护目录为 /vol1/1000/talebook/books/repairs/20261017-plugin-audit/。生产浏览器复测 /admin/settings/plugins 展示 39 个插件，/read/3 显示实际 EPUB 正文，未再次进入安装页。手机上的静读天下仍待用户复测。</p><p>候选镜像沿用已部署前端，只替换经过验证的 Go 二进制与 Nginx 配置；先用隔离数据库副本启动并测 OPDS，再切换生产。保留三个挂载、端口、账号、站点设置、书库位置和仅索引配置；确认没有正在导入的记录后才切换。保留旧镜像与数据库快照用于回退；验收后删除旧容器和临时容器，不删除任何卷。</p><h3>副本验收</h3><pre>{
+  &quot;mode&quot;: &quot;stage&quot;,
+  &quot;book_count&quot;: 89173,
+  &quot;page_size&quot;: 50,
+  &quot;last_page_entries&quot;: 23,
+  &quot;redirect_location&quot;: &quot;/opds/&quot;,
+  &quot;page_ids_disjoint&quot;: true,
+  &quot;copied_import_format_paths&quot;: 0,
+  &quot;requests&quot;: {
+    &quot;root&quot;: {
+      &quot;seconds&quot;: 0.754,
+      &quot;bytes&quot;: 2644,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=navigation;charset=UTF-8&quot;
+    },
+    &quot;newest&quot;: {
+      &quot;seconds&quot;: 2.016,
+      &quot;bytes&quot;: 26067,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;next&quot;: {
+      &quot;seconds&quot;: 2.229,
+      &quot;bytes&quot;: 26319,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;last&quot;: {
+      &quot;seconds&quot;: 2.111,
+      &quot;bytes&quot;: 15488,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;title&quot;: {
+      &quot;seconds&quot;: 4.829,
+      &quot;bytes&quot;: 31547,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;authors&quot;: {
+      &quot;seconds&quot;: 0.638,
+      &quot;bytes&quot;: 9387,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=navigation;charset=UTF-8&quot;
+    },
+    &quot;search&quot;: {
+      &quot;seconds&quot;: 1.877,
+      &quot;bytes&quot;: 11377,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    }
+  }
+}</pre><h3>生产验收</h3><pre>{
+  &quot;mode&quot;: &quot;production&quot;,
+  &quot;book_count&quot;: 89173,
+  &quot;page_size&quot;: 50,
+  &quot;last_page_entries&quot;: 23,
+  &quot;redirect_location&quot;: &quot;/opds/&quot;,
+  &quot;page_ids_disjoint&quot;: true,
+  &quot;copied_import_format_paths&quot;: 0,
+  &quot;requests&quot;: {
+    &quot;root&quot;: {
+      &quot;seconds&quot;: 0.789,
+      &quot;bytes&quot;: 2644,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=navigation;charset=UTF-8&quot;
+    },
+    &quot;newest&quot;: {
+      &quot;seconds&quot;: 2.406,
+      &quot;bytes&quot;: 26067,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;next&quot;: {
+      &quot;seconds&quot;: 2.873,
+      &quot;bytes&quot;: 26319,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;last&quot;: {
+      &quot;seconds&quot;: 3.158,
+      &quot;bytes&quot;: 15488,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;title&quot;: {
+      &quot;seconds&quot;: 5.236,
+      &quot;bytes&quot;: 31547,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    },
+    &quot;authors&quot;: {
+      &quot;seconds&quot;: 0.775,
+      &quot;bytes&quot;: 9387,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=navigation;charset=UTF-8&quot;
+    },
+    &quot;search&quot;: {
+      &quot;seconds&quot;: 2.34,
+      &quot;bytes&quot;: 11377,
+      &quot;content_type&quot;: &quot;application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8&quot;
+    }
+  }
+}</pre></section></main></body></html>

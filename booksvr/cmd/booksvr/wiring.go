@@ -118,7 +118,7 @@ func (w *serviceWiring) serviceSet() httpapi.ServiceSet {
 		PluginRegistry:    w.pluginRegistry,
 		ComicService:      w.comicService,
 		SaveOnline: func(ctx *httpapi.Context, sourceKey, bookURL, format string, clean bool, taskID int64) error {
-			return httpapi.NewSaveOnlineFunc(w.db, w.liveSettings())(ctx, sourceKey, bookURL, format, clean, taskID)
+			return httpapi.NewSaveOnlineWithLibrary(w.db, w.libraryDB, w.liveSettings(), w.pluginRegistry)(ctx, sourceKey, bookURL, format, clean, taskID)
 		},
 		AnnotationSyncer: w,
 		WebDAVServe: func(ctx *httpapi.Context) bool {

@@ -437,6 +437,8 @@ func (c Category) ToDict() map[string]any {
 
 // BookFile 是书源下载的文件。
 type BookFile struct {
+	// LocalPath identifies a verified local source to index without copying its body.
+	LocalPath string
 	Filename  string
 	Content   []byte
 	Format    string

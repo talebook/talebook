@@ -667,6 +667,19 @@ func newServeDispatcher(opts ServeOptions, db, userDB *sql.DB) (*Dispatcher, err
 	specs = append(specs, OpdsRouteSpecs(OpdsConfig{
 		DB:       db,
 		Settings: opts.Settings,
+		FilterVisibleBookIDs: func(ctx *Context, ids []int64) ([]int64, error) {
+			private, err := userdb.PrivateBookIDsFor(userDB, ctx.Identity.UserID, ctx.Identity.IsAdmin)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]int64, 0, len(ids))
+			for _, id := range ids {
+				if !private[id] {
+					out = append(out, id)
+				}
+			}
+			return out, nil
+		},
 	})...)
 	specs = append(specs, AdminRouteSpecs(newAdminConfig(opts, userDB, db))...)
 

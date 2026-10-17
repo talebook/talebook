@@ -114,8 +114,8 @@ func TestNewOpdsOffsets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
-	// last_offset = (total-1) - delta = 24 - 10 = 14。
-	if o.Offset != 0 || o.NextOffset != 10 || o.PreviousOffset != 0 || o.LastOffset != 14 {
+	// The final page starts at offset 20 and includes the remaining five books.
+	if o.Offset != 0 || o.NextOffset != 10 || o.PreviousOffset != 0 || o.LastOffset != 20 {
 		t.Errorf("offsets = %+v", o)
 	}
 

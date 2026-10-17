@@ -12,7 +12,8 @@ def configure(text, prefix=BASE_PATH):
     prefix = normalize_base_path(prefix)
     if not prefix:
         return text
-    text = text.replace("    server_name _;", "    server_name _;\n    absolute_redirect off;")
+    if "absolute_redirect off;" not in text:
+        text = text.replace("    server_name _;", "    server_name _;\n    absolute_redirect off;")
     for path in ("/opds/", "/books/"):
         text = text.replace("return 302 " + path + ";", "return 302 " + prefix + path + ";")
     # Nuxt's server accepts the public base URL, unlike Tornado's internal routes.

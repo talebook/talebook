@@ -142,7 +142,9 @@ func RedactedException(err error, secrets map[string]any) error {
 		case "provider_unauthorized":
 			return pluginproto.NewUpstreamAuthError(message, upstreamErr.ErrorType, upstreamErr.StatusCode)
 		default:
-			return pluginproto.NewUpstreamError(message, upstreamErr.ErrorType, upstreamErr.StatusCode)
+			out := pluginproto.NewUpstreamError(message, upstreamErr.ErrorType, upstreamErr.StatusCode)
+			out.Retryable = upstreamErr.Retryable
+			return out
 		}
 	}
 

@@ -12,6 +12,10 @@ import (
 	"talebook/booksvr/internal/background"
 	"talebook/booksvr/internal/booksource"
 	"talebook/booksvr/internal/booktools"
+	"talebook/booksvr/internal/library"
+	"talebook/booksvr/internal/pluginbuiltin"
+	"talebook/booksvr/internal/plugindomain"
+	"talebook/booksvr/internal/pluginruntime"
 	"talebook/booksvr/internal/sourcecatalog"
 )
 
@@ -25,6 +29,7 @@ type saveOnlineService struct {
 	db       *sql.DB
 	settings map[string]any
 	library  *sql.DB
+	registry *pluginruntime.PluginRegistry
 }
 
 // newSaveOnlineService 构造保存服务。
@@ -34,13 +39,34 @@ func newSaveOnlineService(db *sql.DB, settings map[string]any) *saveOnlineServic
 
 // NewSaveOnlineFunc 返回可直接注入 ServeOptions.SaveOnline 的回调。
 func NewSaveOnlineFunc(db *sql.DB, settings map[string]any) func(*Context, string, string, string, bool, int64) error {
-	return newSaveOnlineService(db, settings).Save
+	return NewSaveOnlineWithLibrary(db, db, settings, nil)
+}
+
+// NewSaveOnlineWithLibrary separates catalog writes from account and plugin records.
+func NewSaveOnlineWithLibrary(db, libraryDB *sql.DB, settings map[string]any, registry *pluginruntime.PluginRegistry) func(*Context, string, string, string, bool, int64) error {
+	if registry == nil {
+		registry = pluginruntime.NewPluginRegistry()
+		if err := pluginbuiltin.Register(registry); err != nil {
+			panic(err)
+		}
+	}
+	s := newSaveOnlineService(db, settings)
+	s.library = libraryDB
+	s.registry = registry
+	return s.Save
 }
 
 // Save 复刻 save_online_book：抓取并导入，返回错误时由调用方转为响应。
 func (s *saveOnlineService) Save(ctx *Context, sourceKey, bookURL, format string,
 	clean bool, taskID int64) error {
-	catalog, err := sourcecatalog.NewService(s.db, s.settings, ctx.Identity.UserID, nil)
+	registry := s.registry
+	if registry == nil {
+		registry = pluginruntime.NewPluginRegistry()
+		if err := pluginbuiltin.Register(registry); err != nil {
+			return err
+		}
+	}
+	catalog, err := sourcecatalog.NewService(s.db, s.settings, ctx.Identity.UserID, pluginruntime.NewRuntime(s.db, s.settings, registry))
 	if err != nil {
 		return fmt.Errorf("初始化书源目录失败: %w", err)
 	}
@@ -74,6 +100,9 @@ func (s *saveOnlineService) Save(ctx *Context, sourceKey, bookURL, format string
 		if err != nil {
 			return err
 		}
+		if err := s.recordOwner(ctx, bookID); err != nil {
+			return err
+		}
 		s.reportProgress(taskID, 1, 1, bookID)
 		return nil
 	}
@@ -104,6 +133,14 @@ func (s *saveOnlineService) Save(ctx *Context, sourceKey, bookURL, format string
 		if err != nil {
 			return "", err
 		}
+		switch content := body.(type) {
+		case plugindomain.SourceContent:
+			return content.Content, nil
+		case *plugindomain.SourceContent:
+			if content != nil {
+				return content.Content, nil
+			}
+		}
 		return stringOf(body), nil
 	}
 
@@ -121,6 +158,9 @@ func (s *saveOnlineService) Save(ctx *Context, sourceKey, bookURL, format string
 
 	bookID, err := s.importTxt(detail, txtPath)
 	if err != nil {
+		return err
+	}
+	if err := s.recordOwner(ctx, bookID); err != nil {
 		return err
 	}
 	s.reportProgress(taskID, total, total, bookID)
@@ -161,12 +201,36 @@ func (s *saveOnlineService) importTxt(detail *booksource.BookDetail, txtPath str
 // importDownloaded 把下载的整本文件导入书库。
 func (s *saveOnlineService) importDownloaded(detail *booksource.BookDetail, fileAny any) (int64, error) {
 	file := anyMapOf(fileAny)
+	var content []byte
+	var localPath string
+	switch value := fileAny.(type) {
+	case plugindomain.BookFile:
+		content = value.Content
+		localPath = value.LocalPath
+		file = map[string]any{"format": value.Format, "filename": value.Filename}
+	case *plugindomain.BookFile:
+		if value != nil {
+			content = value.Content
+			localPath = value.LocalPath
+			file = map[string]any{"format": value.Format, "filename": value.Filename}
+		}
+	}
 	format := strings.ToUpper(stringOf(file["format"]))
 	if format == "" {
 		return 0, fmt.Errorf("书源未返回文件格式")
 	}
-	body := stringOf(file["content"])
-	if body == "" {
+	if localPath != "" {
+		return booktools.ImportNewBook(s.library, localPath, booktools.NewBookOptions{Title: detail.Name, Authors: detail.Authors(), Format: format})
+	}
+	if content == nil {
+		switch value := file["content"].(type) {
+		case []byte:
+			content = value
+		case string:
+			content = []byte(value)
+		}
+	}
+	if len(content) == 0 {
 		return 0, fmt.Errorf("书源未返回文件内容")
 	}
 
@@ -177,13 +241,24 @@ func (s *saveOnlineService) importDownloaded(detail *booksource.BookDetail, file
 	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
 		return 0, fmt.Errorf("创建上传目录失败: %w", err)
 	}
-	name := booksource.SafeFilename(stringOf(file["filename"]))
+	name := booksource.SafeFilename(strings.TrimSuffix(filepath.Base(stringOf(file["filename"])), filepath.Ext(stringOf(file["filename"]))))
 	if name == "" {
 		name = booksource.SafeFilename(detail.Name)
 	}
-	path := filepath.Join(uploadDir, name+"."+strings.ToLower(format))
-	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
-		return 0, fmt.Errorf("写入下载文件失败: %w", err)
+	output, err := os.CreateTemp(uploadDir, name+"-*."+strings.ToLower(format))
+	if err != nil {
+		return 0, err
+	}
+	path := output.Name()
+	_, writeErr := output.Write(content)
+	closeErr := output.Close()
+	if writeErr != nil {
+		os.Remove(path)
+		return 0, writeErr
+	}
+	if closeErr != nil {
+		os.Remove(path)
+		return 0, closeErr
 	}
 
 	bookID, err := booktools.ImportNewBook(s.library, path, booktools.NewBookOptions{
@@ -192,9 +267,19 @@ func (s *saveOnlineService) importDownloaded(detail *booksource.BookDetail, file
 		Format:  format,
 	})
 	if err != nil {
+		os.Remove(path)
 		return 0, fmt.Errorf("导入本地书库失败: %w", err)
 	}
 	return bookID, nil
+}
+
+// recordOwner creates the private account record after catalog persistence succeeds.
+func (s *saveOnlineService) recordOwner(ctx *Context, id int64) error {
+	_, err := s.db.Exec(`INSERT INTO items (book_id,count_guest,count_visit,count_download,website,collector_id,scope,book_type,media_type,media_type_locked,src_path) VALUES (?,0,0,0,'',?,'private','','',0,'')`, id, ctx.Identity.UserID)
+	if err != nil {
+		_ = library.DeleteBook(s.library, id)
+	}
+	return err
 }
 
 // reportProgress 上报任务进度（taskID 为 0 时跳过）。
@@ -234,6 +319,13 @@ func bookDetailOf(v any) *booksource.BookDetail {
 
 // chaptersOf 把接口值转成章节列表。
 func chaptersOf(v any) []booksource.Chapter {
+	if values, ok := v.([]plugindomain.SourceChapter); ok {
+		out := make([]booksource.Chapter, 0, len(values))
+		for _, chapter := range values {
+			out = append(out, booksource.Chapter{Name: chapter.Title, URL: chapter.ExternalID, IsVIP: chapter.IsVIP, UpdateTime: chapter.UpdatedAt})
+		}
+		return out
+	}
 	list, ok := v.([]any)
 	if !ok {
 		return nil
@@ -256,6 +348,9 @@ func chaptersOf(v any) []booksource.Chapter {
 
 // anyMapOf 把接口值转成 map；非 map 时返回空 map。
 func anyMapOf(v any) map[string]any {
+	if value, ok := v.(interface{ ToDict() map[string]any }); ok {
+		return value.ToDict()
+	}
 	if m, ok := v.(map[string]any); ok {
 		return m
 	}

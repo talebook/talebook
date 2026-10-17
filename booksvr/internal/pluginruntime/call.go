@@ -117,7 +117,21 @@ func (r *Runtime) invokeProviderMethod(unit *PreparedCall, method string, args [
 		return nil, NewPluginRuntimeError("plugin.provider_contract",
 			"Plugin provider does not support dynamic method dispatch", false)
 	}
-	return dispatcher.Invoke(method, args, unit.Context)
+	result, err := dispatcher.Invoke(method, args, unit.Context)
+	if err != nil {
+		return nil, err
+	}
+	// Capability interfaces return values; HTTP consumers use nullable records.
+	// Normalize once at the runtime boundary so real builtins and injected providers agree.
+	switch value := result.(type) {
+	case plugindomain.Page:
+		return &value, nil
+	case plugindomain.SourceBookDetail:
+		return &value, nil
+	case plugindomain.SourceContent:
+		return &value, nil
+	}
+	return result, nil
 }
 
 // MethodDispatcher 由 provider 实现，用于按方法名分派调用。

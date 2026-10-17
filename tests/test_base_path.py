@@ -1,6 +1,7 @@
 """Public URLs must stay inside the deployment without rewriting external URLs."""
 
 from unittest import mock
+from pathlib import Path
 
 import pytest
 from tornado import web
@@ -8,6 +9,15 @@ from tornado.testing import AsyncHTTPTestCase
 
 from docker.configure_base_path import configure
 from webserver.base_path import PublicPathMixin, normalize_base_path, public_url
+
+
+@pytest.mark.parametrize('name', ['talebook.conf', 'dev.conf', 'server-side-render.conf'])
+def test_nginx_opds_redirect_keeps_external_authority(name):
+    template = (Path(__file__).parents[1] / 'conf' / 'nginx' / name).read_text(encoding='utf-8')
+    assert template.count('absolute_redirect off;') == 1
+    configured = configure(template, '/library')
+    assert configured.count('absolute_redirect off;') == 1
+    assert 'return 302 /library/opds/;' in configured
 
 
 @pytest.mark.parametrize('value,expected', [('', ''), ('/', ''), ('/readest-test/', '/readest-test'), ('/team/books', '/team/books')])

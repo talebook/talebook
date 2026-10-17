@@ -489,13 +489,15 @@ var defaultQueue = NewHostQueue()
 
 // RequestOptions 是 Request 的可选参数。
 type RequestOptions struct {
-	AllowedHosts []string
-	Headers      map[string]string
-	Timeout      time.Duration
-	HasTimeout   bool
-	Data         []byte
-	Params       url.Values
-	JSON         any
+	// AllowRedirect is a platform-owned, per-request destination policy. Nil keeps same-origin only.
+	AllowRedirect func(*url.URL) bool
+	AllowedHosts  []string
+	Headers       map[string]string
+	Timeout       time.Duration
+	HasTimeout    bool
+	Data          []byte
+	Params        url.Values
+	JSON          any
 }
 
 // Request 复刻 SafeHttpClient.request。
@@ -574,7 +576,10 @@ func (c *SafeHttpClient) Request(ctx context.Context, method, rawURL string, opt
 			return nil, NewEndpointPolicyError("Endpoint URL is invalid")
 		}
 		if curOrigin != origin {
-			return nil, NewEndpointPolicyError("Cross-origin redirects are not allowed")
+			target, _ := url.Parse(current)
+			if opts.AllowRedirect == nil || !opts.AllowRedirect(target) {
+				return nil, NewEndpointPolicyError("Cross-origin redirects are not allowed")
+			}
 		}
 
 		release, err := queue.Acquire(pluginKey, current, maxConcurrency, deadline)
@@ -594,7 +599,7 @@ func (c *SafeHttpClient) Request(ctx context.Context, method, rawURL string, opt
 		resp, err := c.doRequest(ctx, client, method, current, opts, requestTimeout)
 		release()
 		if err != nil {
-			return nil, err
+			return nil, connectionError(method, current, err)
 		}
 
 		if isRedirect(resp.StatusCode) {
@@ -650,6 +655,30 @@ func (c *SafeHttpClient) Request(ctx context.Context, method, rawURL string, opt
 		return resp, nil
 	}
 	return nil, NewEndpointPolicyError("Endpoint exceeded the redirect limit")
+}
+
+// connectionError classifies transport failures without exposing query strings or credentials.
+func connectionError(method, target string, err error) error {
+	if errors.Is(err, context.Canceled) {
+		return err
+	}
+	u, _ := url.Parse(target)
+	host := "upstream"
+	if u != nil && u.Hostname() != "" {
+		host = u.Hostname()
+	}
+	kind := "connection"
+	message := "无法连接插件服务 " + host + "，请检查服务器网络或代理设置"
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		kind = "timeout"
+		message = "连接插件服务 " + host + " 超时"
+	} else if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		message = "插件服务 " + host + " 在连接过程中断开（EOF），请检查服务器网络或代理设置"
+	}
+	out := pluginproto.NewUpstreamError(message, kind, nil)
+	out.Retryable = method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions
+	return out
 }
 
 // doRequest 发起一次底层请求。

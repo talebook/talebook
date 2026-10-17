@@ -3,15 +3,18 @@ package pluginbuiltin
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"talebook/booksvr/internal/plugindomain"
 	"talebook/booksvr/internal/pluginiface"
 	"talebook/booksvr/internal/pluginproto"
 	"talebook/booksvr/internal/pluginruntime"
+	"talebook/booksvr/internal/safehttp"
 )
 
 // comboUserAgent 复刻 combo/open_library.py 的 USER_AGENT。
@@ -155,14 +158,14 @@ func (p *OpenLibraryProvider) Execute(context map[string]any) (pluginproto.Provi
 			continue
 		}
 		candidate := map[string]any{
-			"title":      book["title"],
-			"subtitle":   book["subtitle"],
-			"authors":    openLibraryNames(book["authors"]),
-			"publisher":  firstOf(openLibraryNames(book["publishers"])),
-			"published":  book["publish_date"],
-			"tags":       openLibraryNames(book["subjects"]),
-			"cover_url":  openLibraryCover(book),
-			"isbn":       isbn,
+			"title":     book["title"],
+			"subtitle":  book["subtitle"],
+			"authors":   openLibraryNames(book["authors"]),
+			"publisher": firstOf(openLibraryNames(book["publishers"])),
+			"published": book["publish_date"],
+			"tags":      openLibraryNames(book["subjects"]),
+			"cover_url": openLibraryCover(book),
+			"isbn":      isbn,
 		}
 		var currentMetadata map[string]any
 		if m, ok := query["current_metadata"].(map[string]any); ok {
@@ -178,11 +181,11 @@ func (p *OpenLibraryProvider) Execute(context map[string]any) (pluginproto.Provi
 		}
 		sourceURL := stringOr(book["url"], "https://openlibrary.org/isbn/"+isbn)
 		data := map[string]any{
-			"source":   "open_library",
-			"book_id":  query["book_id"],
-			"isbn":     isbn,
+			"source":     "open_library",
+			"book_id":    query["book_id"],
+			"isbn":       isbn,
 			"source_url": sourceURL,
-			"fields":   openLibraryFieldDecisions(currentMetadata, candidate, lockedFields),
+			"fields":     openLibraryFieldDecisions(currentMetadata, candidate, lockedFields),
 		}
 		if len(targetIDs) == 0 || targetIDs[externalID] {
 			items = append(items, pluginproto.ProviderItem{
@@ -348,18 +351,109 @@ func (p *OpenLibraryProvider) SearchBooks(query plugindomain.MetadataQuery, cont
 	return records, nil
 }
 
-// GetMetadata 复刻 get_metadata。
+var openLibraryKeyRe = regexp.MustCompile(`^/(?:works/OL[0-9]+W|books/OL[0-9]+M)$`)
+var openLibraryAuthorRe = regexp.MustCompile(`^/authors/OL[0-9]+A$`)
+
+// GetMetadata retrieves the selected work or edition instead of returning an empty candidate.
 func (p *OpenLibraryProvider) GetMetadata(externalID string, context map[string]any) (*plugindomain.BookMetadata, error) {
+	if !openLibraryKeyRe.MatchString(externalID) {
+		return nil, pluginproto.NewUpstreamError("Open Library 书籍标识无效", "other", nil)
+	}
+	payload, err := reviewHTTPJSON("GET", "https://openlibrary.org"+externalID+".json", nil, nil, nil, 30)
+	if err != nil {
+		return nil, err
+	}
+	if stringOr(payload["title"], "") == "" {
+		return nil, pluginproto.NewUpstreamError("Open Library 未返回书名", "other", nil)
+	}
+	authors := []string{}
+	if list, ok := payload["authors"].([]any); ok {
+		for i, raw := range list {
+			if i >= 8 {
+				break
+			}
+			entry, _ := raw.(map[string]any)
+			if nested, ok := entry["author"].(map[string]any); ok {
+				entry = nested
+			}
+			name := stringOr(entry["name"], "")
+			key := stringOr(entry["key"], "")
+			if name == "" && openLibraryAuthorRe.MatchString(key) {
+				author, fetchErr := reviewHTTPJSON("GET", "https://openlibrary.org"+key+".json", nil, nil, nil, 30)
+				if fetchErr != nil {
+					return nil, fetchErr
+				}
+				name = stringOr(author["name"], "")
+			}
+			if name != "" {
+				authors = append(authors, name)
+			}
+		}
+	}
+	description := payload["description"]
+	if value, ok := description.(map[string]any); ok {
+		description = value["value"]
+	}
+	cover := ""
+	if covers, ok := payload["covers"].([]any); ok && len(covers) > 0 {
+		if id, ok := covers[0].(float64); ok && id > 0 {
+			cover = fmt.Sprintf("https://covers.openlibrary.org/b/id/%.0f-L.jpg", id)
+		}
+	}
+	isbn := ""
+	for _, field := range []string{"isbn_13", "isbn_10"} {
+		if values, ok := payload[field].([]any); ok && len(values) > 0 {
+			isbn = stringOr(values[0], "")
+			break
+		}
+	}
 	record := plugindomain.NewBookMetadata(map[string]any{
 		"provider_key":   "talebook.combo.open-library",
 		"provider_value": externalID,
+		"title":          payload["title"], "authors": authors, "comments": description,
+		"tags": payload["subjects"], "publisher": firstOf(stringList(payload["publishers"])),
+		"published": payload["publish_date"], "isbn": isbn, "cover_url": cover,
 	})
 	return &record, nil
 }
 
-// GetCover 复刻 get_cover：恒返回 None。
+// GetCover downloads a selected cover through the shared endpoint policy.
 func (p *OpenLibraryProvider) GetCover(coverURL string, context map[string]any) (*pluginiface.CoverResult, error) {
-	return nil, nil
+	coverEndpoint, err := url.Parse(coverURL)
+	if err != nil || coverEndpoint.Scheme != "https" || coverEndpoint.Hostname() != "covers.openlibrary.org" || (coverEndpoint.Port() != "" && coverEndpoint.Port() != "443") {
+		return nil, pluginproto.NewUpstreamError("Open Library 封面地址无效", "other", nil)
+	}
+	client := *reviewHTTPClient
+	client.EnforcePublicAddress = true
+	response, err := client.Get(nil, coverURL, safehttp.RequestOptions{Timeout: 30 * time.Second, HasTimeout: true, AllowRedirect: openLibraryCoverRedirect})
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	extension := "jpg"
+	switch strings.Split(response.Header.Get("Content-Type"), ";")[0] {
+	case "image/jpeg":
+	case "image/png":
+		extension = "png"
+	case "image/webp":
+		extension = "webp"
+	default:
+		return nil, pluginproto.NewUpstreamError("Open Library 封面响应不是图片", "other", nil)
+	}
+	content, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	return &pluginiface.CoverResult{Extension: extension, Content: content}, nil
+}
+
+// openLibraryCoverRedirect admits only HTTPS Internet Archive image storage destinations.
+func openLibraryCoverRedirect(target *url.URL) bool {
+	if target == nil || target.Scheme != "https" || (target.Port() != "" && target.Port() != "443") {
+		return false
+	}
+	host := strings.ToLower(target.Hostname())
+	return host == "archive.org" || strings.HasSuffix(host, ".archive.org")
 }
 
 // GetReviews 复刻 get_reviews。

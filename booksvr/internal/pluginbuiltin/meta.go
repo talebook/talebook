@@ -5,6 +5,7 @@ import (
 	"talebook/booksvr/internal/metasource"
 	"talebook/booksvr/internal/plugindomain"
 	"talebook/booksvr/internal/pluginiface"
+	"talebook/booksvr/internal/pluginproto"
 	"talebook/booksvr/internal/pluginruntime"
 )
 
@@ -192,6 +193,9 @@ func (p *calibreMetaProvider) Manifest() map[string]any { return p.ManifestDict 
 // Search 复刻 _search：优先 ISBN，其次书名。
 func (p *calibreMetaProvider) Search(query plugindomain.MetadataQuery, context map[string]any) ([]map[string]any, error) {
 	_ = context
+	if p.Source.API.Identifier == nil {
+		return nil, pluginproto.NewUpstreamError("Calibre 元数据检索服务未接入，请选择其他元数据源", "unavailable", nil)
+	}
 	results, err := p.Source.Search(query.ISBN, query.Title, query.Authors)
 	if err != nil {
 		return nil, err
@@ -204,6 +208,14 @@ func (p *calibreMetaProvider) Search(query plugindomain.MetadataQuery, context m
 		out = append(out, calibreResultToMetadata(r))
 	}
 	return out, nil
+}
+
+// SelfCheck reports the actual adapter availability rather than a successful no-op.
+func (p *calibreMetaProvider) SelfCheck(context map[string]any) (plugindomain.CheckReport, error) {
+	if p.Source.API.Identifier == nil {
+		return plugindomain.CheckReport{Healthy: false, Message: "Calibre 元数据检索服务未接入，请选择其他元数据源"}, nil
+	}
+	return p.MetaSourceMixin.SelfCheck(context)
 }
 
 // Fetch 复刻 _fetch：按 ISBN 查，失败再按书名查，取第一条。

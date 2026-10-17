@@ -52,7 +52,7 @@ func mappedValue(row map[string]string, name string, aliases map[string][]string
 			return v
 		}
 	}
-	return ""
+	return row[name]
 }
 
 // parseReviewFile 复刻 parse_review_file。

@@ -67,8 +67,8 @@ func newBRSProvider() *BRSProvider {
 				"segment_map": map[string]any{"type": "object"},
 			},
 		},
-		"permissions": []any{"books.read", "plugin_records.write", "network.read", "network.write", "annotations.write"},
-		"data_policy": map[string]any{"stores_full_text": true, "retention": "remote_user_controlled"},
+		"permissions":   []any{"books.read", "plugin_records.write", "network.read", "network.write", "annotations.write"},
+		"data_policy":   map[string]any{"stores_full_text": true, "retention": "remote_user_controlled"},
 		"compatibility": map[string]any{"talebook": ">=0.1.0"},
 		"homepage":      "https://github.com/talebook/talebook",
 		"license":       "GPL-3.0",
@@ -133,8 +133,8 @@ func brsChapterReview(row map[string]any, endpoint, externalID string,
 	mappedBook, chapter, segment string) map[string]any {
 	summary := stringOr(row["summary"], stringOr(row["content"], ""))
 	summary = strings.Join(strings.Fields(summary), " ")
-	if len(summary) > 500 {
-		summary = string([]rune(summary)[:500])
+	if runes := []rune(summary); len(runes) > 500 {
+		summary = string(runes[:500])
 	}
 	scale := row["rating_scale"]
 	if scale == nil {
@@ -397,7 +397,7 @@ func (p *BRSProvider) PushAnnotation(item plugindomain.Annotation, state plugind
 	payload := map[string]any{
 		"book_id": remoteBookID, "chapter_name": chapterName,
 		"segment_id": intOf(annotation["segment_id"]), "cfi": stringOr(annotation["cfi"], ""),
-		"content":   stringOr(annotation["content"], stringOr(annotation["quote_text"], "")),
+		"content":    stringOr(annotation["content"], stringOr(annotation["quote_text"], "")),
 		"refer_text": referText, "kind": kind,
 	}
 	if rootID := stringOr(annotation["remote_root_id"], ""); rootID != "" {

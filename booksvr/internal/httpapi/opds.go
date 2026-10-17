@@ -26,7 +26,8 @@ type OpdsConfig struct {
 	// Search 执行书库搜索；为 nil 时使用内置实现。
 	Search func(query string) ([]int64, error)
 	// CanViewBook 判定当前请求方能否查看该书。
-	CanViewBook func(ctx *Context, bookID int64) bool
+	CanViewBook          func(ctx *Context, bookID int64) bool
+	FilterVisibleBookIDs func(ctx *Context, ids []int64) ([]int64, error)
 }
 
 // ---- 路由常量 ----
@@ -40,10 +41,10 @@ const (
 )
 
 // opdsContentType 是 OPDS 目录的 Content-Type。
-const opdsContentType = "application/atom+xml; profile=opds-catalog; charset=UTF-8"
+const opdsContentType = "application/atom+xml;profile=opds-catalog;kind=acquisition;charset=UTF-8"
 
 // opdsNavContentType 是导航目录的 Content-Type。
-const opdsNavContentType = "application/atom+xml; charset=UTF-8"
+const opdsNavContentType = "application/atom+xml;profile=opds-catalog;kind=navigation;charset=UTF-8"
 
 // ---- Atom XML 结构 ----
 
@@ -178,7 +179,7 @@ func newOpdsOffsets(offset, delta, total int) (*opdsOffsets, error) {
 		SliceUpperBound: offset + delta,
 		NextOffset:      lastCurrent + 1,
 		PreviousOffset:  offset - delta,
-		LastOffset:      lastAllowed - delta,
+		LastOffset:      (lastAllowed / delta) * delta,
 	}
 	if o.NextOffset > lastAllowed {
 		o.NextOffset = -1
@@ -249,18 +250,22 @@ func newOpdsFeed(cfg OpdsConfig, id, title, subtitle string, updated time.Time) 
 	// search / start 链接始终存在。
 	b.feed.Links = append(b.feed.Links,
 		atomLinkXML{Rel: "search", Title: "Search", Href: base + "/search/{searchTerms}", Type: "application/atom+xml"},
-		atomLinkXML{Rel: "start", Href: base, Type: "application/atom+xml;type=feed;profile=opds-catalog"},
+		atomLinkXML{Rel: "start", Href: base + "/", Type: opdsNavContentType},
 	)
 	return b
 }
 
 // withNavLinks 追加 up/first/last/next/previous 链接。
-func (b *opdsFeedBuilder) withNavLinks(offsets *opdsOffsets, pageURL, upURL string) *opdsFeedBuilder {
-	const navType = "application/atom+xml;type=feed;profile=opds-catalog"
+func (b *opdsFeedBuilder) withNavLinks(offsets *opdsOffsets, pageURL, upURL string, types ...string) *opdsFeedBuilder {
+	navType := opdsNavContentType
+	if len(types) > 0 {
+		navType = types[0]
+	}
 	if upURL != "" {
 		b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "up", Href: upURL, Type: navType})
 	}
 	if pageURL != "" {
+		b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "self", Href: pageURL + "?offset=" + strconv.Itoa(offsets.Offset), Type: navType})
 		b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "first", Href: pageURL, Type: navType})
 		b.feed.Links = append(b.feed.Links, atomLinkXML{
 			Rel: "last", Href: pageURL + "?offset=" + strconv.Itoa(offsets.LastOffset), Type: navType,
@@ -303,13 +308,17 @@ func opdsDefaultFeedTitle(cfg OpdsConfig) string {
 func opdsNavCatalogEntry(cfg OpdsConfig, updated time.Time, title, description, query string) atomEntryXML {
 	href := opdsBaseHref(cfg) + "/nav/" + opdsHexlify(query)
 	sum := sha1.Sum([]byte(href))
+	linkType := opdsNavContentType
+	if strings.HasPrefix(query, "O") {
+		linkType = opdsContentType
+	}
 	return atomEntryXML{
 		Title:   title,
 		ID:      "calibre-nav:" + hex.EncodeToString(sum[:]),
 		Updated: opdsUpdated(updated),
 		Content: &atomContentXML{Type: "text", Inner: opdsXMLText(description)},
 		Links: []atomLinkXML{{
-			Href: href, Type: "application/atom+xml;type=feed;profile=opds-catalog",
+			Rel: "subsection", Href: href, Type: linkType,
 		}},
 	}
 }
@@ -338,8 +347,9 @@ func opdsCatalogEntry(item library.Category, itemKind, baseHref string, updated 
 		Updated: opdsUpdated(updated),
 		Content: &atomContentXML{Type: "text", Inner: opdsXMLText(count)},
 		Links: []atomLinkXML{{
+			Rel:  "subsection",
 			Href: baseHref + "/" + opdsHexlify(iid),
-			Type: "application/atom+xml;type=feed;profile=opds-catalog",
+			Type: opdsContentType,
 		}},
 	}
 }
@@ -500,9 +510,12 @@ func opdsPrefix(cfg OpdsConfig) string {
 }
 
 // opdsVisibleIDs 过滤掉当前请求方不可见的书籍。
-func opdsVisibleIDs(cfg OpdsConfig, ctx *Context, ids []int64) []int64 {
+func opdsVisibleIDs(cfg OpdsConfig, ctx *Context, ids []int64) ([]int64, error) {
+	if cfg.FilterVisibleBookIDs != nil {
+		return cfg.FilterVisibleBookIDs(ctx, ids)
+	}
 	if cfg.CanViewBook == nil {
-		return ids
+		return ids, nil
 	}
 	out := make([]int64, 0, len(ids))
 	for _, id := range ids {
@@ -510,7 +523,7 @@ func opdsVisibleIDs(cfg OpdsConfig, ctx *Context, ids []int64) []int64 {
 			out = append(out, id)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // opdsSearchIDs 执行搜索。
@@ -562,8 +575,60 @@ func opdsSortBooks(books []library.BookData, sortBy string, ascending bool) {
 		if ascending {
 			return less
 		}
-		return !less
+		// Equal values must compare false in both directions for a stable sort.
+		switch sortBy {
+		case "timestamp":
+			return books[i].Timestamp > books[j].Timestamp
+		case "series":
+			if books[i].Series != books[j].Series {
+				return books[i].Series > books[j].Series
+			}
+			return books[i].SeriesIdx > books[j].SeriesIdx
+		default:
+			return strings.ToLower(books[i].Title) > strings.ToLower(books[j].Title)
+		}
 	})
+}
+
+// opdsOrderedIDs sorts lightweight rows before loading page-sized complete metadata.
+func opdsOrderedIDs(cfg OpdsConfig, ids []int64, sortBy string, ascending bool) ([]int64, error) {
+	wanted := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		wanted[id] = true
+	}
+	series := "''"
+	if sortBy == "series" {
+		series = `COALESCE((SELECT s.name FROM books_series_link l JOIN series s ON s.id=l.series WHERE l.book=b.id LIMIT 1), '')`
+	}
+	rows, err := cfg.DB.Query(`SELECT b.id, b.title, b.timestamp, COALESCE(b.series_index, 1), ` + series + ` FROM books b ORDER BY b.id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	var books []library.BookData
+	for rows.Next() {
+		var b library.BookData
+		var timestamp []byte
+		if err := rows.Scan(&b.ID, &b.Title, &timestamp, &b.SeriesIdx, &b.Series); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		if !wanted[b.ID] {
+			continue
+		}
+		b.Timestamp = library.ParseCalibreTimestamp(timestamp)
+		books = append(books, b)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	opdsSortBooks(books, sortBy, ascending)
+	out := make([]int64, len(books))
+	for i, b := range books {
+		out[i] = b.ID
+	}
+	return out, nil
 }
 
 // ---- 各 feed 构造 ----
@@ -574,28 +639,30 @@ func opdsAcquisitionFeed(cfg OpdsConfig, ctx *Context, ids []int64, offset int,
 	if len(ids) == 0 {
 		return nil, errOpdsNoBooks
 	}
-	books, err := opdsLoadBooks(cfg, ids)
+	ordered, err := opdsOrderedIDs(cfg, ids, sortBy, ascending)
 	if err != nil {
 		return nil, err
 	}
-	opdsSortBooks(books, sortBy, ascending)
 
 	maxItems := opdsMaxItems(cfg)
-	offsets, err := newOpdsOffsets(offset, maxItems, len(books))
+	offsets, err := newOpdsOffsets(offset, maxItems, len(ordered))
 	if err != nil {
 		return nil, err
 	}
 	end := offsets.SliceUpperBound
-	if end > len(books) {
-		end = len(books)
+	if end > len(ordered) {
+		end = len(ordered)
 	}
-	page := books[offsets.Offset:end]
+	page, err := opdsLoadBooks(cfg, ordered[offsets.Offset:end])
+	if err != nil {
+		return nil, err
+	}
 
 	updated := opdsLastModified(cfg)
 	ctx.Writer.Header().Set("Content-Type", opdsContentType)
 	ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
-	b := newOpdsFeed(cfg, id, feedTitle, "", updated).withNavLinks(offsets, pageURL, upURL)
+	b := newOpdsFeed(cfg, id, feedTitle, "", updated).withNavLinks(offsets, pageURL, upURL, opdsContentType)
 	prefix := opdsPrefix(cfg)
 	for _, book := range page {
 		b.addEntry(opdsAcquisitionEntry(cfg, book, updated, prefix))
@@ -623,6 +690,7 @@ func opdsTopLevelFeed(cfg OpdsConfig, ctx *Context) ([]byte, error) {
 	ctx.Writer.Header().Set("Last-Modified", lastModifiedHeader(updated.Unix()))
 
 	b := newOpdsFeed(cfg, "urn:calibre:main", "", "Books in your library", updated)
+	b.feed.Links = append(b.feed.Links, atomLinkXML{Rel: "self", Href: opdsBaseHref(cfg) + "/", Type: opdsNavContentType})
 	for _, c := range cats {
 		b.addEntry(opdsNavCatalogEntry(cfg, updated,
 			"By "+c.title, "Books sorted by "+c.desc, c.query))
@@ -697,7 +765,10 @@ func opdsAllBooks(cfg OpdsConfig, ctx *Context, which, pageURL, upURL string, of
 	if err != nil {
 		return nil, err
 	}
-	ids = opdsVisibleIDs(cfg, ctx, ids)
+	ids, err = opdsVisibleIDs(cfg, ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	return opdsAcquisitionFeed(cfg, ctx, ids, offset, pageURL, upURL,
 		"calibre-all:"+sortBy, sortBy, ascending, feedTitle)
 }
@@ -879,7 +950,10 @@ func opdsCategory(cfg OpdsConfig, ctx *Context, categoryHex, whichHex string, of
 		if err != nil {
 			return nil, fmt.Errorf("Search: %q not understood", rest)
 		}
-		ids = opdsVisibleIDs(cfg, ctx, ids)
+		ids, err = opdsVisibleIDs(cfg, ctx, ids)
+		if err != nil {
+			return nil, err
+		}
 		return opdsAcquisitionFeed(cfg, ctx, ids, offset, pageURL, upURL,
 			"calibre-search:"+rest, "title", true, "")
 	}
@@ -907,7 +981,10 @@ func opdsCategory(cfg OpdsConfig, ctx *Context, categoryHex, whichHex string, of
 	if err != nil {
 		return nil, err
 	}
-	ids = opdsVisibleIDs(cfg, ctx, ids)
+	ids, err = opdsVisibleIDs(cfg, ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 
 	sortBy := "title"
 	if category == "series" {
@@ -926,7 +1003,10 @@ func opdsSearch(cfg OpdsConfig, ctx *Context, query string, offset int) ([]byte,
 	if err != nil {
 		return nil, fmt.Errorf("Search: %q not understood", query)
 	}
-	ids = opdsVisibleIDs(cfg, ctx, ids)
+	ids, err = opdsVisibleIDs(cfg, ctx, ids)
+	if err != nil {
+		return nil, err
+	}
 	if len(ids) == 0 {
 		return nil, fmt.Errorf("No results found")
 	}

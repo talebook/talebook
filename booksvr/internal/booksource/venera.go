@@ -40,8 +40,8 @@ const (
 )
 
 // VeneraSourceURL 是固定版本的源脚本地址。
-var VeneraSourceURL = "https://api.github.com/repos/venera-app/venera-configs/contents/manga_dex.js?ref=" +
-	VeneraSourceCommit
+var VeneraSourceURL = "https://raw.githubusercontent.com/venera-app/venera-configs/" +
+	VeneraSourceCommit + "/manga_dex.js"
 
 // VeneraSourceSHA256 是源脚本的期望摘要；测试可临时覆盖。
 var VeneraSourceSHA256 = "c8beb84262da8fa3922ff0392fc2f79f03ee36ae08933d10571172ef6c8ce21d"

@@ -484,30 +484,30 @@ type KindleProvider struct {
 // newKindleProvider 构造 Kindle 邮箱推送 provider。
 func newKindleProvider() *KindleProvider {
 	return &KindleProvider{ManifestDict: map[string]any{
-		"protocol_version": pluginproto.ProtocolVersion,
-		"id":               "talebook.push.kindle",
-		"name":             "Kindle 邮箱推送",
-		"description":      "通过 Talebook 配置的 SMTP 服务把书籍发送到 Kindle 邮箱。",
-		"version":          "1.0.0",
-		"categories":       []any{"integrations"},
-		"capabilities":     []any{pushCapability},
-		"runtime_kind":     "builtin",
-		"actions":          []any{"test"},
-		"auth_schema":      map[string]any{"type": "object", "properties": map[string]any{}},
-		"config_schema":    map[string]any{"type": "object", "properties": map[string]any{}},
-		"permissions":      []any{"books.read", "network.write"},
-		"data_policy":      map[string]any{"stores_full_text": false, "retention": "device_owned"},
-		"compatibility":    map[string]any{"talebook": ">=0.1.0"},
+		"protocol_version":  pluginproto.ProtocolVersion,
+		"id":                "talebook.push.kindle",
+		"name":              "Kindle 邮箱推送",
+		"description":       "通过 Talebook 配置的 SMTP 服务把书籍发送到 Kindle 邮箱。",
+		"version":           "1.0.0",
+		"categories":        []any{"integrations"},
+		"capabilities":      []any{pushCapability},
+		"runtime_kind":      "builtin",
+		"actions":           []any{"test"},
+		"auth_schema":       map[string]any{"type": "object", "properties": map[string]any{}},
+		"config_schema":     map[string]any{"type": "object", "properties": map[string]any{}},
+		"permissions":       []any{"books.read", "network.write"},
+		"data_policy":       map[string]any{"stores_full_text": false, "retention": "device_owned"},
+		"compatibility":     map[string]any{"talebook": ">=0.1.0"},
 		"connection_owners": []any{"user"},
-		"homepage":         "https://www.amazon.com/sendtokindle",
-		"license":          "GPL-3.0",
+		"homepage":          "https://www.amazon.com/sendtokindle",
+		"license":           "GPL-3.0",
 		"ui": map[string]any{
-			"icon":            "mdi-email-fast-outline",
-			"brand_icon":      "/images/plugin-icons/kindle.png",
-			"primary_action":  "configure",
-			"manage_route":    "/me/devices",
-			"device_type":     "kindle",
-			"default_port":    0,
+			"icon":           "mdi-email-fast-outline",
+			"brand_icon":     "/images/plugin-icons/kindle.png",
+			"primary_action": "configure",
+			"manage_route":   "/me/devices",
+			"device_type":    "kindle",
+			"default_port":   0,
 		},
 	}}
 }
@@ -533,6 +533,9 @@ func (p *KindleProvider) DefaultPort() int { return 0 }
 
 // SelfCheck 复刻 self_check。
 func (p *KindleProvider) SelfCheck(context map[string]any) (plugindomain.CheckReport, error) {
+	if KindleMailSender == nil {
+		return plugindomain.CheckReport{Healthy: false, Message: "Kindle 邮件发送服务未接入"}, nil
+	}
 	return plugindomain.CheckReport{
 		Healthy: true, Message: "使用 Talebook SMTP 配置发送到 Kindle 邮箱",
 	}, nil
@@ -579,7 +582,7 @@ func (p *KindleProvider) Push(bookFile any, target any, context any) (any, error
 		}
 		return map[string]any{"success": true, "queued": true, "converting": true}, nil
 	}
-	return map[string]any{"success": false, "error_code": "format.not_supported"}, nil
+	return nil, pluginproto.NewUpstreamError("没有可发送到 Kindle 的书籍格式", "other", nil)
 }
 
 // 编译期断言。

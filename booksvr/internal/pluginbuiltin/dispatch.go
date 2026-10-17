@@ -297,6 +297,10 @@ func sourceStateArg(args []any, i int) plugindomain.SourceState {
 // sourceBookDetailArg 取第 i 个参数并转成 SourceBookDetail。
 func sourceBookDetailArg(args []any, i int) plugindomain.SourceBookDetail {
 	switch value := argAt(args, i).(type) {
+	case *plugindomain.SourceBookDetail:
+		if value != nil {
+			return *value
+		}
 	case plugindomain.SourceBookDetail:
 		return value
 	case map[string]any:
@@ -308,6 +312,10 @@ func sourceBookDetailArg(args []any, i int) plugindomain.SourceBookDetail {
 // sourceChapterArg 取第 i 个参数并转成 SourceChapter。
 func sourceChapterArg(args []any, i int) plugindomain.SourceChapter {
 	switch value := argAt(args, i).(type) {
+	case *plugindomain.SourceChapter:
+		if value != nil {
+			return *value
+		}
 	case plugindomain.SourceChapter:
 		return value
 	case map[string]any:

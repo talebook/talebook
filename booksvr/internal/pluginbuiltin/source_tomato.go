@@ -168,16 +168,14 @@ func tomatoValidateEpub(content []byte) error {
 	}
 	var container struct {
 		Rootfiles []struct {
-			Rootfile struct {
-				FullPath string `xml:"full-path,attr"`
-			} `xml:"rootfiles>rootfile"`
-		} `xml:"rootfiles"`
+			FullPath string `xml:"full-path,attr"`
+		} `xml:"rootfiles>rootfile"`
 	}
 	if err := xml.Unmarshal(containerXML, &container); err != nil ||
-		len(container.Rootfiles) == 0 || container.Rootfiles[0].Rootfile.FullPath == "" {
+		len(container.Rootfiles) == 0 || container.Rootfiles[0].FullPath == "" {
 		return pluginproto.NewUpstreamError("番茄 EPUB 文件损坏或阅读目录不完整，未入库", "other", nil)
 	}
-	packagePath := container.Rootfiles[0].Rootfile.FullPath
+	packagePath := container.Rootfiles[0].FullPath
 
 	packageXML, err := readZipEntry(archive, packagePath)
 	if err != nil {
@@ -477,11 +475,6 @@ func (s *tomatoDownloaderSession) request(method, apiPath string, params url.Val
 
 // download 复刻 download()。
 func (s *tomatoDownloaderSession) download(identity string) (plugindomain.BookFile, error) {
-	job, err := s.request("POST", "/api/jobs", nil)
-	if err != nil {
-		return plugindomain.BookFile{}, err
-	}
-	_ = job
 	// POST /api/jobs 的请求体需要 book_id；request 不支持 JSON 体，
 	// 这里直接用底层客户端补齐。
 	left, err := s.remainingOrError()

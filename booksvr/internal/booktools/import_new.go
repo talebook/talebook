@@ -32,7 +32,8 @@ func ImportNewBook(db *sql.DB, filePath string, opts NewBookOptions) (int64, err
 	if err != nil {
 		return 0, fmt.Errorf("booktools: 解析路径失败: %w", err)
 	}
-	if _, err := os.Stat(abs); err != nil {
+	info, err := os.Stat(abs)
+	if err != nil {
 		return 0, fmt.Errorf("booktools: 文件不存在: %w", err)
 	}
 
@@ -93,11 +94,11 @@ func ImportNewBook(db *sql.DB, filePath string, opts NewBookOptions) (int64, err
 	}
 
 	// 登记格式（book_formats + data 两表，与 Calibre 语义一致）。
-	if err := library.RegisterFormat(db, bookID, format, abs, 0, 0); err != nil {
+	if err := library.RegisterFormat(db, bookID, format, abs, info.Size(), info.ModTime().Unix()); err != nil {
 		return 0, fmt.Errorf("booktools: 登记格式失败: %w", err)
 	}
 	if _, err := db.Exec(`INSERT INTO data (book, format, uncompressed_size, name)
-		VALUES (?, ?, 0, ?)`, bookID, format, filepath.Base(abs)); err != nil {
+		VALUES (?, ?, ?, ?)`, bookID, format, info.Size(), filepath.Base(abs)); err != nil {
 		return 0, fmt.Errorf("booktools: 写入 data 表失败: %w", err)
 	}
 

@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 
+	"talebook/booksvr/internal/plugindomain"
 	"talebook/booksvr/internal/pluginiface"
 	"talebook/booksvr/internal/pluginproto"
 	"talebook/booksvr/internal/safehttp"
@@ -137,8 +138,8 @@ func (p *gutenbergProvider) discover(context map[string]any) ([]map[string]any, 
 	}
 	var payload struct {
 		Results []struct {
-			ID      any            `json:"id"`
-			Title   string         `json:"title"`
+			ID      any    `json:"id"`
+			Title   string `json:"title"`
 			Authors []struct {
 				Name string `json:"name"`
 			} `json:"authors"`
@@ -273,7 +274,7 @@ func (p *internetArchiveProvider) discover(context map[string]any) ([]map[string
 			return nil, nil, err
 		}
 		var metadata struct {
-			Metadata map[string]any `json:"metadata"`
+			Metadata map[string]any   `json:"metadata"`
 			Files    []map[string]any `json:"files"`
 		}
 		if err := json.Unmarshal(metaBody, &metadata); err != nil {
@@ -479,13 +480,13 @@ var _ pluginiface.SourceProvider = (*webdavProvider)(nil)
 
 // davMultistatus 是 PROPFIND 响应的 XML 结构。
 type davMultistatus struct {
-	XMLName  xml.Name  `xml:"multistatus"`
+	XMLName   xml.Name      `xml:"multistatus"`
 	Responses []davResponse `xml:"response"`
 }
 
 // davResponse 是单个资源的 PROPFIND 条目。
 type davResponse struct {
-	Href     string      `xml:"href"`
+	Href     string        `xml:"href"`
 	PropStat []davPropStat `xml:"propstat"`
 }
 
@@ -496,8 +497,8 @@ type davPropStat struct {
 
 // davProp 是感兴趣的属性集合。
 type davProp struct {
-	GetETag         string `xml:"getetag"`
-	GetLastModified string `xml:"getlastmodified"`
+	GetETag         string    `xml:"getetag"`
+	GetLastModified string    `xml:"getlastmodified"`
 	Collection      *struct{} `xml:"resourcetype>collection"`
 }
 
@@ -539,7 +540,7 @@ func (p *webdavProvider) discover(context map[string]any) ([]map[string]any, map
 			continue
 		}
 		prop := item.PropStat[0].Prop
-		href := strings.TrimPrefix(item.Href, "http://")
+		href := item.Href
 		// Python urljoin(endpoint, '') 得 endpoint（href 为空继续走格式过滤）。
 		full := endpoint
 		if href != "" {
@@ -594,7 +595,7 @@ func newWatchFolderProvider() *watchFolderProvider {
 	properties["recursive"] = map[string]any{"type": "boolean", "default": true}
 	p.Base.Manifest = webSourceManifest(
 		"talebook.source.watch-folder", "Watch Folder",
-		"扫描白名单内的本地目录，以内容 hash 增量发现待审电子书。",
+		"扫描管理员指定的本地目录，以内容指纹增量发现电子书，入库仅索引原文件。",
 		[]string{"sources.browse", "sources.acquire"},
 		map[string]any{
 			"type":       "object",
@@ -638,7 +639,9 @@ var _ pluginiface.SourceProvider = (*watchFolderProvider)(nil)
 func (p *watchFolderProvider) discover(context map[string]any) ([]map[string]any, map[string]any, error) {
 	config, _ := context["config"].(map[string]any)
 	platform, _ := context["platform"].(map[string]any)
-	roots := stringList(platform["import_allowed_roots"])
+	_ = platform
+	// The administrator chooses a readable directory; there is no second import allowlist.
+	roots := []string{asStringOr(config["path"], "")}
 
 	target, err := watchFolderAllowedPath(asStringOr(config["path"], ""), roots)
 	if err != nil {
@@ -714,6 +717,28 @@ func (p *watchFolderProvider) discover(context map[string]any) ([]map[string]any
 		entries = append(entries, normalized.ToDict())
 	}
 	return entries, map[string]any{"files": files}, nil
+}
+
+// Download returns a verified source reference, never a persistent copy of a local book.
+func (p *watchFolderProvider) Download(book plugindomain.SourceBookDetail, context map[string]any) (plugindomain.BookFile, error) {
+	config, _ := context["config"].(map[string]any)
+	root := asStringOr(config["path"], "")
+	u, err := url.Parse(book.AcquisitionURL)
+	if err != nil || u.Scheme != "file" || u.Host != "" {
+		return plugindomain.BookFile{}, pluginproto.NewUpstreamError("本地书籍路径无效", "other", nil)
+	}
+	path, err := watchFolderAllowedPath(filepath.FromSlash(u.Path), []string{root})
+	if err != nil {
+		return plugindomain.BookFile{}, err
+	}
+	if book.ExternalID != sourcebase.ExternalID(p.SourceName, path) {
+		return plugindomain.BookFile{}, pluginproto.NewUpstreamError("本地书籍标识与路径不匹配", "other", nil)
+	}
+	format := strings.TrimPrefix(strings.ToLower(filepath.Ext(path)), ".")
+	if !sourceFormats(context)[format] {
+		return plugindomain.BookFile{}, pluginproto.NewUpstreamError("不支持此文件格式", "other", nil)
+	}
+	return plugindomain.BookFile{LocalPath: path, Filename: filepath.Base(path), Format: format, SourceURL: book.AcquisitionURL}, nil
 }
 
 // watchFolderAllowedPath 复刻 _allowed_path：白名单校验。
