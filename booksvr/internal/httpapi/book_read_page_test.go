@@ -27,7 +27,7 @@ func TestMobiReadingReturnsImmediatelyAndUsesBootstrapContract(t *testing.T) {
 	if _, err := db.Exec(`INSERT INTO book_formats(book_id,format,path,size,mtime) VALUES(1,'MOBI',?,4,0)`, src); err != nil {
 		t.Fatal(err)
 	}
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	w.convert = convert.NewService(db, dir)
 	started := make(chan struct{})
 	release := make(chan struct{})
@@ -104,7 +104,7 @@ func TestBookReadReturnsHTML(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	cfg := w.Config("")
 	cfg.CanViewBook = func(*Context, int64) bool { return true }
 
@@ -155,7 +155,7 @@ func TestBookReadEPUBIsReady(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	cfg := w.Config("")
 	cfg.CanViewBook = func(*Context, int64) bool { return true }
 
@@ -186,7 +186,7 @@ func TestBookReadUnsupportedFormat(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	cfg := w.Config("")
 	cfg.CanViewBook = func(*Context, int64) bool { return true }
 
@@ -220,7 +220,7 @@ func TestReaderBootstrapReportsConversionPending(t *testing.T) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	w.convert = convert.NewService(db, t.TempDir())
 	w.convert.Converter = func(string, string) error { return nil }
 	rec := httptest.NewRecorder()

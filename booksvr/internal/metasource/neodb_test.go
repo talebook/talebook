@@ -1,6 +1,7 @@
 package metasource
 
 import (
+	"talebook/booksvr/internal/plugindomain"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -660,7 +661,7 @@ func TestNeoDBProviderSearch(t *testing.T) {
 	defer srv.Close()
 
 	p := NewNeoDBProvider(neoDBTestSource(srv.URL))
-	got, err := p.SearchBooks("三体", map[string]any{})
+	got, err := p.SearchBooks(plugindomain.MetadataQuery{Title: "三体"}, map[string]any{})
 	if err != nil {
 		t.Fatalf("失败: %v", err)
 	}

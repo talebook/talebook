@@ -8,6 +8,7 @@ package httpapi
 import (
 	"database/sql"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,6 +43,8 @@ const (
 
 // BookToolsConfig 是内置文本工具 handler 的依赖。
 type BookToolsConfig struct {
+	// LibraryRoot holds explicitly generated tool results.
+	LibraryRoot string
 	// Settings 是 Talebook 配置（CONF）。
 	Settings map[string]any
 	// Registry 是插件注册表；为 nil 时工具接口返回「未启用」。
@@ -122,7 +125,85 @@ func (cfg BookToolsConfig) toolResolveBook(ctx *Context, bookID int64) (*library
 			return nil, booktools.NewError("书籍不存在：ID=%d", bookID)
 		}
 	}
-	return booktools.ResolveBook(ctx.DB, bookID)
+	return booktools.ResolveBook(toolLibraryDB(ctx), bookID)
+}
+
+func toolLibraryDB(ctx *Context) *sql.DB {
+	if ctx.LibraryDB != nil {
+		return ctx.LibraryDB
+	}
+	return ctx.DB
+}
+
+// toolImportNew keeps the explicitly requested transformed output outside the
+// per-run scratch directory. It never copies or relocates the indexed source.
+func (cfg BookToolsConfig) toolImportNew(ctx *Context, srcID int64, output string, opts booktools.ImportOptions) (int64, error) {
+	root := cfg.LibraryRoot
+	if root == "" {
+		root = settingString(cfg.Settings, "library_path")
+	}
+	if root == "" {
+		root = filepath.Join(filepath.Dir(cfg.backupDir()), "tool-results")
+	}
+	parent := filepath.Join(root, "Talebook Tools")
+	if err := os.MkdirAll(parent, 0755); err != nil {
+		return 0, err
+	}
+	dir, err := os.MkdirTemp(parent, "result-")
+	if err != nil {
+		return 0, err
+	}
+	keep := false
+	defer func() {
+		if !keep {
+			_ = os.RemoveAll(dir)
+		}
+	}()
+	dst := filepath.Join(dir, filepath.Base(output))
+	in, err := os.Open(output)
+	if err != nil {
+		return 0, err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	if err != nil {
+		return 0, err
+	}
+	_, err = io.Copy(out, in)
+	closeErr := out.Close()
+	if err != nil {
+		return 0, err
+	}
+	if closeErr != nil {
+		return 0, closeErr
+	}
+	collector := opts.CollectorID
+	opts.CollectorID = 0
+	db := toolLibraryDB(ctx)
+	id, err := booktools.ImportAsNewBook(db, srcID, dst, opts)
+	if err != nil {
+		return 0, err
+	}
+	rel, err := filepath.Rel(root, dir)
+	if err == nil {
+		_, err = db.Exec(`UPDATE books SET path = ? WHERE id = ?`, filepath.ToSlash(rel), id)
+	}
+	info, statErr := os.Stat(dst)
+	if err == nil {
+		err = statErr
+	}
+	if err == nil {
+		err = library.RegisterFormat(db, id, strings.TrimPrefix(filepath.Ext(dst), "."), dst, info.Size(), info.ModTime().Unix())
+	}
+	if err == nil {
+		_, err = ctx.DB.Exec(`INSERT INTO items (book_id, count_guest, count_visit, count_download, website, collector_id, scope, book_type, media_type, media_type_locked, src_path) VALUES (?, 0, 0, 0, '', ?, 'private', '', '', 0, '')`, id, collector)
+	}
+	if err != nil {
+		_ = library.DeleteBook(db, id)
+		return 0, err
+	}
+	keep = true
+	return id, nil
 }
 
 // toolRuntime 复刻 plugin_booktools._tool_runtime。
@@ -217,16 +298,25 @@ func UserBookToolsBooksHandler(cfg BookToolsConfig) HandlerFunc {
 		}
 
 		keyword := strings.ToLower(strings.TrimSpace(ctx.Query("query")))
-		ids, err := library.AllBookIDs(ctx.DB)
+		ids, err := library.AllBookIDs(toolLibraryDB(ctx))
 		if err != nil {
 			return nil, err
 		}
-		all, err := library.GetBooksData(ctx.DB, ids)
+		all, err := library.GetBooksData(toolLibraryDB(ctx), ids)
 		if err != nil {
 			return nil, err
 		}
 		items := []map[string]any{}
 		for i := range all {
+			if cfg.CanViewBook != nil {
+				allowed, err := cfg.CanViewBook(ctx, all[i].ID)
+				if err != nil {
+					return nil, err
+				}
+				if !allowed {
+					continue
+				}
+			}
 			item := bookOption(&all[i])
 			if len(item["formats"].([]string)) == 0 {
 				continue
@@ -338,7 +428,7 @@ func UserTextReplacePreviewHandler(cfg BookToolsConfig) HandlerFunc {
 		if format == "" {
 			return toolError(booktools.NewError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")), nil
 		}
-		src, err := booktools.GetFormatPath(ctx.DB, bookID, format)
+		src, err := booktools.GetFormatPath(toolLibraryDB(ctx), bookID, format)
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -385,7 +475,7 @@ func UserTxtFixerAnalyzeHandler(cfg BookToolsConfig) HandlerFunc {
 		if !pluginContains(booktools.AvailableFormats(book), "TXT") {
 			return toolError(booktools.NewError("该书籍没有 TXT 格式，无法执行检测")), nil
 		}
-		src, err := booktools.GetFormatPath(ctx.DB, bookID, "TXT")
+		src, err := booktools.GetFormatPath(toolLibraryDB(ctx), bookID, "TXT")
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -416,8 +506,20 @@ func UserTxtFixerAnalyzeHandler(cfg BookToolsConfig) HandlerFunc {
 func UserEpubBeautifyPresetsHandler(cfg BookToolsConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
 		out := map[string]any{"err": "ok"}
-		if cfg.EpubBeautifyPresets != nil {
-			for k, v := range cfg.EpubBeautifyPresets() {
+		describe := cfg.EpubBeautifyPresets
+		if describe == nil && cfg.Registry != nil {
+			for _, provider := range cfg.Registry.Providers() {
+				ui := pluginDict(provider.Manifest()["ui"])
+				if pluginStr(ui["manage_route"]) == EpubBeautifyRoute {
+					if describer, ok := provider.(interface{ Describe() map[string]any }); ok {
+						describe = describer.Describe
+					}
+					break
+				}
+			}
+		}
+		if describe != nil {
+			for k, v := range describe() {
 				out[k] = v
 			}
 		}
@@ -473,7 +575,7 @@ func (cfg BookToolsConfig) epubBeautifySource(ctx *Context, bookID int64) (
 	if !pluginContains(booktools.AvailableFormats(book), "EPUB") {
 		return nil, "", booktools.NewError("该书籍没有 EPUB 格式，无法美化")
 	}
-	src, err := booktools.GetFormatPath(ctx.DB, bookID, "EPUB")
+	src, err := booktools.GetFormatPath(toolLibraryDB(ctx), bookID, "EPUB")
 	if err != nil {
 		return nil, "", err
 	}
@@ -527,7 +629,7 @@ func (cfg BookToolsConfig) toolRunWrite(ctx *Context, rt *pluginruntime.Runtime,
 			if rollbackBookID == 0 || backupPath == "" {
 				return nil, false
 			}
-			ok, err := toolRestoreBackup(ctx.DB, rollbackBookID, rollbackFormat, backupPath)
+			ok, err := toolRestoreBackup(toolLibraryDB(ctx), rollbackBookID, rollbackFormat, backupPath)
 			if err != nil {
 				return map[string]any{"msg": err.Error()}, false
 			}
@@ -546,6 +648,14 @@ func (cfg BookToolsConfig) toolRunWrite(ctx *Context, rt *pluginruntime.Runtime,
 		return toolError(err), nil
 	}
 	rsp, ok := result.(map[string]any)
+	if ok && rsp["output_mode"] == "new" {
+		id := pluginInt(rsp["book_id"], 0)
+		if id != 0 {
+			if path, missing, err := library.ResolvePath(toolLibraryDB(ctx), id, pluginStr(rsp["format"])); err == nil && !missing {
+				rsp["path"] = path
+			}
+		}
+	}
 	if !ok {
 		return toolError(booktools.NewError("工具返回了无效结果")), nil
 	}
@@ -578,7 +688,7 @@ func UserTextReplaceRunHandler(cfg BookToolsConfig) HandlerFunc {
 		if format == "" {
 			return toolError(booktools.NewError("该书籍没有 TXT 或 EPUB 格式，无法执行替换")), nil
 		}
-		src, err := booktools.GetFormatPath(ctx.DB, bookID, format)
+		src, err := booktools.GetFormatPath(toolLibraryDB(ctx), bookID, format)
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -605,7 +715,7 @@ func UserTextReplaceRunHandler(cfg BookToolsConfig) HandlerFunc {
 			if outputMode == "overwrite" {
 				path := pluginStr(value["path"])
 				var err error
-				backup, err = booktools.OverwriteFormat(ctx.DB, bookID, format, path, cfg.backupDir())
+				backup, err = booktools.OverwriteFormat(toolLibraryDB(ctx), bookID, format, path, cfg.backupDir())
 				if err != nil {
 					return nil, "", err
 				}
@@ -615,7 +725,7 @@ func UserTextReplaceRunHandler(cfg BookToolsConfig) HandlerFunc {
 				if suffix == "" {
 					suffix = "（正文替换版）"
 				}
-				newID, err := booktools.ImportAsNewBook(ctx.DB, bookID, pluginStr(value["path"]),
+				newID, err := cfg.toolImportNew(ctx, bookID, pluginStr(value["path"]),
 					booktools.ImportOptions{TitleSuffix: suffix, CollectorID: ctx.Identity.UserID})
 				if err != nil {
 					return nil, "", err
@@ -653,7 +763,7 @@ func UserTxtFixerRunHandler(cfg BookToolsConfig) HandlerFunc {
 		if !pluginContains(booktools.AvailableFormats(book), "TXT") {
 			return toolError(booktools.NewError("该书籍没有 TXT 格式，无法执行修复")), nil
 		}
-		src, err := booktools.GetFormatPath(ctx.DB, bookID, "TXT")
+		src, err := booktools.GetFormatPath(toolLibraryDB(ctx), bookID, "TXT")
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -674,14 +784,14 @@ func UserTxtFixerRunHandler(cfg BookToolsConfig) HandlerFunc {
 			backup := ""
 			if outputMode == "overwrite" {
 				var err error
-				backup, err = booktools.OverwriteFormat(ctx.DB, bookID, "TXT",
+				backup, err = booktools.OverwriteFormat(toolLibraryDB(ctx), bookID, "TXT",
 					pluginStr(value["path"]), cfg.backupDir())
 				if err != nil {
 					return nil, "", err
 				}
 				rsp["book_id"] = bookID
 			} else {
-				newID, err := booktools.ImportAsNewBook(ctx.DB, bookID, pluginStr(value["path"]),
+				newID, err := cfg.toolImportNew(ctx, bookID, pluginStr(value["path"]),
 					booktools.ImportOptions{TitleSuffix: "（编码修复版）", CollectorID: ctx.Identity.UserID})
 				if err != nil {
 					return nil, "", err
@@ -721,7 +831,7 @@ func UserZhConverterRunHandler(cfg BookToolsConfig) HandlerFunc {
 		if format == "" {
 			return toolError(booktools.NewError("该书籍没有 EPUB / TXT 格式，无法转换")), nil
 		}
-		src, err := booktools.GetFormatPath(ctx.DB, bookID, format)
+		src, err := booktools.GetFormatPath(toolLibraryDB(ctx), bookID, format)
 		if err != nil {
 			return toolError(err), nil
 		}
@@ -756,12 +866,12 @@ func UserZhConverterRunHandler(cfg BookToolsConfig) HandlerFunc {
 					dir = cfg.backupDir()
 				}
 				var err error
-				backupPath, err = booktools.OverwriteFormat(ctx.DB, bookID, format,
+				backupPath, err = booktools.OverwriteFormat(toolLibraryDB(ctx), bookID, format,
 					pluginStr(value["path"]), dir)
 				if err != nil {
 					return nil, "", err
 				}
-				zhSyncBookMeta(ctx.DB, bookID, lang,
+				zhSyncBookMeta(toolLibraryDB(ctx), bookID, lang,
 					pluginStr(value["converted_title"]), pluginStrList(value["converted_authors"]))
 				rsp["book_id"] = bookID
 			} else {
@@ -772,7 +882,7 @@ func UserZhConverterRunHandler(cfg BookToolsConfig) HandlerFunc {
 				case "zht":
 					suffix = ZhNewBookSuffixZht
 				}
-				newID, err := booktools.ImportAsNewBook(ctx.DB, bookID, pluginStr(value["path"]),
+				newID, err := cfg.toolImportNew(ctx, bookID, pluginStr(value["path"]),
 					booktools.ImportOptions{
 						TitleSuffix:     suffix,
 						Language:        lang,
@@ -873,7 +983,7 @@ func UserEpubBeautifyRunHandler(cfg BookToolsConfig) HandlerFunc {
 				if suffix == "" {
 					suffix = EpubBeautifySuffix
 				}
-				newID, err := booktools.ImportAsNewBook(ctx.DB, bookID, pluginStr(value["path"]),
+				newID, err := cfg.toolImportNew(ctx, bookID, pluginStr(value["path"]),
 					booktools.ImportOptions{TitleSuffix: suffix, CollectorID: ctx.Identity.UserID})
 				if err != nil {
 					return nil, "", err

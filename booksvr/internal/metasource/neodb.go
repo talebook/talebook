@@ -15,6 +15,7 @@ import (
 	"talebook/booksvr/internal/htmlx"
 	"talebook/booksvr/internal/metabase"
 	"talebook/booksvr/internal/plugindomain"
+	"talebook/booksvr/internal/pluginiface"
 	"talebook/booksvr/internal/safehttp"
 )
 
@@ -424,6 +425,22 @@ func NewNeoDBProvider(source *NeoDBSource) *NeoDBProvider {
 	mixin.LegacySources = []string{"neodb"}
 	p.MetaSourceMixin = mixin
 	return p
+}
+
+// SearchBooks 用接口精确签名覆盖 mixin 的宽签名，使 provider 满足
+// pluginiface.MetadataProvider（DispatchInvoke 按此接口断言分派）。
+func (p *NeoDBProvider) SearchBooks(query plugindomain.MetadataQuery,
+	context map[string]any) ([]plugindomain.BookMetadata, error) {
+	return p.MetaSourceMixin.SearchBooks(query, context)
+}
+
+// GetCover 用接口精确签名适配 NeoDBPlugin.GetCover，补齐 MetadataProvider 能力。
+func (p *NeoDBProvider) GetCover(coverURL string, context map[string]any) (*pluginiface.CoverResult, error) {
+	_ = context
+	if cover := p.Plugin.GetCover(coverURL); cover != nil {
+		return &pluginiface.CoverResult{Extension: cover.Extension, Content: cover.Content}, nil
+	}
+	return nil, nil
 }
 
 // Manifest 实现 metabase.MetaSource。

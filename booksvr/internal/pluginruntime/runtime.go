@@ -255,10 +255,14 @@ type PreparedCall struct {
 
 // PrepareRead 在调用线程内解密凭据并构造上下文，返回可并发执行的调用单元。
 //
+// method 是能力方法名（如 search_books），供 provider 的 PrepareContext
+// 钩子按方法裁剪注入（对齐 Python prepare_context(session, settings, provider_method)）；
+// run 执行器路径不经过该钩子，传空串即可。
+//
 // 返回的 failures 以 connection.id 为键，记录准备阶段就失败的连接。
 func (r *Runtime) PrepareRead(connections []*userdb.PluginConnection, timeout float64,
 	contextOverrides map[int64]map[string]any, requiredScopes []string,
-	action string, requestedBy *int64) ([]*PreparedCall, map[int64]error, error) {
+	action string, requestedBy *int64, method string) ([]*PreparedCall, map[int64]error, error) {
 	prepared := make([]*PreparedCall, 0, len(connections))
 	failures := map[int64]error{}
 
@@ -301,7 +305,7 @@ func (r *Runtime) PrepareRead(connections []*userdb.PluginConnection, timeout fl
 		if preparer, ok := provider.(interface {
 			PrepareContext(db *sql.DB, settings map[string]any, method string) map[string]any
 		}); ok {
-			providerPlatform = preparer.PrepareContext(r.DB, r.Settings, "")
+			providerPlatform = preparer.PrepareContext(r.DB, r.Settings, method)
 		}
 
 		config := map[string]any{}

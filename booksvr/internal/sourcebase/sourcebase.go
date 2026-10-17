@@ -5,6 +5,7 @@ package sourcebase
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -458,8 +459,9 @@ func (b *Base) Normalize(context map[string]any, identity any, title string, opt
 	if displayTitle == "" {
 		displayTitle = "未知标题"
 	}
-	if len(displayTitle) > 500 {
-		displayTitle = displayTitle[:500]
+	// Python str[:500] 按字符（码点）截断，避免切断多字节字符。
+	if runes := []rune(displayTitle); len(runes) > 500 {
+		displayTitle = string(runes[:500])
 	}
 
 	return plugindomain.SourceBookFromDict(map[string]any{
@@ -482,11 +484,23 @@ func (b *Base) Normalize(context map[string]any, identity any, title string, opt
 }
 
 // headers 复刻 SourceBase._headers。
+// headers 复刻 SourceBase._headers：默认 Accept + secrets 凭据换请求头。
 func (b *Base) headers(context map[string]any) map[string]string {
-	out := map[string]string{}
+	out := map[string]string{
+		"Accept": "application/opds+json, application/atom+xml, application/json, application/xml",
+	}
 	config := asMap(context["config"])
 	if ua := asString(config["user_agent"]); ua != "" {
 		out["User-Agent"] = ua
+	}
+	secrets := asMap(context["secrets"])
+	if apiKey := asString(secrets["api_key"]); apiKey != "" {
+		out["X-Api-Key"] = apiKey
+	} else if username := asString(secrets["username"]); username != "" {
+		if password := asString(secrets["password"]); password != "" {
+			token := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+			out["Authorization"] = "Basic " + token
+		}
 	}
 	return out
 }

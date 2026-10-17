@@ -363,7 +363,7 @@ func TestPrepareReadBuildsContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ConnectionsFor: %v", err)
 	}
-	prepared, failures, err := rt.PrepareRead(conns, 30, nil, nil, "read", nil)
+	prepared, failures, err := rt.PrepareRead(conns, 30, nil, nil, "read", nil, "")
 	if err != nil {
 		t.Fatalf("PrepareRead: %v", err)
 	}
@@ -398,7 +398,7 @@ func TestPrepareReadScopeFailure(t *testing.T) {
 		t.Fatalf("ConnectionsFor: %v", err)
 	}
 	prepared, failures, err := rt.PrepareRead(conns, 30, nil,
-		[]string{"network.outbound"}, "read", nil)
+		[]string{"network.outbound"}, "read", nil, "")
 	if err != nil {
 		t.Fatalf("PrepareRead: %v", err)
 	}
@@ -428,7 +428,7 @@ func TestPrepareReadContextOverrides(t *testing.T) {
 			"platform":   map[string]any{"device": "boox"},
 		},
 	}
-	prepared, failures, err := rt.PrepareRead(conns, 30, overrides, nil, "read", nil)
+	prepared, failures, err := rt.PrepareRead(conns, 30, overrides, nil, "read", nil, "")
 	if err != nil {
 		t.Fatalf("PrepareRead: %v", err)
 	}
@@ -452,7 +452,7 @@ func TestPrepareReadContextOverrides(t *testing.T) {
 
 func TestPrepareReadEmptyConnections(t *testing.T) {
 	rt, _, _ := newRuntimeWithPlugin(t, "demo", nil)
-	prepared, failures, err := rt.PrepareRead(nil, 30, nil, nil, "read", nil)
+	prepared, failures, err := rt.PrepareRead(nil, 30, nil, nil, "read", nil, "")
 	if err != nil {
 		t.Fatalf("PrepareRead: %v", err)
 	}

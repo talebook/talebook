@@ -1,0 +1,162 @@
+/* mb-beauty.css — 经典出版：暖深棕标题 + 米底章节卡，出版书卷气 */
+@page {
+    margin: 5% 6%;
+}
+
+body {
+    {{FONT_BODY}}
+    line-height: {{LINE_HEIGHT}} !important;
+    text-align: justify;
+    orphans: 2;
+    widows: 2;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+/* 正文段落：中文缩进制，段距 0 */
+p {
+    text-indent: 2em !important;
+    duokan-text-indent: 2em;
+    text-align: justify !important;
+    text-justify: inter-ideograph;
+    line-height: {{LINE_HEIGHT}} !important;
+    margin: 0 !important;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 章首首段顶格 */
+p[data-mb-first] {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+}
+
+/* 章节标题（识别标记）— 经典出版：顶部粗棕线 + 米底章节卡 + 字距 */
+.mb-ch {
+    page-break-before: always;
+    break-before: page;
+    text-align: center !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    {{FONT_HEAD}}
+    font-weight: bold;
+    font-size: {{TITLE_SIZE}} !important;
+    line-height: 1.55;
+    color: {{ACCENT}};
+    margin: 4.2em 0 0.7em 0 !important;
+    padding: 1.25em 1em 1.05em 1em !important;
+    background: {{ACCENT_LIGHT}} !important;
+    border-top: 3px solid {{ACCENT}} !important;
+    border-bottom: 1px solid {{BORDER}} !important;
+    border-radius: 3px;
+    letter-spacing: 0.06em;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 标题内章节号（如 span.num / 第N章 前缀） */
+.mb-ch span {
+    font-size: 0.75em;
+    color: {{MUTED}};
+    font-weight: normal;
+}
+
+/* 无标记标题的温和兜底（仅去缩进，不强制居中/分页） */
+h1, h2, h3 {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 引文/诗词/书信（配色：QUOTE_BG + ACCENT 边框） */
+blockquote {
+    {{FONT_KAI}}
+    font-size: 0.95em;
+    line-height: 1.7;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    margin: 1em 1.5em !important;
+    padding: 0.5em 0;
+    color: #444;
+    background: {{QUOTE_BG}};
+    border-left: 3px solid {{ACCENT}};
+    orphans: 2;
+    widows: 2;
+}
+blockquote p {
+    text-indent: 2em !important;
+    margin: 0 !important;
+}
+
+/* 强调 */
+strong {
+    font-weight: bold;
+}
+em {
+    font-style: italic;
+}
+
+/* 插图 */
+img {
+    max-width: 100% !important;
+    height: auto;
+    margin: 1em auto !important;
+    display: block;
+}
+p img {
+    display: inline;
+    margin: 0 !important;
+    vertical-align: baseline;
+}
+
+/* 分割线（配色：BORDER） */
+hr {
+    border: none !important;
+    border-top: 1px dotted {{BORDER}} !important;
+    width: 40% !important;
+    margin: 1.5em auto !important;
+}
+
+/* 注释/脚注 */
+sup {
+    font-size: 0.75em !important;
+    line-height: 1;
+}
+.footnote,
+.duokan-footnote-content {
+    {{FONT_KAI}}
+    font-size: 0.9em;
+    line-height: 1.6;
+    text-align: left !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+}
+
+/* 表格（配色：BORDER） */
+table {
+    border-collapse: collapse;
+    margin: 1em auto !important;
+    font-size: 0.9em;
+}
+td, th {
+    border: 1px solid {{BORDER}};
+    padding: 0.4em;
+    text-indent: 0;
+}
+
+/* 链接 */
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+/* 标题下方长线 — 经典：窄线 40% + 淡 */
+.mb-ch-sep {
+    width: 40% !important;
+    background: {{ACCENT}} !important;
+    opacity: 0.35;
+}
+
+{{RESPONSIVE}}
+{{TOC_STYLE}}

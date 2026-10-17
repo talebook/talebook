@@ -29,7 +29,7 @@ func nilFields(cfg any) []string {
 func TestBookWiringNoNilFields(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	cfg := newBookWiring(db, db, map[string]any{}).Config("")
+	cfg := newBookWiring(db, db, map[string]any{}, nil).Config("")
 
 	// DB / LibraryDB / Settings / CDNURL 等非函数字段不参与判定。
 	if nils := nilFields(cfg); len(nils) > 0 {

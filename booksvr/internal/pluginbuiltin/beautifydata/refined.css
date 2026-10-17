@@ -1,0 +1,140 @@
+/* mb-beauty.css — 典雅精致（本次“感觉还不错”的标题定版） */
+@page {
+    margin: 5% 6%;
+}
+
+body {
+    {{FONT_BODY}}
+    line-height: {{LINE_HEIGHT}} !important;
+    text-align: justify;
+    orphans: 2;
+    widows: 2;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+/* 正文：白底 + 1.85 行高，段首缩进，首段顶格 */
+p {
+    text-indent: 2em !important;
+    duokan-text-indent: 2em;
+    text-align: justify !important;
+    text-justify: inter-ideograph;
+    line-height: {{LINE_HEIGHT}} !important;
+    margin: 0 !important;
+    orphans: 2;
+    widows: 2;
+}
+p[data-mb-first] {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+}
+
+/* 章节标题 — 典雅：双细线 + 淡底 + 大字距 + 居中大写 + 长线 */
+.mb-ch {
+    page-break-before: always;
+    break-before: page;
+    text-align: center !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    {{FONT_HEAD}}
+    font-weight: 800;
+    font-size: {{TITLE_SIZE}} !important;
+    line-height: 1.6;
+    color: {{ACCENT}};
+    margin: 4.5em 0 0.8em 0 !important;
+    padding: 1.4em 1em 1.2em 1em !important;
+    background: {{ACCENT_LIGHT}} !important;
+    border-top: 1px solid {{BORDER}} !important;
+    border-bottom: 1px solid {{BORDER}} !important;
+    border-radius: 4px;
+    letter-spacing: 0.1em;
+    orphans: 2;
+    widows: 2;
+}
+.mb-ch span {
+    display: block;
+    font-size: 0.68em;
+    color: {{MUTED}};
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    margin-top: 0.6em;
+    text-transform: none;
+}
+h1, h2, h3 {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 引文 — 淡底 + 左色条 */
+blockquote {
+    {{FONT_KAI}}
+    font-size: 0.95em;
+    line-height: 1.75;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    margin: 1.2em 1.4em !important;
+    padding: 0.7em 1em;
+    color: #333;
+    background: {{QUOTE_BG}};
+    border-left: 3px solid {{ACCENT}};
+    border-right: 1px solid {{BORDER}};
+    orphans: 2;
+    widows: 2;
+}
+blockquote p {
+    text-indent: 2em !important;
+    margin: 0.4em 0 !important;
+}
+strong { font-weight: bold; }
+em { font-style: italic; }
+
+/* 插图 */
+img {
+    max-width: 100% !important;
+    height: auto;
+    margin: 1.3em auto !important;
+    display: block;
+}
+p img { display: inline; margin: 0 !important; vertical-align: baseline; }
+
+/* 分割线 */
+hr {
+    border: none !important;
+    border-top: 1px solid {{BORDER}} !important;
+    width: 38% !important;
+    margin: 1.8em auto !important;
+}
+sup { font-size: 0.72em !important; line-height: 1; }
+.footnote, .duokan-footnote-content {
+    {{FONT_KAI}}
+    font-size: 0.88em;
+    line-height: 1.65;
+    text-align: left !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    color: {{MUTED}};
+}
+table {
+    border-collapse: collapse;
+    margin: 1.2em auto !important;
+    font-size: 0.9em;
+}
+td, th {
+    border: 1px solid {{BORDER}};
+    padding: 0.45em 0.6em;
+    text-indent: 0;
+}
+a { color: inherit; text-decoration: none; }
+
+/* 长线 — 典雅：42% 窄线 + 淡 + 圆角 */
+.mb-ch-sep {
+    width: 42% !important;
+    background: {{ACCENT}} !important;
+    opacity: 0.32;
+    height: 1px !important;
+}
+
+{{RESPONSIVE}}
+{{TOC_STYLE}}

@@ -24,7 +24,7 @@ func TestBookLibraryLargeFormatFilterStreamsOnlyPage(t *testing.T) {
 	}
 	insertItem(t, fx.DB, 40000, "private", 99)
 	insertItem(t, fx.DB, 39996, "private", 1)
-	w := newBookWiring(fx.DB, fx.DB, map[string]any{})
+	w := newBookWiring(fx.DB, fx.DB, map[string]any{}, nil)
 	for _, tc := range []struct {
 		name         string
 		user         int64

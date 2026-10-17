@@ -2,12 +2,14 @@ package httpapi
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"talebook/booksvr/internal/convert"
 	"talebook/booksvr/internal/library"
+	"talebook/booksvr/internal/pluginbuiltin"
 	"talebook/booksvr/internal/pluginruntime"
 	"talebook/booksvr/internal/userdb"
 )
@@ -33,13 +35,23 @@ type bookWiring struct {
 }
 
 // newBookWiring 构造接线器。
-func newBookWiring(db, libraryDB *sql.DB, settings map[string]any) *bookWiring {
+//
+// registry 是启动期已注册内置插件的注册表；为 nil 时自建并注册内置插件，
+// 保证单独构造接线器（测试、嵌入式调用）也能拿到完整注册表。
+func newBookWiring(db, libraryDB *sql.DB, settings map[string]any,
+	registry *pluginruntime.PluginRegistry) *bookWiring {
+	if registry == nil {
+		registry = pluginruntime.NewPluginRegistry()
+		if err := pluginbuiltin.Register(registry); err != nil {
+			panic(fmt.Sprintf("httpapi: 注册内置插件失败: %v", err))
+		}
+	}
 	return &bookWiring{
 		db:        db,
 		libraryDB: libraryDB,
 		settings:  settings,
 		aliases:   userdb.NewAliasService(db),
-		registry:  pluginruntime.NewPluginRegistry(),
+		registry:  registry,
 	}
 }
 

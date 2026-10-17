@@ -387,15 +387,23 @@ func (o *OPDSProvider) parseAtom(context map[string]any, content []byte, endpoin
 }
 
 // formats 复刻 SourceBase._formats。
+// formats 复刻 SourceBase._formats：config.formats（空/未设回退全集）与
+// ALLOWED_FORMATS 求交集。
 func (b *Base) formats(context map[string]any) map[string]bool {
 	config := asMap(context["config"])
 	raw := config["formats"]
-	if raw == nil {
-		raw = []any{"epub", "pdf", "mobi", "txt"}
+	requested := asStringSliceAny(raw)
+	if len(requested) == 0 {
+		for f := range AllowedFormats {
+			requested = append(requested, f)
+		}
 	}
 	out := map[string]bool{}
-	for _, f := range asStringSliceAny(raw) {
-		out[strings.ToLower(f)] = true
+	for _, f := range requested {
+		lower := strings.ToLower(f)
+		if AllowedFormats[lower] {
+			out[lower] = true
+		}
 	}
 	return out
 }

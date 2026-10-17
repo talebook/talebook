@@ -21,6 +21,8 @@ func TestBookSendToDeviceRequiresDeviceType(t *testing.T) {
 }
 
 // TestBookSendToDeviceUnsupported 覆盖无 push provider 时的明确错误。
+//
+// 内置插件装配后 kindle 已有 provider，改用从未存在的设备类型验证路由失败。
 func TestBookSendToDeviceUnsupported(t *testing.T) {
 	w, dir := newToolsFixture(t)
 	insertBook(t, w.libraryDB, 1, "书")
@@ -28,8 +30,8 @@ func TestBookSendToDeviceUnsupported(t *testing.T) {
 	seedRealFormat(t, w, dir, 1, "EPUB", "PK\x03\x04body")
 
 	resp, err := w.bookSendToDevice(adminCtx(1), 1, map[string]any{
-		"device_type": "kindle",
-		"mailbox":     "a@example.com",
+		"device_type": "no-such-device",
+		"device_url":  "127.0.0.1:1",
 	})
 	if err != nil {
 		t.Fatalf("意外错误: %v", err)
@@ -103,7 +105,7 @@ func TestBookSendToMailUnsupported(t *testing.T) {
 func TestCheckPushPermissionGuestDenied(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 
 	resp := w.checkPushPermission(&Context{Identity: Identity{UserID: 0}})
 	if resp == nil || resp["err"] != "user.need_login" {
@@ -115,7 +117,7 @@ func TestCheckPushPermissionGuestDenied(t *testing.T) {
 func TestCheckPushPermissionGuestAllowed(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{"ALLOW_GUEST_PUSH": true})
+	w := newBookWiring(db, db, map[string]any{"ALLOW_GUEST_PUSH": true}, nil)
 
 	if resp := w.checkPushPermission(&Context{Identity: Identity{UserID: 0}}); resp != nil {
 		t.Errorf("resp = %v，期望 nil", resp)
@@ -126,7 +128,7 @@ func TestCheckPushPermissionGuestAllowed(t *testing.T) {
 func TestPluginRegistryNonNil(t *testing.T) {
 	db := netSchemaDB(t)
 	createCalibreTables(t, db)
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	if w.pluginRegistry() == nil {
 		t.Error("pluginRegistry 为 nil")
 	}

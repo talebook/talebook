@@ -47,7 +47,7 @@ func bootstrapWiring(t *testing.T) (*bookWiring, string) {
 		t.Fatalf("insert format: %v", err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	w.libraryRoot = root
 	return w, epubFile
 }
@@ -204,7 +204,7 @@ func TestReaderBootstrapNoEpub(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	rec := serveBootstrap(t, w, "engine=readest")
 
 	if rec.Code != http.StatusNotFound {
@@ -233,7 +233,7 @@ func TestReaderBootstrapConversionPending(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	w := newBookWiring(db, db, map[string]any{})
+	w := newBookWiring(db, db, map[string]any{}, nil)
 	w.convert = convert.NewService(db, t.TempDir())
 	w.convert.Converter = func(string, string) error { return nil }
 	rec := serveBootstrap(t, w, "engine=readest")

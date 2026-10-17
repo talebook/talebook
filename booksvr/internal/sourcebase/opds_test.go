@@ -534,13 +534,13 @@ func TestOPDSDiscoverRequiresEndpoint(t *testing.T) {
 // TestFormats 覆盖格式集合解析。
 func TestFormats(t *testing.T) {
 	b := NewBase("demo", nil, nil)
-	// 默认值。
+	// 默认值：回退 ALLOWED_FORMATS 全集（对齐 Python _formats）。
 	got := b.formats(map[string]any{})
-	if len(got) != 4 || !got["epub"] || !got["pdf"] || !got["mobi"] || !got["txt"] {
+	if len(got) != len(AllowedFormats) || !got["epub"] || !got["cbz"] || !got["fb2"] {
 		t.Errorf("默认得到 %v", got)
 	}
-	// 显式配置（大小写归一）。
-	got = b.formats(map[string]any{"config": map[string]any{"formats": []any{"EPUB"}}})
+	// 显式配置（大小写归一，且与全集求交集）。
+	got = b.formats(map[string]any{"config": map[string]any{"formats": []any{"EPUB", "exe"}}})
 	if len(got) != 1 || !got["epub"] {
 		t.Errorf("显式得到 %v", got)
 	}

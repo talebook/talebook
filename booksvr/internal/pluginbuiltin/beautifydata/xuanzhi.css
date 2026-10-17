@@ -1,0 +1,160 @@
+/* mb-beauty.css — 宣纸墨韵：章扉式大留白 + 栗红点缀
+   章扉式大留白标题 + 栗红圆角引文卡 + 整页宣纸米黄底。
+   装饰全部为真实元素与常规属性，兼容手机阅读器。 */
+@page {
+    margin: 5% 6%;
+}
+
+{{RESPONSIVE}}
+
+body {
+    {{FONT_BODY}}
+    background-color: {{ACCENT_LIGHT}};
+    line-height: {{LINE_HEIGHT}} !important;
+    text-align: justify;
+    orphans: 2;
+    widows: 2;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+}
+
+/* 正文段落：段距 0 缩进制，行高承载呼吸感 */
+p {
+    text-indent: 2em !important;
+    duokan-text-indent: 2em;
+    text-align: justify !important;
+    text-justify: inter-ideograph;
+    line-height: {{LINE_HEIGHT}} !important;
+    margin: 0 !important;
+    orphans: 2;
+    widows: 2;
+}
+
+p[data-mb-first] {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+}
+
+/* 章扉式章节标题：超大顶留白独屏开场、标宋居中、无卡片无边框，
+   仅以标题下方栗红短线收束（margin 用百分比随屏幕宽度缩放） */
+.mb-ch {
+    page-break-before: always;
+    break-before: page;
+    text-align: center !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    {{FONT_HEAD}}
+    font-weight: bold;
+    font-size: {{TITLE_SIZE}} !important;
+    line-height: 1.7;
+    color: {{ACCENT}};
+    margin: 34% 0 0.8em 0 !important;
+    padding: 0 0.5em !important;
+    letter-spacing: 0.12em;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 双行标题（split_title，lib 加 mb-ch-split 类）关闭章扉大顶距：
+   num+title 双 span 已增高，再叠 34% 顶距会把标题、长线与正文挤出首屏
+   （顶空修复）。无拆分的书保留 34% 章扉留白。裸类选择器（0-1-0）与
+   .mb-ch 同特异性、按其后置源序取胜；手机端仍由 responsive 的
+   body .mb-ch（0-1-1）接管 2.2em 顶距 */
+.mb-ch-split {
+    margin: 4em 0 0.8em 0 !important;
+}
+
+/* 标题内副标/卷号：楷体小字宽字距 */
+.mb-ch span {
+    display: block;
+    font-size: 0.6em;
+    color: {{MUTED}};
+    font-weight: normal;
+    letter-spacing: 0.35em;
+    margin-top: 0.8em;
+}
+
+h1, h2, h3 {
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    orphans: 2;
+    widows: 2;
+}
+
+/* 引文：栗红圆角边框白卡 */
+blockquote {
+    {{FONT_KAI}}
+    font-size: 0.95em;
+    line-height: 1.8;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    margin: 1.4em 1.2em !important;
+    padding: 0.9em 1.1em;
+    color: #3D322A;
+    background: {{QUOTE_BG}};
+    border: 2px solid {{ACCENT}};
+    border-radius: 14px;
+    orphans: 2;
+    widows: 2;
+}
+blockquote p {
+    text-indent: 2em !important;
+    margin: 0.4em 0 !important;
+}
+
+strong { font-weight: bold; }
+em { font-style: italic; }
+
+img {
+    max-width: 100% !important;
+    height: auto;
+    margin: 1.3em auto !important;
+    display: block;
+}
+p img { display: inline; margin: 0 !important; vertical-align: baseline; }
+
+hr {
+    border: none !important;
+    border-top: 1px solid {{BORDER}} !important;
+    width: 30% !important;
+    margin: 1.8em auto !important;
+}
+
+sup { font-size: 0.72em !important; line-height: 1; }
+.footnote, .duokan-footnote-content {
+    {{FONT_KAI}}
+    font-size: 0.88em;
+    line-height: 1.65;
+    text-align: left !important;
+    text-indent: 0 !important;
+    duokan-text-indent: 0;
+    color: {{MUTED}};
+}
+
+table {
+    border-collapse: collapse;
+    margin: 1.2em auto !important;
+    font-size: 0.9em;
+}
+td, th {
+    border: 1px solid {{BORDER}};
+    padding: 0.45em 0.6em;
+    text-indent: 0;
+}
+
+pre, code {
+    {{FONT_CODE}}
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* 标题下方收束线 — 章扉：14% 栗红短棒居中（印章条） */
+.mb-ch-sep {
+    width: 14% !important;
+    height: 2px !important;
+    background: {{ACCENT}} !important;
+    opacity: 0.75;
+    margin: 0 auto 2.6em auto !important;
+}
+
+{{TOC_STYLE}}
