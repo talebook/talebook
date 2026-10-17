@@ -1,13 +1,14 @@
 package pluginbuiltin
 
 import (
-	"os"
-	"regexp"
 	"embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 // zhData 内嵌 OpenCC 字典与配置（来自 webserver/plugins/tool/zh_converter）。
@@ -27,10 +28,19 @@ type openCCDict struct {
 	words  map[string][]string
 }
 
-// openCCConverter 复刻 OpenCC：字典链 + 最长匹配。
+// openCCConverter 复刻 OpenCC：字典链 + StringTree 全局最长匹配。
 type openCCConverter struct {
-	// chains 是每个分组（group）的字典列表；组内按序匹配一次。
-	chains [][]*openCCDict
+	// chain 是转换链的项序列；每项要么是单字典（应用后展平），
+	// 要么是字典组（组内共享树结构，后续字典只处理未命中残余）。
+	chain []openCCChainItem
+}
+
+// openCCChainItem 复刻 _dict_chain_data 的项：tuple（单字典）或 list（组）。
+type openCCChainItem struct {
+	// group 非 nil 时为字典组（is_dict_group=True 语义）。
+	group []*openCCDict
+	// single 非 nil 时为单字典（非组语义，应用后展平）。
+	single *openCCDict
 }
 
 // dictCache 是进程级字典缓存（复刻 _class_dict_cache）。
@@ -136,78 +146,142 @@ func newOpenCCConverter(direction string, extraDicts []*openCCDict) (func(string
 	}
 	converter := &openCCConverter{}
 	for _, link := range config.ConversionChain {
-		var dicts []*openCCDict
-		dicts = append(dicts, extraDicts...)
-		if link.Dict != nil {
-			var names []string
-			if link.Dict.Type == "group" {
-				for _, item := range link.Dict.Dicts {
-					if item.File != "" {
-						names = append(names, item.File)
-					}
-				}
-			} else if link.Dict.File != "" {
-				names = []string{link.Dict.File}
-			}
-			for _, name := range names {
-				dict, err := loadOpenCCDict(name)
-				if err != nil {
-					return nil, err
-				}
-				dicts = append(dicts, dict)
-			}
+		if link.Dict == nil {
+			continue
 		}
-		if len(dicts) > 0 {
-			converter.chains = append(converter.chains, dicts)
+		var names []string
+		if link.Dict.Type == "group" {
+			for _, item := range link.Dict.Dicts {
+				if item.File != "" {
+					names = append(names, item.File)
+				}
+			}
+		} else if link.Dict.File != "" {
+			names = []string{link.Dict.File}
+		}
+		var dicts []*openCCDict
+		for _, name := range names {
+			dict, err := loadOpenCCDict(name)
+			if err != nil {
+				return nil, err
+			}
+			dicts = append(dicts, dict)
+		}
+		if len(dicts) == 0 {
+			continue
+		}
+		// 复刻 _inject_extra_dicts：extra 字典插入每个链项的最前位置；
+		// 单字典项包成单元素组（组内树结构跨字典保留）。
+		if len(extraDicts) > 0 {
+			withExtra := make([]*openCCDict, 0, len(extraDicts)+len(dicts))
+			withExtra = append(withExtra, extraDicts...)
+			withExtra = append(withExtra, dicts...)
+			converter.chain = append(converter.chain, openCCChainItem{group: withExtra})
+		} else if link.Dict.Type == "group" {
+			converter.chain = append(converter.chain, openCCChainItem{group: dicts})
+		} else {
+			converter.chain = append(converter.chain, openCCChainItem{single: dicts[0]})
 		}
 	}
 	return converter.Convert, nil
 }
 
-// convertSegment 对单个片段执行字典链转换（组内每本字典只匹配一次）。
-func (c *openCCConverter) convertSegment(text string) string {
-	for _, group := range c.chains {
-		var out strings.Builder
-		runes := []rune(text)
-		i := 0
-		for i < len(runes) {
-			matched := false
-			for _, dict := range group {
-				maxLen := dict.maxLen
-				if maxLen > len(runes)-i {
-					maxLen = len(runes) - i
-				}
-				for l := maxLen; l >= 1; l-- {
-					if values, ok := dict.words[string(runes[i:i+l])]; ok {
-						out.WriteString(values[0])
-						i += l
-						matched = true
-						break
-					}
-				}
-				if matched {
-					break
-				}
-			}
-			if !matched {
-				out.WriteRune(runes[i])
-				i++
-			}
-		}
-		text = out.String()
-	}
-	return text
+// stringTree 复刻 StringTree：最长匹配 + 左右子树递归。
+type stringTree struct {
+	str     string
+	left    *stringTree
+	right   *stringTree
+	matched bool
 }
 
-// openCCSplitRe 复刻 split_chars_re 的分隔符集合（按 rune 判断）。
+// convertTree 复刻 StringTree.convert_tree：从全段范围找最长命中，
+// 命中后把左右残余递归给同一本字典（matched 节点不再重匹配）。
+func (t *stringTree) convertTree(maxLen int, dict map[string][]string) {
+	if t.matched {
+		if t.left != nil {
+			t.left.convertTree(maxLen, dict)
+		}
+		if t.right != nil {
+			t.right.convertTree(maxLen, dict)
+		}
+		return
+	}
+	runes := []rune(t.str)
+	n := len(runes)
+	testLen := maxLen
+	if testLen > n {
+		testLen = n
+	}
+	for ; testLen != 0; testLen-- {
+		for i := 0; i+testLen <= n; i++ {
+			values, ok := dict[string(runes[i:i+testLen])]
+			if !ok {
+				continue
+			}
+			if i > 0 {
+				t.left = &stringTree{str: string(runes[:i])}
+				t.left.convertTree(maxLen, dict)
+			}
+			if i+testLen < n {
+				t.right = &stringTree{str: string(runes[i+testLen:])}
+				t.right.convertTree(maxLen, dict)
+			}
+			// 多映射取首个（对齐 value.split(" ")[0]）。
+			t.str = values[0]
+			t.matched = true
+			return
+		}
+	}
+}
+
+// inorder 复刻 StringTree.inorder：中序遍历还原字符串。
+func (t *stringTree) inorder() string {
+	var b strings.Builder
+	var walk func(*stringTree)
+	walk = func(node *stringTree) {
+		if node == nil {
+			return
+		}
+		walk(node.left)
+		b.WriteString(node.str)
+		walk(node.right)
+	}
+	walk(t)
+	return b.String()
+}
+
+// convertGroup 复刻 _convert 的组分支：组内字典共享树结构，
+// 每本字典只处理未命中残余；返回展平字符串。
+func convertGroup(text string, dicts []*openCCDict) string {
+	tree := &stringTree{str: text}
+	for _, dict := range dicts {
+		tree.convertTree(dict.maxLen, dict.words)
+	}
+	return tree.inorder()
+}
+
+// convertSegment 复刻 _convert：按链项依次应用；单字典应用后展平，
+// 字典组共享树结构。
+func (c *openCCConverter) convertSegment(text string) string {
+	tree := &stringTree{str: text}
+	for _, item := range c.chain {
+		if item.group != nil {
+			tree = &stringTree{str: convertGroup(tree.inorder(), item.group)}
+		} else if item.single != nil {
+			tree.convertTree(item.single.maxLen, item.single.words)
+			tree = &stringTree{str: tree.inorder()}
+		}
+	}
+	return tree.inorder()
+}
+
+// isOpenCCSeparator 复刻 split_chars_re：\s+（Unicode 空白，含全角空格）
+// 加 OpenCC PhraseExtract.cpp 的显式分隔符集合。
 func isOpenCCSeparator(ch rune) bool {
-	switch {
-	case ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r':
-		return true
-	case strings.ContainsRune("-,.?!*，。、；：？！…“”‘’『』「」﹁﹂—－（）《》〈〉～．／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼", ch):
+	if unicode.IsSpace(ch) {
 		return true
 	}
-	return false
+	return strings.ContainsRune("-,.?!*，。、；：？！…“”‘’『』「」﹁﹂—－（）《》〈〉～．／＼︒︑︔︓︿﹀︹︺︙︐［﹇］﹈︕︖︰︳︴︽︾︵︶｛︷｝︸﹃﹄【︻】︼", ch)
 }
 
 // Convert 复刻 OpenCC.convert：按分隔符切分后逐段转换。
@@ -226,8 +300,6 @@ func (c *openCCConverter) Convert(text string) string {
 	out.WriteString(c.convertSegment(segment.String()))
 	return out.String()
 }
-
-
 
 // ---- 繁简转换的 EPUB / TXT 处理（复刻 zh_converter/transform.py）----
 
