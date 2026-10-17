@@ -332,6 +332,10 @@ func attachIdentifiers(db *sql.DB, byID map[int64]*BookData, ph string, args []a
 
 // attachFormats 填充格式列表（来自 Calibre 的 data 表）。
 func attachFormats(db *sql.DB, byID map[int64]*BookData, ph string, args []any) error {
+	missing, err := missingSourceFormats(db, ph, args)
+	if err != nil {
+		return err
+	}
 	rows, err := db.Query(fmt.Sprintf(`
 		SELECT book, UPPER(format), MAX(uncompressed_size) FROM data WHERE book IN (%s) GROUP BY book, UPPER(format) ORDER BY book, UPPER(format)`, ph), args...)
 	if err != nil {
@@ -344,6 +348,9 @@ func attachFormats(db *sql.DB, byID map[int64]*BookData, ph string, args []any) 
 		var size sql.NullInt64
 		if err := rows.Scan(&bookID, &format, &size); err != nil {
 			return fmt.Errorf("library: 扫描格式失败: %w", err)
+		}
+		if missing[bookID][strings.ToUpper(format)] {
+			continue
 		}
 		if b, ok := byID[bookID]; ok {
 			b.Formats = append(b.Formats, strings.ToUpper(format))

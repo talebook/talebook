@@ -668,6 +668,9 @@ func (s *Service) markIndexed(row *userdb.ScanFile, mi importmeta.Metadata, fpat
 		return row.Status, 0, saveScanFile(s.DB, row)
 	}
 
+	if err := library.SeedSourceHashes(s.LibraryDB, map[string]string{fpath: row.Hash}); err != nil {
+		return "", 0, err
+	}
 	s.extractCover(bookID, physicalPath, format)
 	row.ImportID = importID
 	row.BookID = bookID

@@ -225,6 +225,8 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 
 	opts, stopImports := attachImportWorker(ctx, opts, userDB)
 	defer stopImports()
+	opts, stopSources := attachSourceWorker(ctx, opts, db, userDB)
+	defer stopSources()
 	dispatcher, err := newSettingsHandler(opts, db, userDB)
 	if err != nil {
 		return err

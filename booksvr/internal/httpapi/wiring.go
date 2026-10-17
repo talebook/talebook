@@ -126,7 +126,24 @@ func (w *bookWiring) Config(cdnURL string) BookConfig {
 			return title
 		},
 		HotBooks: func(ctx *Context, start, delta int) ([]int64, int, error) {
-			return userdb.HotBookIDs(w.db, ctx.Identity.UserID, ctx.Identity.IsAdmin, start, delta)
+			missing, err := library.UnavailableSourceBooks(w.libraryDB)
+			if err != nil {
+				return nil, 0, err
+			}
+			if len(missing) == 0 {
+				return userdb.HotBookIDs(w.db, ctx.Identity.UserID, ctx.Identity.IsAdmin, start, delta)
+			}
+			ids, _, err := userdb.HotBookIDs(w.db, ctx.Identity.UserID, ctx.Identity.IsAdmin, 0, -1)
+			if err != nil {
+				return nil, 0, err
+			}
+			visible := make([]int64, 0, len(ids))
+			for _, id := range ids {
+				if !missing[id] {
+					visible = append(visible, id)
+				}
+			}
+			return bookSlice(visible, start, start+delta), len(visible), nil
 		},
 		NavTags: func(ctx *Context) (map[string]int, error) {
 			return userdb.TagCounts(w.libraryDB)

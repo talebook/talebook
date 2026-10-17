@@ -357,10 +357,20 @@ func bookLoadBooks(cfg BookConfig, ids []int64) (map[int64]library.BookData, err
 
 // bookPrivateIDs 取当前请求方不可见的私藏书集合。
 func bookPrivateIDs(cfg BookConfig, ctx *Context) (map[int64]bool, error) {
-	if cfg.PrivateBookIDs == nil {
-		return map[int64]bool{}, nil
+	out, err := library.UnavailableSourceBooks(cfg.LibraryDB)
+	if err != nil {
+		return nil, err
 	}
-	return cfg.PrivateBookIDs(ctx)
+	if cfg.PrivateBookIDs != nil {
+		private, e := cfg.PrivateBookIDs(ctx)
+		if e != nil {
+			return nil, e
+		}
+		for id := range private {
+			out[id] = true
+		}
+	}
+	return out, nil
 }
 
 // bookAttachStates 给书籍列表附加阅读状态。

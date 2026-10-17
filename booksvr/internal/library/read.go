@@ -211,7 +211,15 @@ func FieldFor(db *sql.DB, field string, bookID int64) (any, error) {
 
 // BooksForFormat retrieves IDs without loading unrelated book metadata.
 func BooksForFormat(db *sql.DB, format string) ([]int64, error) {
-	rows, err := db.Query(`SELECT DISTINCT book FROM data WHERE UPPER(format)=UPPER(?)`, format)
+	var exists int
+	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='source_sync_formats'`).Scan(&exists); err != nil {
+		return nil, err
+	}
+	query := `SELECT DISTINCT book FROM data d WHERE UPPER(format)=UPPER(?)`
+	if exists > 0 {
+		query += ` AND NOT EXISTS (SELECT 1 FROM book_formats f JOIN source_sync_formats s ON s.format_id=f.id WHERE f.book_id=d.book AND UPPER(f.format)=UPPER(d.format) AND s.missing=1)`
+	}
+	rows, err := db.Query(query, format)
 	if err != nil {
 		return nil, fmt.Errorf("library: 查询格式书籍失败: %w", err)
 	}

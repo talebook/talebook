@@ -503,8 +503,12 @@ func metaRenderBookList(ctx *Context, cfg MetaConfig, allBooks []map[string]any,
 		return nil, err
 	}
 	visible := make([]map[string]any, 0, len(allBooks))
+	missing, err := library.UnavailableSourceBooks(cfg.DB)
+	if err != nil {
+		return nil, err
+	}
 	for _, b := range allBooks {
-		if privateIDs[int64Of(b["id"])] {
+		if privateIDs[int64Of(b["id"])] || missing[int64Of(b["id"])] {
 			continue
 		}
 		visible = append(visible, b)

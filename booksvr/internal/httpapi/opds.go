@@ -515,6 +515,17 @@ func opdsPrefix(cfg OpdsConfig) string {
 
 // opdsVisibleIDs 过滤掉当前请求方不可见的书籍。
 func opdsVisibleIDs(cfg OpdsConfig, ctx *Context, ids []int64) ([]int64, error) {
+	missing, err := library.UnavailableSourceBooks(cfg.DB)
+	if err != nil {
+		return nil, err
+	}
+	available := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if !missing[id] {
+			available = append(available, id)
+		}
+	}
+	ids = available
 	if cfg.FilterVisibleBookIDs != nil {
 		return cfg.FilterVisibleBookIDs(ctx, ids)
 	}

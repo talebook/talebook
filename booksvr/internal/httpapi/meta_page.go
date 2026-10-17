@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"talebook/booksvr/internal/library"
 )
 
 // metaRenderBookIDs loads full metadata for the visible page only. Candidate
@@ -15,9 +16,13 @@ func metaRenderBookIDs(ctx *Context, cfg MetaConfig, ids []int64, title string) 
 		return nil, err
 	}
 	seen := make(map[int64]bool, len(ids))
+	missing, err := library.UnavailableSourceBooks(cfg.DB)
+	if err != nil {
+		return nil, err
+	}
 	visible := make([]int64, 0, len(ids))
 	for _, id := range ids {
-		if !seen[id] && !privateIDs[id] {
+		if !seen[id] && !privateIDs[id] && !missing[id] {
 			visible = append(visible, id)
 			seen[id] = true
 		}

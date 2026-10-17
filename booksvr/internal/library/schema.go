@@ -94,7 +94,7 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
-	return nil
+	return migrateSourceSync(db)
 }
 
 // columnExists reports whether the named column is present on the table.

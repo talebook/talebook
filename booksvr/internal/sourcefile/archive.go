@@ -55,8 +55,14 @@ func Fingerprint(file string) (string, error) {
 	if !info.Mode().IsRegular() {
 		return "", fmt.Errorf("ZIP 来源不是普通文件")
 	}
-	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", file, info.Size(), info.ModTime().UnixNano())))
-	return hex.EncodeToString(sum[:]), nil
+	return FingerprintValues(file, info.Size(), info.ModTime().UnixNano()), nil
+}
+
+// FingerprintValues preserves the existing on-disk reference contract when
+// an inotify rename cookie proves that file metadata is unchanged.
+func FingerprintValues(file string, size, mtime int64) string {
+	sum := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d", file, size, mtime)))
+	return hex.EncodeToString(sum[:])
 }
 
 type memberInfo struct {
