@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>兼容阅读设备上传接口 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page" id="main-content"><header class="hero"><h1>兼容阅读设备上传接口</h1><p>创建日期：2026-10-18 · 所属模块：booksvr · 状态：ACTIVE</p></header>
+<section class="card"><h2>原始诉求</h2><p>“兼容新老接口好了。再把其它设备的接口也都搜一下资料，看看是否需要增加兼容。”</p></section>
+<section class="card"><h2>目标与边界</h2><p>BOOX 旧推送库和新存储接口兼容；准确保留 HTTP 状态和业务错误；核查多看、汉王、掌阅、当当、PureLibro、Kindle。保留端口和现有设备设置。来源文件和正在运行的导入任务不作数据变更。</p></section>
+<section class="card"><h2>方案与决策</h2><p>沿用旧 library 接口；仅明确 HTTP 403/404/405/410/501 时尝试 storage 接口，写入 /Download。连接中断、超时、限流、5xx（除明确未实现501）、业务错误不重传。两次尝试共享一个超时预算。新接口必须返回 JSON code=0 且未明确 successful=false；旧接口要求 successful 或 isSuccessful 至少一个明确成功标记，且任一出现的失败标记都拒绝。存储接口保留设备同名冲突结果，不能强制覆盖。</p><p>SafeHTTP 保留认证响应的原始状态。共用上传器按照结构化错误区分 HTTP、策略、超时和连接失败。Python 兼容后端保持同样的 BOOX 回退规则。</p><p>实机迭代证据：2026-10-18 BOOX 重新开启后，Go实机上传通过，返回 code=0、isSuccessful=true、isTokenInvalid=false，message为 /storage/emulated/0/Download/Talebook-传书验证-20261018.txt。追加兼容 successful/isSuccessful 两种字段；任一显式失败或token无效都拒绝成功判定。旧library要求至少一个成功标记，新storage允许仅code=0的已知变体；不把任意设备message直接呈现在HTML错误中。设计边界核对：同一设备、同一目标地址、固定两个端点；不扫描网络、不猜端口、不添加未经证实的上传路径；仅 BOOX 端点拒绝时回退。没有其他设备可实测时记录限制。</p></section>
+<section class="card"><h2>现状证据与资料核查</h2><p>leonFN 宿主机和容器访问设备根路径200，/api/ping 返回ok；旧 library POST403。设备自身 JS 明确使用 storage upload，multipart字段 file 和 path=/Download。GET旧上传接口404不能代表POST不支持，判定采用POST的明确状态。</p><p><a href="https://raw.githubusercontent.com/talebook/talebook/master/webserver/plugins/sending/uploader.py">上游作者的上传器源码</a>：多看 /files + newfile；汉王 /files + newfile/fileName；掌阅 /?action=addBook + Filename/Filedata/Upload，旧版头 application/octet-stream；当当根路径 + files[]；PureLibro /upload + files[]/path。BOOX 旧接口相同。掌阅补充仅HTTP415后使用旧头重试，共享预算，其他接口保持原协议。<a href="https://help.boox.com/hc/en-us/articles/10701399613076-Transfer-with-Your-Computer">BOOX官方说明</a>确认设备开启局域网互传后使用其显示地址；具体新接口以用户设备本身JS为第一手证据。<a href="https://help.dangdang.com/details/page230">当当官方操作指南</a>和<a href="https://apps.apple.com/cn/app/id1546612448">PureLibro开发者发布页</a>有网络/WiFi传书能力说明，没有可确认的新版HTTP契约。<a href="https://github.com/xiaokun567/einksync">EinkSync作者README</a>仍给出汉王9310，但未公开足以确认新multipart字段的源码。Kindle核对<a href="https://www.amazon.com/sendtokindle/email">Amazon邮件传书说明</a>，已有EPUB/PDF/TXT及MOBI/AZW3转换链，无需新增HTTP接口。没有公开新协议和真实设备证据时，不猜测备用路径；其余设备硬件上传尚未实测。</p></section>
+<section class="card"><h2>影响范围</h2><p>booksvr/internal/pluginbuiltin/push.go、safehttp/safehttp.go、webserver/plugins/push/boox.py、spec/插件/发送到设备.md。后端兼容修复，现有错误展示承载准确服务端错误，不新增页面或前端代码。考虑错误文案消费者，执行 interface-review full，结果见后节。剩余风险为无真实设备的厂商接口兼容范围。</p></section>
+<section class="card" id="tests"><h2>测试结果</h2><p>Go：go test ./internal/pluginbuiltin ./internal/safehttp ./internal/pluginruntime -count=1 -timeout 120s 已通过，最终固件返回字段补充后已复跑通过。测试包含旧接口成功、403/404/405/410/501回退、401/429/500/503不回退、连接中断/超时不重传、同名冲突、非JSON、缺失成功码、两种固件成功字段和token无效，以及五个其他设备multipart契约、掌阅415头兼容。HTTP API全包：补齐Python源码fixture后 go test -p 2 ./internal/httpapi -skip TestFileThemeStoreWriteFileError -count=1 -timeout 300s 通过（143.170秒）；该只读权限测试编译为测试二进制后用UID911单独运行通过。此前缺源码fixture和root身份导致的回归环境失败已修正，未改动业务代码规避。设备/推送API定向 BookSend|DeviceTypes|Push 通过（8.900秒）。go vet ./internal/pluginbuiltin ./internal/safehttp 通过。Python隔离依赖/包命名空间运行 tests/test_boox_compat.py：21通过；没有声称执行整个Python/Calibre集成套件。Ruff check与format通过。25篇spec检查通过；WIP阶段设计校验按预期拒绝合并，转ACTIVE后复跑。Go build成功，镜像内二进制和Python文件hash与构建输入一致。真实设备开启前上传超时（设备/api/ping也超时）；用户重新开启后新接口真实上传通过，文件保存到BOOX Download目录，旧library403得到兼容回退。旧固件仅模拟服务器验证；其他设备没有实体地址，未声称硬件上传已验证。最终Go实机复测0.06秒成功，返回 isSuccessful=true / isTokenInvalid=false，保存 /storage/emulated/0/Download/Talebook-传书验证-1792300442155463456.txt。两个测试文件的下载回读/清理请求随后均超时，因此只确认上传接口明确接收，不声称已回读校验或清理测试文件。首次部署健康窗口40次不足覆盖冷启动，部署脚本自动回滚，日志自检通过、进程正常退出；已把等待窗口改为180次再部署。未修改应用启动业务或配置。正式容器已更新：image sha256:401faeb6676aa0f97938dfdc2c2857437511ac2903fa020f327b33f8c71a5cc6；container 5065325f99e877590b03db2b9e0990d93f04dcb6780703ed5e3323aeb2a45dc2。/data、/books、/books1挂载与旧容器逐项相同；停机等待当前图书完成，库内importing归零后交接；import_resume_job前后均active。上线API登录、welcome、设备类型、导入列表成功；manual_library_import_running=true、phase=importing、error为空，done=126218，todo=82569。booksvr/nginx/upgrade进程RUNNING。上线后BOOX ping又超时，因此正式站点API完整推书步骤未执行，不能声称站点API→实体设备全链路通过；实体上传结论来自同一最终二进制在leonFN隔离调用的两次明确成功响应。设备必须保持互传服务开启和网络可达。后端最终go vet再次通过。</p></section><section class="card"><h2>Interface review · full</h2><h3>Scope and Coverage</h3><p>审查目标：当前分支相对 origin/master 的全部本地变化清单，包括提交和未提交。base d5d21dda160d65d29cc0c9ab8a13ae6b4deb69d2；head f51080dc3aa72ace232447fd5573adcc07824238；49个提交、7个未提交路径、842个变化路径。排除47个锁文件、生成资源、二进制等（完整清单记录于本地 talebook-device-interface-scope.json）。范围过大，按 skill 收窄为完整的“阅读设备配置 → 书籍发送 → 成功/失败反馈”流程，最多展开5个消费者；其余30个变化UI路径不展开，不声称全站已审查。</p><p>Nuxt4/Vue3/Vuetify3/i18n；约定来源 AGENTS.md、app/AGENTS.md、spec/插件/发送到设备.md。读取 interface-review、better-interface 和六个 better-* 领域技能及相关表单、换行、自适应参考；核对变更前后两侧，未移除本流程的标签、焦点、反馈或交互入口。</p><div class="table-wrap"><table><thead><tr><th>Domain</th><th>Evidence inspected</th><th>Result</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>发送弹窗具名字段和按钮；发送loading/finally；失败弹窗手动关闭</td><td>静态检查无新增问题；键盘/读屏运行态 Not verified</td></tr>
+<tr><td>Layout</td><td>书籍发送弹窗、个人与全局设备配置，保留自定义端口</td><td>无新增布局代码；窄屏和200%缩放运行态 Not verified</td></tr>
+<tr><td>Writing</td><td>HTTP状态与业务码；两端失败信息；同名冲突；API msg回传</td><td>Clear：不再把403误称连接失败；业务失败使用短说明，不直接输出设备任意JSON</td></tr>
+<tr><td>Typography</td><td>错误弹窗消息不新增固定高度或截断；错误缩短为状态码说明</td><td>无新增文字样式；实际换行 Not verified</td></tr>
+<tr><td>Colors</td><td>无主题、token、颜色修改</td><td>Not reviewed: no evidence in the change scope；不声称已测对比度</td></tr>
+<tr><td>UI</td><td>现有发送按钮loading和完成状态保留；失败不关闭设备配置</td><td>静态Clear；没有新增图标、动画、视觉资源</td></tr>
+</tbody></table></div><h3>Findings</h3><p>No actionable interface findings in this change. 初查的误导连接文案已修正，复查保留HTTP具体状态。安全/网络正确性另由代码检查和契约测试验证。</p><h3>Considered but Rejected</h3><p>增加“新旧接口”选择器：不需要读者判断固件，明确拒绝时自动兼容即可。强制恢复8085默认端口：现有自定义8088是有效输入，deviceTypes工具保留手动端口。</p><h3>Verification</h3><p>git symbolic-ref refs/remotes/origin/HEAD → origin/master；git merge-base origin/master HEAD → 上述base；git rev-list --count base..HEAD →49；git diff --name-only base + git ls-files --others --exclude-standard → 清单；git diff -U1 base -- 五个消费者 → 双侧核对；git status --short →7。没有fetch、checkout、stash、worktree或其他.git写入。5个消费者：app/pages/book/[bid]/index.vue、app/pages/user/detail.vue、app/components/GlobalDeviceSettings.vue、app/plugins/talebook.js、app/layouts/default.vue；另读取端口工具定义以核对调用。此次未请求额外渲染审查，所有视觉/运行态声明标记Not verified。</p><h3>Verdict</h3><p>Approve（限定上述流程的静态变更审查；不代表全站或真实硬件验收）。</p></section></main></body></html>

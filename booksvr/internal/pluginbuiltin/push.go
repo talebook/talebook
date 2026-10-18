@@ -3,6 +3,7 @@ package pluginbuiltin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -321,9 +322,19 @@ type pushFormField struct {
 // serverURL 是设备基础地址（connection 失败消息用它，对齐 Python）。
 func pushPost(serverURL, target string, fields []pushFormField, timeout time.Duration,
 	check func(map[string]any) error) map[string]any {
+	return pushPostContentType(serverURL, target, fields, timeout, check, "")
+}
+
+// pushPostContentType keeps the standard multipart header unless a legacy
+// device explicitly requires its historical upload content type.
+func pushPostContentType(serverURL, target string, fields []pushFormField, timeout time.Duration,
+	check func(map[string]any) error, legacyContentType string) map[string]any {
 	body, contentType, err := pushMultipartBody(fields)
 	if err != nil {
 		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
+	}
+	if legacyContentType != "" {
+		contentType = legacyContentType
 	}
 	resp, err := pushHTTPClient.Request(nil, "POST", target, safehttp.RequestOptions{
 		Headers:    map[string]string{"Content-Type": contentType},
@@ -332,6 +343,19 @@ func pushPost(serverURL, target string, fields []pushFormField, timeout time.Dur
 		HasTimeout: true,
 	})
 	if err != nil {
+		var policy *safehttp.EndpointPolicyError
+		var oversized *safehttp.EndpointResponseTooLarge
+		if errors.As(err, &policy) || errors.As(err, &oversized) {
+			return pushFailure("other", nil, err.Error(), "")
+		}
+		var upstream *pluginproto.UpstreamError
+		if errors.As(err, &upstream) {
+			if upstream.StatusCode != nil {
+				return pushFailure("http", upstream.StatusCode,
+					fmt.Sprintf("设备上传接口返回 HTTP %d", *upstream.StatusCode), upstream.Message)
+			}
+			return pushFailure(upstream.ErrorType, nil, upstream.Message, "")
+		}
 		if os.IsTimeout(err) || strings.Contains(err.Error(), "timeout") ||
 			strings.Contains(err.Error(), "deadline exceeded") {
 			return pushFailure("timeout", nil, "Upload timeout", err.Error())
@@ -392,23 +416,74 @@ func duokanUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filename
 // booxUpload 复刻 BooxUploader.upload。
 func booxUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filename,
 	contentType string, timeout time.Duration) map[string]any {
+	started := time.Now()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/api/library/upload"
-	return pushPost(serverURL, target, []pushFormField{
+	result := pushPost(serverURL, target, []pushFormField{
 		{Name: "parent", Value: "null"},
 		{Name: "sender", Value: "web"},
 		{Name: "file", Filename: filename, Content: content, ContentType: contentType},
 	}, timeout, func(payload map[string]any) error {
-		code, _ := payload["code"].(float64)
-		successful, _ := payload["successful"].(bool)
-		if int(code) != 0 || !successful {
-			return fmt.Errorf("Upload failed: %v", payload)
-		}
-		return nil
+		return booxCheckResult(payload, false)
 	})
+	// A rejected legacy endpoint is safe to fall back from. Never resend after
+	// an ambiguous transport failure or a device-side business error.
+	status, _ := result["status_code"].(int)
+	if status != 403 && status != 404 && status != 405 && status != 410 && status != 501 {
+		return result
+	}
+	remaining := timeout - time.Since(started)
+	if remaining <= 0 {
+		return pushFailure("timeout", nil, "Upload timeout before BOOX compatibility fallback", "")
+	}
+	fallback := pushPost(serverURL, strings.TrimRight(serverURL, "/")+"/api/storage/upload", []pushFormField{
+		{Name: "path", Value: "/Download"},
+		{Name: "file", Filename: filename, Content: content, ContentType: contentType},
+	}, remaining, func(payload map[string]any) error {
+		return booxCheckResult(payload, true)
+	})
+	if ok, _ := fallback["success"].(bool); !ok {
+		fallback["message"] = fmt.Sprintf("BOOX 旧接口返回 HTTP %d；存储接口：%s", status, stringOr(fallback["message"], "上传失败"))
+	}
+	return fallback
+}
+
+// booxCheckResult accepts both firmware generations' success flags. A code
+// alone is accepted only for storage uploads; explicit failure always wins.
+func booxCheckResult(payload map[string]any, storage bool) error {
+	label := "BOOX 推送库"
+	if storage {
+		label = "BOOX 存储接口"
+	}
+	code, hasCode := payload["code"].(float64)
+	if !hasCode {
+		return fmt.Errorf("%s未返回有效的成功结果", label)
+	}
+	if code == 300001 {
+		return fmt.Errorf("BOOX 设备已存在同名文件，请先在设备上检查")
+	}
+	if code != 0 {
+		return fmt.Errorf("%s拒绝上传（业务码 %g）", label, code)
+	}
+	if value, present := payload["isTokenInvalid"]; present && value != false {
+		return fmt.Errorf("BOOX 设备拒绝访问，请重新开启文石互传并检查授权")
+	}
+	hasSuccess := false
+	for _, key := range []string{"successful", "isSuccessful"} {
+		if value, present := payload[key]; present {
+			if value != true {
+				return fmt.Errorf("%s拒绝上传（业务码 %g）", label, code)
+			}
+			hasSuccess = true
+		}
+	}
+	if !storage && !hasSuccess {
+		return fmt.Errorf("%s未返回有效的成功结果", label)
+	}
+	return nil
 }
 
 // hanwangUpload 复刻 HanwangUploader.upload。
@@ -428,16 +503,28 @@ func hanwangUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filenam
 // ireaderUpload 复刻 IReaderUploader.upload。
 func ireaderUpload(client *safehttp.SafeHttpClient, serverURL, filePath, filename,
 	contentType string, timeout time.Duration) map[string]any {
+	started := time.Now()
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return pushFailure("other", nil, "Upload failed: "+err.Error(), "")
 	}
 	target := strings.TrimRight(serverURL, "/") + "/?action=addBook"
-	return pushPost(serverURL, target, []pushFormField{
+	fields := []pushFormField{
 		{Name: "Filename", Value: filename},
 		{Name: "Filedata", Filename: filename, Content: content, ContentType: contentType},
 		{Name: "Upload", Value: "Submit Query"},
-	}, timeout, nil)
+	}
+	result := pushPost(serverURL, target, fields, timeout, nil)
+	// Older iReader firmware uses an octet-stream header for a multipart body.
+	// Only retry a definite unsupported-media-type rejection, never a timeout.
+	if status, _ := result["status_code"].(int); status != 415 {
+		return result
+	}
+	remaining := timeout - time.Since(started)
+	if remaining <= 0 {
+		return pushFailure("timeout", nil, "Upload timeout before iReader compatibility fallback", "")
+	}
+	return pushPostContentType(serverURL, target, fields, remaining, nil, "application/octet-stream")
 }
 
 // dangdangUpload 复刻 DangdangUploader.upload。

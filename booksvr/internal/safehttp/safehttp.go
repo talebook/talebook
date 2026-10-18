@@ -628,8 +628,9 @@ func (c *SafeHttpClient) Request(ctx context.Context, method, rawURL string, opt
 		}
 
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			code := resp.StatusCode
 			drain(resp)
-			return nil, pluginproto.NewUpstreamAuthError("Upstream rejected the configured credentials", "other", nil)
+			return nil, pluginproto.NewUpstreamAuthError("Upstream rejected the configured credentials", "other", &code)
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
