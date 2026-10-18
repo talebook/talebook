@@ -211,3 +211,29 @@ def test_pdf_remains_unknown_and_media_type_merge_never_downgrades_comic():
     assert result.media_type == MEDIA_TYPE_UNKNOWN
     assert merge_media_type(MEDIA_TYPE_COMIC, MEDIA_TYPE_EBOOK) == MEDIA_TYPE_COMIC
     assert merge_media_type(MEDIA_TYPE_UNKNOWN, MEDIA_TYPE_EBOOK) == MEDIA_TYPE_EBOOK
+
+
+@pytest.mark.parametrize(
+    "prefix,valid", [(b"", True), (b"\xef\xbb\xbf", True), (b"HTML", False), (b"\xef\xbb\xbf\xef\xbb\xbf", False)]
+)
+def test_pdf_bom_compatibility(tmp_path, prefix, valid):
+    target = tmp_path / "book.pdf"
+    target.write_bytes(prefix + b"%PDF-1.7\nbody")
+    if valid:
+        assert analyze_media_file(target, "pdf").detected_format == "pdf"
+    else:
+        with pytest.raises(InvalidMediaError):
+            analyze_media_file(target, "pdf")
+
+
+@pytest.mark.parametrize("size,valid", [(0, True), (64, True), (1024, True), (1025, False)])
+def test_epub_bounded_trailing_data(tmp_path, size, valid):
+    target = tmp_path / "trailing.epub"
+    _write_epub(target, comic=False)
+    with target.open("ab") as stream:
+        stream.write(b"\xa7" * size)
+    if valid:
+        assert analyze_media_file(target, "epub").media_type == MEDIA_TYPE_EBOOK
+    else:
+        with pytest.raises(InvalidMediaError):
+            analyze_media_file(target, "epub")

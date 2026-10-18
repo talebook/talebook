@@ -48,10 +48,11 @@ func AnalyzeFile(filePath, declaredFormat string) (Analysis, error) {
 	case declaredFormat == "epub":
 		return analyzeEpub(filePath, declaredFormat)
 	case declaredFormat == "pdf":
-		sig, err := readSignature(filePath, 5)
+		sig, err := readSignature(filePath, 8)
 		if err != nil {
 			return Analysis{}, err
 		}
+		sig = bytes.TrimPrefix(sig, []byte{0xef, 0xbb, 0xbf})
 		if !bytes.HasPrefix(sig, []byte("%PDF-")) {
 			return Analysis{}, invalid("format.mismatch", "文件内容不是有效的 PDF")
 		}

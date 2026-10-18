@@ -305,11 +305,12 @@
             <template #item.path="{ item }">
                 <span class="directory-path">{{ item.data?.archive_source || item.data?.source_path || item.path }}</span>
                 <div
-                    v-if="item.status === 'failed' && (item.data?.analysis_error || item.data?.import_error)"
+                    v-if="['failed', 'drop', 'delete_failed'].includes(item.status)"
                     class="import-failure-reason text-body-2 text-high-emphasis mt-1"
-                    data-testid="import-failure-reason"
+                    :data-testid="item.status === 'drop' ? 'import-skip-reason' : 'import-failure-reason'"
                 >
-                    {{ item.data?.analysis_error || item.data?.import_error }}
+                    <strong>{{ t('admin.imports.reasonLabel') }}</strong>
+                    <span>{{ importRecordReason(item) }}</span>
                 </div>
             </template>
             <template #item.title="{ item }">
@@ -633,6 +634,9 @@ const count_todo = ref(0);
 const count_done = ref(0);
 const count_failed = ref(0);
 const count_skipped = ref(0);
+const importRecordReason = (item) => item.status === 'drop'
+    ? (item.data?.skip_reason || t('admin.imports.legacySkippedReason'))
+    : (item.data?.import_error || item.data?.index_error || item.data?.analysis_error || item.data?.delete_error || t('admin.imports.legacyFailedReason'));
 const import_mode = ref(DEFAULT_IMPORT_MODE);
 const auto_watch_enabled = ref(false);
 const directory_check = ref(null);

@@ -92,6 +92,42 @@ func TestFullLibraryImportDrainsExistingAndScanCheckpoints(t *testing.T) {
 	}
 }
 
+func TestLibraryImportPrioritizesRecoveredWithoutSkippingNormalCursor(t *testing.T) {
+	users := newUserFixture(t)
+	id := seedReader(t, users.DB, "recovered-admin", "test-password", true, true)
+	db := scanTestDB(t)
+	root := t.TempDir()
+	for _, row := range []struct{ path, hash, data string }{
+		{filepath.Join(root, "normal.txt"), "normal", `{}`},
+		{filepath.Join(root, "recovered.pdf"), "recovered", `{"previous_analysis_error":"PDF prefix"}`},
+		{filepath.Join(t.TempDir(), "outside.pdf"), "outside", `{"previous_analysis_error":"PDF prefix"}`},
+	} {
+		if _, err := db.Exec(`INSERT INTO scanfiles(path,hash,status,data) VALUES (?,?,'ready',?)`, row.path, row.hash, row.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc := scan.NewService(db, nil)
+	opts := ServeOptions{ImportDir: importdir.Config{AllowedRoots: []string{root}}, ScanService: func() *scan.Service { return svc }}
+	opts.StartScanBatchContext = func(context.Context, string, int, func() error) error { return nil }
+	var order []string
+	err := runLibraryImport(context.Background(), opts, users.DB, nil, id, "index", nil, func(hashes []string, _ int64, _ bool, _ string) error {
+		order = append(order, hashes...)
+		for _, hash := range hashes {
+			if _, err := db.Exec(`UPDATE scanfiles SET status='indexed' WHERE hash=?`, hash); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, func(string) {})
+	if err != nil || strings.Join(order, ",") != "recovered,normal" {
+		t.Fatalf("order=%v err=%v", order, err)
+	}
+	var status string
+	if err := db.QueryRow(`SELECT status FROM scanfiles WHERE hash='outside'`).Scan(&status); err != nil || status != "ready" {
+		t.Fatalf("outside=%s err=%v", status, err)
+	}
+}
+
 func TestLibraryImportWorkerDeduplicatesAndReportsWholeTask(t *testing.T) {
 	users := newUserFixture(t)
 	id := seedReader(t, users.DB, "queue-admin", "test-password", true, true)

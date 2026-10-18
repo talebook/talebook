@@ -370,8 +370,13 @@ func (s *Service) processRow(row *userdb.ScanFile) (string, error) {
 func (s *Service) processFileRow(row *userdb.ScanFile, filePath string) (string, error) {
 	realHash, err := FileSHA256(filePath)
 	if err != nil {
-		// 文件已不存在：标记 drop。
-		row.Status = userdb.ScanStatusDrop
+		if os.IsNotExist(err) {
+			row.Status = userdb.ScanStatusDrop
+			setRowData(row, "skip_reason", "扫描时原文件已不存在", "skip_reason_code", "source.missing")
+		} else {
+			row.Status = userdb.ScanStatusFailed
+			setRowData(row, "analysis_error", "无法读取源文件："+err.Error(), "analysis_error_code", "source.read")
+		}
 		return row.Status, saveScanFile(s.DB, row)
 	}
 
@@ -382,6 +387,7 @@ func (s *Service) processFileRow(row *userdb.ScanFile, filePath string) (string,
 	}
 	if dup {
 		row.Status = userdb.ScanStatusDrop
+		s.setDuplicateReason(row, realHash)
 		return row.Status, saveScanFile(s.DB, row)
 	}
 

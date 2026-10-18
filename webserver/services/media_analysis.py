@@ -189,7 +189,7 @@ def _preflight_zip_directory(path):
     try:
         size = os.path.getsize(path)
         with open(path, "rb") as stream:
-            stream.seek(max(0, size - (65535 + 22)))
+            stream.seek(max(0, size - (65535 + 22 + 1024)))
             tail = stream.read()
     except OSError as err:
         _invalid("media.unreadable", "无法读取 ZIP 目录：%s" % err)
@@ -210,7 +210,8 @@ def _preflight_zip_directory(path):
         ) = struct.unpack("<4s4H2LH", tail[marker : marker + 22])
     except struct.error:
         _invalid("archive.corrupt", "ZIP 中央目录不完整")
-    if marker + 22 + comment_size != len(tail):
+    end = marker + 22 + comment_size
+    if end > len(tail) or len(tail) - end > 1024:
         _invalid("archive.corrupt", "ZIP 中央目录长度不匹配")
     if disk_number or directory_disk or disk_entries != total_entries:
         _invalid("archive.multidisk", "暂不支持分卷 ZIP 压缩包")
@@ -669,7 +670,7 @@ def analyze_media_file(path, declared_format):
     if declared_format == "epub":
         return _analyze_epub(path, declared_format)
     if declared_format == "pdf":
-        if not _read_signature(path, 5).startswith(b"%PDF-"):
+        if not _read_signature(path, 8).removeprefix(b"\xef\xbb\xbf").startswith(b"%PDF-"):
             _invalid("format.mismatch", "文件内容不是有效的 PDF")
         return MediaAnalysis(declared_format, "pdf", "application/pdf", MEDIA_TYPE_UNKNOWN, "pdf_unclassified")
 

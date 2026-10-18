@@ -162,3 +162,45 @@ test.describe('Import all without selecting books', () => {
         expect((await sent).postDataJSON().hashlist).toBe('all');
     });
 });
+
+
+test('shows specific and historical skip reasons without interpreting HTML', async ({ request, page }) => {
+    await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
+    const reason = '文件内容与扫描记录 #101193 相同，保留来源：/books/很长的来源目录/真爱.epub <img src=x onerror=alert(1)>';
+    await page.route('**/api/admin/scan/list?*', route => route.fulfill({ json: {
+        err: 'ok', scan_dir: '/books', import_mode: 'index', watch_status: { state: 'off' },
+        summary: { total: 2, todo: 0, done: 0, failed: 0, skipped: 2 }, total: 2,
+        items: [
+            { id: 1, hash: 'copy', status: 'drop', path: '/books/copy.epub', data: { skip_reason: reason } },
+            { id: 2, hash: 'old', status: 'drop', path: '/books/old.epub', data: {} },
+        ],
+    } }));
+    await page.goto('/admin/imports');
+    await page.getByRole('tab', { name: '已跳过 (2)' }).click();
+    await expect(page.getByTestId('import-skip-reason')).toHaveCount(2);
+    await expect(page.getByTestId('import-skip-reason').first()).toContainText(reason);
+    await expect(page.getByText('历史记录未保存具体跳过原因，尚未核实。')).toBeVisible();
+    await expect(page.locator('img[src="x"]')).toHaveCount(0);
+    await page.setViewportSize({ width: 320, height: 800 });
+    await expect(page.getByTestId('import-skip-reason').first()).toBeVisible();
+});
+
+test('shows every failed reason and prioritizes the current import error', async ({ request, page }) => {
+    await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
+    await page.route('**/api/admin/scan/list?*', route => route.fulfill({ json: {
+        err: 'ok', scan_dir: '/books', import_mode: 'index', watch_status: { state: 'off' },
+        summary: { total: 3, todo: 0, done: 0, failed: 3, skipped: 0 }, total: 3,
+        items: [
+            { id: 1, hash: 'current', status: 'failed', path: '/books/current.pdf', data: { import_error: '当前源文件读取失败', analysis_error: '过期分析错误' } },
+            { id: 2, hash: 'old', status: 'failed', path: '/books/old.pdf', data: {} },
+            { id: 3, hash: 'index', status: 'failed', path: '/books/index.pdf', data: { index_error: '索引建立失败' } },
+        ],
+    } }));
+    await page.goto('/admin/imports');
+    await page.getByRole('tab', { name: '失败 (3)' }).click();
+    await expect(page.getByTestId('import-failure-reason')).toHaveCount(3);
+    await expect(page.getByText('索引建立失败')).toBeVisible();
+    await expect(page.getByText('当前源文件读取失败')).toBeVisible();
+    await expect(page.getByText('过期分析错误')).toHaveCount(0);
+    await expect(page.getByText('历史记录未保存具体失败原因。')).toBeVisible();
+});

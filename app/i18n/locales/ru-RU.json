@@ -761,6 +761,10 @@
       }
     },
     "imports": {
+      "reasonLabel": "Причина: ",
+      "legacySkippedReason": "В старой записи нет причины пропуска; она ещё не проверена.",
+      "legacyFailedReason": "В старой записи не сохранена причина ошибки.",
+
       "title": "Импорт книг",
       "titles": {
         "addOpdsSource": "Добавить источник OPDS",

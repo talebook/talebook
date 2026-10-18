@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 内部方案模板：用于记录原始诉求、目标边界、实现方案、风险与测试结果。" />
+    <link rel="icon" href="data:," />
+    <title>修复 PDF BOM 与 EPUB 尾部兼容 · WIP</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+<body><main class="page" id="main-content"><header class="hero"><h1>修复 PDF BOM 与 EPUB 尾部兼容</h1><p>创建日期：2026-10-18 · 所属模块：booksvr · 状态：ACTIVE</p></header><section class="card"><h2>原始诉求</h2><p>“把PDF带BOM的兼容性误判修好，误判失败的重新导入，另外4个结构错误的也看看能不能修复。别影响正在跑的导入任务，测试通过后部署、提交并推送。”同时查明指定当当EPUB失败。追加需求：“你把失败和跳过的都加上原因吧”。</p></section><section class="card"><h2>目标与边界</h2><p>只兼容开头UTF-8 BOM后紧接PDF签名；不修改34份已可读取原件，不接受HTML假PDF。4份结构损坏先隔离修复并核验所有页，验证通过才保留原件备份后原子替换。若无可靠恢复结果，保留原件并如实报告。不清库、不重启原任务、不开第二个全量导入。部署时仅在当前书结束后交接续跑。</p></section><section class="card"><h2>证据与诊断</h2><p>allitebooks：7538待处理，128跳过，39失败。38失败的PDF均UTF-8 BOM开头，其中34份pdfinfo正常解析，4份xref/pages错误；4份仅剥离BOM仍失败。隔离MuPDF重建得到372、384、236、254页，全部1246页文本及36dpi渲染逐页完全一致，重开后is_repaired=false、无签名字段。独立Poppler的pdfinfo/pdftotext均成功，分别提取709916、582975、273943、414604字节文本，但仍各有一条非致命Weird page contents警告，不声称源文档完美无损或警告全清；封面与中间页视觉检查均可读。依据MuPDF官方修复方案，garbage=3/deflate不展开页面为图片。仅4份验证副本经原件备份后原子替换，保持权限、所有者、mtime，并CAS同步原扫描记录内容哈希；其余34份BOM文件不改动。另1个失败和127个跳过是相同564字节404网页。指定《真爱没那么累，幸福没那么贵》sha256与已索引book101193完全相同，跳过正确。其目录仅《撒切尔夫人传-刘建飞.epub》失败，ZIP48条目CRC全部正常，EOCD声明0字节注释但尾部附加64字节。</p></section><section class="card"><h2>方案与决策</h2><p>Go/Python PDF签名检测读取8字节，只移除一个UTF-8 BOM后检查%PDF-。ZIP预检容许不超过1024字节的EOCD注释后附加数据，仍拒绝缺失/截断目录、分卷、ZIP64、越界、条目预算和不安全路径，真实条目仍由ZIP解析器校验。PDF与archive.corrupt失败纳入兼容重检，格式分别选择重检版本；更新失败行使用状态/路径/原JSON比较交换，不覆盖importing或已完成项。不自动重置已跳过重复项。</p><p>38份PDF与1份EPUB先在隔离数据库核验；结构修复方案、源文件更换与真实哈希对齐须先记录验证后执行。恢复项接回原任务并重点核验其39条；在原自动导入worker的批次边界优先读取带previous_analysis_error审计标记的ready行，且只选当前已配置根目录内的条目；仍复用同一startImport并等待结束，优先批次不推进普通id游标，保证旧队列不中断也不漏掉较小ID。无需新表、额外worker或全量重排。部署在旧worker优雅停止、importing为0后，用最终二进制定向重检这40条，再启动新容器，使39条恢复项由同一续跑worker优先接手；旧容器内低优先级原因补查随部署停止，新容器按缺失原因幂等续查，不重复已补项；所有失败与跳过记录在导入列表显示原因，新跳过记录持久化具体原因、重复来源ID/书籍ID和路径；旧9250条原因缺失的跳过记录用单进程低优先级读取原文件哈希核对补充，约37.3GB源内容只读，不产生书籍副本；初始idle I/O在持续导入下进展过慢，调整为best-effort最低I/O优先级7、CPU nice15，主导入维持正常优先级，逐条短事务CAS补充原因。状态、路径、原JSON、哈希使用CAS保护，文件身份前后稳定才记录重复结论。不能核实的历史记录明确说明原因缺失，不能伪称重复；核对隔离导入时发现index_error也可能承载失败原因，因此失败展示覆盖import_error、index_error、analysis_error、delete_error；新导入尝试清除上一轮错误，避免陈旧原因遮住最新失败。失败优先展示当前import_error，再index_error和analysis_error，最终有诚实兜底。前端使用文字插值，覆盖中英俄本地化与320px/明暗主题，新增跳过原因E2E，不要求扫描整个书库。改动spec/书籍.md。不新增页面；现有页面增加失败/跳过原因；错误结果影响现有导入消费者，按interface-review full核对完整导入→详情/阅读流程并记录范围。</p></section><section class="card"><h2>测试结果</h2><p>Go最终全套45个包通过（go test -p 2 ./... -skip TestFileThemeStoreWriteFileError|TestBackupCreateFailsOnReadOnlyDir -count=1 -timeout=300s），两项只读权限测试另以UID911执行均PASS；go vet ./...通过。新优先批次测试验证恢复项先执行、普通游标不遗漏、根目录外项不循环。Python格式分析模块隔离27项通过（跳过包初始化对Calibre/全站依赖的导入，不声称完整Python集成测试）；Ruff检查/格式通过。Nuxt generate通过，导入页E2E10项通过，包括错误优先级、旧记录、HTML按纯文本、设置、多目录、全部导入与320px；ESLint 0错误、5条已有警告。规格25篇通过。隔离重检40恢复39；38PDF索引成功，EPUB第一次因隔离夹具缺publisher表失败，补齐夹具后索引成功；不把夹具失败视作产品缺陷。4份PDF1246页逐页文本与渲染一致，Poppler提取成功但各有一条非致命Weird page contents警告。生产重检40恢复39；38PDF已indexed（128548至128585），撒切尔夫人传重试为exist，书库已有同名同作者EPUB99893，没有重复新增。假PDF仍failed。5份真实PDF（普通BOM及4份修复）下载200且签名正确；该下载接口不支持Range，不能声称206。生产阅读器资源接口Range206，99893的正文iframe实际渲染，等待浮层与转圈消失；图书管理、书库卡片、详情页均真实后端打开，JS错误0。旧测试脚本硬编码样本的bootstrap返回正常conversion_pending，改用核实的EPUB样本完成正文验收，不把此状态误报为同步加载失败。镜像9a20b9d9be45部署完成；三处挂载保持原值，import_resume_job部署前后均active，旧worker先优雅停在书籍边界且importing=0；原任务续跑。allitebooks的128条历史跳过与用户指定EPUB共129条定向复核全部Updated，无Missing/Unresolved/Changed；重复HTML明确保留项仍因不是PDF而失败，指定EPUB注明书101193。历史原因补查以CPU nice15、IO7持续运行，完成的CAS更新保留，尚未核实的在界面明确标注，未声称9250条全部核实。</p></section><section class="card"><h2>界面审查：interface-review full</h2><p>Scope and Coverage：change review，默认分支origin/master（symbolic-ref确认，fetch master与工作分支仅写.git），merge-base d5d21dda160d65d29cc0c9ab8a13ae6b4deb69d2，HEAD d751fd77f2d39aae383bbdfa5004049d23572349。50个已提交commit与22个未提交文件分别盘点，合计846个路径。排除锁文件、截图/纹理等二进制、生成Readest chunks/manifests与第三方vendor。全分支过大，按skill收窄至完整“导入→书库/管理→详情→阅读”流程，审阅新旧diff、删除信号与当前上下文。5个消费者为imports.vue、admin/books.vue、LocalLibraryContent及BookCards、book/[bid]/index.vue、Go阅读bootstrap及现有Readest；另外7个卡片消费者（BookList/ListBook、首页、scopedbooks、network、history、shelf）未扩展；设备/插件设置、网络书库、音频/漫画阅读不在本次流程审查内，不声称已全面审查。约定依据根AGENTS、app/CLAUDE、webserver/CLAUDE、现有Nuxt4/Vuetify组件和语义token。</p><table><thead><tr><th>Domain</th><th>Evidence</th><th>Result</th></tr></thead><tbody><tr><td>Accessibility</td><td>错误原因保留纯文本语义；已有目录选择/删除按钮名称保留；真实已跳过页Tab聚焦后Enter激活成功，aria-selected=true，新增静态文字无额外交互；320px不横溢</td><td>Clear（本变更）</td></tr><tr><td>Layout</td><td>路径及原因原地分组，overflow-wrap:anywhere；明暗主题320px真实长重复来源与桌面截图；管理、详情、书库、正文完成流</td><td>Clear</td></tr><tr><td>Writing</td><td>具体失败优先于旧分析错误；未知历史明确未核实；重复来源包括记录/书ID、源路径与核对时状态；中英俄兜底齐全</td><td>Clear</td></tr><tr><td>Typography</td><td>继承text-body-2，实测14px/19.95px行高，长路径换行且无截断；文件大小保留tabular-nums</td><td>Clear</td></tr><tr><td>Colors</td><td>原因使用text-high-emphasis；实测浅色rgba(0,0,0,.87)/白底，深色白字/rgb(33,33,33)，合成后WCAG对比均约16:1；不以颜色单独表达原因。未做APCA量化，不作全站对比度合规声明</td><td>Clear（新增原因）</td></tr><tr><td>UI</td><td>继承现有表格密度与反馈，无新运动效果；空/加载/错误状态沿用，E2E覆盖本次错误、跳过及其交互，真实页面无JS错误</td><td>Clear</td></tr></tbody></table><h3>Findings</h3><p>No actionable interface findings in this change；Introduced/Regression均0。未发现本变更引入的HIGH/MEDIUM问题。未把正确性、测试与性能混作界面审查。</p><h3>Considered but Rejected</h3><ul><li>给每条原因加aria-live：100条批量刷新会造成重复播报；保留表格静态内容和已有任务status区域。</li><li>把原因全文改红色：状态已有文本，新增原因用高强调正文更适于长段阅读。</li><li>截短重复来源路径：会丢失用户排查所需位置；真实320px换行核验已通过。</li></ul><h3>Verification</h3><p>git symbolic-ref refs/remotes/origin/HEAD→origin/master；git fetch origin master feat/booksvr-calibre-rewrite --no-tags成功，远端工作分支仍d751fd77；git merge-base/rev-list --count/diff --name-only及ls-files --others解析上述范围；无checkout/stash/worktree变更。真实后端8850登录后打开失败100条、跳过100条，明暗主题与320px均无横向溢出；真实长重复原因可见且Tab键激活通过；书库格式大小、管理、详情、EPUB正文、Range206实测。初次旧脚本的硬编码样本触发conversion_pending，不作为失败产品证据；核实EPUB99893后重测完整通过。Mock仅10项自动化隔离用，未当作真实数据验收。未作整站可访问性认证或其他7个消费者的运行时覆盖声明。</p><h3>Verdict</h3><p>Approve（上述完整流程及明确边界内）。</p></section></main></body></html>

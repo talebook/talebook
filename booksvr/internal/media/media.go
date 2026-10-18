@@ -309,7 +309,8 @@ func preflightZipDirectory(path string) error {
 	}
 	defer f.Close()
 
-	const tailMax = 65535 + 22
+	const maxTrailingData = 1024
+	const tailMax = 65535 + 22 + maxTrailingData
 	start := info.Size() - tailMax
 	if start < 0 {
 		start = 0
@@ -334,7 +335,8 @@ func preflightZipDirectory(path string) error {
 	directorySize := binary.LittleEndian.Uint32(rec[12:16])
 	commentSize := binary.LittleEndian.Uint16(rec[20:22])
 
-	if marker+22+int(commentSize) != len(tail) {
+	end := marker + 22 + int(commentSize)
+	if end > len(tail) || len(tail)-end > maxTrailingData {
 		return invalid("archive.corrupt", "ZIP 中央目录长度不匹配")
 	}
 	if diskNumber != 0 || directoryDisk != 0 || diskEntries != totalEntries {

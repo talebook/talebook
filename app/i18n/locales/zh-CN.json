@@ -784,6 +784,10 @@
       }
     },
     "imports": {
+      "reasonLabel": "原因：",
+      "legacySkippedReason": "历史记录未保存具体跳过原因，尚未核实。",
+      "legacyFailedReason": "历史记录未保存具体失败原因。",
+
       "title": "导入图书",
       "titles": {
         "addOpdsSource": "添加 OPDS 源",

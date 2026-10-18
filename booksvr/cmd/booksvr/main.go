@@ -37,6 +37,7 @@ const usage = `booksvr - Talebook library storage layer
   repair-covers       补齐已有图书封面（仅保存压缩图片）
   import-pending      处理一批已扫描记录（运维与隔离验证）
   repair-import-compat 重新检查兼容性失败记录
+  repair-import-reasons 补充历史跳过原因（只读源文件）
   repair-source-baseline 核对并显式确认来源挂载身份
   sync-sources        完整核对来源文件（运维与隔离验证）
   repair-mobi-titles  预览或恢复旧偏移错误产生的 MOBI 书名
@@ -71,6 +72,8 @@ func Run(args []string) error {
 		return runRepairCovers(args[2:], os.Stdout)
 	case "repair-import-compat":
 		return runRepairImport(args[2:], os.Stdout)
+	case "repair-import-reasons":
+		return runRepairReasons(args[2:], os.Stdout)
 	case "sync-sources":
 		return runSyncSources(args[2:], os.Stdout)
 	case "import-pending":

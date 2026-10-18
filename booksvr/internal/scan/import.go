@@ -173,6 +173,9 @@ func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, imp
 }
 
 func (s *Service) importRowPrepared(row *userdb.ScanFile, userID int64, mode string, importID int64, prepared *preparedImport) (string, int64, error) {
+	for _, key := range []string{"import_error", "index_error", "analysis_error", "analysis_error_code", "delete_error", "skip_reason", "skip_reason_code"} {
+		delete(row.Data, key)
+	}
 	fpath, cleanup, err := s.resolveImportSource(row, mode)
 	if err != nil {
 		row.Status = userdb.ScanStatusFailed
@@ -220,6 +223,7 @@ func (s *Service) importRowPrepared(row *userdb.ScanFile, userID int64, mode str
 	}
 	if gone {
 		row.Status = userdb.ScanStatusDrop
+		setRowData(row, "skip_reason", "导入时原文件已不存在", "skip_reason_code", "source.missing")
 		return row.Status, 0, saveScanFile(s.DB, row)
 	}
 

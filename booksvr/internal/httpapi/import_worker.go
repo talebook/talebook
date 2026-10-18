@@ -243,7 +243,11 @@ func runLibraryImport(ctx context.Context, opts ServeOptions, db *sql.DB, settin
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			rows, err := opts.ScanService().ReadyBatch(afterID, 500)
+			rows, err := opts.ScanService().RecoveredReadyBatch(roots, 500)
+			priority := len(rows) > 0
+			if err == nil && !priority {
+				rows, err = opts.ScanService().ReadyBatch(afterID, 500)
+			}
 			if err != nil {
 				return err
 			}
@@ -252,7 +256,9 @@ func runLibraryImport(ctx context.Context, opts ServeOptions, db *sql.DB, settin
 			}
 			var hashes []string
 			for _, row := range rows {
-				afterID = row.ID
+				if !priority {
+					afterID = row.ID
+				}
 				for _, root := range roots {
 					if importdir.IsWithin(row.Path, root) {
 						hashes = append(hashes, row.Hash)

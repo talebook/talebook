@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"talebook/booksvr/internal/importdir"
 
 	"talebook/booksvr/internal/userdb"
 )
@@ -216,6 +217,39 @@ func (s *Service) ReadyBatch(afterID int64, limit int) ([]*userdb.ScanFile, erro
 			return nil, err
 		}
 		result = append(result, row)
+	}
+	return result, rows.Err()
+}
+
+// RecoveredReadyBatch gives verified compatibility retries the next boundary
+// in the existing worker, without advancing or replacing its ordinary cursor.
+func (s *Service) RecoveredReadyBatch(roots []string, limit int) ([]*userdb.ScanFile, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 500
+	}
+	rows, err := s.DB.Query(`SELECT ` + scanFileColumns + ` FROM scanfiles WHERE status='ready' AND data LIKE '%"previous_analysis_error"%' ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []*userdb.ScanFile
+	for rows.Next() {
+		row, err := scanRow(rows.Scan)
+		if err != nil {
+			return nil, err
+		}
+		if _, verified := row.Data["previous_analysis_error"]; !verified {
+			continue
+		}
+		for _, root := range roots {
+			if importdir.IsWithin(row.Path, root) {
+				result = append(result, row)
+				break
+			}
+		}
+		if len(result) >= limit {
+			break
+		}
 	}
 	return result, rows.Err()
 }

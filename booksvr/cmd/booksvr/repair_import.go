@@ -37,6 +37,29 @@ func runRepairImport(args []string, out io.Writer) error {
 	return json.NewEncoder(out).Encode(result)
 }
 
+func runRepairReasons(args []string, out io.Writer) error {
+	flags := flag.NewFlagSet("repair-import-reasons", flag.ContinueOnError)
+	flags.SetOutput(out)
+	file := flags.String("user-db", "", "用户库")
+	roots := flags.String("roots", "", "已确认的来源根目录，逗号分隔")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if *file == "" || *roots == "" {
+		return fmt.Errorf("必须提供 user-db 与 roots")
+	}
+	db, err := sql.Open("sqlite", *file+"?_pragma=busy_timeout(10000)")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	result, err := scan.NewService(db, nil).BackfillSkippedReasons(context.Background(), strings.Split(*roots, ","))
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(out).Encode(result)
+}
+
 func runRebaseline(args []string, out io.Writer) error {
 	flags := flag.NewFlagSet("repair-source-baseline", flag.ContinueOnError)
 	flags.SetOutput(out)

@@ -764,6 +764,10 @@
       }
     },
     "imports": {
+      "reasonLabel": "Reason: ",
+      "legacySkippedReason": "This older record has no saved skip reason and has not been verified.",
+      "legacyFailedReason": "This older record has no saved failure reason.",
+
       "title": "Import Books",
       "titles": {
         "addOpdsSource": "Add OPDS Source",

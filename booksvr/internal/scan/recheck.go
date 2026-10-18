@@ -41,12 +41,18 @@ func (s *Service) RecheckCompatibilityFailures(ctx context.Context, roots []stri
 			return result, e
 		}
 		code, _ := row.Data["analysis_error_code"].(string)
-		if !strings.HasPrefix(code, "epub.") && code != "format.mismatch" {
+		if !strings.HasPrefix(code, "epub.") && code != "format.mismatch" && code != "archive.corrupt" {
 			continue
 		}
 		declared, _ := row.Data["declared_format"].(string)
-		if declared != "epub" {
+		if declared != "epub" && (declared != "pdf" || code != "format.mismatch") {
 			continue
+		}
+		version := "2"
+		if declared == "pdf" {
+			version = "pdf-bom-1"
+		} else if code == "archive.corrupt" {
+			version = "zip-trailer-1"
 		}
 		allowed := false
 		for _, root := range roots {
@@ -74,14 +80,20 @@ func (s *Service) RecheckCompatibilityFailures(ctx context.Context, roots []stri
 			continue
 		}
 		stamp := strconv.FormatInt(info.Size(), 10) + ":" + strconv.FormatInt(info.ModTime().UnixNano(), 10) + ":" + analysisFileIdentity(info)
-		if analysisFileIdentity(info) != "" && row.Data["compat_recheck_version"] == "2" && row.Data["compat_recheck_stamp"] == stamp {
+		if analysisFileIdentity(info) != "" && row.Data["compat_recheck_version"] == version && row.Data["compat_recheck_stamp"] == stamp {
 			release()
 			result.Unchanged++
 			continue
 		}
 		result.Checked++
-		analysis, e := media.AnalyzeFile(physical, "epub")
-		setRowData(row, "compat_recheck_version", "2", "compat_recheck_stamp", stamp)
+		analysis, e := media.AnalyzeFile(physical, declared)
+		after, statErr := os.Stat(physical)
+		if statErr != nil || !os.SameFile(info, after) || info.Size() != after.Size() || !info.ModTime().Equal(after.ModTime()) {
+			release()
+			result.Unchanged++
+			continue
+		}
+		setRowData(row, "compat_recheck_version", version, "compat_recheck_stamp", stamp)
 		if e == nil {
 			for key, value := range analysis.ToDict() {
 				setRowData(row, key, value)
@@ -119,7 +131,7 @@ func (s *Service) RecheckCompatibilityFailures(ctx context.Context, roots []stri
 		if string(normalized) != string(raw) {
 			continue
 		}
-		changed, err := s.DB.ExecContext(ctx, `UPDATE scanfiles SET status=?,data=? WHERE id=? AND status='failed' AND path=? AND data=?`, row.Status, string(next), row.ID, row.Path, original)
+		changed, err := s.DB.ExecContext(ctx, `UPDATE scanfiles SET status=?,data=? WHERE id=? AND status='failed' AND path=? AND hash=? AND data=?`, row.Status, string(next), row.ID, row.Path, row.Hash, original)
 		if err != nil {
 			return result, err
 		}
