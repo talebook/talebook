@@ -71,6 +71,37 @@ func scanCtx(t *testing.T, method, target, body string, admin bool) (*Context, *
 }
 
 // TestScanListHandler 覆盖列表接口。
+func TestScanSkippedClassification(t *testing.T) {
+	db := scanTestDB(t)
+	seedScanRow(t, db, "ready", userdb.ScanStatusReady, 1, 0)
+	seedScanRow(t, db, "duplicate", userdb.ScanStatusDrop, 1, 0)
+	seedScanRow(t, db, "expanded", "expanded", 1, 0)
+	cfg := scanTestConfig(t, db, t.TempDir())
+	for _, filter := range []string{"todo", "skipped"} {
+		ctx, _ := scanCtx(t, http.MethodGet, "/api/admin/scan/list?filter="+filter, "", true)
+		got, err := ScanListHandler(cfg)(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		summary := got["summary"].(scan.Summary)
+		if summary.Total != 2 || summary.Todo != 1 || summary.Skipped != 1 {
+			t.Fatalf("%+v", summary)
+		}
+		items := got["items"].([]map[string]any)
+		want := "ready"
+		if filter == "skipped" {
+			want = "drop"
+		}
+		if got["total"] != int64(1) || len(items) != 1 || items[0]["status"] != want {
+			t.Fatalf("%s: %+v", filter, got)
+		}
+	}
+	batch, err := cfg.Service().ReadyBatch(0, 500)
+	if err != nil || len(batch) != 1 || batch[0].Status != userdb.ScanStatusReady {
+		t.Fatalf("skipped records queued: %+v %v", batch, err)
+	}
+}
+
 func TestScanListHandler(t *testing.T) {
 	root := t.TempDir()
 	db := scanTestDB(t)

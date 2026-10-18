@@ -10,10 +10,11 @@ import (
 
 // Summary 复刻 Scanner.summary()。
 type Summary struct {
-	Total  int64 `json:"total"`
-	Done   int64 `json:"done"`
-	Todo   int64 `json:"todo"`
-	Failed int64 `json:"failed"`
+	Total   int64 `json:"total"`
+	Done    int64 `json:"done"`
+	Todo    int64 `json:"todo"`
+	Failed  int64 `json:"failed"`
+	Skipped int64 `json:"skipped"`
 }
 
 // doneStatuses 与 Python 的 done_status 一致。
@@ -28,6 +29,9 @@ var failedStatuses = []string{
 	userdb.ScanStatusFailed,
 	userdb.ScanStatusDeleteFailed,
 }
+
+// Dropped records have already been skipped and need no import action.
+var skippedStatuses = []string{userdb.ScanStatusDrop}
 
 // countStatuses 复刻 Scanner.count() 的初始键集合与顺序。
 //
@@ -60,7 +64,11 @@ func (s *Service) Summary() (Summary, error) {
 	if err := s.DB.QueryRow(failQ, toArgs(failedStatuses)...).Scan(&out.Failed); err != nil {
 		return out, fmt.Errorf("scan: 统计失败数失败: %w", err)
 	}
-	out.Todo = out.Total - out.Done - out.Failed
+	skipQ := `SELECT COUNT(*) FROM scanfiles WHERE status IN (` + placeholders(len(skippedStatuses)) + `)`
+	if err := s.DB.QueryRow(skipQ, toArgs(skippedStatuses)...).Scan(&out.Skipped); err != nil {
+		return out, fmt.Errorf("scan: 统计跳过数失败: %w", err)
+	}
+	out.Todo = out.Total - out.Done - out.Failed - out.Skipped
 	return out, nil
 }
 
@@ -174,10 +182,11 @@ func (s *Service) Delete(hashlist []string) (int64, error) {
 type ListFilter string
 
 const (
-	FilterAll    ListFilter = "all"
-	FilterTodo   ListFilter = "todo"
-	FilterDone   ListFilter = "done"
-	FilterFailed ListFilter = "failed"
+	FilterAll     ListFilter = "all"
+	FilterTodo    ListFilter = "todo"
+	FilterDone    ListFilter = "done"
+	FilterFailed  ListFilter = "failed"
+	FilterSkipped ListFilter = "skipped"
 )
 
 // ListOptions 复刻 ScanList 的查询参数。
@@ -236,6 +245,7 @@ func (s *Service) List(opts ListOptions) ([]*userdb.ScanFile, int64, error) {
 	switch opts.Filter {
 	case FilterTodo:
 		all := append(append([]string{}, doneStatuses...), failedStatuses...)
+		all = append(all, skippedStatuses...)
 		where += ` AND status NOT IN (` + placeholders(len(all)) + `)`
 		args = toArgs(all)
 	case FilterDone:
@@ -244,6 +254,9 @@ func (s *Service) List(opts ListOptions) ([]*userdb.ScanFile, int64, error) {
 	case FilterFailed:
 		where += ` AND status IN (` + placeholders(len(failedStatuses)) + `)`
 		args = toArgs(failedStatuses)
+	case FilterSkipped:
+		where += ` AND status IN (` + placeholders(len(skippedStatuses)) + `)`
+		args = toArgs(skippedStatuses)
 	}
 
 	var total int64

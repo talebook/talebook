@@ -33,12 +33,14 @@ func TestSummaryCounts(t *testing.T) {
 	seedStatusRow(t, db, "h5", userdb.ScanStatusDeleteFailed, 1, 0)
 	seedStatusRow(t, db, "h6", userdb.ScanStatusReady, 1, 0)
 	seedStatusRow(t, db, "h7", userdb.ScanStatusNew, 1, 0)
+	seedStatusRow(t, db, "h8", userdb.ScanStatusDrop, 1, 0)
+	seedStatusRow(t, db, "container", "expanded", 1, 0)
 
 	got, err := svc.Summary()
 	if err != nil {
 		t.Fatalf("失败: %v", err)
 	}
-	want := Summary{Total: 7, Done: 3, Failed: 2, Todo: 2}
+	want := Summary{Total: 8, Done: 3, Failed: 2, Todo: 2, Skipped: 1}
 	if got != want {
 		t.Errorf("summary = %+v, want %+v", got, want)
 	}
@@ -346,15 +348,18 @@ func TestListFilters(t *testing.T) {
 	seedStatusRow(t, db, "h4", userdb.ScanStatusIndexed, 1, 0)      // done
 	seedStatusRow(t, db, "h5", userdb.ScanStatusFailed, 1, 0)       // failed
 	seedStatusRow(t, db, "h6", userdb.ScanStatusDeleteFailed, 1, 0) // failed
+	seedStatusRow(t, db, "h7", userdb.ScanStatusDrop, 1, 0)         // skipped
+	seedStatusRow(t, db, "container", "expanded", 1, 0)
 
 	cases := []struct {
 		filter ListFilter
 		want   int64
 	}{
-		{FilterAll, 6},
+		{FilterAll, 7},
 		{FilterTodo, 1},
 		{FilterDone, 3},
 		{FilterFailed, 2},
+		{FilterSkipped, 1},
 	}
 	for _, c := range cases {
 		_, total, err := svc.List(ListOptions{Num: 20, Sort: "id", Desc: false, Filter: c.filter})

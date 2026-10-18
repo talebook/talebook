@@ -858,10 +858,11 @@
         "failed": "Failed",
         "deleteFailed": "Source Delete Failed",
         "deleteFailedTooltip": "The book was imported, but deleting the source file failed. Check directory permissions and retry.",
-        "drop": "Duplicate",
-        "dropTooltip": "A file with the same hash already exists and was skipped. Delete the duplicate record and re-scan to import again."
+        "drop": "Skipped",
+        "dropTooltip": "This record was skipped automatically and is excluded from imports and pending counts. The file may be a duplicate or may no longer exist."
       },
       "tab": {
+        "skipped": "Skipped",
         "todo": "Pending",
         "done": "Imported",
         "failed": "Failed"

@@ -126,6 +126,7 @@
             </v-btn>
             <template v-if="selected.length > 0">
                 <v-btn
+                    v-if="filter_type !== 'skipped'"
                     :disabled="loading || backgroundTask !== null || importActionsDisabled"
                     variant="elevated"
                     color="#424242"
@@ -178,6 +179,9 @@
             </v-tab>
             <v-tab value="failed">
                 {{ t('admin.imports.tab.failed') }} ({{ count_failed }})
+            </v-tab>
+            <v-tab value="skipped" data-testid="import-skipped-tab">
+                {{ t('admin.imports.tab.skipped') }} ({{ count_skipped }})
             </v-tab>
         </v-tabs>
         <v-data-table-server
@@ -620,6 +624,7 @@ const options = ref({ page: 1, itemsPerPage: 100, sortBy: [{ key: 'create_time',
 const count_todo = ref(0);
 const count_done = ref(0);
 const count_failed = ref(0);
+const count_skipped = ref(0);
 const import_mode = ref(DEFAULT_IMPORT_MODE);
 const auto_watch_enabled = ref(false);
 const directory_check = ref(null);
@@ -745,6 +750,7 @@ const updateOptions = (newOptions) => {
 
 const onFilterChange = () => {
     options.value.page = 1;
+    selected.value = [];
     getDataFromApi();
 };
 
@@ -779,6 +785,7 @@ const getDataFromApi = (resume = true) => {
             count_done.value = rsp.summary.done;
             count_todo.value = rsp.summary.todo;
             count_failed.value = rsp.summary.failed || 0;
+            count_skipped.value = rsp.summary.skipped || 0;
             if (resume !== false) resumeBackgroundTask();
         })
         .catch((error) => {
@@ -832,6 +839,7 @@ const observeTask = (kind) => {
         count_done.value = rsp.summary.done;
         count_todo.value = rsp.summary.todo;
         count_failed.value = rsp.summary.failed || 0;
+        count_skipped.value = rsp.summary.skipped || 0;
         if (kind === 'scan') scan_status.value = rsp.status;
         else import_status.value = rsp.status;
         loading.value = false;

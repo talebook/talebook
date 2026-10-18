@@ -2,6 +2,49 @@ import { test, expect } from '@playwright/test';
 
 const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
+test('separates skipped records from pending and resets selection on tab changes', async ({ request, page }) => {
+    await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
+    await page.route('**/api/admin/scan/list?*', async route => {
+        const skipped = new URL(route.request().url()).searchParams.get('filter') === 'skipped';
+        await route.fulfill({ json: {
+            err: 'ok', scan_dir: '/books', import_mode: 'index',
+            watch_status: { state: 'off' },
+            summary: { total: 3, todo: 1, done: 0, failed: 0, skipped: 2 },
+            total: skipped ? 2 : 1,
+            items: skipped
+                ? [1, 2].map(id => ({ id, hash: `skip-${id}`, status: 'drop', title: `Skipped ${id}`, path: `/books/skip-${id}.epub` }))
+                : [{ id: 3, hash: 'ready', status: 'ready', title: 'Pending book', path: '/books/ready.epub' }],
+        } });
+    });
+    await page.goto('/admin/imports');
+    await expect(page.getByRole('tab', { name: '待处理 (1)' })).toBeVisible();
+    await expect(page.getByText('Pending book', { exact: true })).toBeVisible();
+    await page.getByRole('checkbox').nth(1).check();
+    await page.getByTestId('import-skipped-tab').click();
+    await expect(page.getByRole('tab', { name: '已跳过 (2)' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Skipped 1', { exact: true })).toBeVisible();
+    await expect(page.getByText('Pending book', { exact: true })).toHaveCount(0);
+    await page.getByRole('checkbox').nth(1).check();
+    await expect(page.getByRole('button', { name: /导入选中书籍/ })).toHaveCount(0);
+    await page.screenshot({ path: 'test-results/import-skipped-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 320, height: 800 });
+    await expect(page.getByTestId('import-skipped-tab')).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBeTruthy();
+    await page.screenshot({ path: 'test-results/import-skipped-mobile.png', fullPage: true });
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.getByRole('tab', { name: '待处理 (1)' }).click();
+    await expect(page.getByText('Pending book', { exact: true })).toBeVisible();
+    await expect(page.getByText('Skipped 1', { exact: true })).toHaveCount(0);
+    await page.route('**/api/admin/scan/list?*', route => route.fulfill({ json: {
+        err: 'ok', summary: { total: 1, todo: 1, done: 0, failed: 0, skipped: 0 },
+        total: 0, items: [], watch_status: { state: 'off' },
+    } }));
+    await page.getByTestId('import-skipped-tab').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('tab', { name: '已跳过 (0)' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByText('Pending book', { exact: true })).toHaveCount(0);
+});
+
 test.describe('Admin import directories', () => {
     test.beforeEach(async ({ request, page }) => {
         await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });

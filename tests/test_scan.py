@@ -80,6 +80,23 @@ class TestScan(TestWithUserLogin):
         d = self.json("/api/admin/scan/list?num=10000")
         self.assertEqual(d["total"], self.RECORDS_COUNT)
 
+    def test_skipped_records_are_not_pending(self):
+        row = self.session.query(ScanFile).filter(ScanFile.id == self.NEW_ROW_ID).one()
+        row.status = ScanFile.DROP
+        self.session.commit()
+        try:
+            skipped = self.json("/api/admin/scan/list?filter=skipped&num=10000")
+            self.assertGreaterEqual(skipped["summary"]["skipped"], 1)
+            self.assertIn(row.id, [item["id"] for item in skipped["items"]])
+            pending = self.json("/api/admin/scan/list?filter=todo&num=10000")
+            self.assertNotIn(row.id, [item["id"] for item in pending["items"]])
+            summary = pending["summary"]
+            self.assertEqual(summary["total"], sum(summary[key] for key in ("todo", "done", "failed", "skipped")))
+        finally:
+            self.session.rollback()
+            row.status = ScanFile.NEW
+            self.session.commit()
+
     def test_scan(self):
         d = self.json("/api/admin/scan/run", method="POST", body="")
         self.assertEqual(d["err"], "ok")

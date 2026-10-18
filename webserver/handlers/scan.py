@@ -222,12 +222,13 @@ class Scanner:
 
     def summary(self):
         done_status = [ScanFile.EXIST, ScanFile.IMPORTED, ScanFile.INDEXED]
-        query = self.session.query(ScanFile)
+        query = self.session.query(ScanFile).filter(ScanFile.status != "expanded")
         total = query.count()
         done = query.filter(ScanFile.status.in_(done_status)).count()
         failed = query.filter(ScanFile.status.in_([ScanFile.FAILED, ScanFile.DELETE_FAILED])).count()
-        todo = total - done - failed
-        return {"total": total, "done": done, "todo": todo, "failed": failed}
+        skipped = query.filter(ScanFile.status == ScanFile.DROP).count()
+        todo = total - done - failed - skipped
+        return {"total": total, "done": done, "todo": todo, "failed": failed, "skipped": skipped}
 
     def run_scan(self, path_dir, limit=None):
         # 直接调用异步服务进行扫描
@@ -327,16 +328,18 @@ class ScanList(BaseHandler):
             "update_time": ScanFile.update_time,
         }.get(sort, ScanFile.create_time)
         order = order.asc() if desc == "false" else order.desc()
-        query = self.session.query(ScanFile).order_by(order)
+        query = self.session.query(ScanFile).filter(ScanFile.status != "expanded").order_by(order)
 
         done_status = [ScanFile.EXIST, ScanFile.IMPORTED, ScanFile.INDEXED]
         failed_status = [ScanFile.FAILED, ScanFile.DELETE_FAILED]
         if filter == "todo":
-            query = query.filter(ScanFile.status.not_in(done_status + failed_status))
+            query = query.filter(ScanFile.status.not_in(done_status + failed_status + [ScanFile.DROP]))
         elif filter == "done":
             query = query.filter(ScanFile.status.in_(done_status))
         elif filter == "failed":
             query = query.filter(ScanFile.status.in_(failed_status))
+        elif filter == "skipped":
+            query = query.filter(ScanFile.status == ScanFile.DROP)
         total = query.count()
 
         # 当 num 为 None 时，显示全部数据，不分页
