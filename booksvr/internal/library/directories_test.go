@@ -21,7 +21,7 @@ func TestBookDirectoryDefaultDirectRecursiveAndPrivacy(t *testing.T) {
 		id           int
 		file, format string
 	}{
-		{1, "/books/direct.epub", "EPUB"}, {1, "/books/direct.pdf", "PDF"},
+		{1, "/books/direct.epub", "EPUB"}, {1, "/books/direct.pdf", "PDF"}, {1, "/books/child/also.mobi", "MOBI"},
 		{2, "/books/child/nested.epub", "EPUB"}, {3, "/books-other/sibling.pdf", "PDF"},
 		{4, "/private/hidden.pdf", "PDF"}, {5, "/gone/missing.pdf", "PDF"},
 		{6, sourcefile.Encode(sourcefile.Reference{Archive: "/books/archives/pack.zip", Chain: []string{"deep/member.epub"}, Hash: "sha256:" + strings.Repeat("a", 64), Size: 64}), "EPUB"},

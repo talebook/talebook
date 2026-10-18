@@ -96,7 +96,10 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
-	return migrateSourceSync(db)
+	if err := migrateSourceSync(db); err != nil {
+		return err
+	}
+	return migrateBookDirectoryIndex(db)
 }
 
 // columnExists reports whether the named column is present on the table.

@@ -50,3 +50,35 @@ func TestBookDirectoriesHandlerFiltersNamesAndPaginates(t *testing.T) {
 		}
 	}
 }
+func TestBookDirectoriesHandlerMissingAndRecovery(t *testing.T) {
+	f := newBookFixture(t)
+	if err := library.Migrate(f.DB); err != nil {
+		t.Fatal(err)
+	}
+	insertBook(t, f.DB, 90, "Directory missing")
+	if _, err := f.DB.Exec(`INSERT INTO book_formats(book_id,format,path,size,mtime) VALUES(90,'PDF','/source/check.pdf',20,0)`); err != nil {
+		t.Fatal(err)
+	}
+	handler := BookDirectoriesHandler(f.Cfg)
+	check := func(want int) {
+		t.Helper()
+		ctx := pluginCtx(t, f.DB, http.MethodGet, "/api/library/directories?path=/source", "", 0, false)
+		r, e := handler(ctx)
+		if e != nil || r["total"] != want {
+			t.Fatal(r, e)
+		}
+	}
+	check(1)
+	if _, err := f.DB.Exec(`INSERT INTO source_sync_formats(format_id,identity,size,mtime,missing) SELECT id,'',20,0,1 FROM book_formats WHERE book_id=90`); err != nil {
+		t.Fatal(err)
+	}
+	check(0)
+	if _, err := f.DB.Exec(`UPDATE source_sync_formats SET missing=0`); err != nil {
+		t.Fatal(err)
+	}
+	check(1)
+	if _, err := f.DB.Exec(`DELETE FROM books WHERE id=90`); err != nil {
+		t.Fatal(err)
+	}
+	check(0)
+}

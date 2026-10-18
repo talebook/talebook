@@ -415,7 +415,11 @@ func bookRenderList(cfg BookConfig, ctx *Context, ids []int64, title string, sor
 	}
 	count := len(filtered)
 	page := bookSlice(filtered, start, start+delta)
+	return bookRenderResolvedPage(cfg, ctx, page, title, count, sortByID)
+}
 
+// bookRenderResolvedPage renders an already filtered and paginated SQL result.
+func bookRenderResolvedPage(cfg BookConfig, ctx *Context, page []int64, title string, count int, sortByID bool) (map[string]any, error) {
 	booksMap, err := bookLoadBooks(cfg, page)
 	if err != nil {
 		return nil, err

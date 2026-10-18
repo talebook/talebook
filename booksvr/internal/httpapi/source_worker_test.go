@@ -87,6 +87,8 @@ func TestSourceSyncWorkerWorksWithAutoImportDisabled(t *testing.T) {
 	}
 	opts, stop := attachSourceWorker(context.Background(), ServeOptions{ImportDir: importdir.Config{AllowedRoots: []string{root}, AutoWatchEnabled: false}}, fx.DB, fx.DB)
 	defer stop()
+	stopDirectories := attachDirectoryWorker(context.Background(), fx.DB, "", nil)
+	defer stopDirectories()
 	await := func(check func() bool) {
 		t.Helper()
 		end := time.Now().Add(8 * time.Second)
@@ -103,6 +105,12 @@ func TestSourceSyncWorkerWorksWithAutoImportDisabled(t *testing.T) {
 		fx.DB.QueryRow(`SELECT count(*) FROM source_sync_formats`).Scan(&count)
 		return count == 1
 	})
+	// Background maintenance builds the directory projection without a GET.
+	await(func() bool {
+		var count int
+		fx.DB.QueryRow(`SELECT total_count FROM book_directory_nodes WHERE path=?`, root).Scan(&count)
+		return count == 1
+	})
 	// The watcher gets installed immediately after committing the first snapshot.
 	time.Sleep(200 * time.Millisecond)
 	if err := os.Rename(old, next); err != nil {
@@ -116,4 +124,9 @@ func TestSourceSyncWorkerWorksWithAutoImportDisabled(t *testing.T) {
 	await(func() bool { changes, err := library.SourceChanges(fx.DB); return err == nil && len(changes) == 0 })
 	os.Remove(next)
 	await(func() bool { missing, err := library.UnavailableSourceBooks(fx.DB); return err == nil && missing[1] })
+	await(func() bool {
+		var count int
+		err := fx.DB.QueryRow(`SELECT total_count FROM book_directory_nodes WHERE path=?`, root).Scan(&count)
+		return err == nil && count == 0
+	})
 }
