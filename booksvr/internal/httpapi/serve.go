@@ -80,7 +80,8 @@ type ServeOptions struct {
 	StartScanContext      func(context.Context, string, int) error
 	StartScanBatchContext func(context.Context, string, int, func() error) error
 	// StartImport 启动一次异步导入；为 nil 时返回服务不可用。
-	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
+	StartImport        func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
+	StartImportContext func(context.Context, []string, int64, bool, string) error
 	// Settings 是 Talebook 配置（CONF），供网络书库与插件运行时读取。
 	Settings map[string]any
 	// SettingsPath 是配置文件路径（conf/auto.py），供系统设置页保存配置。
@@ -126,7 +127,8 @@ type ServiceSet struct {
 	StartScanContext      func(context.Context, string, int) error
 	StartScanBatchContext func(context.Context, string, int, func() error) error
 	// StartImport 启动一次异步导入。
-	StartImport func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
+	StartImport        func(hashlist []string, userID int64, deleteAfter bool, importMode string) error
+	StartImportContext func(context.Context, []string, int64, bool, string) error
 	// ImportWatchStatus 返回自动监控状态。
 	ImportWatchStatus func() map[string]any
 	// PluginRegistry 是插件注册表。
@@ -203,6 +205,9 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		if set.StartImport != nil {
 			opts.StartImport = set.StartImport
 		}
+		if set.StartImportContext != nil {
+			opts.StartImportContext = set.StartImportContext
+		}
 		if set.ImportWatchStatus != nil {
 			opts.ImportWatchStatus = set.ImportWatchStatus
 		}
@@ -223,6 +228,17 @@ func Serve(ctx context.Context, opts ServeOptions) error {
 		}
 	}
 
+	stopCovers, err := attachCoverWorker(ctx, db, opts.LibraryRoot)
+	if err != nil {
+		return err
+	}
+	defer stopCovers()
+	if opts.ScanService != nil {
+		if service := opts.ScanService(); service != nil {
+			service.DeferCovers = true
+			service.PrepareWorkers = 4
+		}
+	}
 	opts, stopImports := attachImportWorker(ctx, opts, userDB)
 	defer stopImports()
 	opts, stopSources := attachSourceWorker(ctx, opts, db, userDB)

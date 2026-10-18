@@ -46,9 +46,7 @@ def _book_formats_table_exists(session):
         return cached
 
     try:
-        row = session.execute(
-            text("SELECT name FROM sqlite_master WHERE type='table' AND name='book_formats'")
-        ).fetchone()
+        row = session.execute(text("SELECT name FROM sqlite_master WHERE type='table' AND name='book_formats'")).fetchone()
         exists = row is not None
     except Exception as exc:  # noqa: BLE001 - 非 SQLite 或权限问题都按「不存在」处理
         logger.debug("book_formats 表探测失败，回退 Calibre 路径: %s", exc)
@@ -126,7 +124,7 @@ def available_formats(book):
     for key, value in book.items():
         if not key.startswith(FORMAT_KEY_PREFIX) or not value:
             continue
-        fmt = key[len(FORMAT_KEY_PREFIX):]
+        fmt = key[len(FORMAT_KEY_PREFIX) :]
         if fmt:
             formats.append(fmt.upper())
     return ",".join(sorted(formats))

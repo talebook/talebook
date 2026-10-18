@@ -35,6 +35,10 @@ const usage = `booksvr - Talebook library storage layer
   serve               启动 HTTP 后端（已实现路由本地服务，其余代理回 Tornado）
   import-calibre      把 Calibre 书库单向只读迁移到三层模型，输出迁移报告
   repair-covers       补齐已有图书封面（仅保存压缩图片）
+  import-pending      处理一批已扫描记录（运维与隔离验证）
+  repair-import-compat 重新检查兼容性失败记录
+  repair-source-baseline 核对并显式确认来源挂载身份
+  sync-sources        完整核对来源文件（运维与隔离验证）
   repair-mobi-titles  预览或恢复旧偏移错误产生的 MOBI 书名
   reindex-normalize   重算全库归一化键并重建作品归组，输出差异报告
 
@@ -65,6 +69,14 @@ func Run(args []string) error {
 		return runImportCalibre(args[2:], os.Stdout)
 	case "repair-covers":
 		return runRepairCovers(args[2:], os.Stdout)
+	case "repair-import-compat":
+		return runRepairImport(args[2:], os.Stdout)
+	case "sync-sources":
+		return runSyncSources(args[2:], os.Stdout)
+	case "import-pending":
+		return runImportPending(args[2:], os.Stdout)
+	case "repair-source-baseline":
+		return runRebaseline(args[2:], os.Stdout)
 	case "repair-mobi-titles":
 		return runRepairMobi(args[2:], os.Stdout)
 	case "reindex-normalize":

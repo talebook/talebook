@@ -13,6 +13,7 @@ import (
 	"io"
 	"regexp"
 	"strings"
+	"talebook/booksvr/internal/epubpath"
 )
 
 // SummaryLimit 是 description 的截断长度。
@@ -138,10 +139,7 @@ func summary(value string) string {
 
 // readEntry 读取归档内的指定条目。
 func readEntry(reader *zip.Reader, name string) ([]byte, error) {
-	for _, f := range reader.File {
-		if f.Name != name {
-			continue
-		}
+	if f := epubpath.Find(reader.File, name); f != nil {
 		rc, err := f.Open()
 		if err != nil {
 			return nil, err

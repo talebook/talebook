@@ -437,13 +437,13 @@ func TestAnalyzeEpubBadMimetype(t *testing.T) {
 	}
 }
 
-// TestAnalyzeEpubCompressedMimetype mimetype 被压缩时单独报错。
+// A compressed mimetype is readable; validation proceeds to the container.
 func TestAnalyzeEpubCompressedMimetype(t *testing.T) {
 	dir := t.TempDir()
 	p := makeZip(t, dir, "a.epub", map[string][]byte{"mimetype": []byte("application/epub+zip")})
 	_, err := AnalyzeFile(p, "epub")
-	if me, ok := err.(*Error); !ok || me.Code != "epub.mimetype_invalid" {
-		t.Errorf("应报 epub.mimetype_invalid，得到 %v", err)
+	if me, ok := err.(*Error); !ok || me.Code != "epub.container_missing" {
+		t.Errorf("应继续验证 container，得到 %v", err)
 	}
 }
 

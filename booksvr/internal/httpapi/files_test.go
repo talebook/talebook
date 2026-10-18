@@ -14,6 +14,26 @@ import (
 	"time"
 )
 
+func TestExtractCaseFallbackAndAmbiguity(t *testing.T) {
+	file := t.TempDir() + "/case.epub"
+	if err := writeZip(file, map[string]string{"OPS/Chapter.xhtml": "body"}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := extractZipEntry(file, "ops/chapter.xhtml")
+	if err != nil || string(data) != "body" {
+		t.Fatalf("%q %v", data, err)
+	}
+	if err = writeZip(file, map[string]string{"OPS/Chapter.xhtml": "a", "OPS/CHAPTER.xhtml": "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = extractZipEntry(file, "ops/chapter.xhtml"); err == nil {
+		t.Fatal("ambiguous case accepted")
+	}
+	if _, err = extractZipEntry(file, "../OPS/Chapter.xhtml"); err == nil {
+		t.Fatal("traversal accepted")
+	}
+}
+
 // 本文件覆盖 files.go（/get/* 路由族）此前完全没有测试的部分：
 // ImageHandler、filesGetData、parseBookID、filesHasID、filesGetCover、
 // filesThumbnail、filesGetMetadataAsOPF、lastModifiedHeader、

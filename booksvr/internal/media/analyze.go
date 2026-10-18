@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"talebook/booksvr/internal/epubpath"
 )
 
 // AnalyzeFile 复刻 analyze_media_file：按声明格式校验并分类。
@@ -347,13 +348,19 @@ func analyzeEpub(filePath, declaredFormat string) (Analysis, error) {
 	for _, f := range files {
 		infoByName[f.Name] = f
 	}
+	if entry := epubpath.Find(files, "META-INF/encryption.xml"); entry != nil {
+		data, e := readZipEntryLimited(entry, MaxEpubXMLBytes, "EPUB encryption.xml")
+		if e != nil {
+			return Analysis{}, e
+		}
+		if epubpath.Encrypted(data) {
+			return Analysis{}, invalid("epub.encrypted", "EPUB 正文受加密保护，需要对应授权密钥或无加密版本；当前无法解密阅读")
+		}
+	}
 
-	mimetypeInfo := infoByName["mimetype"]
+	mimetypeInfo := epubpath.Find(files, "mimetype")
 	if mimetypeInfo == nil {
 		return Analysis{}, invalid("epub.mimetype_missing", "EPUB 缺少 mimetype 标识")
-	}
-	if mimetypeInfo.Method != zip.Store {
-		return Analysis{}, invalid("epub.mimetype_invalid", "EPUB mimetype 必须是未压缩条目")
 	}
 	mimetype, err := readZipEntryLimited(mimetypeInfo, 64, "EPUB mimetype")
 	if err != nil {
@@ -363,7 +370,7 @@ func analyzeEpub(filePath, declaredFormat string) (Analysis, error) {
 		return Analysis{}, invalid("format.mismatch", "EPUB mimetype 标识不匹配")
 	}
 
-	containerInfo := infoByName["META-INF/container.xml"]
+	containerInfo := epubpath.Find(files, "META-INF/container.xml")
 	if containerInfo == nil {
 		return Analysis{}, invalid("epub.container_missing", "EPUB 缺少 META-INF/container.xml")
 	}
@@ -387,11 +394,12 @@ func analyzeEpub(filePath, declaredFormat string) (Analysis, error) {
 	})
 	var opfInfo *zip.File
 	if opfPath != "" {
-		opfInfo = infoByName[opfPath]
+		opfInfo = epubpath.Find(files, opfPath)
 	}
 	if opfInfo == nil {
 		return Analysis{}, invalid("epub.package_missing", "EPUB package 文档不存在")
 	}
+	opfPath = opfInfo.Name
 	pkgData, err := readZipEntryLimited(opfInfo, MaxEpubXMLBytes, "EPUB package")
 	if err != nil {
 		return Analysis{}, err
@@ -438,7 +446,7 @@ func analyzeEpub(filePath, declaredFormat string) (Analysis, error) {
 			return Analysis{}, invalid("epub.spine_invalid", "EPUB spine 引用了不存在的 manifest 条目")
 		}
 		pagePath, mediaType := item[0], item[1]
-		pageInfo := infoByName[pagePath]
+		pageInfo := epubpath.Find(files, pagePath)
 		if pageInfo == nil {
 			return Analysis{}, invalid("epub.spine_invalid", "EPUB spine 页面文件不存在")
 		}

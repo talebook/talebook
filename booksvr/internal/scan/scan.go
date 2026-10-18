@@ -235,6 +235,9 @@ type Service struct {
 	LibraryDB *sql.DB
 	// LibraryRoot 是书库根目录，用于写入提取出的封面；为空时跳过封面提取。
 	LibraryRoot string
+	// DeferCovers keeps artwork off the serialized import path in production.
+	DeferCovers    bool
+	PrepareWorkers int
 	// BookStorageRoot 是复制/移动导入的文件存储根目录；为空时回退到 LibraryRoot。
 	BookStorageRoot string
 	// SupportedFormats 是支持的文件扩展名（小写，不含点）。
@@ -389,6 +392,7 @@ func (s *Service) processFileRow(row *userdb.ScanFile, filePath string) (string,
 
 	// 媒体分析：签名、容器结构与资源预算。
 	format := strings.ToLower(strings.TrimPrefix(filepath.Ext(row.Path), "."))
+	analysisBefore, _ := os.Stat(filePath)
 	analysis, err := media.AnalyzeFile(filePath, format)
 	if err != nil {
 		row.Status = userdb.ScanStatusFailed
@@ -404,6 +408,7 @@ func (s *Service) processFileRow(row *userdb.ScanFile, filePath string) (string,
 	for k, v := range analysis.ToDict() {
 		setRowData(row, k, v)
 	}
+	stampAnalysis(row, filePath, analysisBefore)
 
 	// 元数据：受管文档与漫画容器用文件名，其余尝试解析。
 	mi := s.extractMetadata(filePath, format)

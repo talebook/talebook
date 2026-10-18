@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -15,6 +16,10 @@ func sourceRootIdentity(root string, info os.FileInfo) string {
 	if err != nil {
 		return sourceFileIdentity(info)
 	}
+	return sourceMountIdentity(root, info, data)
+}
+
+func sourceMountIdentity(root string, info os.FileInfo, data []byte) string {
 	var relevant []string
 	var covering string
 	longest := -1
@@ -34,13 +39,15 @@ func sourceRootIdentity(root string, info os.FileInfo) string {
 		if decoded, e := strconv.Unquote(`"` + mount + `"`); e == nil {
 			mount = decoded
 		}
-		if sourceWithin(mount, root) {
+		if mount != root && sourceWithin(mount, root) {
 			relevant = append(relevant, signature)
-		} else if sourceWithin(root, mount) && len(mount) > longest {
+		}
+		if sourceWithin(root, mount) && len(mount) > longest {
 			longest = len(mount)
 			covering = signature
 		}
 	}
+	sort.Strings(relevant)
 	sum := sha256.Sum256([]byte(covering + "\n" + strings.Join(relevant, "\n")))
-	return fmt.Sprintf("%s:%x", sourceFileIdentity(info), sum)
+	return fmt.Sprintf("v2:%s:%x", sourceFileIdentity(info), sum)
 }

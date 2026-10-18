@@ -9,16 +9,39 @@ import zipfile
 import pytest
 
 from webserver.constants import MEDIA_TYPE_COMIC, MEDIA_TYPE_EBOOK, MEDIA_TYPE_UNKNOWN
-from webserver.services.media_analysis import (
-    InvalidMediaError,
-    analyze_media_file,
-    has_mixed_media_formats,
-    merge_media_type,
-)
+from webserver.services.media_analysis import InvalidMediaError, analyze_media_file, has_mixed_media_formats, merge_media_type
 
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"test-image"
 JPEG = b"\xff\xd8\xff\xe0" + b"test-image"
+
+
+def test_epub_compatible_case_and_compressed_mimetype(tmp_path):
+    source = tmp_path / "source.epub"
+    _write_epub(source, comic=False)
+    target = tmp_path / "compatible.epub"
+    with zipfile.ZipFile(source) as original, zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as output:
+        for info in original.infolist():
+            name = info.filename.replace("OEBPS/content.opf", "oebps/content.opf").replace("pages/1.xhtml", "pages/1.XHTML")
+            output.writestr(name, original.read(info))
+    assert analyze_media_file(target, "epub").media_type == MEDIA_TYPE_EBOOK
+
+
+@pytest.mark.parametrize("resource,encrypted", [("chapter.xhtml", True), ("font.ttf", False)])
+def test_epub_content_encryption_and_font_obfuscation(tmp_path, resource, encrypted):
+    target = tmp_path / "encrypted.epub"
+    _write_epub(target, comic=False)
+    with zipfile.ZipFile(target, "a") as output:
+        output.writestr(
+            "META-INF/encryption.xml",
+            '<root><EncryptionMethod Algorithm="aes128"/><CipherReference URI="' + resource + '"/></root>',
+        )
+    if encrypted:
+        with pytest.raises(InvalidMediaError) as error:
+            analyze_media_file(target, "epub")
+        assert error.value.code == "epub.encrypted"
+    else:
+        assert analyze_media_file(target, "epub").media_type == MEDIA_TYPE_EBOOK
 
 
 def _write_epub(path, *, comic, fixed_layout=False):

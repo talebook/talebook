@@ -20,6 +20,19 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 		return opts, func() {}
 	}
 	ctx, cancel := context.WithCancel(ctx)
+	if db == nil {
+		if service := opts.ScanService(); service != nil {
+			db = service.DB
+		}
+	}
+	if db == nil {
+		cancel()
+		return opts, func() {}
+	}
+	if err := ensureImportTasks(db); err != nil {
+		cancel()
+		return opts, func() {}
+	}
 	var workMu, statusMu sync.Mutex
 	status := map[string]any{"state": "off", "queued": 0, "running": 0, "failed": 0, "last_scan_at": nil, "message": ""}
 	// Existing scan rows survive restarts, so do not claim an already populated
@@ -50,6 +63,11 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 		return copy
 	}
 	startScan, startImport := opts.StartScan, opts.StartImport
+	if opts.StartImportContext != nil {
+		startImport = func(hashes []string, id int64, remove bool, mode string) error {
+			return opts.StartImportContext(ctx, hashes, id, remove, mode)
+		}
+	}
 	if opts.StartScanContext != nil {
 		startScan = func(path string, batchSize int) error { return opts.StartScanContext(ctx, path, batchSize) }
 	}
@@ -97,6 +115,13 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 					return
 				}
 				err := task.run()
+				if task.kind == "library_import" && ctx.Err() == nil {
+					if err == nil {
+						_, err = db.Exec(`DELETE FROM import_resume_job WHERE id=1`)
+					} else {
+						db.Exec(`UPDATE import_resume_job SET state='failed',error=? WHERE id=1`, err.Error())
+					}
+				}
 				workMu.Unlock()
 				statusMu.Lock()
 				if task.kind == "scan" {
@@ -119,11 +144,19 @@ func attachImportWorker(ctx context.Context, opts ServeOptions, db *sql.DB) (Ser
 		return enqueue("import", func() error { return startImport(selected, id, deleteAfter, mode) })
 	}
 	opts.StartLibraryImport = func(id int64, mode string) error {
+		if err := rememberImportTask(db, id, mode); err != nil {
+			return err
+		}
 		return enqueue("library_import", func() error {
 			phase := func(value string) { statusMu.Lock(); status["manual_library_import_phase"] = value; statusMu.Unlock() }
 			settings := LoadSettings(opts.SettingsPath)
 			return runLibraryImport(ctx, opts, db, settings, id, mode, startScan, startImport, phase)
 		})
+	}
+	var resumeID int64
+	var resumeMode string
+	if db.QueryRow(`SELECT user_id,mode FROM import_resume_job WHERE id=1 AND state='active'`).Scan(&resumeID, &resumeMode) == nil {
+		opts.StartLibraryImport(resumeID, resumeMode)
 	}
 	done := make(chan struct{})
 	go func() {
@@ -194,6 +227,11 @@ func runLibraryImport(ctx context.Context, opts ServeOptions, db *sql.DB, settin
 		dir.ImportMode, dir.SavedImportMode = mode, mode
 	}
 	roots := importdir.ConfiguredAllowedRoots(dir)
+	if service := opts.ScanService(); service != nil {
+		if _, err := service.RecheckCompatibilityFailures(ctx, roots); err != nil {
+			return err
+		}
+	}
 	setPhase := func(value string) {
 		if phase != nil {
 			phase(value)

@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"talebook/booksvr/internal/captcha"
 	"talebook/booksvr/internal/httpapi"
@@ -268,7 +270,9 @@ func runServe(args []string, out io.Writer) error {
 		return newServiceWiring(userDB, libraryDB, opts).serviceSet()
 	}
 
-	return httpapi.Serve(context.Background(), httpapi.ServeOptions{
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+	return httpapi.Serve(ctx, httpapi.ServeOptions{
 		DBPath:       opts.DBPath,
 		UserDBPath:   opts.UserDBPath,
 		Addr:         opts.Addr,

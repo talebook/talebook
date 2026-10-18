@@ -187,7 +187,8 @@
         <v-data-table-server
             v-model="selected"
             density="compact"
-            class="elevation-1 text-body-2"
+            class="imports-table elevation-1 text-body-2"
+            :mobile-breakpoint="600"
             show-select
             item-value="hash"
             :search="search"
@@ -303,6 +304,13 @@
             </template>
             <template #item.path="{ item }">
                 <span class="directory-path">{{ item.data?.archive_source || item.data?.source_path || item.path }}</span>
+                <div
+                    v-if="item.status === 'failed' && (item.data?.analysis_error || item.data?.import_error)"
+                    class="import-failure-reason text-body-2 text-high-emphasis mt-1"
+                    data-testid="import-failure-reason"
+                >
+                    {{ item.data?.analysis_error || item.data?.import_error }}
+                </div>
             </template>
             <template #item.title="{ item }">
                 {{ t('admin.imports.label.bookTitle') }}：<span v-if="item.book_id == 0"> {{ item.title }} </span>
@@ -658,9 +666,9 @@ const import_status = ref({});
 
 const headers = computed(() => [
     { title: 'ID', key: 'id', sortable: true },
-    { title: t('admin.imports.label.status'), key: 'status', sortable: true },
+    { title: t('admin.imports.label.status'), key: 'status', sortable: true, minWidth: '88px' },
     { title: t('admin.imports.label.path'), key: 'path', sortable: true },
-    { title: t('admin.imports.label.scanInfo'), key: 'title', sortable: false },
+    { title: t('admin.imports.label.scanInfo'), key: 'title', sortable: false, minWidth: '128px' },
     { title: t('admin.imports.label.time'), key: 'create_time', sortable: true, width: '200px' },
 ]);
 
@@ -754,7 +762,9 @@ const onFilterChange = () => {
     getDataFromApi();
 };
 
+let listRequestSerial = 0;
 const getDataFromApi = (resume = true) => {
+    const requestSerial = ++listRequestSerial;
     loading.value = true;
     const { page, itemsPerPage, sortBy } = options.value;
 
@@ -770,6 +780,7 @@ const getDataFromApi = (resume = true) => {
 
     return $backend('/admin/scan/list?' + data.toString())
         .then((rsp) => {
+            if (pageDisposed || requestSerial !== listRequestSerial) return;
             if (rsp.err != 'ok') {
                 items.value = [];
                 total.value = 0;
@@ -789,10 +800,11 @@ const getDataFromApi = (resume = true) => {
             if (resume !== false) resumeBackgroundTask();
         })
         .catch((error) => {
+            if (pageDisposed || requestSerial !== listRequestSerial) return;
             if ($alert) $alert('error', error.message || t('errors.networkError'));
         })
         .finally(() => {
-            loading.value = false;
+            if (!pageDisposed && requestSerial === listRequestSerial) loading.value = false;
         });
 };
 
@@ -1165,6 +1177,23 @@ useHead(() => ({
 .directory-path {
     font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
     overflow-wrap: anywhere;
+}
+
+.import-failure-reason {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 599px) {
+    .imports-table :deep(.v-data-table__tr--mobile > td:not(.v-data-table__td--select-row)) {
+        grid-template-columns: minmax(0, 1fr);
+        row-gap: 4px;
+        padding-block: 8px;
+    }
+
+    .imports-table :deep(.v-data-table__td-value) {
+        min-width: 0;
+        text-align: start;
+    }
 }
 
 .imports-help {

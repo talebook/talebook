@@ -2,6 +2,55 @@ import { test, expect } from '@playwright/test';
 
 const mockApi = process.env.MOCK_API_URL || 'http://127.0.0.1:8080';
 
+test('keeps the selected filter when an older list response arrives late', async ({ request, page }) => {
+    await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
+    let releaseTodo!: () => void;
+    const heldTodo = new Promise<void>(resolve => { releaseTodo = resolve; });
+    let todoResponded = false;
+    await page.route('**/api/admin/scan/list?*', async route => {
+        const failed = new URL(route.request().url()).searchParams.get('filter') === 'failed';
+        if (!failed) await heldTodo;
+        await route.fulfill({ json: {
+            err: 'ok', scan_dir: '/books', import_mode: 'index', watch_status: { state: 'off' },
+            summary: { total: 2, todo: 1, done: 0, failed: 1, skipped: 0 }, total: 1,
+            items: failed
+                ? [{ id: 2, hash: 'bad', status: 'failed', path: '/books/bad.epub', data: { analysis_error: '文件内容不是 ZIP 容器' } }]
+                : [{ id: 1, hash: 'late', status: 'ready', title: 'Late pending book', path: '/books/late.epub' }],
+        } });
+        if (!failed) todoResponded = true;
+    });
+    await page.goto('/admin/imports');
+    await page.getByRole('tab', { name: /^失败 / }).click();
+    await expect(page.getByTestId('import-failure-reason')).toBeVisible();
+    releaseTodo();
+    await expect.poll(() => todoResponded).toBe(true);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    await expect(page.getByTestId('import-failure-reason')).toBeVisible();
+    await expect(page.getByText('Late pending book', { exact: true })).toHaveCount(0);
+});
+
+test('shows encrypted EPUB and import failure reasons in the failed list', async ({ request, page }) => {
+    await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
+    await page.route('**/api/admin/scan/list?*', route => route.fulfill({ json: {
+        err: 'ok', scan_dir: '/books', import_mode: 'index', watch_status: { state: 'off' },
+        summary: { total: 2, todo: 0, done: 0, failed: 2, skipped: 0 }, total: 2,
+        items: [
+            { id: 1, hash: 'encrypted', status: 'failed', title: 'Encrypted EPUB', path: '/books/encrypted.epub', data: { analysis_error: 'EPUB 正文受加密保护，需要对应授权密钥或无加密版本；当前无法解密阅读' } },
+            { id: 2, hash: 'missing', status: 'failed', title: 'Missing source', path: '/books/missing.epub', data: { import_error: '源文件不存在，请恢复文件后重新扫描' } },
+        ],
+    } }));
+    await page.goto('/admin/imports');
+    await page.getByRole('tab', { name: '失败 (2)' }).click();
+    await expect(page.getByTestId('import-failure-reason')).toHaveCount(2);
+    await expect(page.getByText(/EPUB 正文受加密保护/)).toBeVisible();
+    await expect(page.getByText('源文件不存在，请恢复文件后重新扫描')).toBeVisible();
+    await page.setViewportSize({ width: 320, height: 800 });
+    await expect(page.getByText(/EPUB 正文受加密保护/)).toBeVisible();
+    await expect(page.locator('.v-data-table__tr--mobile').first()).toBeVisible();
+    await expect.poll(() => page.getByTestId('import-failure-reason').first().evaluate(el => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(200);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+});
+
 test('separates skipped records from pending and resets selection on tab changes', async ({ request, page }) => {
     await request.post(`${mockApi}/_test/reset`, { data: { installed: true } });
     await page.route('**/api/admin/scan/list?*', async route => {

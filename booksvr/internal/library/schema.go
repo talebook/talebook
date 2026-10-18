@@ -85,6 +85,8 @@ func Migrate(db *sql.DB) error {
 	}
 
 	indexes := []string{
+		// Import duplicate checks compare the exact title for every source file.
+		`CREATE INDEX IF NOT EXISTS idx_books_title ON books(title)`,
 		`CREATE INDEX IF NOT EXISTS idx_books_work_id     ON books(work_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_books_edition_key ON books(work_id, edition_key)`,
 	}

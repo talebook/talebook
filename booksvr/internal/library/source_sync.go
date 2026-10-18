@@ -221,6 +221,7 @@ func SyncSourceFiles(ctx context.Context, db *sql.DB, roots []string, libraryRoo
 	byKey := map[string][]sourceDiskFile{}
 	bySize := map[int64][]sourceDiskFile{}
 	hashes := map[string]string{}
+	archiveCandidates := sourceArchiveCandidates{}
 	roots = normalizeSourceRoots(roots)
 	for _, raw := range roots {
 		root, e := filepath.Abs(raw)
@@ -251,6 +252,9 @@ func SyncSourceFiles(ctx context.Context, db *sql.DB, roots []string, libraryRoo
 			}
 			snap.token = token
 		}
+		// A legacy digest cannot distinguish an unrelated overlay change from a
+		// lost nested mount. Require explicit inspection rather than upgrading it
+		// from the root inode and health marker alone.
 		if previous != "" && previous != snap.key {
 			result.Roots[root] = "源目录身份变化，暂停删除同步"
 			continue
@@ -476,6 +480,9 @@ func SyncSourceFiles(ctx context.Context, db *sql.DB, roots []string, libraryRoo
 			matches := []string{}
 			for _, f := range bySize[t.size] {
 				if claimed[f.path] != "" {
+					continue
+				}
+				if t.ref != nil && !archiveCandidates.mayContain(f.path, t.ref.Chain[0]) {
 					continue
 				}
 				var h string

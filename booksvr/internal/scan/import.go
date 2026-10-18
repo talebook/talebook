@@ -48,6 +48,10 @@ type ImportResult struct {
 // hashlist 为 nil 时处理全部 READY 记录；否则只处理指定哈希。
 // 未配置书库句柄时直接报错，避免后续写入路径空指针。
 func (s *Service) Import(hashlist []string, userID int64, deleteAfter bool, importMode string) (ImportResult, error) {
+	return s.ImportContext(context.Background(), hashlist, userID, deleteAfter, importMode)
+}
+
+func (s *Service) ImportContext(ctx context.Context, hashlist []string, userID int64, deleteAfter bool, importMode string) (ImportResult, error) {
 	res := ImportResult{ImportID: s.clock().Unix()}
 	if s.LibraryDB == nil {
 		return res, fmt.Errorf("scan: 导入需要书库句柄")
@@ -64,15 +68,45 @@ func (s *Service) Import(hashlist []string, userID int64, deleteAfter bool, impo
 	}
 
 	// 统一打上本次导入的任务 ID。
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return res, err
+	}
 	for _, row := range rows {
 		row.ImportID = res.ImportID
-		if err := saveScanFile(s.DB, row); err != nil {
+		if _, err := tx.ExecContext(ctx, `UPDATE scanfiles SET import_id=? WHERE id=? AND status='ready'`, res.ImportID, row.ID); err != nil {
+			tx.Rollback()
 			return res, err
 		}
 	}
+	if err = tx.Commit(); err != nil {
+		return res, err
+	}
 
-	for _, row := range rows {
-		outcome, bookID, err := s.importRow(row, userID, mode, res.ImportID)
+	var prepared []*preparedImport
+	workers := s.PrepareWorkers
+	if workers < 1 {
+		workers = 1
+	}
+	if workers > 4 {
+		workers = 4
+	}
+	for i, row := range rows {
+		if err := ctx.Err(); err != nil {
+			return res, err
+		}
+		if s.PrepareWorkers > 0 && i%workers == 0 {
+			end := i + workers
+			if end > len(rows) {
+				end = len(rows)
+			}
+			prepared = s.prepareBatch(rows[i:end])
+		}
+		var preparation *preparedImport
+		if s.PrepareWorkers > 0 {
+			preparation = prepared[i%workers]
+		}
+		outcome, bookID, err := s.importRowPrepared(row, userID, mode, res.ImportID, preparation)
 		if err != nil {
 			row.Status = userdb.ScanStatusFailed
 			setRowData(row, "import_error", err.Error())
@@ -135,6 +169,10 @@ func (s *Service) readyRows(hashlist []string) ([]*userdb.ScanFile, error) {
 //
 // 返回 (最终状态, 书籍 ID)。
 func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, importID int64) (string, int64, error) {
+	return s.importRowPrepared(row, userID, mode, importID, nil)
+}
+
+func (s *Service) importRowPrepared(row *userdb.ScanFile, userID int64, mode string, importID int64, prepared *preparedImport) (string, int64, error) {
 	fpath, cleanup, err := s.resolveImportSource(row, mode)
 	if err != nil {
 		row.Status = userdb.ScanStatusFailed
@@ -151,7 +189,13 @@ func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, imp
 	}
 
 	// 媒体分析。
-	analysis, err := media.AnalyzeFile(fpath, format)
+	usePrepared := prepared != nil && prepared.unchanged(fpath)
+	var analysis media.Analysis
+	if usePrepared {
+		analysis, err = prepared.analysis, prepared.err
+	} else {
+		analysis, err = cachedAnalysis(row, fpath, format)
+	}
 	if err != nil {
 		row.Status = userdb.ScanStatusFailed
 		if me, ok := err.(*media.Error); ok {
@@ -167,7 +211,13 @@ func (s *Service) importRow(row *userdb.ScanFile, userID int64, mode string, imp
 	}
 
 	// 元数据。
-	mi, gone := s.importMetadata(fpath, format)
+	var mi importmeta.Metadata
+	var gone bool
+	if usePrepared {
+		mi, gone = prepared.metadata, prepared.gone
+	} else {
+		mi, gone = s.importMetadata(fpath, format)
+	}
 	if gone {
 		row.Status = userdb.ScanStatusDrop
 		return row.Status, 0, saveScanFile(s.DB, row)
@@ -541,6 +591,16 @@ func (s *Service) bookStorageRoot() string {
 // 任何一步失败都静默跳过（与 Calibre 一致，不阻断导入）。
 func (s *Service) extractCover(bookID int64, fpath, format string) {
 	if s.LibraryDB == nil || s.LibraryRoot == "" {
+		return
+	}
+	if s.DeferCovers {
+		var registered string
+		if s.LibraryDB.QueryRow(`SELECT path FROM book_formats WHERE book_id=? AND UPPER(format)=UPPER(?)`, bookID, format).Scan(&registered) == nil && registered != "" {
+			fpath = registered
+		}
+		if err := coverart.Queue(s.LibraryDB, bookID, fpath, format); err != nil {
+			log.Printf("scan: queue cover for book %d: %v", bookID, err)
+		}
 		return
 	}
 	if err := coverart.Ensure(context.Background(), s.LibraryDB, s.LibraryRoot, bookID, fpath, format); err != nil {

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"talebook/booksvr/internal/epubpath"
 )
 
 // Cover 从 EPUB 归档里取出封面图片。
@@ -52,6 +53,9 @@ func coverFromArchive(reader *zip.Reader) ([]byte, bool) {
 		return nil, false
 	}
 	opfPath := rootfile.attr("full-path")
+	if actual := epubpath.Find(reader.File, opfPath); actual != nil {
+		opfPath = actual.Name
+	}
 
 	packageData, err := readEntry(reader, opfPath)
 	if err != nil {

@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"talebook/booksvr/internal/epubpath"
 	"talebook/booksvr/internal/sourcefile"
 	"time"
 
@@ -449,10 +450,7 @@ func extractZipEntry(archivePath, entry string) ([]byte, error) {
 	}
 	defer func() { _ = zr.Close() }()
 
-	for _, f := range zr.File {
-		if f.Name != entry {
-			continue
-		}
+	if f := epubpath.Find(zr.File, entry); f != nil {
 		rc, err := f.Open()
 		if err != nil {
 			return nil, err

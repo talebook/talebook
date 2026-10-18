@@ -2,6 +2,7 @@ package library
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 
 	_ "modernc.org/sqlite"
@@ -67,11 +68,41 @@ func TestMigrateCreatesIndexes(t *testing.T) {
 		"idx_works_title_norm",
 		"idx_works_author_norm",
 		"idx_books_work_id",
+		"idx_books_title",
 		"idx_books_edition_key",
 	} {
 		if !indexExists(t, db, idx) {
 			t.Errorf("index %q was not created", idx)
 		}
+	}
+}
+
+func TestMigrateIndexesExactTitleLookup(t *testing.T) {
+	db := openTestDB(t)
+	if err := Migrate(db); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := db.Query(`EXPLAIN QUERY PLAN SELECT id FROM books WHERE title = ?`, "西游记")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	found := false
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(detail, "SEARCH books USING COVERING INDEX idx_books_title") {
+			found = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("exact title duplicate lookup does not use the title index")
 	}
 }
 

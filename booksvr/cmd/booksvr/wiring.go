@@ -116,6 +116,10 @@ func (w *serviceWiring) serviceSet() httpapi.ServiceSet {
 			_, err := w.scanService.Import(hashlist, userID, deleteAfter, importMode)
 			return err
 		},
+		StartImportContext: func(ctx context.Context, hashes []string, id int64, remove bool, mode string) error {
+			_, err := w.scanService.ImportContext(ctx, hashes, id, remove, mode)
+			return err
+		},
 		ImportWatchStatus: w.watchStatus,
 		PluginRegistry:    w.pluginRegistry,
 		ComicService:      w.comicService,

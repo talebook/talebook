@@ -5,6 +5,7 @@
 
 import os
 import posixpath
+import re
 import stat
 import struct
 import zipfile
@@ -30,9 +31,7 @@ OFFICE_DOCUMENT_FORMATS = frozenset(("docx",))
 XML_DOCUMENT_FORMATS = frozenset(("fb2",))
 HTML_ARCHIVE_FORMATS = frozenset(("htmlz",))
 DOWNLOAD_ONLY_FORMATS = OFFICE_DOCUMENT_FORMATS | XML_DOCUMENT_FORMATS | HTML_ARCHIVE_FORMATS
-SUPPORTED_MEDIA_FORMATS = (
-    EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS | MANAGED_DOCUMENT_FORMATS | DOWNLOAD_ONLY_FORMATS
-)
+SUPPORTED_MEDIA_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS | MANAGED_DOCUMENT_FORMATS | DOWNLOAD_ONLY_FORMATS
 ONLINE_READ_FORMATS = EBOOK_MEDIA_FORMATS | COMIC_CONTAINER_FORMATS
 
 MAX_ARCHIVE_ENTRIES = 10000
@@ -409,6 +408,15 @@ def _epub_xhtml_image(archive, info, page_path, manifest_by_path):
     return next(iter(image_paths)) if len(image_paths) == 1 else None
 
 
+def _epub_entry(infos, name):
+    if not name or not _safe_archive_name(name):
+        return None
+    if name in infos:
+        return infos[name]
+    matches = [info for key, info in infos.items() if key.lower() == name.lower()]
+    return matches[0] if len(matches) == 1 else None
+
+
 def _analyze_epub(path, declared_format):
     if not _read_signature(path, 4).startswith(b"PK"):
         _invalid("format.mismatch", "文件内容不是 ZIP 容器")
@@ -418,16 +426,27 @@ def _analyze_epub(path, declared_format):
         with zipfile.ZipFile(path) as archive:
             infos, _file_infos = _zip_file_entries(archive)
             info_by_name = {info.filename: info for info in infos if not info.is_dir()}
-            mimetype_info = info_by_name.get("mimetype")
+            encryption = _epub_entry(info_by_name, "META-INF/encryption.xml")
+            if encryption:
+                text = _read_zip_entry(archive, encryption, MAX_EPUB_XML_BYTES, "EPUB encryption.xml").lower()
+                protected = any(
+                    word in text for word in (b"zhangyue.inc", b"aes128", b"aes256", b"aes-128", b"aes-256", b"tripledes")
+                )
+                resources = re.findall(rb'cipherreference[^>]*\buri=["\']([^"\']+)', text)
+                font_only = bool(resources) and all(
+                    posixpath.splitext(uri.decode("utf-8", "replace"))[1] in (".ttf", ".otf", ".woff", ".woff2")
+                    for uri in resources
+                )
+                if protected and not font_only:
+                    _invalid("epub.encrypted", "EPUB 正文受加密保护，需要对应授权密钥或无加密版本；当前无法解密阅读")
+            mimetype_info = _epub_entry(info_by_name, "mimetype")
             if not mimetype_info:
                 _invalid("epub.mimetype_missing", "EPUB 缺少 mimetype 标识")
-            if mimetype_info.compress_type != zipfile.ZIP_STORED:
-                _invalid("epub.mimetype_invalid", "EPUB mimetype 必须是未压缩条目")
             mimetype = _read_zip_entry(archive, mimetype_info, 64, "EPUB mimetype")
             if mimetype.strip() != b"application/epub+zip":
                 _invalid("format.mismatch", "EPUB mimetype 标识不匹配")
 
-            container_info = info_by_name.get("META-INF/container.xml")
+            container_info = _epub_entry(info_by_name, "META-INF/container.xml")
             if not container_info:
                 _invalid("epub.container_missing", "EPUB 缺少 META-INF/container.xml")
             container = _parse_xml(
@@ -436,9 +455,10 @@ def _analyze_epub(path, declared_format):
             )
             rootfiles = [node.get("full-path") for node in container.iter() if _local_name(node) == "rootfile"]
             opf_path = next((path for path in rootfiles if path and _safe_archive_name(path)), None)
-            opf_info = info_by_name.get(opf_path) if opf_path else None
+            opf_info = _epub_entry(info_by_name, opf_path) if opf_path else None
             if not opf_info:
                 _invalid("epub.package_missing", "EPUB package 文档不存在")
+            opf_path = opf_info.filename
             package = _parse_xml(
                 _read_zip_entry(archive, opf_info, MAX_EPUB_XML_BYTES, "EPUB package"),
                 "EPUB package",
@@ -470,7 +490,7 @@ def _analyze_epub(path, declared_format):
                 if not manifest_item:
                     _invalid("epub.spine_invalid", "EPUB spine 引用了不存在的 manifest 条目")
                 page_path, media_type = manifest_item
-                page_info = info_by_name.get(page_path)
+                page_info = _epub_entry(info_by_name, page_path)
                 if not page_info:
                     _invalid("epub.spine_invalid", "EPUB spine 页面文件不存在")
                 if media_type.lower().startswith("image/"):

@@ -8,6 +8,25 @@ import (
 	"testing"
 )
 
+func TestMetadataCoverCaseFallback(t *testing.T) {
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	writeEntry(t, w, "META-INF/container.xml", `<container><rootfiles><rootfile full-path="ops/book.opf"/></rootfiles></container>`)
+	writeEntry(t, w, "OPS/book.opf", `<package><metadata><title>Compatibility</title></metadata><manifest><item id="cover" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/></manifest></package>`)
+	writeEntry(t, w, "OPS/Cover.jpg", "cover bytes")
+	if err := w.Close(); err != nil {
+		t.Fatal(err)
+	}
+	mi, err := Extract(buf.Bytes())
+	if err != nil || mi.Title != "Compatibility" {
+		t.Fatalf("%+v %v", mi, err)
+	}
+	cover, ok := Cover(buf.Bytes())
+	if !ok || string(cover) != "cover bytes" {
+		t.Fatalf("cover=%q ok=%v", cover, ok)
+	}
+}
+
 // makeEpub 构造一个含 container.xml 与包文档的 EPUB 归档。
 func makeEpub(t *testing.T, opfPath, opfBody string) []byte {
 	t.Helper()
