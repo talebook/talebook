@@ -10,7 +10,12 @@
                 :md="mdCols"
                 class="book-list-card"
             >
-                <v-card :to="book.href">
+                <v-card
+                    :to="book.href"
+                    target="_blank"
+                    rel="noopener"
+                    :aria-label="$t('pagination.openBookInNewTab', { title: book.title })"
+                >
                     <v-row>
                         <v-col
                             cols="3"

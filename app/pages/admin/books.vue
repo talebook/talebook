@@ -11,7 +11,9 @@
                 Beta
             </v-chip>
         </v-card-title>
-        <v-card-text class="pb-0"> {{ t('admin.books.message.bookTableInfo') }}</v-card-text>
+        <v-card-text class="pb-0">
+            {{ t('admin.books.message.bookTableInfo') }}
+        </v-card-text>
         <v-card-actions class="pt-0">
             <v-btn
                 :disabled="loading"
@@ -67,6 +69,7 @@
         </v-card-actions>
         
         <v-data-table-server
+            v-model:page="options.page"
             v-model="books_selected"
             density="compact"
             class="elevation-1 text-body-2"
@@ -80,6 +83,14 @@
             :items-per-page="itemsPerPage"
             @update:options="updateOptions"
         >
+            <template #footer.prepend>
+                <PageJump
+                    v-if="itemsPerPage > 0 && total > itemsPerPage"
+                    v-model="options.page"
+                    :length="Math.ceil(total / itemsPerPage)"
+                    :disabled="loading"
+                />
+            </template>
             <template #item.status="{ item }">
                 <v-chip
                     v-if="item.status == 'ready'"
@@ -499,6 +510,7 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import BookFileSizes from '@/components/BookFileSizes.vue';
 import { withBasePath } from '@/utils/base-path';
 import { ref, computed, watch, onMounted } from 'vue';
@@ -559,7 +571,7 @@ const editFieldLabel = ref('');
 const coverDialog = ref(false);
 
 const updateOptions = (newOptions) => {
-    options.value = newOptions;
+    options.value = { ...newOptions };
     // 同步更新 itemsPerPage，确保用户选择"全部"时能正确显示
     if (newOptions.itemsPerPage !== undefined) {
         itemsPerPage.value = newOptions.itemsPerPage;

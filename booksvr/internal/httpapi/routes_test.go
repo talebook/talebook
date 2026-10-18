@@ -24,15 +24,15 @@ func TestLegacyRouteCountIs215(t *testing.T) {
 	}
 }
 
-func TestNewRouteCountIs3(t *testing.T) {
-	if got := len(NewRoutes()); got != 3 {
-		t.Fatalf("NewRoutes() 数 = %d, want 3", got)
+func TestNewRouteCountIs4(t *testing.T) {
+	if got := len(NewRoutes()); got != 4 {
+		t.Fatalf("NewRoutes() 数 = %d, want 4", got)
 	}
 }
 
-func TestTotalRouteCountIs218(t *testing.T) {
-	if got := RouteCount(); got != 218 {
-		t.Fatalf("RouteCount() = %d, want 218（215 既有 + 3 新增）", got)
+func TestTotalRouteCountIs219(t *testing.T) {
+	if got := RouteCount(); got != 219 {
+		t.Fatalf("RouteCount() = %d, want 219（215 既有 + 4 新增）", got)
 	}
 }
 
@@ -57,7 +57,7 @@ func TestNoDuplicatePatterns(t *testing.T) {
 	}
 }
 
-// TestNewRoutesDoNotCollideWithLegacy 断言新增 3 条不与既有 215 条撞路径。
+// TestNewRoutesDoNotCollideWithLegacy 断言新增 4 条不与既有 215 条撞路径。
 func TestNewRoutesDoNotCollideWithLegacy(t *testing.T) {
 	legacy := map[string]bool{}
 	for _, r := range LegacyRoutes() {
@@ -110,7 +110,7 @@ func TestSourceFilesExist(t *testing.T) {
 // TestPatternsExistInPythonSource 断言每条既有 pattern 逐字出现在其 Source 文件里。
 //
 // 这是「与 Python 版一致」的硬证据：不是靠人工抄写，而是回到源码比对。
-// 新增的 3 条路由不属于 Python 版，因此只对 LegacyRoutes 做此断言。
+// 新增的 4 条路由不属于 Python 版，因此只对 LegacyRoutes 做此断言。
 func TestPatternsExistInPythonSource(t *testing.T) {
 	root := repoRoot(t)
 	cache := map[string]string{}
@@ -133,7 +133,7 @@ func TestPatternsExistInPythonSource(t *testing.T) {
 
 // TestPrefixDistribution 断言既有 215 条按前缀分布与盘点表一致。
 //
-// 新增 3 条不计入：它们不是 Python 版路由。
+// 新增 4 条不计入：它们不是 Python 版路由。
 func TestPrefixDistribution(t *testing.T) {
 	want := map[string]int{
 		"/api/":   188,

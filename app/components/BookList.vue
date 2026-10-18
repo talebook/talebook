@@ -16,9 +16,10 @@
 
             <v-col cols="12">
                 <v-container class="max-width">
-                    <v-pagination
+                    <AppPagination
                         v-if="page_cnt > 1"
                         v-model="page"
+                        :disabled="pending"
                         :length="page_cnt"
                         rounded="circle"
                         @update:model-value="change_page"
@@ -30,6 +31,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import { ref, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
@@ -55,7 +57,7 @@ const loadData = async () => {
 };
 
 // 使用 useAsyncData，它会自动处理异步数据
-const { data: listData } = useAsyncData(
+const { data: listData, pending } = useAsyncData(
     'book-list-' + route.fullPath,
     () => loadData(),
     {

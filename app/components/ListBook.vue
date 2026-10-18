@@ -18,9 +18,10 @@
 
             <v-col cols="12">
                 <v-container class="max-width">
-                    <v-pagination
+                    <AppPagination
                         v-if="page_cnt > 0"
                         v-model="page"
+                        :disabled="pending"
                         :length="page_cnt"
                         rounded="circle"
                         @update:model-value="change_page"
@@ -32,6 +33,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import { ref, computed, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAsyncData, useNuxtApp } from 'nuxt/app';
@@ -76,7 +78,7 @@ const fetchData = async () => {
 
 // 修复这里：不要使用 await，直接使用 useAsyncData
 // useAsyncData 会自动处理异步操作
-const { data, refresh } = useAsyncData(`list-${route.fullPath}`, async () => {
+const { data, refresh, pending } = useAsyncData(`list-${route.fullPath}`, async () => {
     return await $backend(route.fullPath);
 });
 

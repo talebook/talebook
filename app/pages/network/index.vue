@@ -176,7 +176,7 @@
                     <v-col
                         v-if="searched && (results.length > 0 || searchPage > 1)"
                         cols="12"
-                        class="d-flex justify-center align-center"
+                        class="d-flex justify-center align-center flex-wrap ga-2"
                     >
                         <v-btn
                             variant="text"
@@ -185,7 +185,11 @@
                         >
                             {{ $t('network.prevPage') }}
                         </v-btn>
-                        <span class="mx-3">{{ $t('network.page', { n: searchPage }) }}</span>
+                        <PageJump
+                            :model-value="searchPage"
+                            :disabled="loading"
+                            @update:model-value="changeSearchPage"
+                        />
                         <v-btn
                             variant="text"
                             :disabled="results.length === 0 || loading"
@@ -266,11 +270,18 @@
                         </div>
 
                         <div
-                            v-if="exploreBooks.length > 0"
+                            v-if="exploreBooks.length > 0 || explorePage > 1"
                             class="mt-3"
                         >
                             <BookCards :books="toExploreCards(exploreBooks)" />
-                            <div class="d-flex justify-center align-center mt-2">
+                            <v-alert
+                                v-if="!exploreBooks.length && !exploreLoading"
+                                type="info"
+                                variant="tonal"
+                            >
+                                {{ $t('network.exploreNoBooks') }}
+                            </v-alert>
+                            <div class="d-flex justify-center align-center flex-wrap ga-2 mt-2">
                                 <v-btn
                                     variant="text"
                                     :disabled="explorePage <= 1 || exploreLoading"
@@ -278,7 +289,11 @@
                                 >
                                     {{ $t('network.prevPage') }}
                                 </v-btn>
-                                <span class="mx-3">{{ $t('network.page', { n: explorePage }) }}</span>
+                                <PageJump
+                                    :model-value="explorePage"
+                                    :disabled="exploreLoading"
+                                    @update:model-value="changeExplorePage"
+                                />
                                 <v-btn
                                     variant="text"
                                     :disabled="exploreLoading || !exploreHasMore"
@@ -305,6 +320,7 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BookCards from '~/components/BookCards.vue';

@@ -21,6 +21,8 @@ type BookConfig struct {
 	DB *sql.DB
 	// LibraryDB 是 Calibre 元数据库。
 	LibraryDB *sql.DB
+	// LibraryRoot resolves relative managed Calibre format locations.
+	LibraryRoot string
 	// Settings 是站点配置。
 	Settings map[string]any
 	// CDNURL 用于拼接封面地址。

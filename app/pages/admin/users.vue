@@ -325,6 +325,7 @@
         </v-dialog>
 
         <v-data-table-server
+            v-model:page="options.page"
             v-model="selectedUsers"
             density="compact"
             class="elevation-1 text-body-2"
@@ -337,6 +338,14 @@
             :items-per-page="itemsPerPage"
             @update:options="updateOptions"
         >
+            <template #footer.prepend>
+                <PageJump
+                    v-if="itemsPerPage > 0 && total > itemsPerPage"
+                    v-model="options.page"
+                    :length="Math.ceil(total / itemsPerPage)"
+                    :disabled="loading"
+                />
+            </template>
             <template #item.login_ip="{ item }">
                 {{ item.extra.login_ip }}
             </template>
@@ -468,6 +477,7 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import { ref, onMounted, computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
@@ -627,7 +637,7 @@ const permissionStringToObject = (permStr) => {
 };
 
 const updateOptions = (newOptions) => {
-    options.value = newOptions;
+    options.value = { ...newOptions };
     // 同步更新 itemsPerPage，确保用户选择"全部"时能正确显示
     if (newOptions.itemsPerPage !== undefined) {
         itemsPerPage.value = newOptions.itemsPerPage;

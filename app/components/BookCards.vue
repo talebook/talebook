@@ -12,6 +12,9 @@
             >
                 <v-card
                     :to="book.href"
+                    target="_blank"
+                    rel="noopener"
+                    :aria-label="$t('pagination.openBookInNewTab', { title: book.title })"
                     class="book-card-shell"
                     data-testid="book-card"
                 >

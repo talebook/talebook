@@ -88,9 +88,10 @@
 
             <v-col cols="12">
                 <v-container class="max-width">
-                    <v-pagination
+                    <AppPagination
                         v-if="page_cnt > 0"
                         v-model="page"
+                        :disabled="loading"
                         :length="page_cnt"
                         circle
                         @update:model-value="change_page"
@@ -103,6 +104,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import BookCards from '~/components/BookCards.vue';
 import LibraryChipFilter from '~/components/LibraryChipFilter.vue';
 import SerializeStatusBadge from '~/components/SerializeStatusBadge.vue';

@@ -180,7 +180,7 @@
 
                 <v-card-actions class="library-filter-picker__footer">
                     <span>{{ t('library.filterPickerPageSize', { count: pageSize }) }}</span>
-                    <v-pagination
+                    <AppPagination
                         v-if="pickerPageCount > 1"
                         v-model="pickerPage"
                         :data-testid="`library-filter-${filterKey}-pagination`"
@@ -196,6 +196,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import { useDisplay } from 'vuetify';
 import { useI18n } from 'vue-i18n';
 import { useMetadataPage } from '@/composables/useMetadataPage';

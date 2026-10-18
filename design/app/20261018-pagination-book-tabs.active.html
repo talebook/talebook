@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="文件目录浏览、分页直接跳转与书籍详情新标签打开的实现和验证记录。" />
+    <link rel="icon" href="data:," />
+    <title>文件目录、页码跳转与新标签详情 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page" id="main-content"><header class="hero"><h1>文件目录、页码跳转与新标签详情</h1><p>创建日期：2026-10-18 · 状态：ACTIVE · 模块：app</p></header><section class="card"><h2>需求与决策</h2><p>书库点击书籍在新标签打开详情，原列表保留筛选、页码及滚动。各分页浏览入口提供页码输入和跳转，避免反复翻页。延续会话既有测试、部署、提交推送要求；分页与新标签部分不改变后端接口；追加文件目录使用独立只读接口，保留正在运行的导入。</p></section><section class="card"><h2>方案与边界</h2><p>共享书籍卡片BookCards、BookCards_Small、BookCoverGrid使用原生target=_blank、rel=noopener，保留href及键盘/中键能力，并提供新标签提示。PageJump统一数字校验、按Enter或按钮提交；只接受安全正整数，已知上限时超范围提示且不发请求，空、负、零、小数与非数字拒绝；已处当前页不重复发请求。外部翻页后同步输入；总页数变化只更新范围，不覆盖正在输入的内容，避免导入任务持续改变数量时打断输入，loading禁用提交。AppPagination组合原有页码按钮与PageJump，替换全部7处v-pagination；现有服务端/客户端表格通过footer.prepend加入PageJump，绑定同一个Vuetify页码与每页条数；接收update:options时复制事件对象，避免v-model修改Vuetify保存的旧options引用而抑制后续请求；窄屏只显示当前页及前后箭头，避免省略号额外按钮溢出，保留选择、排序和筛选。网络搜索与发现只有下一页语义、无可靠总数，使用无上限PageJump，不假造总页数。发现页跳到无结果的页后仍保留分页入口及空结果提示，允许返回或再跳，避免落到无法操作的空页。无限滚动/游标加载不强行伪造随机页码。明暗与320px布局、标签和错误说明遵循Vuetify。三语言文案齐全，更新spec/书库.md。</p></section><section class="card"><h2>影响范围</h2><p>书库本地、元数据列表与筛选弹窗、通用列表/搜索/范围书库、Legado书源、管理图书/用户/导入/回收站/插件运行及详情、网络搜索/发现。回归另发现/library入口在静态SPA中await navigateTo重定向后留下空页面，直接/library/local正常；改为Nuxt支持的路由元信息redirect，在进入空组件前完成导航并保留查询参数和hash。分页部分不改后端；文件目录新增只读查询，数据库结构、挂载和导入worker不修改。当前分支对origin/master进行full范围解析，再按技能边界审查完整浏览→跳页→新标签详情流程。</p></section><section class="card"><h2>验证计划与记录</h2><p>组件验证边界输入、外部同步、loading、未知总页数；页面验证跳页请求携带筛选排序且一次触发、真实新标签和原页保持；分页每页条数切换与空列表；320px与明暗可读性。执行构建、lint、规格/设计校验，真实后端验收后部署并提交推送。</p></section><section class="card"><h2>追加需求：文件目录</h2><p>用户要求“分类浏览”下新增“文件目录”，左右显示目录树与选中目录书籍。已确认默认只看当前目录，可选包含子目录。新增只读/api/library/directories，查询现有格式路径与受管书库格式，先排除当前读者不可见及确认缺失的书/格式，再按目录分组；多格式去重。左侧按需展开直接子目录，虚拟列表控制大目录DOM数量；右侧只加载当前60本详情，页码写入URL，筛选/选中路径与包含子目录状态可恢复；移动端上下排列保持控件可用。树仅呈现已入库书籍的来源目录，不枚举磁盘、不访问任意系统目录、不触发导入/复制；压缩包成员归到原压缩包所在目录，不保留解压缓存，不暴露内部编码。树目录数量为包含后代的去重书籍数量，右侧默认只显示当前目录，文案明确。真实大库探测冷读12.94秒、后续全路径读取5.69/5.24秒，不能每次展开重复。增加仅保存去重目录路径/书ID的只读快照缓存：按读者身份、管理员标记和当前不可见/缺失ID集合指纹隔离，最多4份、30秒到期同步重读，不增加常驻刷新worker。每次响应仍按最新不可见集合和现存书ID过滤，不让已删除记录留在计数中；目录位置/新增记录最多延迟30秒，手动刷新强制重读，原文件状态不另行探测。刷新先完成服务端新快照再读取当前书目，避免左右不同快照。缓存路径字符串驻留去重控制内存。初版缓存仍因逐格式JOIN书目/状态而有22.83秒冷读、2.84秒后续读取；改为路径快照只读格式路径，响应时分别通过覆盖索引读取现存书ID、格式ID和缺失格式ID，避免重复随机JOIN，不改变过滤语义。没有新表、数据库迁移或后台worker；Go查询属于library，权限与列表渲染复用httpapi既有逻辑。新增中文/英/俄文案、后端权限/多格式/目录边界与压缩包回归、前端展开/默认非递归/分页与URL测试。后端编译/部署使用原容器挂载和优雅导入交接，不重置导入任务。</p></section><section class="card"><h2>实际测试结果</h2><ul>
+<li>组件：PageJump 14 项、BookCards 6 项、AppHeader/BuiltinThemeHeader 25 项通过。包括空值、负数、零、小数、指数、越界、未知总数、loading、总页数变化不打断输入、新标签链接与提示。</li>
+<li>Playwright：<code>playwright test test/e2e/directories.spec.ts test/e2e/pagination-navigation.spec.ts test/e2e/library.spec.ts test/e2e/admin-imports.spec.ts</code>，21 项通过（21.9 秒）。短生命周期 mock 仅用于隔离回归，服务已结束。覆盖默认当前目录、可选递归、展开/恢复/刷新、表格跳页和每页条数、元数据分页、筛选排序保留、新标签不改变原页、窄屏。</li>
+<li>Go：<code>go test -p 2 ./... -skip 'TestFileThemeStoreWriteFileError|TestBackupCreateFailsOnReadOnlyDir'</code> 全部 45 包通过；两项依赖权限的测试以 UID 911 独立运行通过。最终 SQL 优化后再次执行 <code>go test -p 2 ./internal/library ./internal/httpapi -run 'TestBookDirector|TestDirectoryCache' -count=1 -timeout=120s</code> 通过。<code>go vet ./...</code> 和生产二进制编译通过。覆盖目录边界、多格式去重、私藏权限、丢失格式、ZIP 来源、缓存隔离/失效/强制刷新和删除立即排除。路由契约保持 215 个兼容路由 + 4 个原生路由，共 219。</li>
+<li>Nuxt generate 成功；改动文件 ESLint 修复检查通过（0 errors，现有规则忽略 composable 与测试文件，5 条 ignored 警告）；<code>python scripts/check_spec.py</code> 25 篇通过；<code>python scripts/check_design_docs.py</code> 194 篇通过；<code>git diff --check</code> 通过。旧 Python 后端未改动，未运行其完整测试套件。</li>
+<li>回归过程中发现服务端表格 options 引用别名导致不发跳页请求、library 重定向空白、移动分页省略号溢出，均修复后重新通过上述回归。客户端表格选择器测试改为键盘选择真实可交互控件。Nuxt 组件夹具存在被捕获的 i18n 初始化提示，真实生产页面无 pageerror。</li>
+<li>真实生产验收：登录后浏览 /directories，当前 /books1/books1/allitebooks/pdf 有 7519 本；默认 recursive=0、每页 60 本，跳到第 2 页请求 start=60；打开书 180301 详情为新标签，原 URL/页码/滚动保持。/library/local 的 PDF 筛选跳页保留，/admin/books 跳第 3 页有真实响应，/publisher 跳第 2 页成功；OPDS 状态 200、Atom Content-Type 正确。明暗两主题、320px 无横向溢出，pageerror 为 0。</li>
+<li>真实性能：与导入任务及编译并行的只读探测，最终缓存方案冷读 15.27 秒，后续 1.45/1.15 秒；生产实际根目录请求 14.303 秒，随后带 60 本详情的目录请求 5.986 秒。不是瞬时目录接口；30 秒 TTL/手动刷新平衡更新与大库全路径读取开销，未声称所有请求低延迟。</li>
+<li>生产目录树按需展开、深层选中及可见键盘焦点通过；初次检查误把 Vuetify 隐藏的 card loader 计入 loading，修正为可见 progress 后通过，非产品故障。16 个改动 Go 源文件与实际构建源逐一 SHA256 核对一致。</li></ul></section>
+<section class="card"><h2>Interface review — Scope and Coverage</h2>
+<p>full 模式；先解析当前分支相对默认分支的全部本地变化（已提交及未提交）。Nuxt 4/Vue 3/Vuetify，沿用主题、原生链接、响应式与现有文案目录。依据根 AGENTS.md、app/CLAUDE.md 与六个 better-* 领域 skill。完整分支过大，按技能允许边界收敛至“浏览目录/书库 → 跳页 → 新标签详情”完整流程，最多展开 5 个消费者；不声称本次重新审查既往全部插件、设备、阅读器或导入流程。</p>
+<table><tbody><tr><th>字段</th><th>解析结果</th></tr>
+<tr><td>Target</td><td>branch + working tree</td></tr><tr><td>Base</td><td>origin/master，merge-base d5d21dda160d65d29cc0c9ab8a13ae6b4deb69d2</td></tr><tr><td>Head</td><td>b378e2454364e039ee6a33a8e50da4d3097d91f8，加当前改动</td></tr><tr><td>范围</td><td>51 个既有提交，47 个未提交文件；873 个路径清单。机械排除锁文件、vendor/dist/reader 生成文件及图片/二进制 44 项，余 829 项用于表面映射，再按完整流程收敛。</td></tr>
+<tr><td>Consumers</td><td>文件目录、本地书库、元数据列表/筛选、服务端图书表、客户端回收站，共 5 个。其余分页消费者未展开完整界面审查：通用列表、范围书库、Legado、网络搜索/发现、管理用户、管理导入、插件运行列表/详情，共 8 类；其中导入另有功能回归。</td></tr></tbody></table>
+<table><thead><tr><th>Domain</th><th>Evidence inspected</th><th>Result</th></tr></thead><tbody>
+<tr><td>Accessibility</td><td>原生链接 target/rel/名称；PageJump label/错误信息/Enter/loading；树按钮名称、expanded/current 和 focus-visible；实际键盘与320px。</td><td>Clear（已检查范围）</td></tr>
+<tr><td>Layout</td><td>桌面 300px + 852px 两栏、窄屏上下排列；分页 flex-wrap、xs 单页按钮；长目录换行、虚拟目录列表。</td><td>Clear</td></tr>
+<tr><td>Writing</td><td>默认只看当前目录、包含子目录开关、树计数解释、无选择/无书/错误重试；中英俄新文案。</td><td>Clear</td></tr>
+<tr><td>Typography</td><td>沿用 text-h5/h6/body-2；实际输入16px，书名截断和完整链接名称；路径可断行。</td><td>Clear</td></tr>
+<tr><td>Colors</td><td>沿用 Vuetify surface/on-surface/primary；实际明暗截图可读性，选中兼用边框/粗体/aria-current，不靠颜色单独表达。</td><td>Clear（无新增自定义正文色对）</td></tr>
+<tr><td>UI</td><td>加载禁用、空/失败/重试、页码校验和无效页保留操作；无新增动画；真实320px页码输入/按钮可达。</td><td>Clear</td></tr>
+</tbody></table></section>
+<section class="card"><h2>Findings</h2><p>No actionable interface findings in this change（上述明确范围内）。读取了基线与当前两侧差异：分页原按钮保留，footer.prepend 不替换每页条数、选择和排序；卡片 href 保留；导航未移除分类入口；未发现未被替代的焦点、标签、空状态或返回路径删除。初轮回归发现的问题已修复并复验，无待处理 HIGH/MEDIUM/LOW 界面项。</p></section>
+<section class="card"><h2>Considered but Rejected</h2><table><tbody><tr><th>位置</th><th>候选</th><th>未采用原因</th></tr><tr><td>BookCards 系列</td><td>JavaScript window.open</td><td>原生链接已满足新标签且保留键盘/中键操作，增加脚本无益。</td></tr><tr><td>network/index</td><td>显示总页数</td><td>外部源没有可靠总数；无上限跳页保留下一页语义，不制造末页。</td></tr><tr><td>directories</td><td>直接枚举整个挂载文件系统</td><td>该页浏览已入库书籍来源，入库/扫描仍使用既有导入流程；无需新增磁盘扫描或缓存书籍正文。</td></tr></tbody></table></section>
+<section class="card"><h2>Verification</h2><p>范围命令：git symbolic-ref --short refs/remotes/origin/HEAD、git merge-base origin/master HEAD、git rev-list --count BASE..HEAD、git diff --name-only BASE、git status --short、git diff BASE -- app，以及当前 git diff；结果与范围表一致。唯一远程引用写入为 git fetch origin master feat/booksvr-calibre-rewrite --no-tags；未 checkout/stash/切换工作区。读取新旧侧及直接消费者，最终检查 diff --check。运行验证见“实际测试结果”；截图保存于工作区外 talebook-directories-light/dark[-mobile].png，生产 JSON 为 talebook-pagination-production-proof.json。DevTools MCP 不可用，改用 Chromium/Playwright 对真实生产后端验收；未验证真实手机/俄语排版/全部既往分支界面，不把隔离 mock 当生产体验。</p><h3>Verdict</h3><p>Approve — 限上述完整流程与已声明状态。</p></section>
+<section class="card"><h2>部署与回退</h2><p>leonFN 已部署镜像 talebook:pagination-20261018，SHA256 8b7aa4866412791942206dd73514476368aae39a749e43de8c24d21566c304f1。沿用原挂载 /data、/books、/books1，等待正在处理的单本图书优雅完成后交接；import_resume_job 部署前后均 active。无数据库迁移、清库或源文件变更。部署凭据未入库，生产回执保存在 /vol1/1000/talebook/books/repairs/20261018-pagination/ 。保留旧镜像供回退，验证后清理本任务旧容器与构建容器。</p></section></main></body></html>

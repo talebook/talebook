@@ -59,6 +59,7 @@ export function usePrimaryNavigation(store: ReturnType<typeof useMainStore>, t: 
 
         items.push(
             { key: 'categories', heading: t('navigation.categories') },
+            { key: 'directories', icon: 'mdi-folder-open-outline', href: '/directories', text: t('directories.title') },
             { key: 'nav', icon: 'mdi-widgets', href: '/nav', text: t('navigation.browse'), count: store.sys.books },
             { key: 'publisher', icon: 'mdi-home-group', href: '/publisher', text: t('navigation.publishers'), count: store.sys.publishers },
             { key: 'author', icon: 'mdi-human-greeting', href: '/author', text: t('navigation.authors'), count: store.sys.authors },

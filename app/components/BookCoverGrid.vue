@@ -15,6 +15,9 @@
         >
             <v-card
                 :to="book.href || '/book/' + book.id"
+                target="_blank"
+                rel="noopener"
+                :aria-label="$t('pagination.openBookInNewTab', { title: book.title })"
                 class="ma-1"
             >
                 <v-img
@@ -27,7 +30,10 @@
                 >
                     {{ book.title }}
                 </v-card-subtitle>
-                <BookFileSizes :sizes="book.format_sizes" class="px-2 pb-2" />
+                <BookFileSizes
+                    :sizes="book.format_sizes"
+                    class="px-2 pb-2"
+                />
             </v-card>
         </v-col>
     </v-row>

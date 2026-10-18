@@ -64,7 +64,8 @@ describe('BookCards.vue', () => {
         ];
         const wrapper = mount(BookCards, {
             global: {
-                plugins: [vuetify]
+                plugins: [vuetify],
+                mocks: { $t: (_key: string, args: { title: string }) => `${args.title}（新标签页）` },
             },
             props: {
                 books
@@ -81,6 +82,8 @@ describe('BookCards.vue', () => {
         const vCards = wrapper.findAllComponents({ name: 'VCard' });
         expect(vCards.length).toBeGreaterThan(0);
         expect(vCards[0].props('to')).toBe('/book/1');
+        expect(vCards[0].attributes('target')).toBe('_blank');
+        expect(vCards[0].attributes('rel')).toBe('noopener');
     });
 
     it('identifies every standard book card regardless of introduction length', () => {

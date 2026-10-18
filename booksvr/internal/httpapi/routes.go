@@ -5,10 +5,11 @@ package httpapi
 // 本表逐条对齐 Python 版注册的 215 条路由。
 // 生成脚本：scripts/_tmp_gen_routes.py
 
-// newRoutes 是 booksvr 新增的 3 条作品/版本路由（5.5 节）。
+// newRoutes 是 booksvr 原生新增的作品/版本与文件目录路由。
 //
 // 它们不属于 Python 版既有 215 条，因此单独列出，便于区分「兼容」与「新增」。
 var newRoutes = []Route{
+	{Pattern: "/api/library/directories", Handler: "BookDirectories", Source: "booksvr/internal/httpapi/book_directories.go", Methods: []string{"GET"}},
 	{Pattern: "/api/work/([0-9]+)", Handler: "WorkDetail", Source: "booksvr/internal/httpapi/work.go", Methods: []string{"GET"}},
 	{Pattern: "/api/book/([0-9]+)/versions", Handler: "BookVersions", Source: "booksvr/internal/httpapi/work.go", Methods: []string{"GET"}},
 	{Pattern: "/api/book/([0-9]+)/merge", Handler: "MergeBooks", Source: "booksvr/internal/httpapi/work.go", Methods: []string{"POST"}},

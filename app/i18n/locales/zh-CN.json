@@ -1,4 +1,26 @@
 {
+  "directories": {
+    "title": "文件目录",
+    "tree": "目录树",
+    "description": "按已入库书籍的来源目录浏览；压缩包内的书归到压缩包所在目录。",
+    "countHint": "目录旁的数量包含子目录中的书。",
+    "loadFailed": "加载目录或书籍失败，请重试。",
+    "noDirectories": "暂无可浏览的书籍目录。",
+    "recursive": "包含子目录",
+    "bookCount": "共 {count} 本书",
+    "empty": "当前目录没有书，可以展开左侧子目录，或勾选“包含子目录”。",
+    "choose": "请在左侧选择一个目录。",
+    "expand": "展开 {name}",
+    "collapse": "收起 {name}"
+  },
+  "pagination": {
+    "pageNumber": "页码",
+    "go": "跳转",
+    "totalPages": "共 {count} 页",
+    "invalidPage": "请输入正整数页码。",
+    "invalidRange": "请输入 1 到 {count} 之间的整数页码。",
+    "openBookInNewTab": "{title}（在新标签页打开）"
+  },
   "common": {
     "welcome": "欢迎使用",
     "home": "首页",

@@ -16,6 +16,8 @@ import (
 	"talebook/booksvr/internal/userdb"
 )
 
+const rBookDirectories = "/api/library/directories"
+
 // ---- 收藏 / 书架 ----
 
 // BookFavoriteHandler 实现 /api/book/<id>/favorite。
@@ -668,6 +670,7 @@ func BookRouteSpecs(cfg BookConfig) []RouteSpec {
 		{Pattern: rBookNav, Methods: getPost, Handler: BookNavHandler(cfg)},
 		{Pattern: rBookRecent, Methods: getPost, Handler: BookRecentHandler(cfg)},
 		{Pattern: rBookLibrary, Methods: getPost, Handler: BookLibraryHandler(cfg)},
+		{Pattern: rBookDirectories, Methods: get, Handler: BookDirectoriesHandler(cfg)},
 		{Pattern: rBookSearch, Methods: getPost, Handler: BookSearchHandler(cfg)},
 		{Pattern: rBookHot, Methods: getPost, Handler: BookHotHandler(cfg)},
 		{Pattern: rBookUpload, Methods: all, Auth: true, Handler: BookUploadHandler(cfg)},

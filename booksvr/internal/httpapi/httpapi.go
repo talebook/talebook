@@ -22,7 +22,7 @@ type Route struct {
 	Methods []string
 }
 
-// Routes 返回全部路由（215 条既有 + 3 条新增）的逐条镜像。
+// Routes 返回全部路由（215 条既有 + 4 条新增）的逐条镜像。
 //
 // 返回的是副本，调用方修改不会影响注册表。
 func Routes() []Route {
@@ -39,7 +39,7 @@ func LegacyRoutes() []Route {
 	return out
 }
 
-// NewRoutes 只返回 booksvr 新增的 3 条路由。
+// NewRoutes 只返回 booksvr 新增的 4 条路由。
 func NewRoutes() []Route {
 	out := make([]Route, len(newRoutes))
 	copy(out, newRoutes)

@@ -16,9 +16,10 @@
 
             <v-col cols="12">
                 <v-container class="max-width">
-                    <v-pagination
+                    <AppPagination
                         v-if="page_cnt > 0"
                         v-model="page"
+                        :disabled="loading"
                         :length="page_cnt"
                         circle
                         @update:model-value="change_page"
@@ -31,6 +32,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import BookCards from '~/components/BookCards.vue';
 import { useMainStore } from '@/stores/main';
 import { useI18n } from 'vue-i18n';
@@ -86,12 +88,12 @@ const fetchBooks = async (p = 1) => {
 
 const init = async () => {
     inited.value = true;
-  
+
     let p = 1;
     if (route.query.start) {
         p = 1 + parseInt(route.query.start / page_size);
     }
-  
+
     await fetchBooks(p);
 };
 

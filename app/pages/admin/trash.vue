@@ -75,6 +75,8 @@
             class="trash-table-wrap"
         >
             <v-data-table
+                v-model:page="tablePage"
+                v-model:items-per-page="tablePageSize"
                 v-model="selected"
                 :headers="headers"
                 :items="items"
@@ -84,6 +86,14 @@
                 density="compact"
                 :no-data-text="t('admin.trash.empty')"
             >
+                <template #footer.prepend>
+                    <PageJump
+                        v-if="tablePageSize > 0 && items.length > tablePageSize"
+                        v-model="tablePage"
+                        :disabled="loading"
+                        :length="Math.ceil(items.length / tablePageSize)"
+                    />
+                </template>
                 <template #item.title="{ item }">
                     <span class="font-weight-medium">{{ item.title }}</span>
                 </template>
@@ -279,10 +289,14 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
 import { useDisplay } from 'vuetify';
+
+const tablePage = ref(1);
+const tablePageSize = ref(10);
 
 const store = useMainStore();
 const display = useDisplay();

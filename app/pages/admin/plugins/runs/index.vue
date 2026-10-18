@@ -53,12 +53,21 @@
                 {{ t('pluginManagement.loadError') }}
             </v-alert>
             <v-data-table
+                v-model:page="tablePage"
+                v-model:items-per-page="tablePageSize"
                 :headers="headers"
                 :items="filteredRuns"
                 :loading="loading"
-                :items-per-page="25"
                 density="compact"
             >
+                <template #footer.prepend>
+                    <PageJump
+                        v-if="tablePageSize > 0 && filteredRuns.length > tablePageSize"
+                        v-model="tablePage"
+                        :disabled="loading"
+                        :length="Math.ceil(filteredRuns.length / tablePageSize)"
+                    />
+                </template>
                 <template #item.status="{ item }">
                     <v-chip
                         size="small"
@@ -113,9 +122,13 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
+
+const tablePage = ref(1);
+const tablePageSize = ref(25);
 
 const { t } = useI18n();
 const { $backend, $alert } = useNuxtApp();

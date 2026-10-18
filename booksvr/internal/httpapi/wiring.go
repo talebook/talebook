@@ -73,11 +73,12 @@ func (w *bookWiring) autoLogin() bool {
 // Config 返回装配好的 BookConfig。
 func (w *bookWiring) Config(cdnURL string) BookConfig {
 	return BookConfig{
-		DB:        w.db,
-		LibraryDB: w.libraryDB,
-		Settings:  w.settings,
-		CDNURL:    cdnURL,
-		PublicURL: func(path string) string { return path },
+		DB:          w.db,
+		LibraryDB:   w.libraryDB,
+		LibraryRoot: w.libraryRoot,
+		Settings:    w.settings,
+		CDNURL:      cdnURL,
+		PublicURL:   func(path string) string { return path },
 
 		CanViewBook: func(ctx *Context, bookID int64) bool {
 			ok, err := userdb.CanViewBook(w.db, bookID, ctx.Identity.UserID, ctx.Identity.IsAdmin)

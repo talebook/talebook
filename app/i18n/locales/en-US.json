@@ -1,4 +1,26 @@
 {
+  "directories": {
+    "title": "File directories",
+    "tree": "Directory tree",
+    "description": "Browse the source folders of indexed books. Books inside archives appear in the folder containing the archive.",
+    "countHint": "Folder counts include books in subfolders.",
+    "loadFailed": "Could not load folders or books. Please retry.",
+    "noDirectories": "No book directories are available.",
+    "recursive": "Include subfolders",
+    "bookCount": "{count} books",
+    "empty": "No books directly in this folder. Open a subfolder or enable Include subfolders.",
+    "choose": "Select a folder on the left.",
+    "expand": "Expand {name}",
+    "collapse": "Collapse {name}"
+  },
+  "pagination": {
+    "pageNumber": "Page number",
+    "go": "Go",
+    "totalPages": "of {count} pages",
+    "invalidPage": "Enter a positive whole page number.",
+    "invalidRange": "Enter a whole page number from 1 to {count}.",
+    "openBookInNewTab": "{title} (opens in a new tab)"
+  },
   "common": {
     "welcome": "Welcome",
     "home": "Home",

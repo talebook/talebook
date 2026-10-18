@@ -80,13 +80,17 @@
                 role="status"
                 aria-live="polite"
             >
-                <div class="text-high-emphasis">{{ t(watch_status.manual_library_import_phase === 'queued' && watch_status.manual_library_import_running ? 'admin.imports.message.fullImportQueued' : backgroundTask === 'scan' ? 'admin.imports.message.fullScanRunning' : 'admin.imports.message.importRunning') }}</div>
+                <div class="text-high-emphasis">
+                    {{ t(watch_status.manual_library_import_phase === 'queued' && watch_status.manual_library_import_running ? 'admin.imports.message.fullImportQueued' : backgroundTask === 'scan' ? 'admin.imports.message.fullScanRunning' : 'admin.imports.message.importRunning') }}
+                </div>
                 <div
                     v-if="watch_status.scan_progress?.directory"
                     class="text-high-emphasis imports-progress"
                 >
                     {{ t('admin.imports.message.scanProgress', [watch_status.scan_progress.processed || 0, watch_status.scan_progress.archives || 0, watch_status.scan_progress.failed || 0]) }}
-                    <div class="directory-path">{{ watch_status.scan_progress.current || watch_status.scan_progress.directory }}</div>
+                    <div class="directory-path">
+                        {{ watch_status.scan_progress.current || watch_status.scan_progress.directory }}
+                    </div>
                 </div>
                 <div class="text-high-emphasis imports-progress">
                     {{ t('admin.imports.message.importProgress', [count_done, count_todo, count_failed]) }}
@@ -180,11 +184,15 @@
             <v-tab value="failed">
                 {{ t('admin.imports.tab.failed') }} ({{ count_failed }})
             </v-tab>
-            <v-tab value="skipped" data-testid="import-skipped-tab">
+            <v-tab
+                value="skipped"
+                data-testid="import-skipped-tab"
+            >
                 {{ t('admin.imports.tab.skipped') }} ({{ count_skipped }})
             </v-tab>
         </v-tabs>
         <v-data-table-server
+            v-model:page="options.page"
             v-model="selected"
             density="compact"
             class="imports-table elevation-1 text-body-2"
@@ -199,6 +207,14 @@
             :items-per-page="itemsPerPage"
             @update:options="updateOptions"
         >
+            <template #footer.prepend>
+                <PageJump
+                    v-if="itemsPerPage > 0 && total > itemsPerPage"
+                    v-model="options.page"
+                    :length="Math.ceil(total / itemsPerPage)"
+                    :disabled="loading"
+                />
+            </template>
             <template #item.status="{ item }">
                 <v-chip
                     v-if="item.status == 'ready'"
@@ -604,6 +620,7 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import { DEFAULT_IMPORT_MODE, allowedRootsFromSettings, validateAllowedRoots } from '@/composables/useImportRoots';
 import { activeImportTask } from '@/composables/useImportTask';
 import { withBasePath } from '@/utils/base-path';
@@ -753,7 +770,7 @@ const directoryCheckAlertType = (check) => {
 };
 
 const updateOptions = (newOptions) => {
-    options.value = newOptions;
+    options.value = { ...newOptions };
     if (newOptions.itemsPerPage !== undefined) {
         itemsPerPage.value = newOptions.itemsPerPage;
     }

@@ -384,8 +384,9 @@
                     {{ $t('booksource.totalCount', { n: total }) }}
                 </span>
                 <v-spacer />
-                <v-pagination
+                <AppPagination
                     v-model="page"
+                    :disabled="loading"
                     :length="pageCount"
                     :total-visible="7"
                     density="compact"
@@ -453,6 +454,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import BookSourceImportDialog from '~/components/BookSourceImportDialog.vue';

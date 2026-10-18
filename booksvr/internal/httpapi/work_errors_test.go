@@ -324,6 +324,7 @@ func TestBookVersionsIncludesFiles(t *testing.T) {
 // TestNewRoutesHaveCorrectMethods 断言新增路由的方法与设计一致。
 func TestNewRoutesHaveCorrectMethods(t *testing.T) {
 	want := map[string]string{
+		"/api/library/directories":    "GET",
 		"/api/work/([0-9]+)":          "GET",
 		"/api/book/([0-9]+)/versions": "GET",
 		"/api/book/([0-9]+)/merge":    "POST",

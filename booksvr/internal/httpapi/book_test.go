@@ -78,8 +78,8 @@ func bookSeedState(t *testing.T, db *sql.DB, bookID, readerID, readState int64, 
 
 func TestBookRouteSpecs(t *testing.T) {
 	specs := BookRouteSpecs(BookConfig{})
-	if len(specs) != 38 {
-		t.Fatalf("len = %d, want 38", len(specs))
+	if len(specs) != 39 {
+		t.Fatalf("len = %d, want 39", len(specs))
 	}
 	for _, s := range specs {
 		if s.Pattern == "" || s.Handler == nil || len(s.Methods) == 0 {
@@ -97,7 +97,7 @@ func TestBookRouteSpecsCoverLegacy(t *testing.T) {
 		"/api/index", "/api/book/([0-9]+)", "/api/book/([0-9]+\\..+)",
 		"/api/book/([0-9]+)/convert", "/api/book/([0-9]+)/topdf", "/api/book/([0-9]+)/refer",
 		"/api/book/([0-9]+)/edit", "/api/book/([0-9]+)/delete", "/api/book/nav",
-		"/api/recent", "/api/library", "/api/search", "/api/hot",
+		"/api/recent", "/api/library", "/api/library/directories", "/api/search", "/api/hot",
 		"/api/book/upload", "/api/book/upload/chunk", "/api/book/upload/complete",
 		"/read/([0-9]+)", "/api/book/([0-9]+)/reader-bootstrap",
 		"/read/resource/([0-9]+\\.epub)", "/api/read/txt", "/api/book/txt/init",

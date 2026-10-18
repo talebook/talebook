@@ -69,7 +69,7 @@
         >
             {{ t('library.noMatchingFilter', { label }) }}
         </div>
-        <v-pagination
+        <AppPagination
             v-if="pages > 1"
             v-model="page"
             :length="pages"
@@ -83,6 +83,7 @@
 </template>
 
 <script setup>
+import AppPagination from '@/components/AppPagination.vue';
 import { computed, watch } from 'vue';
 import { useDisplay } from 'vuetify';
 import { useRoute } from 'vue-router';

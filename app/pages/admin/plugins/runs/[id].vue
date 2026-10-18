@@ -85,12 +85,21 @@
                     </v-btn>
                 </div>
                 <v-data-table
+                    v-model:page="tablePage"
+                    v-model:items-per-page="tablePageSize"
                     class="compliance-table"
                     :headers="headers"
                     :items="displayItems"
                     density="compact"
-                    :items-per-page="25"
                 >
+                    <template #footer.prepend>
+                        <PageJump
+                            v-if="tablePageSize > 0 && displayItems.length > tablePageSize"
+                            v-model="tablePage"
+                            :disabled="loading"
+                            :length="Math.ceil(displayItems.length / tablePageSize)"
+                        />
+                    </template>
                     <template #item.status="{ item }">
                         <v-chip
                             size="small"
@@ -115,9 +124,13 @@
 </template>
 
 <script setup>
+import PageJump from '@/components/PageJump.vue';
 import { computed, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
+
+const tablePage = ref(1);
+const tablePageSize = ref(25);
 
 const { t } = useI18n();
 const { $backend, $alert } = useNuxtApp();

@@ -517,6 +517,9 @@ func TestWorkRouteSpecsMatchRegisteredRoutes(t *testing.T) {
 	specs := WorkRouteSpecs()
 	registered := map[string]bool{}
 	for _, r := range NewRoutes() {
+		if r.Source != "booksvr/internal/httpapi/work.go" {
+			continue
+		}
 		registered[r.Pattern] = true
 	}
 	if len(specs) != len(registered) {

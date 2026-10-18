@@ -3,5 +3,7 @@
 </template>
 
 <script setup>
-await navigateTo('/library/local', { replace: true });
+definePageMeta({
+    redirect: to => ({ path: '/library/local', query: to.query, hash: to.hash }),
+});
 </script>
