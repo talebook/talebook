@@ -73,8 +73,11 @@ func (w *bookWiring) autoLogin() bool {
 // Config 返回装配好的 BookConfig。
 func (w *bookWiring) Config(cdnURL string) BookConfig {
 	return BookConfig{
-		DB:          w.db,
-		LibraryDB:   w.libraryDB,
+		DB:        w.db,
+		LibraryDB: w.libraryDB,
+		BrowsePage: func(ctx *Context, q library.BrowseQuery) ([]int64, int, error) {
+			return library.BrowseBooks(ctx.Request.Context(), w.libraryDB, q)
+		},
 		LibraryRoot: w.libraryRoot,
 		Settings:    w.settings,
 		CDNURL:      cdnURL,
@@ -119,6 +122,7 @@ func (w *bookWiring) Config(cdnURL string) BookConfig {
 			}
 			return library.GetBooksForCategory(w.libraryDB, category, itemID)
 		},
+		BookTitles: func(ids []int64) (map[int64]string, error) { return library.BookTitles(w.libraryDB, ids) },
 		BookTitle: func(bookID int64) string {
 			title, err := userdb.BookTitleByID(w.libraryDB, bookID)
 			if err != nil {
@@ -245,8 +249,9 @@ func newAudioWiring(db, libraryDB *sql.DB, settings map[string]any, root string)
 // Config 返回装配好的 AudioConfig。
 func (w *audioWiring) Config(cdnURL string, publicURL func(string) string) AudioConfig {
 	return AudioConfig{
-		DB:          w.db,
-		LibraryDB:   w.libraryDB,
+		DB:        w.db,
+		LibraryDB: w.libraryDB,
+
 		Settings:    w.settings,
 		StorageRoot: w.root,
 		CDNURL:      cdnURL,

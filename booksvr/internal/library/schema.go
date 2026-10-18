@@ -99,6 +99,18 @@ func Migrate(db *sql.DB) error {
 	if err := migrateSourceSync(db); err != nil {
 		return err
 	}
+	if err := MigrateBrowseIndexes(db); err != nil {
+		return err
+	}
+	if err := migrateBrowseAvailability(db); err != nil {
+		return err
+	}
+	if err := migrateBrowseCounts(db); err != nil {
+		return err
+	}
+	if err := migrateBrowseFormats(db); err != nil {
+		return err
+	}
 	return migrateBookDirectoryIndex(db)
 }
 

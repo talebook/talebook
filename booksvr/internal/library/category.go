@@ -2,6 +2,7 @@ package library
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 )
 
@@ -83,6 +84,26 @@ func GetCategories(db *sql.DB, category string) ([]Category, error) {
 		nameCol = "CAST(i." + spec.nameExpr + " AS TEXT)"
 	}
 
+	var indexed int
+	if err := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='book_browse_counts'").Scan(&indexed); err != nil {
+		return nil, err
+	}
+	if indexed > 0 {
+		rows, err := db.Query(fmt.Sprintf("SELECT i.id,%s,COALESCE(c.n,0) FROM %s i LEFT JOIN book_browse_counts c ON c.kind=? AND c.item=CAST(i.id AS TEXT) ORDER BY 2", nameCol, spec.itemTable), category)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		out := []Category{}
+		for rows.Next() {
+			var c Category
+			if err = rows.Scan(&c.ID, &c.Name, &c.Count); err != nil {
+				return nil, err
+			}
+			out = append(out, c)
+		}
+		return out, rows.Err()
+	}
 	rows, err := db.Query(fmt.Sprintf(`
 		SELECT i.id, %s AS name, COUNT(DISTINCT l.book) AS cnt
 		FROM %s i
@@ -164,4 +185,42 @@ func GetItemNameMap(db *sql.DB, category string) (map[int64]string, error) {
 		return nil, fmt.Errorf("library: 遍历分类名映射失败: %w", err)
 	}
 	return out, nil
+}
+
+// CountAuthorBooks deduplicates aliases in SQLite without returning all IDs.
+func CountAuthorBooks(db *sql.DB, names []string) (int64, error) {
+	raw, _ := json.Marshal(names)
+	var n int64
+	err := db.QueryRow(`SELECT COUNT(DISTINCT l.book) FROM books_authors_link l JOIN authors a ON a.id=l.author WHERE a.name IN (SELECT value FROM json_each(?))`, string(raw)).Scan(&n)
+	return n, err
+}
+
+// CountAuthorGroups deduplicates all multi-name groups in one indexed query.
+type categoryQuerier interface {
+	Query(string, ...any) (*sql.Rows, error)
+}
+
+func CountAuthorGroups(db *sql.DB, groups map[string][]string) (map[string]int64, error) {
+	return countAuthorGroups(db, groups)
+}
+func countAuthorGroups(db categoryQuerier, groups map[string][]string) (map[string]int64, error) {
+	out := map[string]int64{}
+	if len(groups) == 0 {
+		return out, nil
+	}
+	raw, _ := json.Marshal(groups)
+	rows, err := db.Query(`SELECT g.key,COUNT(DISTINCT l.book) FROM json_each(?) g JOIN json_each(g.value) n JOIN authors a ON a.name=n.value JOIN books_authors_link l ON l.author=a.id GROUP BY g.key`, string(raw))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var n int64
+		if err = rows.Scan(&key, &n); err != nil {
+			return nil, err
+		}
+		out[key] = n
+	}
+	return out, rows.Err()
 }

@@ -37,6 +37,8 @@ type BookConfig struct {
 	PrivateBookIDs func(ctx *Context) (map[int64]bool, error)
 	// Search 执行 Calibre 全文检索，返回匹配的书籍 id。
 	Search func(ctx *Context, keyword string) ([]int64, error)
+	// BrowsePage performs SQL filtering and paging in the production wiring.
+	BrowsePage func(ctx *Context, q library.BrowseQuery) ([]int64, int, error)
 	// SearchField 按字段检索（publisher/author/tag）。
 	SearchField func(ctx *Context, field, value string) ([]int64, error)
 	// AliasBookIDs 返回书名别名命中的书籍 id。
@@ -46,7 +48,8 @@ type BookConfig struct {
 	// BooksForCategory 返回某分类项下的书籍 id。
 	BooksForCategory func(ctx *Context, category, name string) ([]int64, error)
 	// BookTitle 返回书名（用于搜索相关性排序）。
-	BookTitle func(bookID int64) string
+	BookTitle  func(bookID int64) string
+	BookTitles func(ids []int64) (map[int64]string, error)
 	// HotBooks 返回热度榜单的书籍 id（已按下载量降序）。
 	HotBooks func(ctx *Context, start, delta int) ([]int64, int, error)
 	// NavTags 返回全部标签及计数。
@@ -219,6 +222,10 @@ func bookReadingStateAPI(s *userdb.ReadingState) map[string]any {
 
 // bookDict 组装书籍字典（对齐 utils.BookFormatter 的 JSON 输出）。
 func bookDict(cfg BookConfig, b library.BookData) map[string]any {
+	return bookDictWithItem(cfg, b, bookItemFields(cfg, b.ID))
+}
+
+func bookDictWithItem(cfg BookConfig, b library.BookData, item bookItem) map[string]any {
 	formats := map[string]any{}
 	for _, f := range b.Formats {
 		formats["fmt_"+strings.ToLower(f)] = true
@@ -226,7 +233,6 @@ func bookDict(cfg BookConfig, b library.BookData) map[string]any {
 
 	// 基础字段集与 Python 的 SimpleBookFormatter.format 对齐（22 个），
 	// 复用 compat.go 的 Formatter，避免两处各写一份而漂移。
-	item := bookItemFields(cfg, b.ID)
 	f := &Formatter{
 		Book: Book{
 			ID:               b.ID,
@@ -295,6 +301,14 @@ func bookItemFields(cfg BookConfig, bookID int64) bookItem {
 	}
 	item, err := userdb.GetItem(cfg.DB, bookID)
 	if err != nil || item == nil {
+		return out
+	}
+	return bookItemFromRow(item)
+}
+
+func bookItemFromRow(item *userdb.Item) bookItem {
+	out := bookItem{scope: "public", mediaType: MediaTypeUnknown}
+	if item == nil {
 		return out
 	}
 	if item.Scope != "" {
@@ -424,10 +438,14 @@ func bookRenderResolvedPage(cfg BookConfig, ctx *Context, page []int64, title st
 	if err != nil {
 		return nil, err
 	}
+	items, err := userdb.ListCardItems(cfg.DB, page)
+	if err != nil {
+		return nil, err
+	}
 	values := make([]map[string]any, 0, len(page))
 	for _, id := range page {
 		if b, ok := booksMap[id]; ok {
-			values = append(values, bookDict(cfg, b))
+			values = append(values, bookDictWithItem(cfg, b, bookItemFromRow(items[id])))
 		}
 	}
 	if sortByID {
@@ -729,6 +747,9 @@ func BookNavHandler(cfg BookConfig) HandlerFunc {
 // BookRecentHandler 实现 /api/recent。
 func BookRecentHandler(cfg BookConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		if cfg.BrowsePage != nil {
+			return bookBrowsePage(cfg, ctx, library.BrowseQuery{}, "新书推荐")
+		}
 		ids, err := bookAllVisibleIDs(cfg, ctx)
 		if err != nil {
 			return nil, err
@@ -742,6 +763,9 @@ func BookRecentHandler(cfg BookConfig) HandlerFunc {
 // BookLibraryHandler 实现 /api/library。
 func BookLibraryHandler(cfg BookConfig) HandlerFunc {
 	return func(ctx *Context) (map[string]any, error) {
+		if cfg.BrowsePage != nil {
+			return bookBrowsePage(cfg, ctx, library.BrowseQuery{Format: ctx.Query("format"), Filters: map[string]string{"publisher": ctx.Query("publisher"), "author": ctx.Query("author"), "tag": ctx.Query("tag")}}, "书库")
+		}
 		ids, err := bookAllVisibleIDs(cfg, ctx)
 		if err != nil {
 			return nil, err
@@ -847,7 +871,15 @@ func BookSearchHandler(cfg BookConfig) HandlerFunc {
 		for id := range idSet {
 			ids = append(ids, id)
 		}
-		ids = bookSortByTitleRelevance(cfg, ids, name, titleAliasIDs)
+		sortCfg := cfg
+		if cfg.BookTitles != nil {
+			titles, e := cfg.BookTitles(ids)
+			if e != nil {
+				return nil, e
+			}
+			sortCfg.BookTitle = func(id int64) string { return titles[id] }
+		}
+		ids = bookSortByTitleRelevance(sortCfg, ids, name, titleAliasIDs)
 		return bookRenderList(cfg, ctx, ids, fmt.Sprintf("搜索：%s", name), false)
 	}
 }
@@ -857,14 +889,20 @@ func bookSortByTitleRelevance(cfg BookConfig, ids []int64, keyword string, title
 	keyword = strings.ToLower(strings.TrimSpace(keyword))
 	out := make([]int64, len(ids))
 	copy(out, ids)
+	keys := make(map[int64][2]int64, len(ids))
+	for _, id := range ids {
+		if _, ok := keys[id]; !ok {
+			keys[id] = bookRelevanceKey(cfg, id, keyword, titleAliasIDs)
+		}
+	}
 	sort.SliceStable(out, func(i, j int) bool {
-		ki := bookRelevanceKey(cfg, out[i], keyword, titleAliasIDs)
-		kj := bookRelevanceKey(cfg, out[j], keyword, titleAliasIDs)
+		ki, kj := keys[out[i]], keys[out[j]]
 		if ki[0] != kj[0] {
 			return ki[0] < kj[0]
 		}
 		return ki[1] < kj[1]
 	})
+
 	return out
 }
 
@@ -1117,4 +1155,21 @@ func bookGetOne(cfg BookConfig, bookID int64) (*library.BookData, error) {
 		return nil, nil
 	}
 	return &books[0], nil
+}
+
+func bookBrowsePage(cfg BookConfig, ctx *Context, q library.BrowseQuery, title string) (map[string]any, error) {
+	var err error
+	if cfg.PrivateBookIDs != nil {
+		q.Excluded, err = cfg.PrivateBookIDs(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+	q.Start = bookArgumentStart(ctx)
+	q.Size = bookPageDelta(ctx, bookMaxPageSize(cfg))
+	ids, total, err := cfg.BrowsePage(ctx, q)
+	if err != nil {
+		return nil, err
+	}
+	return bookRenderResolvedPage(cfg, ctx, ids, title, total, true)
 }

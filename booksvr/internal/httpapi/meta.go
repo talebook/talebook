@@ -119,6 +119,57 @@ func MetaListHandler(cfg MetaConfig) HandlerFunc {
 			title = "未知"
 		}
 
+		// Small legacy fixtures retain the compatibility path. Production
+		// author lists merge only normalized groups into an indexed SQL page.
+		projectedAuthors := false
+		if meta == "author" {
+			var indexed int
+			if e := cfg.DB.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='book_browse_counts'").Scan(&indexed); e != nil {
+				return nil, e
+			}
+			projectedAuthors = indexed > 0
+		}
+		if meta != "author" || projectedAuthors {
+			var cats []library.Category
+			var total, unfiltered int
+			var paginated bool
+			var e error
+			if projectedAuthors {
+				mapping, err := userdb.NewAliasService(cfg.userDB()).AuthorMapping()
+				if err != nil {
+					return nil, err
+				}
+				cats, total, unfiltered, paginated, e = library.AuthorCategoryPage(ctx.Request.Context(), cfg.DB, mapping, userdb.NormalizeAlias, query, page, pageSize, pageArg != "" || sizeArg != "")
+			} else {
+				cats, total, unfiltered, paginated, e = library.CategoryPage(ctx.Request.Context(), cfg.DB, metaCategory(meta), query, page, pageSize, pageArg != "" || sizeArg != "")
+			}
+
+			if e != nil {
+				return nil, e
+			}
+			items := make([]map[string]any, 0, len(cats))
+			for _, v := range cats {
+				var id any = v.ID
+				if meta == "format" {
+					id = v.Name
+				}
+				items = append(items, map[string]any{"id": id, "name": v.Name, "count": v.Count})
+			}
+			pages := 1
+			effectiveSize := pageSize
+			if paginated {
+				pages = (total + pageSize - 1) / pageSize
+				if pages < 1 {
+					pages = 1
+				}
+			} else {
+				effectiveSize = total
+				if effectiveSize < 1 {
+					effectiveSize = 1
+				}
+			}
+			return map[string]any{"err": "ok", "meta": meta, "title": title, "items": items, "total": total, "unfiltered_total": unfiltered, "page": page, "page_size": effectiveSize, "pages": pages, "paginated": paginated}, nil
+		}
 		var items []map[string]any
 		var err error
 		if meta == "format" {
@@ -176,6 +227,9 @@ func MetaListHandler(cfg MetaConfig) HandlerFunc {
 				pages = 1
 			}
 			start := (page - 1) * pageSize
+			if page > int(^uint(0)>>1)/pageSize {
+				start = total
+			}
 			if start > total {
 				start = total
 			}
@@ -294,20 +348,26 @@ func metaGroupAuthors(cfg MetaConfig, items []map[string]any) ([]map[string]any,
 		g.members = append(g.members, name)
 	}
 
+	multi := map[string][]string{}
+	for _, key := range order {
+		if len(grouped[key].members) > 1 {
+			multi[key] = grouped[key].members
+		}
+	}
+	counts, err := library.CountAuthorGroups(cfg.DB, multi)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]map[string]any, 0, len(order))
 	for _, key := range order {
 		g := grouped[key]
 		count := g.count
-		// 多个成员合并时，计数改为去重后的实际书籍数。
 		if len(g.members) > 1 {
-			ids, err := metaAuthorBookIDs(cfg.DB, g.members)
-			if err != nil {
-				return nil, err
-			}
-			count = int64(len(ids))
+			count = counts[key]
 		}
 		out = append(out, map[string]any{"id": g.id, "name": g.name, "count": count})
 	}
+
 	return out, nil
 }
 
@@ -347,38 +407,37 @@ func MetaBooksHandler(cfg MetaConfig) HandlerFunc {
 		}
 		title = strings.ReplaceAll(title, "%(name)s", name)
 
-		var ids []int64
-		var err error
+		q := library.BrowseQuery{RatingSort: true}
 		var authorGroup *userdb.AuthorGroup
-
-		switch {
-		case meta == "format":
-			ids, err = metaFormatBookIDs(cfg.DB, name)
-		case meta == "author":
-			svc := userdb.NewAliasService(cfg.userDB())
-			authorGroup, err = svc.GetAuthorGroup(name)
+		if meta == "format" {
+			q.Format = name
+			q.FormatFilter = true
+		} else if meta == "author" {
+			var err error
+			authorGroup, err = userdb.NewAliasService(cfg.userDB()).GetAuthorGroup(name)
 			if err != nil {
 				return nil, err
 			}
 			title = strings.ReplaceAll(metaBooksTitles["author"], "%(name)s", authorGroup.Canonical)
-			idSet, err := metaAuthorBookIDs(cfg.DB, authorGroup.Names)
-			if err != nil {
-				return nil, err
+			q.Category = "authors"
+			q.Names = authorGroup.Names
+		} else {
+			q.Category = metaCategory(meta)
+			q.Names = []string{name}
+			if meta == "rating" {
+				v, e := strconv.ParseInt(strings.TrimSpace(name), 10, 64)
+				if e != nil {
+					q.Names = []string{}
+				} else {
+					q.Names = []string{strconv.FormatInt(v, 10)}
+				}
 			}
-			ids = sortedInt64Keys(idSet)
-		case meta == "rating":
-			ids, err = metaRatingBookIDs(cfg.DB, name)
-		default:
-			ids, err = metaCategoryBookIDs(cfg.DB, meta, name)
 		}
+		rsp, err := metaRenderQuery(ctx, cfg, q, title)
 		if err != nil {
 			return nil, err
 		}
 
-		rsp, err := metaRenderBookIDs(ctx, cfg, ids, title)
-		if err != nil {
-			return nil, err
-		}
 		if meta == "author" && authorGroup != nil {
 			rsp["canonical_author"] = authorGroup.Canonical
 			rsp["author_aliases"] = authorGroup.Aliases
@@ -439,10 +498,14 @@ func metaLoadBooks(cfg MetaConfig, ids []int64) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	items, err := userdb.ListCardItems(cfg.Book.DB, ids)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]map[string]any, 0, len(data))
 	for _, b := range data {
 		if cfg.Book.DB != nil {
-			out = append(out, bookDict(cfg.Book, b))
+			out = append(out, bookDictWithItem(cfg.Book, b, bookItemFromRow(items[b.ID])))
 			continue
 		}
 		out = append(out, bookDataToDict(b))

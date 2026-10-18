@@ -516,3 +516,28 @@ func TestSortedInt64(t *testing.T) {
 		t.Errorf("got = %v", got)
 	}
 }
+
+func TestExternalFormatReplacementFiresCounterTriggers(t *testing.T) {
+	db := extDB(t)
+	extBook(t, db, 1, "Book")
+	for _, stmt := range []string{`CREATE TABLE counter(n INTEGER)`, `INSERT INTO counter VALUES(0)`, `CREATE TRIGGER counter_add AFTER INSERT ON data BEGIN UPDATE counter SET n=n+1; END`, `CREATE TRIGGER counter_del AFTER DELETE ON data BEGIN UPDATE counter SET n=n-1; END`} {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	file := filepath.Join(t.TempDir(), "book.epub")
+	if err := os.WriteFile(file, []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		if err := setExternalFormatRecord(db, 1, file, "EPUB"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n, rows int
+	db.QueryRow(`SELECT n FROM counter`).Scan(&n)
+	db.QueryRow(`SELECT count(*) FROM data WHERE book=1`).Scan(&rows)
+	if n != 1 || rows != 1 {
+		t.Fatalf("counter %d rows %d", n, rows)
+	}
+}

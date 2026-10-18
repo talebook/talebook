@@ -678,6 +678,25 @@ func UnavailableSourceBooks(db *sql.DB) (map[int64]bool, error) {
 	if db == nil {
 		return out, nil
 	}
+	var indexed int
+	if err := db.QueryRow("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='book_unavailable_sources'").Scan(&indexed); err != nil {
+		return nil, err
+	}
+	if indexed > 0 {
+		rows, err := db.Query("SELECT book_id FROM book_unavailable_sources")
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id int64
+			if err = rows.Scan(&id); err != nil {
+				return nil, err
+			}
+			out[id] = true
+		}
+		return out, rows.Err()
+	}
 	var exists int
 	if err := db.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type='table' AND name='source_sync_formats'`).Scan(&exists); err != nil {
 		return nil, err

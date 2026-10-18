@@ -126,7 +126,7 @@ func missingSourceFormats(db *sql.DB, ph string, args []any) (map[int64]map[stri
 	if exists == 0 {
 		return out, nil
 	}
-	rows, err := db.Query(fmt.Sprintf(`SELECT f.book_id,UPPER(f.format) FROM book_formats f JOIN source_sync_formats s ON s.format_id=f.id WHERE s.missing=1 AND f.book_id IN (%s)`, ph), args...)
+	rows, err := db.Query(fmt.Sprintf(`SELECT f.book_id,UPPER(f.format) FROM book_formats f CROSS JOIN source_sync_formats s ON s.format_id=f.id WHERE f.book_id IN (%s) AND s.missing=1`, ph), args...)
 	if err != nil {
 		return nil, err
 	}

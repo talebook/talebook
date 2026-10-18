@@ -1,6 +1,7 @@
 package library
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strconv"
@@ -452,4 +453,88 @@ func fullText(value string) (string, []any, error) {
 		OR b.id IN (SELECT l.book FROM books_tags_link l JOIN tags t ON t.id = l.tag WHERE t.name LIKE ?)
 	)`
 	return sqlText, []any{like, like, like}, nil
+}
+
+// SearchPage uses the existing query grammar but returns only a requested page.
+// A negative size preserves the administrative export-all contract.
+func SearchPage(ctx context.Context, db *sql.DB, query string, start, size int, descending bool) ([]int64, int, error) {
+	cond := "1=1"
+	args := []any{}
+	if strings.TrimSpace(query) != "" {
+		tokens, err := lex(strings.TrimSpace(query))
+		if err != nil {
+			return nil, 0, err
+		}
+		p := &parser{tokens: tokens}
+		node, err := p.parseExpr()
+		if err != nil {
+			return nil, 0, err
+		}
+		if p.pos != len(p.tokens) {
+			return nil, 0, fmt.Errorf("library: 查询语法错误：有多余内容")
+		}
+		cond, args, err = node.toSQL()
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+	tx, err := db.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, 0, err
+	}
+	defer tx.Rollback()
+	var total int
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM books b WHERE "+cond, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	order := "ASC"
+	if descending {
+		order = "DESC"
+	}
+	stmt := "SELECT b.id FROM books b WHERE " + cond + " ORDER BY b.id " + order
+	if size >= 0 {
+		stmt += " LIMIT ? OFFSET ?"
+		args = append(args, size, start)
+	}
+	rows, err := tx.QueryContext(ctx, stmt, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	ids := []int64{}
+	for rows.Next() {
+		var id int64
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, 0, err
+		}
+		ids = append(ids, id)
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, 0, err
+	}
+	if err = tx.Commit(); err != nil {
+		return nil, 0, err
+	}
+	return ids, total, nil
+}
+
+// BookTitles reads only titles and IDs; no per-comparison database accesses.
+func BookTitles(db *sql.DB, ids []int64) (map[int64]string, error) {
+	rows, err := db.Query("SELECT id,title FROM books WHERE id IN (SELECT value FROM json_each(?))", jsonIDs(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64]string{}
+	for rows.Next() {
+		var id int64
+		var title string
+		if err = rows.Scan(&id, &title); err != nil {
+			return nil, err
+		}
+		out[id] = title
+	}
+	return out, rows.Err()
 }

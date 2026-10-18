@@ -774,31 +774,20 @@ func AdminBookListHandler(cfg AdminConfig) HandlerFunc {
 		desc := ctx.Query("desc") == "true"
 		search := ctx.Query("search")
 
-		ids, err := library.Search(cfg.LibraryDB, search)
+		size := num
+		if all {
+			size = -1
+		}
+		start := 0
+		if !all {
+			start = page * num
+			if page > int(^uint(0)>>1)/num {
+				start = int(^uint(0) >> 1)
+			}
+		}
+		pageIDs, total, err := library.SearchPage(ctx.Request.Context(), cfg.LibraryDB, search, start, size, sortBy == "id" && desc)
 		if err != nil {
 			return nil, err
-		}
-		total := len(ids)
-		if sortBy == "id" {
-			sort.Slice(ids, func(i, j int) bool {
-				if desc {
-					return ids[i] > ids[j]
-				}
-				return ids[i] < ids[j]
-			})
-		}
-
-		pageIDs := ids
-		if !all {
-			start := page * num
-			if start > total {
-				start = total
-			}
-			end := start + num
-			if end > total {
-				end = total
-			}
-			pageIDs = ids[start:end]
 		}
 
 		books, err := library.GetBooksData(cfg.LibraryDB, pageIDs)

@@ -344,7 +344,12 @@ func setExternalFormatRecord(db *sql.DB, bookID int64, fpath, format string) err
 		bookID, format, info.Size(), name); err != nil {
 		return fmt.Errorf("userdb: 写入格式记录失败: %w", err)
 	}
-	if _, err := tx.Exec(`INSERT OR REPLACE INTO data (book, format, uncompressed_size, name) VALUES (?, ?, ?, ?)`,
+	// Explicit replacement fires ordinary delete/insert triggers even when
+	// SQLite recursive_triggers is disabled (the default).
+	if _, err := tx.Exec(`DELETE FROM data WHERE book=? AND format=?`, bookID, format); err != nil {
+		return fmt.Errorf("userdb: 清理 data 格式失败: %w", err)
+	}
+	if _, err := tx.Exec(`INSERT INTO data (book, format, uncompressed_size, name) VALUES (?, ?, ?, ?)`,
 		bookID, format, info.Size(), name); err != nil {
 		return fmt.Errorf("userdb: 写入 data 记录失败: %w", err)
 	}

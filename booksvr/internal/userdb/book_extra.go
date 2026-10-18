@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -14,17 +13,13 @@ func ListReadingStates(db *sql.DB, readerID int64, bookIDs []int64) (map[int64]*
 	if len(bookIDs) == 0 {
 		return out, nil
 	}
-	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(bookIDs)), ",")
-	args := make([]any, 0, len(bookIDs)+1)
-	args = append(args, readerID)
-	for _, id := range bookIDs {
-		args = append(args, id)
-	}
+	raw, _ := json.Marshal(bookIDs)
+	args := []any{readerID, string(raw)}
 	rows, err := db.Query(`SELECT book_id, reader_id, COALESCE(favorite,0), COALESCE(favorite_date,''),
 		COALESCE(wants,0), COALESCE(wants_date,''), COALESCE(read_state,0), COALESCE(read_date,''),
 		COALESCE(online_read,0), COALESCE(download,0), COALESCE(progress,'{}'),
 		COALESCE(progress_update_time,'')
-		FROM reading_state WHERE reader_id = ? AND book_id IN (`+placeholders+`)`, args...)
+		FROM reading_state WHERE reader_id = ? AND book_id IN (SELECT value FROM json_each(?))`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("userdb: 查询 reading_state 失败: %w", err)
 	}
@@ -264,4 +259,28 @@ func SetItemScope(db *sql.DB, bookID int64, scope string) error {
 func SetItemMediaType(db *sql.DB, bookID int64, mediaType string) error {
 	_, err := db.Exec(`UPDATE items SET media_type = ? WHERE book_id = ?`, mediaType, bookID)
 	return err
+}
+
+// ListCardItems reads display fields for a page with one bound JSON parameter.
+func ListCardItems(db *sql.DB, ids []int64) (map[int64]*Item, error) {
+	out := map[int64]*Item{}
+	if len(ids) == 0 || db == nil {
+		return out, nil
+	}
+	raw, _ := json.Marshal(ids)
+	rows, err := db.Query(`SELECT book_id,COALESCE(scope,'public'),collector_id,COALESCE(count_visit,0),COALESCE(count_download,0),COALESCE(media_type,'unknown'),COALESCE(media_type_locked,0) FROM items WHERE book_id IN (SELECT value FROM json_each(?))`, string(raw))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		v := &Item{}
+		var locked int64
+		if err = rows.Scan(&v.BookID, &v.Scope, &v.CollectorID, &v.CountVisit, &v.CountDownload, &v.MediaType, &locked); err != nil {
+			return nil, err
+		}
+		v.MediaTypeLocked = locked != 0
+		out[v.BookID] = v
+	}
+	return out, rows.Err()
 }
