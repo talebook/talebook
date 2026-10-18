@@ -187,7 +187,7 @@
             <template v-else>
                 <v-btn
                     class="px-xs-1 login-btn mr-4"
-                    to="/login"
+                    @click="mainStore.openLoginPrompt()"
                     color="#304ffe"
                     variant="elevated"
                 >

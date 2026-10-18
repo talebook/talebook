@@ -1,6 +1,8 @@
 import { withBasePath } from '@/utils/base-path';
 import { useMainStore } from '@/stores/main';
 
+const LOGIN_PROMPT_EXEMPT_PATHS = ['/login', '/signup'];
+
 export default defineNuxtPlugin((nuxtApp) => {
   // Capture request-scoped values while the plugin still has Nuxt context.
   const backendConfig = useRuntimeConfig();
@@ -11,6 +13,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   const activeRedirects = new Map();
 
   nuxtApp.$router.afterEach((to) => {
+    store.releaseLoginRequirement(to.path);
     for (const [targetPath, reached] of activeRedirects) {
       if (to.path === targetPath) {
         activeRedirects.set(targetPath, true);
@@ -60,7 +63,10 @@ export default defineNuxtPlugin((nuxtApp) => {
       next = next ? '?next=' + next : '';
       await redirectOnce('/welcome' + next);
     } else if (data.err === 'user.need_login') {
-      await redirectOnce('/login');
+      // 在当前页面上弹出登录浮窗，登录后页面原地重新加载；登录/注册页自身不再叠加浮窗。
+      if (!LOGIN_PROMPT_EXEMPT_PATHS.includes(currentRoute().path)) {
+        store.openLoginPrompt();
+      }
     } else if (data.err === 'exception') {
       store.setAlert({ type: 'error', msg: data.msg, to: null });
     }
