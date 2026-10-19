@@ -252,7 +252,7 @@ function buildPayload() {
 
 async function loadOptions() {
     try {
-        const rsp = await $backend(bookToolUrl(PLUGIN_KEY));
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'describe'), { method: 'POST', body: '{}' });
         if (rsp.err === 'ok') {
             const options = rsp.options || {};
             presets.value = options.presets || [];

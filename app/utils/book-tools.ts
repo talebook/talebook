@@ -6,10 +6,14 @@ export function confirmDestructiveBookWrite(
     return !isOverwrite || confirmAction(message);
 }
 
-export type BookToolAction = 'preview' | 'run';
+export type BookToolAction = 'describe' | 'preview' | 'run';
 
-/** 所有书籍工具共用按插件 ID 分发的统一接口：/plugins/<plugin_key>/tool[/preview|/run]。 */
-export function bookToolUrl(pluginKey: string, action?: BookToolAction) {
-    const base = `/plugins/${encodeURIComponent(pluginKey)}/tool`;
-    return action ? `${base}/${action}` : base;
+/** 插件能力的统一调用入口：POST /plugins/<plugin_key>/exec/<action>。 */
+export function pluginExecUrl(pluginKey: string, action: string) {
+    return `/plugins/${encodeURIComponent(pluginKey)}/exec/${encodeURIComponent(action)}`;
+}
+
+/** 书籍工具的三个平台动作：tool.describe、tool.preview、tool.run，均为 POST。 */
+export function bookToolUrl(pluginKey: string, action: BookToolAction) {
+    return pluginExecUrl(pluginKey, `tool.${action}`);
 }

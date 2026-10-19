@@ -391,13 +391,13 @@ class TransformProvider(Protocol):
     def apply(self, src: ToolInput, out_dir: str, context) -> ToolOutput: ...
 ```
 
-内置工具继承 `webserver/plugins/tool/base.py` 的 `TextTransformPlugin` 即可获得上述默认实现。所有书籍工具共用三条按插件 ID 分发的接口，**新增工具不新增 Handler 或路由**：
+内置工具继承 `webserver/plugins/tool/base.py` 的 `TextTransformPlugin` 即可获得上述默认实现。所有书籍工具都通过能力调用入口 `POST /api/plugins/<plugin_key>/exec/<action>` 使用（见 7.3），**新增工具不新增 Handler 或路由**：
 
-| 方法 | 路径 | 说明 |
+| 动作 | 权限 | 请求体与说明 |
 |---|---|---|
-| GET | `/api/plugins/<plugin_key>/tool` | 描述：`formats`、`output_modes`、`options`（即 `describe()`） |
-| POST | `/api/plugins/<plugin_key>/tool/preview` | 读者可用，只读；请求体 `{"book_id", "params"}` |
-| POST | `/api/plugins/<plugin_key>/tool/run` | 仅管理员；请求体 `{"book_id", "output_mode", "suffix", "params"}`，留下 PluginRun 审计 |
+| `tool.describe` | 登录 | `{}`；返回 `formats`、`output_modes`、`options`（即 `describe()`） |
+| `tool.preview` | 读者可用，只读 | `{"book_id", "params"}` |
+| `tool.run` | 仅管理员 | `{"book_id", "output_mode", "suffix", "params"}`，留下 PluginRun 审计 |
 
 平台负责书籍可见性校验、按 `input_formats` 挑选文件、临时目录、写回原书的备份与回滚、另存为新书和审计；插件只处理 `params` 中自己认识的字段。
 
@@ -425,7 +425,7 @@ class ExtraFeatureProvider(Protocol):
     def execute_feature(self, action, params, context) -> dict: ...
 ```
 
-这是受控逃生舱，只用于尚未形成稳定标准接口、且确实属于复杂综合服务的额外能力。使用时必须在 `extra_features` 中为每个 action 声明：
+这是受控逃生舱，只用于尚未形成稳定标准接口、且确实属于复杂综合服务的额外能力。调用方式是 `POST /api/plugins/<plugin_key>/exec/<action>`，`action` 不带点号，请求体 `{"params": {...}, "credentials": {...}}`。使用时必须在 `extra_features` 中为每个 action 声明：
 
 - `mode`：`read`、`write` 或 `sync`；
 - 参数 `schema`；
@@ -559,7 +559,23 @@ enabled installation
 
 ### 7.3 通用 API 与专用 API
 
-通用插件 API 适合 definition、activation、connection、run 和 manifest 这类平台对象。按 Capability 形成稳定契约的操作（例如书籍工具的 `/api/plugins/<plugin_key>/tool*`）一律走按插件 ID 分发的通用接口；尚未标准化的额外能力走 `/api/plugins/<plugin_key>/features/<action>` 逃生舱。不要为单个插件注册专属路由。
+插件 API 只有两类，都不认识具体插件：
+
+- **资源接口**：definition、activation、connection、run、preferences 这类平台对象，按 REST 资源组织，例如 `/api/admin/plugins/connections/<id>/state`、`/api/plugins/runs/<id>`。
+- **能力调用**：`POST /api/plugins/<plugin_key>/exec/<action>` 是对单个插件发起能力调用的唯一入口。插件参数统一放在 `params`，`book_id`、`output_mode`、`suffix`、`credentials` 等平台字段在顶层。
+
+`action` 分两种：
+
+| action | 能力 | 权限 |
+|---|---|---|
+| `tool.describe` / `tool.preview` | 书籍工具 | 登录 / 书籍可见 |
+| `tool.run` | 书籍工具 | 管理员 |
+| `metadata.search` | `metadata.lookup`，`params` 为 MetadataQuery 字段 | 管理员 |
+| `source.search` | `sources.search`，`params.query` 为关键词 | 管理员 |
+| `review.lookup` | `reviews.lookup`，`params` 为 isbn、title 等 | 管理员 |
+| 不带点号的名字 | `extra_features` 中声明的额外功能 | 登录，并受声明的 scope 约束 |
+
+带点号但不在上表的动作返回 `plugin.action_not_supported`。新增一个标准能力的调用方式，是在 `webserver/handlers/plugin_exec.py` 的 `EXEC_ACTIONS` 里登记一个动作，而不是注册新路由；不要为单个插件注册专属路由。
 
 不要为了一个插件新建只属于它的顶层 Handler 文件，再让公共 Handler 硬编码转发。优先将协议实现收进具体插件目录，由稳定的服务层或路由装配调用。
 

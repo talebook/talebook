@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bookToolUrl, confirmDestructiveBookWrite } from '@/utils/book-tools';
+import { bookToolUrl, confirmDestructiveBookWrite, pluginExecUrl } from '@/utils/book-tools';
 
 describe('confirmDestructiveBookWrite', () => {
     it('does not interrupt save-as-new operations', () => {
@@ -18,9 +18,16 @@ describe('confirmDestructiveBookWrite', () => {
 });
 
 describe('bookToolUrl', () => {
-    it('routes every tool through the unified plugin tool endpoint', () => {
-        expect(bookToolUrl('talebook.tool.epub-beautify')).toBe('/plugins/talebook.tool.epub-beautify/tool');
-        expect(bookToolUrl('talebook.tool.text-replace', 'preview')).toBe('/plugins/talebook.tool.text-replace/tool/preview');
-        expect(bookToolUrl('talebook.tool.zh-converter', 'run')).toBe('/plugins/talebook.tool.zh-converter/tool/run');
+    it('routes every tool through the plugin exec endpoint', () => {
+        expect(bookToolUrl('talebook.tool.epub-beautify', 'describe')).toBe('/plugins/talebook.tool.epub-beautify/exec/tool.describe');
+        expect(bookToolUrl('talebook.tool.text-replace', 'preview')).toBe('/plugins/talebook.tool.text-replace/exec/tool.preview');
+        expect(bookToolUrl('talebook.tool.zh-converter', 'run')).toBe('/plugins/talebook.tool.zh-converter/exec/tool.run');
+    });
+});
+
+describe('pluginExecUrl', () => {
+    it('builds the single capability endpoint for any plugin and action', () => {
+        expect(pluginExecUrl('talebook.meta.douban', 'metadata.search')).toBe('/plugins/talebook.meta.douban/exec/metadata.search');
+        expect(pluginExecUrl('talebook.combo.weread', 'search')).toBe('/plugins/talebook.combo.weread/exec/search');
     });
 });

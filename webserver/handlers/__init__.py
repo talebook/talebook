@@ -19,6 +19,7 @@ def routes():
         network_comic,
         network_library,
         opds,
+        plugin_exec,
         plugins,
         scan,
         theme,
@@ -41,6 +42,7 @@ def routes():
     routes += network_comic.routes()
     routes += audiobook.routes()
     routes += plugins.routes()
+    routes += plugin_exec.routes()
     captcha_routes = captcha.routes()
     routes += captcha_routes
     logging.info("CAPTCHA routes registered: %s", [r[0] for r in captcha_routes])

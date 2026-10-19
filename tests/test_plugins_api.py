@@ -385,9 +385,9 @@ class TestPluginsApi(TestWithAdminUser):
 
         with mock.patch.object(provider, "search_books", return_value=[candidate]) as search:
             data = self.json(
-                "/api/admin/plugins/%s/metadata/search" % plugin_key,
+                "/api/plugins/%s/exec/metadata.search" % plugin_key,
                 method="POST",
-                body=json.dumps({"query": {"title": "活着", "authors": ["余华"]}}),
+                body=json.dumps({"params": {"title": "活着", "authors": ["余华"]}}),
             )
 
         self.assertEqual(data["err"], "ok")
@@ -417,9 +417,9 @@ class TestPluginsApi(TestWithAdminUser):
 
         with mock.patch.object(provider, "search", return_value=page) as search:
             data = self.json(
-                "/api/admin/plugins/%s/source/search" % plugin_key,
+                "/api/plugins/%s/exec/source.search" % plugin_key,
                 method="POST",
-                body=json.dumps({"query": "Pride"}),
+                body=json.dumps({"params": {"query": "Pride"}}),
             )
 
         self.assertEqual(data["err"], "ok")
@@ -445,9 +445,9 @@ class TestPluginsApi(TestWithAdminUser):
 
         with mock.patch.object(provider, "get_reviews", return_value=page) as lookup:
             data = self.json(
-                "/api/admin/plugins/%s/reviews/lookup" % plugin_key,
+                "/api/plugins/%s/exec/review.lookup" % plugin_key,
                 method="POST",
-                body=json.dumps({"query": {"isbn": "9787506365437"}}),
+                body=json.dumps({"params": {"isbn": "9787506365437"}}),
             )
 
         self.assertEqual(data["err"], "ok")
@@ -459,9 +459,9 @@ class TestPluginsApi(TestWithAdminUser):
         plugin_key = "talebook.source.standard-ebooks"
         self._enable_plugin_for_test(plugin_key)
         data = self.json(
-            "/api/admin/plugins/%s/metadata/search" % plugin_key,
+            "/api/plugins/%s/exec/metadata.search" % plugin_key,
             method="POST",
-            body=json.dumps({"query": {"title": "Pride"}}),
+            body=json.dumps({"params": {"title": "Pride"}}),
         )
         self.assertEqual(data["err"], "plugin.capability_not_supported")
 
@@ -613,7 +613,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         gateway.return_value = {"results": []}
 
         data = self.json(
-            "/api/plugins/talebook.combo.weread/features/search",
+            "/api/plugins/talebook.combo.weread/exec/search",
             method="POST",
             body=json.dumps(
                 {
@@ -630,14 +630,14 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
 
     def test_extra_feature_rejects_undeclared_action_and_unknown_params(self):
         unsupported = self.json(
-            "/api/plugins/talebook.combo.weread/features/delete_account",
+            "/api/plugins/talebook.combo.weread/exec/delete_account",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {}}),
         )
         self.assertEqual(unsupported["err"], "plugin.feature_not_supported")
 
         invalid = self.json(
-            "/api/plugins/talebook.combo.weread/features/statistics",
+            "/api/plugins/talebook.combo.weread/exec/statistics",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"surprise": True}}),
         )
@@ -653,7 +653,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         }
 
         data = self.json(
-            "/api/plugins/talebook.combo.weread/features/search",
+            "/api/plugins/talebook.combo.weread/exec/search",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"keyword": "活着"}}),
         )
@@ -679,7 +679,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
         ):
             gateway.side_effect = error
             data = self.json(
-                "/api/plugins/talebook.combo.weread/features/notebooks",
+                "/api/plugins/talebook.combo.weread/exec/notebooks",
                 method="POST",
                 body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"count": 1}}),
             )
@@ -692,7 +692,7 @@ class TestWereadIntegrationApi(OrdinaryUserMixin, TestWithUserLogin):
     @mock.patch.object(WereadProvider, "_gateway", return_value={"results": []})
     def test_generic_import_preview_reuses_saved_connection_without_api_key(self, gateway, fetch_all, _settings, _async_mode):
         connected = self.json(
-            "/api/plugins/talebook.combo.weread/features/search",
+            "/api/plugins/talebook.combo.weread/exec/search",
             method="POST",
             body=json.dumps({"credentials": {"api_key": self.api_key}, "params": {"keyword": "活着"}}),
         )
@@ -787,7 +787,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
     def test_weread_no_longer_rejected_by_generic_action_endpoint(self, mocked):
         with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
             self.json(
-                "/api/plugins/talebook.combo.weread/features/shelf",
+                "/api/plugins/talebook.combo.weread/exec/shelf",
                 method="POST",
                 body=json.dumps({"credentials": {"api_key": "unit-test-key"}, "params": {}}),
             )
@@ -809,7 +809,7 @@ class TestGenericActionInputData(OrdinaryUserMixin, TestWithUserLogin):
     def test_client_supplied_allowed_book_ids_is_discarded(self, mocked):
         with mock.patch.object(WereadProvider, "_gateway", return_value={"books": []}):
             self.json(
-                "/api/plugins/talebook.combo.weread/features/shelf",
+                "/api/plugins/talebook.combo.weread/exec/shelf",
                 method="POST",
                 body=json.dumps({"credentials": {"api_key": "unit-test-key"}, "params": {}}),
             )

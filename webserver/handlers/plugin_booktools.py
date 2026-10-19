@@ -1,7 +1,7 @@
 """书籍工具（integrations.tool）的统一 HTTP 编排。
 
-所有书籍工具共用 ``/api/plugins/<plugin_key>/tool``、``/tool/preview``、``/tool/run``
-三条路由，本模块按 plugin_key 分发，只负责书籍定位、权限校验、临时文件编排、写回入库
+所有书籍工具共用 ``/api/plugins/<plugin_key>/exec/tool.describe``、``tool.preview``、``tool.run``
+三个 exec 动作（见 handlers/plugin_exec.py），本模块提供动作实现，只负责书籍定位、权限校验、临时文件编排、写回入库
 与审计；取哪种格式、接受哪些参数、允许的写回方式、新书后缀与元数据同步都由
 provider 按 ``TransformProvider`` 契约自述（内置工具见 ``webserver/plugins/tool/base.py``）。新增工具只需在
 ``webserver/plugins/register.py`` 注册 provider，不再新增 handler 或路由。
@@ -210,145 +210,131 @@ def _sync_book_meta(db, book_id, updates):
         logging.warning("[booktools] Failed to update metadata for book_id=%d: %s", book_id, err)
 
 
-class BookTool(BaseHandler):
-    """书籍工具描述：支持格式、写回方式与插件自述的选项（预设、方向等）。"""
-
-    @js
-    @auth
-    def get(self, plugin_key):
-        try:
-            _runtime, _connection, provider = _tool_runtime(self, plugin_key)
-            return {
-                "err": "ok",
-                "plugin_key": plugin_key,
-                "name": provider.manifest["name"],
-                "formats": list(provider.input_formats),
-                "output_modes": list(provider.output_modes),
-                "options": provider.describe(),
-            }
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
+def tool_describe(handler, plugin_key):
+    """exec 动作 tool.describe：支持格式、写回方式与插件自述的选项（预设、方向等）。"""
+    try:
+        _runtime, _connection, provider = _tool_runtime(handler, plugin_key)
+        return {
+            "err": "ok",
+            "plugin_key": plugin_key,
+            "name": provider.manifest["name"],
+            "formats": list(provider.input_formats),
+            "output_modes": list(provider.output_modes),
+            "options": provider.describe(),
+        }
+    except (BookToolsError, RuntimeError) as exc:
+        return _tool_error(exc)
 
 
-class BookToolPreview(BaseHandler):
-    """只读预览：读者可用，但只能处理自己可见的书。"""
-
-    @js
-    @auth
-    def post(self, plugin_key):
-        req = _body(self)
-        try:
-            book_id = _tool_book_id(req)
-            params = _tool_params(req)
-            runtime, connection, provider = _tool_runtime(self, plugin_key)
-            book, fmt, src = _tool_source(self, provider, book_id)
-            result = runtime.read(
-                connection,
-                "preview",
-                _tool_input(provider, params, book, fmt, src),
-                required_scopes=("books.read",),
-                requested_by=self.user_id(),
-                timeout=provider.preview_timeout,
-            ).to_dict()
-            result["err"] = "ok"
-            result["book_id"] = book_id
-            return result
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
+def tool_preview(handler, plugin_key):
+    """exec 动作 tool.preview：只读预览，读者可用，但只能处理自己可见的书。"""
+    req = _body(handler)
+    try:
+        book_id = _tool_book_id(req)
+        params = _tool_params(req)
+        runtime, connection, provider = _tool_runtime(handler, plugin_key)
+        book, fmt, src = _tool_source(handler, provider, book_id)
+        result = runtime.read(
+            connection,
+            "preview",
+            _tool_input(provider, params, book, fmt, src),
+            required_scopes=("books.read",),
+            requested_by=handler.user_id(),
+            timeout=provider.preview_timeout,
+        ).to_dict()
+        result["err"] = "ok"
+        result["book_id"] = book_id
+        return result
+    except (BookToolsError, RuntimeError) as exc:
+        return _tool_error(exc)
 
 
-class BookToolRun(BaseHandler):
-    """执行并写回书库：另存为新书或覆盖原书格式（可回滚），统一留下 PluginRun 审计。"""
+def tool_run(handler, plugin_key):
+    """exec 动作 tool.run（仅管理员）：另存为新书或覆盖原书格式（可回滚），统一留下 PluginRun 审计。"""
+    req = _body(handler)
+    work_dir = None
+    try:
+        book_id = _tool_book_id(req)
+        params = _tool_params(req)
+        runtime, connection, provider = _tool_runtime(handler, plugin_key)
+        output_mode = req.get("output_mode") or "new"
+        if output_mode not in provider.output_modes:
+            raise BookToolsError("参数错误：output_mode 必须为 %s" % " 或 ".join(provider.output_modes))
+        book, fmt, src = _tool_source(handler, provider, book_id)
+        title = book.get("title") or "Unknown"
+        tool_input = _tool_input(provider, params, book, fmt, src)
+        work_dir = _tool_workdir()
+        rollback_state = {}
 
-    @js
-    @is_admin
-    def post(self, plugin_key):
-        req = _body(self)
-        work_dir = None
-        try:
-            book_id = _tool_book_id(req)
-            params = _tool_params(req)
-            runtime, connection, provider = _tool_runtime(self, plugin_key)
-            output_mode = req.get("output_mode") or "new"
-            if output_mode not in provider.output_modes:
-                raise BookToolsError("参数错误：output_mode 必须为 %s" % " 或 ".join(provider.output_modes))
-            book, fmt, src = _tool_source(self, provider, book_id)
-            title = book.get("title") or "Unknown"
-            tool_input = _tool_input(provider, params, book, fmt, src)
-            work_dir = _tool_workdir()
-            rollback_state = {}
-
-            def finalize(output):
-                value = output.to_dict()
-                updates = provider.book_updates(value)
-                rsp = {"err": "ok", **value, "output_mode": output_mode}
-                if output_mode == "overwrite":
-                    rollback_state["backup_path"] = overwrite_format(
-                        self.db,
-                        book_id,
-                        fmt,
-                        value["path"],
-                        backup_dir=_tool_backup_dir(),
-                        backup_state=rollback_state,
-                    )
-                    _sync_book_meta(self.db, book_id, updates)
-                    rsp["book_id"] = book_id
-                else:
-                    suffix = str(req.get("suffix") or "").strip() or provider.new_book_title_suffix(value)
-                    rsp["book_id"] = import_as_new_book(
-                        self.db,
-                        self.session,
-                        book_id,
-                        value["path"],
-                        title_suffix=suffix,
-                        language=updates.get("language"),
-                        title_override=updates.get("title"),
-                        authors_override=updates.get("authors"),
-                        collector_id=self.user_id(),
-                    )
-                rsp["backup_path"] = rollback_state.get("backup_path") or ""
-                return rsp
-
-            rsp = runtime.write(
-                connection,
-                "apply",
-                tool_input,
-                work_dir,
-                required_scopes=("books.write",),
-                requested_by=self.user_id(),
-                timeout=provider.apply_timeout,
-                finalize=finalize,
-                rollback=lambda: _restore_backup(self.db, book_id, fmt, rollback_state),
-                audit_data={
-                    **provider.audit_fields(tool_input.to_dict()),
-                    "book_id": book_id,
-                    "format": fmt,
-                    "output_mode": output_mode,
-                },
-            )
-            logging.info(
-                "[booktools] %s done: %s book=%s mode=%s result_book=%s [uid:%s]",
-                plugin_key,
-                fmt,
-                title,
-                output_mode,
-                rsp.get("book_id"),
-                self.user_id(),
-            )
+        def finalize(output):
+            value = output.to_dict()
+            updates = provider.book_updates(value)
+            rsp = {"err": "ok", **value, "output_mode": output_mode}
+            if output_mode == "overwrite":
+                rollback_state["backup_path"] = overwrite_format(
+                    handler.db,
+                    book_id,
+                    fmt,
+                    value["path"],
+                    backup_dir=_tool_backup_dir(),
+                    backup_state=rollback_state,
+                )
+                _sync_book_meta(handler.db, book_id, updates)
+                rsp["book_id"] = book_id
+            else:
+                suffix = str(req.get("suffix") or "").strip() or provider.new_book_title_suffix(value)
+                rsp["book_id"] = import_as_new_book(
+                    handler.db,
+                    handler.session,
+                    book_id,
+                    value["path"],
+                    title_suffix=suffix,
+                    language=updates.get("language"),
+                    title_override=updates.get("title"),
+                    authors_override=updates.get("authors"),
+                    collector_id=handler.user_id(),
+                )
+            rsp["backup_path"] = rollback_state.get("backup_path") or ""
             return rsp
-        except (BookToolsError, RuntimeError) as exc:
-            return _tool_error(exc)
-        finally:
-            if work_dir:
-                shutil.rmtree(work_dir, ignore_errors=True)
+
+        rsp = runtime.write(
+            connection,
+            "apply",
+            tool_input,
+            work_dir,
+            required_scopes=("books.write",),
+            requested_by=handler.user_id(),
+            timeout=provider.apply_timeout,
+            finalize=finalize,
+            rollback=lambda: _restore_backup(handler.db, book_id, fmt, rollback_state),
+            audit_data={
+                **provider.audit_fields(tool_input.to_dict()),
+                "book_id": book_id,
+                "format": fmt,
+                "output_mode": output_mode,
+            },
+        )
+        logging.info(
+            "[booktools] %s done: %s book=%s mode=%s result_book=%s [uid:%s]",
+            plugin_key,
+            fmt,
+            title,
+            output_mode,
+            rsp.get("book_id"),
+            handler.user_id(),
+        )
+        return rsp
+    except (BookToolsError, RuntimeError) as exc:
+        return _tool_error(exc)
+    finally:
+        if work_dir:
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 def routes():
-    # 所有书籍工具共用这三条按 plugin_key 分发的路由，新增工具只需注册 provider。
+    # 书籍工具本身的预览与执行走 /api/plugins/<plugin_key>/exec/tool.*（见 plugin_exec.py）；
+    # 这里只保留与具体工具无关的两个辅助接口。
     return [
         (r"/api/plugins/tools/book-actions", AdminBookToolActions),
         (r"/api/plugins/tools/books", UserBookToolsBooks),
-        (r"/api/plugins/([a-z0-9.-]+)/tool", BookTool),
-        (r"/api/plugins/([a-z0-9.-]+)/tool/preview", BookToolPreview),
-        (r"/api/plugins/([a-z0-9.-]+)/tool/run", BookToolRun),
     ]

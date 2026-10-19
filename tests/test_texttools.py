@@ -196,7 +196,7 @@ def test_tool_providers_declare_initial_enabled_state():
 
 
 # ---------------------------------------------------------------------------
-# HTTP 层测试：/api/plugins/tools/* 与统一书籍工具路由 /api/plugins/<plugin_key>/tool*
+# HTTP 层测试：/api/plugins/tools/* 与统一能力调用 /api/plugins/<plugin_key>/exec/tool.*
 #
 # 覆盖此前 review 发现的两个高危问题：
 # - zh-converter run 因缺少 DIRECTION_LABELS 导入而 NameError；
@@ -295,7 +295,7 @@ class TestTextReplacePreview(TestApp):
     def test_preview_ok(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-            d = self.json("/api/plugins/talebook.tool.text-replace/tool/preview", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.preview", method="POST", body=body)
             self.assertEqual(d["err"], "ok")
             self.assertEqual(d["book_id"], BID_TXT)
 
@@ -303,21 +303,21 @@ class TestTextReplacePreview(TestApp):
         with temporary_book_scope(BID_TXT, "private", collector_id=1):
             with mock.patch.object(BaseHandler, "user_id", return_value=2):
                 body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-                d = self.json("/api/plugins/talebook.tool.text-replace/tool/preview", method="POST", body=body)
+                d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.preview", method="POST", body=body)
                 self.assertEqual(d["err"], "booktools.failed")
 
     def test_preview_allows_owner_on_private_book(self):
         with temporary_book_scope(BID_TXT, "private", collector_id=1):
             with mock.patch.object(BaseHandler, "user_id", return_value=1):
                 body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-                d = self.json("/api/plugins/talebook.tool.text-replace/tool/preview", method="POST", body=body)
+                d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.preview", method="POST", body=body)
                 self.assertEqual(d["err"], "ok")
 
     def test_preview_allows_admin_on_other_users_private_book(self):
         with temporary_book_scope(BID_TXT, "private", collector_id=2):
             with mock.patch.object(BaseHandler, "user_id", return_value=1):
                 body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-                d = self.json("/api/plugins/talebook.tool.text-replace/tool/preview", method="POST", body=body)
+                d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.preview", method="POST", body=body)
                 self.assertEqual(d["err"], "ok")
 
 
@@ -325,7 +325,7 @@ class TestTxtFixerAnalyze(TestApp):
     def test_analyze_ok(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT})
-            d = self.json("/api/plugins/talebook.tool.txt-fixer/tool/preview", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.txt-fixer/exec/tool.preview", method="POST", body=body)
             self.assertEqual(d["err"], "ok")
             self.assertEqual(d["book_id"], BID_TXT)
 
@@ -333,7 +333,7 @@ class TestTxtFixerAnalyze(TestApp):
         with temporary_book_scope(BID_TXT, "private", collector_id=1):
             with mock.patch.object(BaseHandler, "user_id", return_value=2):
                 body = json.dumps({"book_id": BID_TXT})
-                d = self.json("/api/plugins/talebook.tool.txt-fixer/tool/preview", method="POST", body=body)
+                d = self.json("/api/plugins/talebook.tool.txt-fixer/exec/tool.preview", method="POST", body=body)
                 self.assertEqual(d["err"], "booktools.failed")
 
 
@@ -341,7 +341,7 @@ class TestTextReplaceRun(TestApp):
     def test_run_requires_admin(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=2):
             body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-            d = self.json("/api/plugins/talebook.tool.text-replace/tool/run", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.run", method="POST", body=body)
             self.assertEqual(d["err"], "permission.not_admin")
 
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
@@ -349,7 +349,7 @@ class TestTextReplaceRun(TestApp):
         m_import.return_value = 9001
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-            d = self.json("/api/plugins/talebook.tool.text-replace/tool/run", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.run", method="POST", body=body)
             self.assertEqual(d["err"], "ok")
             self.assertEqual(d["book_id"], 9001)
             self.assertTrue(m_import.called)
@@ -363,7 +363,7 @@ class TestTxtFixerRun(TestApp):
         m_import.return_value = 9002
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT})
-            d = self.json("/api/plugins/talebook.tool.txt-fixer/tool/run", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.txt-fixer/exec/tool.run", method="POST", body=body)
             self.assertEqual(d["err"], "ok")
             self.assertEqual(d["book_id"], 9002)
             self.assertTrue(m_import.called)
@@ -375,7 +375,7 @@ class TestZhConverterRun(TestApp):
     def test_run_requires_admin(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=2):
             body = json.dumps({"book_id": BID_TXT, "params": {"direction": "t2s"}})
-            d = self.json("/api/plugins/talebook.tool.zh-converter/tool/run", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.zh-converter/exec/tool.run", method="POST", body=body)
             self.assertEqual(d["err"], "permission.not_admin")
 
     @mock.patch("webserver.handlers.plugin_booktools.import_as_new_book")
@@ -385,7 +385,7 @@ class TestZhConverterRun(TestApp):
         m_import.return_value = 9003
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT, "output_mode": "new", "params": {"direction": "t2s"}})
-            d = self.json("/api/plugins/talebook.tool.zh-converter/tool/run", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.zh-converter/exec/tool.run", method="POST", body=body)
             self.assertEqual(d["err"], "ok")
             self.assertEqual(d["book_id"], 9003)
             self.assertEqual(d["direction_label"], "繁体→简体")
@@ -417,7 +417,7 @@ class TestBookToolAuditTrail(TestApp):
 
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-            d = self.json("/api/plugins/talebook.tool.text-replace/tool/run", method="POST", body=body)
+            d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.run", method="POST", body=body)
         self.assertEqual(d["err"], "ok")
 
         runs = self._runs_for("talebook.tool.text-replace")
@@ -437,7 +437,7 @@ class TestBookToolAuditTrail(TestApp):
 
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             body = json.dumps({"book_id": BID_TXT, "params": {"pattern": "a", "replacement": "b", "use_regex": False}})
-            self.json("/api/plugins/talebook.tool.text-replace/tool/run", method="POST", body=body)
+            self.json("/api/plugins/talebook.tool.text-replace/exec/tool.run", method="POST", body=body)
 
         runs = self._runs_for("talebook.tool.text-replace")
         self.assertEqual(len(runs), before + 1)
@@ -453,7 +453,7 @@ class TestBookToolAuditTrail(TestApp):
         before = len(self._runs_for("talebook.tool.txt-fixer"))
 
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
-            d = self.json("/api/plugins/talebook.tool.txt-fixer/tool/run", method="POST", body=json.dumps({"book_id": BID_TXT}))
+            d = self.json("/api/plugins/talebook.tool.txt-fixer/exec/tool.run", method="POST", body=json.dumps({"book_id": BID_TXT}))
         self.assertEqual(d["err"], "ok")
 
         runs = self._runs_for("talebook.tool.txt-fixer")
@@ -465,7 +465,7 @@ class TestBookToolAuditTrail(TestApp):
 class TestEpubBeautifyPresets(TestApp):
     def test_presets_ok(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
-            d = self.json("/api/plugins/talebook.tool.epub-beautify/tool")
+            d = self.json("/api/plugins/talebook.tool.epub-beautify/exec/tool.describe", method="POST", body="{}")
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["output_modes"], ["new"])
         self.assertEqual(len(d["options"]["presets"]), 12)
@@ -476,7 +476,7 @@ class TestEpubBeautifyPreview(TestApp):
     def test_preview_ok(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.epub-beautify/tool/preview",
+                "/api/plugins/talebook.tool.epub-beautify/exec/tool.preview",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB}),
             )
@@ -488,7 +488,7 @@ class TestEpubBeautifyPreview(TestApp):
         with temporary_book_scope(BID_EPUB, "private", collector_id=1):
             with mock.patch.object(BaseHandler, "user_id", return_value=2):
                 d = self.json(
-                    "/api/plugins/talebook.tool.epub-beautify/tool/preview",
+                    "/api/plugins/talebook.tool.epub-beautify/exec/tool.preview",
                     method="POST",
                     body=json.dumps({"book_id": BID_EPUB}),
                 )
@@ -499,7 +499,7 @@ class TestEpubBeautifyRun(TestApp):
     def test_run_requires_admin(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=2):
             d = self.json(
-                "/api/plugins/talebook.tool.epub-beautify/tool/run",
+                "/api/plugins/talebook.tool.epub-beautify/exec/tool.run",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB, "params": {"preset": "classic", "toc_style": "elegant"}}),
             )
@@ -517,7 +517,7 @@ class TestEpubBeautifyRun(TestApp):
         m_import.return_value = 9201
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.epub-beautify/tool/run",
+                "/api/plugins/talebook.tool.epub-beautify/exec/tool.run",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB, "params": {"preset": "classic", "toc_style": "elegant"}}),
             )
@@ -532,7 +532,7 @@ class TestEpubBeautifyRun(TestApp):
     def test_run_rejects_invalid_preset(self, m_beautify):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.epub-beautify/tool/run",
+                "/api/plugins/talebook.tool.epub-beautify/exec/tool.run",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB, "params": {"preset": "does-not-exist", "toc_style": "elegant"}}),
             )
@@ -541,21 +541,46 @@ class TestEpubBeautifyRun(TestApp):
 
 
 class TestUnifiedBookToolRoutes(TestApp):
-    """所有书籍工具共用按 plugin_key 分发的三条路由，新增工具不再注册专属接口。"""
+    """所有书籍工具共用 /api/plugins/<plugin_key>/exec/tool.* 调用，新增工具不再注册专属接口。"""
 
-    def test_routes_do_not_name_any_tool(self):
-        from webserver.handlers.plugin_booktools import routes
+    def test_routes_do_not_name_any_plugin(self):
+        from webserver.handlers import routes
+        from webserver.services.plugin_runtime import REGISTRY
 
-        patterns = [pattern for pattern, _handler in routes()]
-        for provider in TOOL_PROVIDERS:
+        patterns = [route[0] for route in routes() if "/plugins" in route[0]]
+        for provider in REGISTRY.providers():
             short_name = provider.manifest["id"].rsplit(".", 1)[-1]
             for pattern in patterns:
-                self.assertNotIn(short_name, pattern)
-        self.assertIn(r"/api/plugins/([a-z0-9.-]+)/tool/run", patterns)
+                self.assertNotIn("/%s/" % short_name, pattern + "/")
+        self.assertIn(r"/api/plugins/([a-z0-9.-]+)/exec/([a-z0-9_.]+)", patterns)
+
+    def test_admin_only_action_rejects_reader(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=2):
+            for action in ("tool.run", "metadata.search", "source.search", "review.lookup"):
+                d = self.json(
+                    "/api/plugins/talebook.tool.text-replace/exec/%s" % action,
+                    method="POST",
+                    body=json.dumps({"book_id": BID_TXT, "params": {}}),
+                )
+                self.assertEqual(d["err"], "permission.not_admin", action)
+
+    def test_unknown_platform_action_is_rejected(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.delete", method="POST", body="{}")
+        self.assertEqual(d["err"], "plugin.action_not_supported")
+
+    def test_undotted_action_falls_back_to_extra_features(self):
+        with mock.patch.object(BaseHandler, "user_id", return_value=1):
+            d = self.json("/api/plugins/talebook.tool.text-replace/exec/statistics", method="POST", body="{}")
+        self.assertEqual(d["err"], "plugin.feature_not_supported")
+
+    def test_guest_is_rejected(self):
+        d = self.json("/api/plugins/talebook.tool.text-replace/exec/tool.describe", method="POST", body="{}")
+        self.assertNotEqual(d["err"], "ok")
 
     def test_descriptor_lists_formats_modes_and_options(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
-            d = self.json("/api/plugins/talebook.tool.zh-converter/tool")
+            d = self.json("/api/plugins/talebook.tool.zh-converter/exec/tool.describe", method="POST", body="{}")
         self.assertEqual(d["err"], "ok")
         self.assertEqual(d["plugin_key"], "talebook.tool.zh-converter")
         self.assertEqual(d["formats"], ["EPUB", "TXT"])
@@ -565,7 +590,7 @@ class TestUnifiedBookToolRoutes(TestApp):
     def test_unknown_plugin_is_rejected(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.not-exist/tool/preview",
+                "/api/plugins/talebook.tool.not-exist/exec/tool.preview",
                 method="POST",
                 body=json.dumps({"book_id": BID_TXT}),
             )
@@ -573,13 +598,13 @@ class TestUnifiedBookToolRoutes(TestApp):
 
     def test_non_tool_plugin_is_rejected(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
-            d = self.json("/api/plugins/talebook.annotation.brs/tool")
+            d = self.json("/api/plugins/talebook.annotation.brs/exec/tool.describe", method="POST", body="{}")
         self.assertEqual(d["err"], "booktools.failed")
 
     def test_params_must_be_an_object(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.text-replace/tool/preview",
+                "/api/plugins/talebook.tool.text-replace/exec/tool.preview",
                 method="POST",
                 body=json.dumps({"book_id": BID_TXT, "params": ["a"]}),
             )
@@ -588,7 +613,7 @@ class TestUnifiedBookToolRoutes(TestApp):
     def test_book_without_supported_format_is_rejected(self):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.txt-fixer/tool/preview",
+                "/api/plugins/talebook.tool.txt-fixer/exec/tool.preview",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB}),
             )
@@ -599,7 +624,7 @@ class TestUnifiedBookToolRoutes(TestApp):
     def test_output_mode_is_limited_to_provider_declaration(self, m_beautify):
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.epub-beautify/tool/run",
+                "/api/plugins/talebook.tool.epub-beautify/exec/tool.run",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB, "output_mode": "overwrite", "params": {"preset": "classic"}}),
             )
@@ -612,7 +637,7 @@ class TestUnifiedBookToolRoutes(TestApp):
         m_import.return_value = 9301
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.zh-converter/tool/run",
+                "/api/plugins/talebook.tool.zh-converter/exec/tool.run",
                 method="POST",
                 body=json.dumps({"book_id": BID_EPUB, "params": {"direction": "s2t", "convert_title": True}}),
             )
@@ -631,7 +656,7 @@ class TestUnifiedBookToolRoutes(TestApp):
         m_overwrite.return_value = "/tmp/backup.txt"
         with mock.patch.object(BaseHandler, "user_id", return_value=1):
             d = self.json(
-                "/api/plugins/talebook.tool.zh-converter/tool/run",
+                "/api/plugins/talebook.tool.zh-converter/exec/tool.run",
                 method="POST",
                 body=json.dumps({"book_id": BID_TXT, "output_mode": "overwrite", "params": {"direction": "t2s"}}),
             )

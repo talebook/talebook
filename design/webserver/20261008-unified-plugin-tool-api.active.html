@@ -199,13 +199,13 @@
     <div class="page">
       <!-- REQUIRED：标题、摘要和顶部元信息。tags 可增删，不固定字段数量。 -->
       <header class="hero">
-        <h1>书籍工具改为按插件 ID 分发的统一接口</h1>
-        <p class="sub">四个书籍工具各自在 handler 里注册专属路由，每加一个工具就要新增 handler 类和接口。本方案把它们收敛为 <code>/api/plugins/&lt;plugin_key&gt;/tool</code>、<code>/tool/preview</code>、<code>/tool/run</code> 三条通用路由，工具差异全部由插件自述。</p>
+        <h1>插件能力调用统一为 /api/plugins/&lt;key&gt;/exec/&lt;action&gt;</h1>
+        <p class="sub">书籍工具、管理端能力测试和额外功能原先各有一套按插件或按能力命名的路由，每加一个工具或能力就要新增 handler 与接口。本方案把所有“对某个插件做一件事”的调用收敛到唯一入口 <code>POST /api/plugins/&lt;plugin_key&gt;/exec/&lt;action&gt;</code>，其余插件接口按平台资源组织，路由表里不出现任何插件名。</p>
         <div class="chips" aria-label="方案元信息">
           <span class="chip active">状态：ACTIVE</span>
           <span class="chip">创建日期：2026-10-08</span>
           <span class="chip">所属模块：webserver</span>
-          <span class="chip">影响范围：webserver/handlers/plugin_booktools.py、webserver/plugins/tool/、app/pages/plugins/、spec/插件/</span>
+          <span class="chip">影响范围：webserver/handlers/、webserver/plugins/tool/、app/pages/plugins/、app/components/PluginCapabilityTester.vue、spec/插件/、document/PluginGuide.md</span>
           <span class="chip">需求来源：Rex 在项目对话中的原话</span>
         </div>
       </header>
@@ -215,14 +215,15 @@
           <section id="request" class="card">
             <h2>1. 原始诉求</h2>
             <div class="callout warn">“优化一下 talebook 项目的插件系统：当前每个插件都要修改handler暴露独立的api接口，这不合理，应该是有统一的restfull的api，不要每新增插件都新增api”</div>
-            <p>插件平台的连接、五种动作、运行记录和额外功能已经是按插件 ID 或连接 ID 分发的通用接口；真正“每个插件一套接口”的是书籍工具（<code>integrations.tool</code>）：正文查找替换、TXT 编码修复、繁简转换、EPUB 美化各自有 2 到 3 条专属路由和对应 handler 类，handler 里硬编码了每个工具的参数、格式优先级、写回方式和新书后缀。</p>
+            <div class="callout warn">反馈轮（2026-10-19）：“我还是希望用 /api/plugins/&lt;key&gt;/exec/&lt;action&gt; 这种模式，你重新再设计一下，梳理所有plugin接口”</div>
+            <p>第一轮只把书籍工具收敛为 <code>/api/plugins/&lt;key&gt;/tool[/preview|/run]</code>。反馈轮要求以 <code>exec/&lt;action&gt;</code> 作为统一调用形态，并把全部插件接口一起梳理，因此书籍工具、管理端能力测试和额外功能都迁到同一个入口。</p>
           </section>
 
           <section id="goals" class="card">
             <h2>2. 目标与边界</h2>
             <div class="grid">
-              <article class="choice recommended"><h3>目标</h3><ul><li>所有书籍工具共用三条按 plugin_key 分发的路由，路由表中不出现任何工具名。</li><li>handler 不认识具体工具：格式优先级、参数白名单、写回方式、新书后缀、元数据同步、超时、审计摘要都由 provider 自述。</li><li>新增书籍工具只需实现 <code>TransformProvider</code> 并在 <code>register.py</code> 注册，不改 handler、不加路由。</li><li>保持权限不变：预览要求登录且逐书校验可见性，执行仅管理员并留下 PluginRun 审计，覆盖写回可回滚。</li></ul></article>
-              <article class="choice"><h3>非目标</h3><ul><li>不改动平台既有通用接口（连接、五动作、运行记录、<code>/features/</code> 逃生舱、管理端按能力的测试接口）。</li><li>不改动网络书库与 Venera 漫画接口：它们按书源能力分发，属于书源领域，不是“每插件一套”。</li><li>不保留旧路由别名：前后端同仓同版本发布，保留别名等于保留“每插件一套接口”。</li><li>不改变工具页的界面与交互。</li></ul></article>
+              <article class="choice recommended"><h3>目标</h3><ul><li>插件接口只有两类：平台资源接口（目录、启停、连接、运行、偏好）和能力调用入口 <code>exec</code>。</li><li>对单个插件发起的所有调用走 <code>POST /api/plugins/&lt;key&gt;/exec/&lt;action&gt;</code>，路由表中不出现任何插件名。</li><li>handler 不认识具体工具：格式优先级、参数白名单、写回方式、新书后缀、元数据同步、超时、审计摘要都由 provider 自述。</li><li>新增插件只需实现能力协议并在 <code>register.py</code> 注册；新增一种标准能力调用只在动作表登记，不加路由。</li><li>权限不变：工具预览要求登录并逐书校验可见性，工具执行与三类能力测试仅管理员，额外功能受 manifest 声明约束。</li></ul></article>
+              <article class="choice"><h3>非目标</h3><ul><li>不改连接、五种动作、运行记录等资源接口：它们操作平台对象，按 REST 资源组织更合适。</li><li>不改网络书库 <code>/api/book-sources/*</code>、Legado 书源管理与验证码接口：按领域聚合多个书源，不是“对单个插件调用”。</li><li>不保留旧路由别名：前后端同仓同版本发布。</li><li>不改变工具页、插件中心测试面板和微信读书页的界面与交互。</li></ul></article>
             </div>
           </section>
 
@@ -232,10 +233,10 @@
               <table>
                 <thead><tr><th>观察</th><th>权威证据</th><th>结论</th></tr></thead>
                 <tbody>
-                  <tr><td>每个工具都有专属路由</td><td><code>plugin_booktools.py routes()</code>：text-replace/preview、run；txt-fixer/analyze、run；zh-converter/run；epub-beautify/presets、preview、run</td><td>新增工具必须新增 handler 与路由</td></tr>
-                  <tr><td>handler 硬编码工具差异</td><td><code>UserZhConverterRun</code> 内的方向、语言后缀与元数据同步；<code>_epub_beautify_input</code> 的 17 个字段</td><td>工具语义泄漏到 HTTP 层</td></tr>
-                  <tr><td>写回方式命名不一致</td><td>繁简转换用 <code>replace</code>，其余工具用 <code>overwrite</code></td><td>统一为 <code>new</code> / <code>overwrite</code>，由 provider 声明可用集合</td></tr>
-                  <tr><td>工具选择靠前端路由</td><td><code>_tool_runtime(handler, manage_route)</code> 用 <code>ui.manage_route</code> 反查 provider</td><td>改为直接用 plugin_key 定位已启用连接</td></tr>
+                  <tr><td>每个工具都有专属路由</td><td>原 <code>plugin_booktools.py routes()</code>：text-replace/preview、run；txt-fixer/analyze、run；zh-converter/run；epub-beautify/presets、preview、run</td><td>新增工具必须新增 handler 与路由</td></tr>
+                  <tr><td>handler 硬编码工具差异</td><td>原 <code>UserZhConverterRun</code> 的方向、语言后缀与元数据同步；<code>_epub_beautify_input</code> 的 17 个字段</td><td>工具语义泄漏到 HTTP 层</td></tr>
+                  <tr><td>按能力各开一条测试路由</td><td>原 <code>/api/admin/plugins/&lt;key&gt;/metadata/search</code>、<code>/source/search</code>、<code>/reviews/lookup</code>，请求体用 <code>query</code></td><td>每多一种可测试能力就多一条路由，参数字段名与其他调用不一致</td></tr>
+                  <tr><td>调用形态不统一</td><td>额外功能走 <code>/features/&lt;action&gt;</code>，工具走 <code>/tool/&lt;action&gt;</code>，能力测试挂在 <code>/api/admin/plugins/</code> 下</td><td>同一件事（对插件 X 执行 Y）有三种 URL</td></tr>
                 </tbody>
               </table>
             </div>
@@ -243,24 +244,50 @@
 
           <section id="design" class="card">
             <h2>5. 方案</h2>
-            <div class="callout good"><strong>方案结论：</strong>HTTP 层只保留平台职责（定位插件、校验书籍可见性、挑选输入文件、临时目录、备份与回滚、入库、审计），工具语义下沉到 <code>TransformProvider</code> 契约。所有工具经同一组路由按 plugin_key 分发；未知插件、非工具插件、未启用、无可用格式、写回方式不被允许都返回统一的 <code>booktools.failed</code>。</div>
+            <div class="callout good"><strong>方案结论：</strong><code>webserver/handlers/plugin_exec.py</code> 的 <code>PluginExec</code> 是唯一调用入口。带能力前缀的动作查动作表 <code>EXEC_ACTIONS</code>，由平台施加权限后交给对应实现；不带点号的动作交给 manifest <code>extra_features</code> 声明的额外功能；带点号但不在表中的动作返回 <code>plugin.action_not_supported</code>，不会误落到额外功能。</div>
 
-            <div class="flow" aria-label="核心处理流程">
-              <article class="step"><span class="label">Input</span><b>/api/plugins/&lt;key&gt;/tool/run</b><p>请求体 <code>{book_id, output_mode, suffix, params}</code></p></article>
-              <article class="step"><span class="label">Guard</span><b>定位与校验</b><p>已启用的 integrations.tool 连接；管理员；书籍可见；output_mode 属于 provider.output_modes</p></article>
-              <article class="step"><span class="label">Core</span><b>provider 自述</b><p>input_formats 挑文件，tool_input 白名单收敛 params，apply 生成结果</p></article>
-              <article class="step"><span class="label">Output</span><b>写回与审计</b><p>覆盖时备份并按 book_updates 同步元数据；另存时用 new_book_title_suffix 入库；PluginRun 记录 audit_fields</p></article>
+            <div class="flow" aria-label="exec 分发流程">
+              <article class="step"><span class="label">Input</span><b>POST …/exec/&lt;action&gt;</b><p>请求体 <code>{params, book_id?, output_mode?, suffix?, credentials?}</code></p></article>
+              <article class="step"><span class="label">Guard</span><b>登录 + 动作权限</b><p>动作表声明 admin_only 的动作要求管理员</p></article>
+              <article class="step"><span class="label">Dispatch</span><b>按动作名分发</b><p>平台动作查 EXEC_ACTIONS；无点号走 extra_features；其余拒绝</p></article>
+              <article class="step"><span class="label">Core</span><b>能力实现</b><p>实现内部按 plugin_key 定位已启用插件并校验其能力协议</p></article>
             </div>
 
-            <h3>接口</h3>
-            <div class="table-wrap" role="region" aria-label="接口" tabindex="0">
+            <h3>动作表</h3>
+            <div class="table-wrap" role="region" aria-label="exec 动作" tabindex="0">
               <table>
-                <thead><tr><th>方法</th><th>路径</th><th>权限</th><th>说明</th></tr></thead>
+                <thead><tr><th>action</th><th>能力 / 协议</th><th>权限</th><th>请求体</th><th>替代的旧路由</th></tr></thead>
                 <tbody>
-                  <tr><td>GET</td><td><code>/api/plugins/&lt;key&gt;/tool</code></td><td>登录</td><td>返回 <code>formats</code>、<code>output_modes</code>、<code>options</code>（provider.describe()）</td></tr>
-                  <tr><td>POST</td><td><code>/api/plugins/&lt;key&gt;/tool/preview</code></td><td>登录 + 书籍可见</td><td>只读预览，替代原 preview / analyze</td></tr>
-                  <tr><td>POST</td><td><code>/api/plugins/&lt;key&gt;/tool/run</code></td><td>管理员</td><td>执行并写回，替代原各工具 run</td></tr>
-                  <tr><td>GET</td><td><code>/api/plugins/tools/books</code>、<code>/book-actions</code></td><td>不变</td><td>本来就是工具无关的通用接口，保留</td></tr>
+                  <tr><td><code>tool.describe</code></td><td><code>integrations.tool</code> / TransformProvider</td><td>登录</td><td><code>{}</code></td><td><code>GET /api/plugins/&lt;key&gt;/tool</code>、epub-beautify/presets</td></tr>
+                  <tr><td><code>tool.preview</code></td><td>同上</td><td>登录 + 书籍可见</td><td><code>{book_id, params}</code></td><td><code>/tool/preview</code>、text-replace/preview、txt-fixer/analyze、epub-beautify/preview</td></tr>
+                  <tr><td><code>tool.run</code></td><td>同上</td><td>管理员，PluginRun 审计</td><td><code>{book_id, output_mode, suffix, params}</code></td><td><code>/tool/run</code> 与四个工具各自的 run</td></tr>
+                  <tr><td><code>metadata.search</code></td><td><code>metadata.lookup</code></td><td>管理员</td><td><code>{params: {title, authors, isbn, publisher}}</code></td><td><code>/api/admin/plugins/&lt;key&gt;/metadata/search</code></td></tr>
+                  <tr><td><code>source.search</code></td><td><code>sources.search</code></td><td>管理员</td><td><code>{params: {query}}</code></td><td><code>/api/admin/plugins/&lt;key&gt;/source/search</code></td></tr>
+                  <tr><td><code>review.lookup</code></td><td><code>reviews.lookup</code></td><td>管理员</td><td><code>{params: {isbn, title, …}}</code></td><td><code>/api/admin/plugins/&lt;key&gt;/reviews/lookup</code></td></tr>
+                  <tr><td>不带点号的名字，如 <code>search</code></td><td><code>extra_features</code> / ExtraFeatureProvider</td><td>登录 + 声明的 scope</td><td><code>{params, credentials?}</code></td><td><code>/api/plugins/&lt;key&gt;/features/&lt;action&gt;</code></td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>梳理后的全部插件接口</h3>
+            <div class="table-wrap" role="region" aria-label="全部插件接口" tabindex="0">
+              <table>
+                <thead><tr><th>类别</th><th>方法</th><th>路径</th><th>说明</th></tr></thead>
+                <tbody>
+                  <tr><td rowspan="8">管理端资源</td><td>GET</td><td><code>/api/admin/plugins</code></td><td>插件目录、安装与状态</td></tr>
+                  <tr><td>POST</td><td><code>/api/admin/plugins/install</code></td><td>物化内置插件</td></tr>
+                  <tr><td>POST</td><td><code>/api/admin/plugins/installations/&lt;id&gt;/state</code></td><td>启停</td></tr>
+                  <tr><td>GET / POST</td><td><code>/api/admin/plugins/connections</code></td><td>实例连接</td></tr>
+                  <tr><td>POST</td><td><code>/api/admin/plugins/connections/&lt;id&gt;/state</code>、<code>/(test|preview|run|retry|rollback)</code></td><td>实例连接启停与五种动作</td></tr>
+                  <tr><td>GET</td><td><code>/api/admin/plugins/runs</code>、<code>/runs/&lt;id&gt;</code></td><td>全站运行记录</td></tr>
+                  <tr><td>GET / POST</td><td><code>/api/admin/plugins/preferences</code></td><td>全局元数据行为与共享设备</td></tr>
+                  <tr><td>POST</td><td><code>/api/admin/plugins/opds-service</code></td><td>Talebook 对外 OPDS 开关</td></tr>
+                  <tr><td rowspan="4">读者资源</td><td>GET</td><td><code>/api/plugins</code>、<code>/api/plugins/&lt;key&gt;</code></td><td>可配置插件、单个插件详情</td></tr>
+                  <tr><td>GET / POST</td><td><code>/api/plugins/connections</code></td><td>个人连接</td></tr>
+                  <tr><td>POST</td><td><code>/api/plugins/connections/&lt;id&gt;/(test|preview|run|retry|rollback)</code></td><td>个人连接五种动作</td></tr>
+                  <tr><td>GET</td><td><code>/api/plugins/runs</code>、<code>/runs/&lt;id&gt;</code></td><td>个人运行记录</td></tr>
+                  <tr><td>能力调用</td><td>POST</td><td><code>/api/plugins/&lt;key&gt;/exec/&lt;action&gt;</code></td><td>见动作表</td></tr>
+                  <tr><td>工具辅助查询</td><td>GET</td><td><code>/api/plugins/tools/books</code>、<code>/api/plugins/tools/book-actions</code></td><td>跨插件聚合，不针对单个插件，保留为资源查询</td></tr>
                 </tbody>
               </table>
             </div>
@@ -270,27 +297,35 @@
               <table>
                 <thead><tr><th>决策点</th><th>选择</th><th>理由</th><th>放弃项</th></tr></thead>
                 <tbody>
-                  <tr><td>路由形态</td><td><code>/api/plugins/&lt;key&gt;/tool[/preview|/run]</code></td><td>与既有 <code>/api/plugins/&lt;key&gt;/features/&lt;action&gt;</code> 同构；单数名词，符合仓库 RESTful 约定</td><td><code>/api/book/&lt;id&gt;/tool/&lt;key&gt;</code>：描述接口与书无关，拆两处反而不统一</td></tr>
-                  <tr><td>参数位置</td><td>工具参数放 <code>params</code>，平台字段在顶层</td><td>与 <code>/features/</code> 一致；平台字段与插件字段不会撞名</td><td>扁平请求体：无法区分平台字段与插件字段</td></tr>
-                  <tr><td>工具差异归属</td><td>扩展 <code>TransformProvider</code> 协议，内置工具由 <code>TextTransformPlugin</code> 提供默认实现</td><td>契约校验在加载期就能发现缺失方法</td><td>在 handler 里按 plugin_key 分支</td></tr>
-                  <tr><td>兼容策略</td><td>删除旧路由，前端同步迁移</td><td>前后端同版本发布；保留别名与诉求相悖</td><td>旧路由转发：仍需为每个工具维护一条路由</td></tr>
-                  <tr><td>写回方式命名</td><td>统一 <code>new</code> / <code>overwrite</code></td><td>繁简转换的 <code>replace</code> 与其余工具语义相同</td><td>同时接受 replace：同一语义两个名字</td></tr>
+                  <tr><td>调用形态</td><td><code>/api/plugins/&lt;key&gt;/exec/&lt;action&gt;</code></td><td>用户指定；一个入口覆盖工具、能力测试与额外功能</td><td>第一轮的 <code>/tool[/action]</code>：只覆盖书籍工具，其余调用仍是另两种 URL</td></tr>
+                  <tr><td>动作命名</td><td>平台动作带能力前缀（<code>tool.run</code>），额外功能不带点号</td><td>两类动作命名空间不重叠，平台动作不可能被插件自定义名劫持</td><td>平铺命名：<code>run</code> 既可能是工具执行也可能是插件自有动作</td></tr>
+                  <tr><td>权限位置</td><td>动作表声明 <code>admin_only</code>，由 <code>PluginExec</code> 统一施加</td><td>同一路由下的不同动作需要不同权限，集中在一处便于审查</td><td>在每个实现里各自判断：容易遗漏</td></tr>
+                  <tr><td>describe 的方法</td><td>POST</td><td>exec 入口只接受 POST，语义是“对插件执行一个动作”</td><td>exec 同时接受 GET：同一路由两种语义，调用方要记住哪些动作能 GET</td></tr>
+                  <tr><td>参数位置</td><td>插件参数一律放 <code>params</code>，平台字段在顶层</td><td>能力测试原来用 <code>query</code>，现与工具、额外功能一致</td><td>保留 <code>query</code>：同一入口两种参数约定</td></tr>
+                  <tr><td>资源接口</td><td>保持 REST 资源形态，不并入 exec</td><td>连接、运行记录是平台对象，有列表、详情、状态，适合资源路由</td><td>全部塞进 exec：失去资源语义，列表与详情也要变成动作</td></tr>
+                  <tr><td>兼容策略</td><td>删除旧路由，前端同步迁移</td><td>前后端同版本发布；保留别名与诉求相悖</td><td>旧路由转发</td></tr>
                 </tbody>
               </table>
             </div>
 
-            <pre aria-label="示例请求"><code>POST /api/plugins/talebook.tool.zh-converter/tool/run
+            <pre aria-label="示例请求"><code>POST /api/plugins/talebook.tool.zh-converter/exec/tool.run
 {"book_id": 12, "output_mode": "overwrite",
- "params": {"direction": "t2s", "use_a5": true, "convert_title": true}}</code></pre>
+ "params": {"direction": "t2s", "use_a5": true, "convert_title": true}}
+
+POST /api/plugins/talebook.meta.douban/exec/metadata.search
+{"params": {"title": "活着", "authors": ["余华"]}}
+
+POST /api/plugins/talebook.combo.weread/exec/search
+{"params": {"keyword": "活着"}, "credentials": {"api_key": "…"}}</code></pre>
           </section>
 
           <section id="impact" class="card">
             <h2>6. 影响范围、风险与回滚</h2>
             <div class="grid">
-              <article class="choice recommended"><h3>影响范围</h3><p>后端：<code>webserver/handlers/plugin_booktools.py</code>、<code>webserver/plugins/runtime/interfaces.py</code>、<code>webserver/plugins/tool/</code> 四个 provider 与基类。前端：<code>app/pages/plugins/</code> 四个工具页、<code>app/utils/book-tools.ts</code>、mock server。文档：<code>spec/插件/插件平台.md</code>（新增「统一接口」规则与 7.2 接口）、<code>正文查找替换.md</code>、<code>TXT编码修复.md</code>、<code>繁简转换.md</code>、<code>EPUB美化.md</code>（7.2 接口），<code>document/PluginGuide.md</code>。</p></article>
-              <article class="choice"><h3>保持不变</h3><p>工具页界面与交互、权限模型、PluginRun 审计、覆盖写回的备份与回滚、数据库结构、插件 manifest 字段集合。</p></article>
+              <article class="choice recommended"><h3>影响范围</h3><p>后端：新增 <code>webserver/handlers/plugin_exec.py</code>；<code>plugin_booktools.py</code> 与 <code>plugins.py</code> 中的工具、能力测试、额外功能 handler 改为动作函数并删除对应路由；<code>webserver/plugins/runtime/interfaces.py</code> 扩展 <code>TransformProvider</code>；<code>webserver/plugins/tool/</code> 四个 provider 与基类。前端：<code>app/utils/book-tools.ts</code>（<code>pluginExecUrl</code>）、四个工具页、<code>PluginCapabilityTester.vue</code>、<code>pages/plugins/weread.vue</code>、mock server。spec：<code>spec/插件/插件平台.md</code>（5.8 统一接口与 7.2）、<code>元数据源.md</code>、<code>评价源.md</code>、<code>外部书库源.md</code>、<code>微信读书.md</code>、四篇书籍工具的 7.2。开发文档：<code>document/PluginGuide.md</code>。</p></article>
+              <article class="choice"><h3>保持不变</h3><p>页面界面与交互、权限模型、PluginRun 审计、覆盖写回的备份与回滚、数据库结构、manifest 字段集合、资源接口、网络书库接口。</p></article>
             </div>
-            <div class="callout danger"><strong>主要风险：</strong>外部脚本直接调用旧的 <code>/api/plugins/tools/&lt;tool&gt;/*</code> 会失效 → 发布说明列出新旧路由对照。繁简转换另存新书时现在也接受客户端 <code>suffix</code>，与其余工具一致；为空时仍按语言使用「（简体版）/（繁體版）」。</div>
+            <div class="callout danger"><strong>主要风险：</strong>外部脚本直接调用旧路由（<code>/api/plugins/tools/&lt;tool&gt;/*</code>、<code>/api/admin/plugins/&lt;key&gt;/metadata/search</code> 等、<code>/features/&lt;action&gt;</code>）会失效，能力测试的请求体字段从 <code>query</code> 改为 <code>params</code> → PR 与发布说明列出新旧对照。</div>
             <div class="callout"><strong>回滚：</strong>整体回退本次提交即可，无数据迁移与配置变更。</div>
           </section>
 
@@ -300,12 +335,12 @@
               <table>
                 <thead><tr><th>验证层</th><th>实际命令或页面</th><th>预期</th><th>结果</th></tr></thead>
                 <tbody>
-                  <tr><td>后端单元 / HTTP</td><td><code>pytest tests/test_texttools.py tests/test_epub_beautify_plugin.py tests/test_plugin_contract.py tests/test_check_spec.py</code>（<code>talebook/talebook-base</code> 容器）</td><td>原有用例迁到新路由后通过；新增 10 个用例覆盖路由不含工具名、描述、未知插件、非工具插件、params 类型、无可用格式、写回方式限制、新书后缀与语言、覆盖同步元数据</td><td>通过：111 passed</td></tr>
-                  <tr><td>后端全量</td><td><code>pytest tests</code></td><td>与本改动相关的用例全部通过</td><td>1939 passed；<code>test_application_upgrade.py</code>、<code>test_upgrade_release.py</code>、<code>test_audiobook_progress_v2.py</code> 共 8 failed + 36 errors，在基线提交上同样复现（容器拿不到 voicebook 依赖与升级源），与本改动无关；CI 中以完整环境复核</td></tr>
-                  <tr><td>前端单测</td><td><code>npx vitest run test/utils/book-tools.spec.ts</code></td><td><code>bookToolUrl</code> 生成统一路径</td><td>通过：3 passed</td></tr>
-                  <tr><td>E2E</td><td><code>npx playwright test test/e2e/plugins.spec.ts test/e2e/book-detail.spec.ts</code>（mock 校验预览请求必须携带 <code>params.pattern</code>）</td><td>工具页、书籍详情工具菜单与插件中心不回归</td><td>通过：50 passed</td></tr>
-                  <tr><td>实际渲染</td><td>Docker 后端 <code>talebook/talebook:latest</code> 挂载本分支 <code>webserver/</code>，Nuxt dev 连接 <code>http://127.0.0.1:8080</code>，Chromium 1280×900 浅色主题、zh-CN</td><td>正文查找替换预览命中 81 处并高亮；EPUB 美化经 <code>/tool</code> 加载 12 套预设并完成检测；繁简转换另存新书成功；页面布局与改动前一致</td><td>通过；curl 另验 TXT 编码修复对纯 EPUB 书返回明确错误、EPUB 美化写回原书被拒、运行记录为 succeeded</td></tr>
-                  <tr><td>界面审查</td><td><code>interface-review full</code>：当前分支相对 <code>master</code> 的全部变更（1 个提交 + 未提交的方案状态更新），展开到 4 个工具页与书籍详情工具菜单</td><td>无 HIGH / MEDIUM</td><td>通过：无 Introduced / Regression 问题。1 条 LOW · Pre-existing：繁简转换的「保留备份」勾选框后端从未读取（写回原书始终备份），本次不改界面，记为后续事项</td></tr>
+                  <tr><td>后端单元 / HTTP</td><td><code>pytest tests/test_plugin_capability_lookup.py tests/test_texttools.py tests/test_plugins_api.py</code>（<code>talebook/talebook-base</code> 容器）</td><td>工具、能力测试、额外功能用例迁到 exec 后通过；新增用例覆盖：全部插件路由不含插件名且含 exec 路由、四个管理员动作拒绝普通读者、未知带点动作返回 <code>plugin.action_not_supported</code>、不带点动作落到额外功能、游客被拒</td><td>通过：112 passed</td></tr>
+                  <tr><td>后端全量</td><td><code>pytest tests</code></td><td>与本改动相关的用例全部通过</td><td>2003 passed、40 skipped；首轮 1 个失败是 <code>test_extra_feature_dispatch_uses_declared_mode</code> 仍检查已删除的类名，已改为检查 <code>run_feature</code> 并复跑通过。其余 8 failed（<code>test_upgrade_release.py</code> 6 个、<code>test_audiobook_progress_v2.py</code> 2 个）在基线上同样复现，原因是容器拿不到 voicebook 依赖与发布工作流环境，与本改动无关；CI 以完整环境复核</td></tr>
+                  <tr><td>前端单测</td><td><code>npx vitest run test/utils/book-tools.spec.ts test/components</code></td><td><code>bookToolUrl</code>、<code>pluginExecUrl</code> 生成 exec 路径；组件不回归</td><td>通过：33 个文件、134 passed</td></tr>
+                  <tr><td>E2E</td><td><code>npx playwright test test/e2e/plugins.spec.ts test/e2e/book-detail.spec.ts test/e2e/weread-workbench.spec.ts test/e2e/weread-import.spec.ts</code>（mock server 只注册一条 <code>/api/plugins/:key/exec/:action</code>）</td><td>工具页、书籍详情工具菜单、插件中心、微信读书工作台不回归</td><td>51 passed、1 failed：<code>weread-import.spec.ts</code> 的“previews JSON…”在未改动的基线上同样失败（找不到书籍笔记页文案），与本改动无关</td></tr>
+                  <tr><td>实际渲染</td><td>Docker <code>talebook/talebook:latest</code> 挂载本分支 <code>webserver/</code>，真实书库；Nuxt dev 连接该后端，Chromium 1280×900 浅色主题、zh-CN</td><td>页面经 exec 正常工作，布局与改动前一致</td><td>通过：EPUB 美化经 <code>tool.describe</code> 加载 12 套预设；正文查找替换对《红楼梦》预览“宝玉”命中 269 处；插件中心 Standard Ebooks 能力测试发出 <code>source.search</code> 并正确展示上游错误（容器无法解析外部域名）；curl 验证繁简转换 <code>tool.run</code> 另存新书成功、未知动作与未声明额外功能被拒、旧路由不再可用</td></tr>
+                  <tr><td>界面审查</td><td><code>interface-review full</code>：当前分支相对 <code>master</code> 的全部变更（已提交的第一轮 + 本轮未提交变更），展开到 4 个工具页、书籍详情工具菜单、插件中心能力测试面板、微信读书工作台；未展开其他消费者</td><td>无 HIGH / MEDIUM</td><td>通过：本轮只改请求路径与请求体，没有新增或删除界面元素、文案、状态，无 Introduced / Regression 问题。沿用 1 条 LOW · Pre-existing：繁简转换「保留备份」勾选框后端从未读取</td></tr>
                   <tr><td>质量门禁</td><td><code>make lint-py</code>、<code>npm run lint</code>、<code>make check-spec</code>、<code>make check-design</code></td><td>全部通过</td><td>通过（<code>npm run lint</code> 0 errors，567 条均为既有 warning）</td></tr>
                 </tbody>
               </table>
@@ -315,8 +350,9 @@
           <section id="decisions" class="card">
             <h2>8. 决策记录</h2>
             <ol>
-              <li><strong>2026-10-08：</strong>需求未说明范围，默认只收敛“每插件一套接口”的书籍工具；平台其余接口已按插件 ID / 连接 ID / 能力分发，不在范围内。用户未参与 grill，以上默认值在 PR 中说明，可按反馈调整。</li>
-              <li><strong>2026-10-08：</strong>繁简转换页面上的「保留备份」勾选框此前后端就不读取（写回原书始终备份），本次维持界面不变，只是不再随请求发送。</li>
+              <li><strong>2026-10-08：</strong>需求未说明范围，第一轮默认只收敛“每插件一套接口”的书籍工具，采用 <code>/api/plugins/&lt;key&gt;/tool[/action]</code>。</li>
+              <li><strong>2026-10-08：</strong>繁简转换页面上的「保留备份」勾选框此前后端就不读取（写回原书始终备份），维持界面不变，只是不再随请求发送。</li>
+              <li><strong>2026-10-19：</strong>Rex 指定统一调用形态为 <code>/api/plugins/&lt;key&gt;/exec/&lt;action&gt;</code> 并要求梳理全部插件接口。本方案在同一份文档内迭代：工具的 <code>/tool*</code> 路由、三条管理端能力测试路由和 <code>/features/</code> 逃生舱全部并入 exec；资源接口与网络书库接口不在 exec 范围内（理由见关键决策）。</li>
             </ol>
           </section>
         </main>
