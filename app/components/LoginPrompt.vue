@@ -3,6 +3,7 @@
         :model-value="store.loginPrompt.show"
         persistent
         max-width="440"
+        scrim="background"
         class="login-prompt"
         data-testid="login-prompt"
         @keydown.esc="onCancel"
@@ -47,8 +48,9 @@ const onCancel = () => {
 </script>
 
 <style>
+/* 用页面背景色（亮色主题为白色）几乎完全遮住背景内容，只突出登录浮窗。 */
 .login-prompt > .v-overlay__scrim {
-    opacity: 0.6;
-    backdrop-filter: blur(4px);
+    opacity: 0.94;
+    backdrop-filter: blur(6px);
 }
 </style>
