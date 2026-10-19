@@ -583,11 +583,18 @@ class Annotation(Base, SQLAlchemyMixin):
     annotation_type = Column(String(32), nullable=False, index=True)
     is_private = Column(Boolean, default=True, nullable=False, index=True)
     cfi = Column(Text, nullable=True)
+    # 真实选区；cfi 表示评论归属的位置（文字评论为所在段落，跨段时为最后一段）。
+    range_cfi = Column(Text, nullable=True)
     chapter = Column(String(500), default="")
     quote_text = Column(Text, default="")
     content = Column(Text, default="")
     color = Column(String(32), default="")
     author_name = Column(String(255), default="")
+    # 回复：root_id 为所属主评论，reply_to_id 为回复对象（空表示直接回复主评论），
+    # thread_id 为所属第一层回复（由服务端根据 reply_to_id 推出）。顶层记录三者都为空。
+    root_id = Column(Integer, nullable=True, index=True)
+    reply_to_id = Column(Integer, nullable=True)
+    thread_id = Column(Integer, nullable=True, index=True)
     user_modified_at = Column(DateTime, nullable=True)
     create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
     update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
@@ -608,16 +615,34 @@ class Annotation(Base, SQLAlchemyMixin):
             "annotation_type": self.annotation_type,
             "is_private": self.is_private,
             "cfi": self.cfi,
+            "range_cfi": self.range_cfi,
             "chapter": self.chapter or "",
             "quote_text": self.quote_text or "",
             "content": self.content or "",
             "color": self.color or "",
             "author_name": self.author_name or "",
+            "root_id": self.root_id,
+            "reply_to_id": self.reply_to_id,
+            "thread_id": self.thread_id,
             "user_modified_at": self.user_modified_at.isoformat() if self.user_modified_at else None,
             "created_at": self.create_time.isoformat() if self.create_time else None,
             "updated_at": self.update_time.isoformat() if self.update_time else None,
             "sources": [source.to_api_dict() for source in self.sources],
         }
+
+
+class AnnotationVote(Base, SQLAlchemyMixin):
+    """读者对一条公开评论或回复的赞（1）或踩（-1），每人每条一票。"""
+
+    __tablename__ = "annotation_votes"
+    __table_args__ = (UniqueConstraint("annotation_id", "reader_id", name="uq_annotation_vote_reader"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    annotation_id = Column(Integer, ForeignKey("annotations.id", ondelete="CASCADE"), nullable=False, index=True)
+    reader_id = Column(Integer, ForeignKey("readers.id", ondelete="CASCADE"), nullable=False, index=True)
+    value = Column(Integer, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
 
 class AnnotationSource(Base, SQLAlchemyMixin):
