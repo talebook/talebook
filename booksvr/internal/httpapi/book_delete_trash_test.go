@@ -117,3 +117,42 @@ func TestBookDeleteNoLibraryRootStillWorks(t *testing.T) {
 		t.Errorf("书籍记录应已删除，HasID = %v, err = %v", ok, err)
 	}
 }
+
+func TestBookDeleteIndexedSnapshotPreservesSourceAndScan(t *testing.T) {
+	w, db := newWriteFixture(t)
+	w.libraryRoot = t.TempDir()
+	source := t.TempDir()
+	file := filepath.Join(source, "sample.epub")
+	os.WriteFile(file, []byte("original"), 0644)
+	insertBook(t, db, 1, "索引测试书")
+	insertItem(t, db, 1, "public", 1)
+	for _, q := range []string{`CREATE TABLE external_index_books(book_id INTEGER PRIMARY KEY)`, `INSERT INTO external_index_books VALUES(1)`, `INSERT INTO scanfiles(id,book_id,path,hash) VALUES(1,1,'/source/sample.epub','x')`} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Exec(`UPDATE books SET path=? WHERE id=1`, source)
+	seedFormat(t, db, 1, "EPUB", file)
+	resp, err := w.bookDelete(adminCtx(1), 1)
+	if err != nil || resp["err"] != "ok" {
+		t.Fatalf("%v %v", resp, err)
+	}
+	if ok, _ := library.HasID(db, 1); ok {
+		t.Fatal("indexed book remains visible")
+	}
+	entries, err := library.ListTrashEntries(db, w.libraryRoot)
+	if err != nil || len(entries) != 1 || entries[0].Title != "索引测试书" {
+		t.Fatalf("%v %v", entries, err)
+	}
+	var count int
+	db.QueryRow(`SELECT COUNT(*) FROM scanfiles WHERE book_id=1`).Scan(&count)
+	if count != 1 {
+		t.Fatal("scan can resurrect deleted book")
+	}
+	if err = library.RestoreTrashEntry(db, w.libraryRoot, 1); err != nil {
+		t.Fatal(err)
+	}
+	if raw, err := os.ReadFile(file); err != nil || string(raw) != "original" {
+		t.Fatal("source modified")
+	}
+}

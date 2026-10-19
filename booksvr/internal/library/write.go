@@ -119,16 +119,31 @@ func findOrCreateItem(tx *sql.Tx, table, nameCol, value string) (int64, error) {
 // 移到 <libraryRoot>/.caltrash/b/<book_id>，再清理数据库行。这样管理员
 // 可以在回收站页面恢复或永久删除。
 //
-// 目录不存在（外部索引书、已手工删文件）时跳过移动，仍继续删库，
-// 与 Calibre 的容错行为一致。
-func DeleteBookToTrash(db *sql.DB, bookID int64, libraryRoot string) error {
+// 外部索引书和文件已缺失的书仍保存元数据快照；只有托管文件移入回收站。
+func DeleteBookToTrash(db *sql.DB, bookID int64, libraryRoot string) (retErr error) {
+	var snapshot *trashSnapshot
 	if libraryRoot != "" {
-		managed := isManagedBookPath(db, bookID)
+		var err error
+		snapshot, err = snapshotTrashBook(db, bookID)
+		if err != nil {
+			return err
+		}
+	}
+	prepared, deleted := false, false
+	defer func() {
+		if retErr != nil && prepared && !deleted {
+			if err := rollbackTrashMove(libraryRoot, bookID); err != nil {
+				retErr = fmt.Errorf("%w; 回滚文件失败: %v（回收站文件已保留）", retErr, err)
+			}
+		}
+	}()
+	if libraryRoot != "" {
 		if err := moveBookDirToTrash(db, bookID, libraryRoot); err != nil {
 			return err
 		}
+		prepared = true
 		cover := ManagedCoverPath(libraryRoot, bookID)
-		if managed {
+		{
 			if _, err := os.Stat(cover); err == nil {
 				dst, err := trashBookDir(libraryRoot, bookID)
 				if err != nil {
@@ -137,7 +152,7 @@ func DeleteBookToTrash(db *sql.DB, bookID int64, libraryRoot string) error {
 				if err = os.MkdirAll(dst, 0755); err != nil {
 					return err
 				}
-				if err = os.Rename(cover, filepath.Join(dst, "cover.jpg")); err != nil {
+				if err = os.Rename(cover, filepath.Join(dst, trashCoverFile)); err != nil {
 					return err
 				}
 			} else if !os.IsNotExist(err) {
@@ -145,14 +160,19 @@ func DeleteBookToTrash(db *sql.DB, bookID int64, libraryRoot string) error {
 			}
 		}
 	}
-	if err := DeleteBook(db, bookID); err != nil {
-		return err
-	}
-	if libraryRoot != "" {
-		if err := os.Remove(ManagedCoverPath(libraryRoot, bookID)); err != nil && !os.IsNotExist(err) {
+	if snapshot != nil {
+		dir, err := trashBookDir(libraryRoot, bookID)
+		if err != nil {
+			return err
+		}
+		if err = saveTrashSnapshot(dir, snapshot); err != nil {
 			return err
 		}
 	}
+	if err := DeleteBook(db, bookID); err != nil {
+		return err
+	}
+	deleted = true
 	return nil
 }
 
@@ -193,6 +213,9 @@ func moveBookDirToTrash(db *sql.DB, bookID int64, libraryRoot string) error {
 	// 记录原目录，供恢复时定位。删除后 books 行已不存在，
 	// 无法再从库里查到 path，必须随回收站条目一起保存。
 	if err := os.WriteFile(filepath.Join(dst, trashOriginFile), []byte(src), 0o644); err != nil {
+		if undoErr := os.Rename(dst, src); undoErr != nil {
+			return fmt.Errorf("library: 写入回收站来源失败: %w; 回滚失败: %v", err, undoErr)
+		}
 		return fmt.Errorf("library: 写入回收站来源失败: %w", err)
 	}
 	return nil
@@ -288,6 +311,15 @@ func DeleteBook(db *sql.DB, bookID int64) error {
 	for _, t := range []string{"comments", "identifiers", "data"} {
 		if _, err := tx.Exec(fmt.Sprintf(`DELETE FROM %s WHERE book = ?`, t), bookID); err != nil {
 			return fmt.Errorf("library: 清理 %s 失败: %w", t, err)
+		}
+	}
+	var sourceTable int
+	if err := tx.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='source_sync_formats'`).Scan(&sourceTable); err != nil {
+		return err
+	}
+	if sourceTable != 0 {
+		if _, err := tx.Exec(`DELETE FROM source_sync_formats WHERE format_id IN (SELECT id FROM book_formats WHERE book_id=?)`, bookID); err != nil {
+			return err
 		}
 	}
 	if _, err := tx.Exec(`DELETE FROM book_formats WHERE book_id = ?`, bookID); err != nil {

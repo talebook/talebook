@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Cover 返回某本书的封面图片字节。
@@ -89,7 +90,10 @@ var trashMetaFiles = map[string]bool{
 	"metadata.opf":     true,
 	"annotations.json": true,
 	// 侧车文件：记录原目录，供恢复时定位。
-	".talebook-origin": true,
+	".talebook-origin":         true,
+	trashSnapshotFile:          true,
+	trashCoverFile:             true,
+	trashSnapshotFile + ".tmp": true,
 }
 
 // TrashEntry 是回收站中的一个整书条目。
@@ -178,6 +182,29 @@ func ListTrashEntries(db *sql.DB, libraryRoot string) ([]TrashEntry, error) {
 		if author.Valid {
 			entry.Author = author.String
 		}
+		if snapshot, e := readTrashSnapshot(dir); e == nil {
+			saved := snapshot.Entry
+			if len(saved.Formats) == 0 {
+				saved.Formats = entry.Formats
+			}
+			if saved.Size == 0 {
+				files, e := os.ReadDir(dir)
+				if e != nil {
+					return nil, e
+				}
+				for _, file := range files {
+					if file.IsDir() || trashMetaFiles[strings.ToLower(file.Name())] {
+						continue
+					}
+					if info, e := file.Info(); e == nil {
+						saved.Size += info.Size()
+					}
+				}
+			}
+			entry = saved
+		} else if !os.IsNotExist(e) {
+			return nil, fmt.Errorf("library: 读取回收站快照失败: %w", e)
+		}
 		out = append(out, entry)
 	}
 	return out, nil
@@ -262,6 +289,29 @@ func RestoreTrashEntry(db *sql.DB, libraryRoot string, bookID int64) error {
 		return fmt.Errorf("library: 回收站条目 %d 不存在", bookID)
 	}
 
+	snapshot, snapshotErr := readTrashSnapshot(dir)
+	if snapshotErr != nil && !os.IsNotExist(snapshotErr) {
+		return snapshotErr
+	}
+	if snapshot != nil {
+		if snapshot.Entry.BookID != bookID {
+			return fmt.Errorf("library: 回收站书号不一致")
+		}
+		var n int
+		if err = db.QueryRow(`SELECT COUNT(*) FROM books WHERE id=?`, bookID).Scan(&n); err != nil {
+			return err
+		}
+		if n != 0 {
+			return fmt.Errorf("library: 书号 %d 已存在，拒绝覆盖", bookID)
+		}
+		return restoreSnapshotEntry(db, libraryRoot, dir, snapshot)
+	}
+	// Legacy files alone cannot reconstruct a deleted book's database metadata.
+	if exists, e := HasID(db, bookID); e != nil {
+		return e
+	} else if !exists {
+		return fmt.Errorf("library: 旧回收站条目缺少元数据快照，无法恢复书籍记录")
+	}
 	// 优先用回收站条目记录的原目录。删除后 books 行已不存在，
 	// 查库必然失败；只有老条目（无侧车文件）才回退到查库。
 	targetDir := readTrashOrigin(dir)
@@ -293,7 +343,7 @@ func RestoreTrashEntry(db *sql.DB, libraryRoot string, bookID int64) error {
 		return fmt.Errorf("library: 读取回收站目录失败: %w", err)
 	}
 	for _, de := range dirents {
-		if de.IsDir() || de.Name() == trashOriginFile {
+		if de.IsDir() || de.Name() == trashOriginFile || de.Name() == trashSnapshotFile || de.Name() == trashSnapshotFile+".tmp" {
 			continue
 		}
 		src := filepath.Join(dir, de.Name())
@@ -316,11 +366,12 @@ func (t TrashEntry) ToDict() map[string]any {
 		formats = []string{}
 	}
 	return map[string]any{
-		"id":      t.BookID,
-		"title":   t.Title,
-		"author":  t.Author,
-		"size":    t.Size,
-		"formats": formats,
-		"mtime":   t.MTime,
+		"id":         t.BookID,
+		"title":      t.Title,
+		"author":     t.Author,
+		"size":       t.Size,
+		"formats":    formats,
+		"mtime":      t.MTime,
+		"deleted_at": time.Unix(t.MTime, 0).UTC().Format(time.RFC3339),
 	}
 }

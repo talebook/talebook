@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"talebook/booksvr/internal/library"
+	"talebook/booksvr/internal/runtimelog"
 	"talebook/booksvr/internal/sslcert"
 	"talebook/booksvr/internal/userdb"
 )
@@ -1190,12 +1191,12 @@ func AdminSystemLogHandler(cfg AdminConfig) HandlerFunc {
 			linesCount = maxLogLines
 		}
 
-		if _, err := os.Stat(logFile); err != nil {
-			return map[string]any{"err": "ok", "lines": []any{}, "total": 0, "file": logFile}, nil
-		}
 		raw, err := os.ReadFile(logFile)
 		if err != nil {
-			return map[string]any{"err": "ok", "lines": []any{}, "total": 0, "file": logFile}, nil
+			if os.IsNotExist(err) {
+				return map[string]any{"err": "ok", "lines": []any{}, "total": 0, "file": logFile}, nil
+			}
+			return map[string]any{"err": "log.read.failed", "msg": "读取系统日志失败，请检查日志目录权限"}, nil
 		}
 		all := strings.Split(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\n")
 		// 末尾换行会产生一个空元素，去掉它。
@@ -1221,7 +1222,7 @@ func adminLogFile(cfg AdminConfig) string {
 	if cfg.LogFile != "" {
 		return cfg.LogFile
 	}
-	return "/data/log/talebook.log"
+	return runtimelog.Path()
 }
 
 // ---- AdminSystemLogDownload ----

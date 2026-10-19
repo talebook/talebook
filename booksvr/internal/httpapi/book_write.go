@@ -24,8 +24,8 @@ import (
 // 语义：
 //  1. 权限：需 can_edit + can_delete，且为管理员或书籍所有者；
 //  2. 私藏书永久删除（permanent），其余走 Calibre 回收站；
-//  3. 外部索引书只删索引记录；
-//  4. 同步清理 ScanFile 与别名，避免重导入时哈希重复被误判。
+//  3. 外部索引书仅删除书库登记，元数据进入回收站，源文件不动；
+//  4. 可恢复删除保留扫描记录与别名，避免扫描立即重导入；永久删除清理关联。
 func (w *bookWiring) bookDelete(ctx *Context, bookID int64) (map[string]any, error) {
 	book, err := bookGetOne(w.Config(""), bookID)
 	if err != nil {
@@ -41,11 +41,7 @@ func (w *bookWiring) bookDelete(ctx *Context, bookID int64) (map[string]any, err
 	permanent := w.itemScope(bookID) == "private"
 	externalIndexed := w.isExternalIndexBook(bookID)
 
-	if externalIndexed {
-		if err := w.deleteExternalIndexBook(bookID); err != nil {
-			return nil, err
-		}
-	} else if permanent {
+	if permanent {
 		// 私藏书永久删除：不进入回收站，避免其文件与元数据出现在管理员回收站。
 		if err := library.DeleteBook(w.libraryDB, bookID); err != nil {
 			return nil, err
@@ -57,6 +53,15 @@ func (w *bookWiring) bookDelete(ctx *Context, bookID int64) (map[string]any, err
 		}
 	}
 
+	// Keep the indexed scan records for recoverable deletes, so an ongoing scan cannot reimport them.
+	if !permanent && w.libraryRoot != "" {
+		return map[string]any{"err": "ok", "msg": "已移入回收站"}, nil
+	}
+	if externalIndexed {
+		if err := w.deleteExternalIndexBook(bookID); err != nil {
+			return nil, err
+		}
+	}
 	// 清理 ScanFile 记录与别名。
 	// 表名是 scanfiles（无下划线），与 userdb 的 schema 一致。
 	if _, err := w.db.Exec(`DELETE FROM scanfiles WHERE book_id = ?`, bookID); err != nil {

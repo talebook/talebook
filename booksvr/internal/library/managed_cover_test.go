@@ -124,7 +124,7 @@ func TestDeletingManagedBookMovesArtworkToTrash(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if data, err := os.ReadFile(filepath.Join(dst, "cover.jpg")); err != nil || string(data) != "artwork" {
+	if data, err := os.ReadFile(filepath.Join(dst, trashCoverFile)); err != nil || string(data) != "artwork" {
 		t.Fatalf("trash lost artwork: %v", err)
 	}
 }

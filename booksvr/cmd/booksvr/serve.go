@@ -16,6 +16,7 @@ import (
 	"talebook/booksvr/internal/captcha"
 	"talebook/booksvr/internal/httpapi"
 	"talebook/booksvr/internal/importdir"
+	"talebook/booksvr/internal/runtimelog"
 )
 
 // serveOptions 是 `booksvr serve` 的解析结果。
@@ -264,6 +265,11 @@ func runServe(args []string, out io.Writer) error {
 		return err
 	}
 
+	closeLog, err := runtimelog.Install(runtimelog.Path())
+	if err != nil {
+		return err
+	}
+	defer closeLog()
 	// 启动期服务实例（扫描/插件/漫画）依赖 DB 句柄，由 Serve 在打开库后回调构造。
 	// userDB 是 Talebook 自有库（scanfiles/plugin_*），libraryDB 是 Calibre 库（books）。
 	wiring := func(userDB, libraryDB *sql.DB) httpapi.ServiceSet {

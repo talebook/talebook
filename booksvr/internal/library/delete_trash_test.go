@@ -99,11 +99,10 @@ func TestDeleteBookToTrashLeavesExternalDir(t *testing.T) {
 	if _, err := os.Stat(srcFile); err != nil {
 		t.Errorf("外部导入目录不应被动过，stat err = %v", err)
 	}
-	// 不应产生回收站条目。
-	trashDir := filepath.Join(root, ".caltrash", "b", fmt.Sprintf("%d", bookID))
-	if _, err := os.Stat(trashDir); !os.IsNotExist(err) {
-		t.Errorf("外部目录不应进入回收站，stat err = %v", err)
-	}
+ // Only a metadata snapshot enters trash; the source directory stays untouched.
+ trashDir := filepath.Join(root,".caltrash","b",fmt.Sprintf("%d",bookID))
+ if _,err:=os.Stat(filepath.Join(trashDir,trashSnapshotFile));err!=nil {t.Fatal(err)}
+ if _,err:=os.Stat(filepath.Join(trashDir,"book.epub"));!os.IsNotExist(err){t.Fatal("source must never be copied")}
 	// 库记录仍应删除。
 	if ok, err := HasID(db, bookID); err != nil || ok {
 		t.Errorf("书籍记录应已删除，HasID = %v, err = %v", ok, err)

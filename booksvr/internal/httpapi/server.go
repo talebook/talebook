@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
@@ -325,6 +326,8 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		resp, err := rt.spec.Handler(ctx)
 		if err != nil {
+			// Route templates omit request queries and bodies, which may contain secrets.
+			log.Printf("ERROR booksvr: 接口执行失败 route=%s: %v", rt.spec.Pattern, err)
 			// 与 Python 版 @js 一致：异常转成 {"err": "exception"}，不抛 HTTP 异常。
 			writeJSON(w, http.StatusOK, map[string]any{
 				"err": ErrException,

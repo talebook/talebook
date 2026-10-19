@@ -34,8 +34,16 @@ func TestBulkDeleteUsesProductionSingleBookWiring(t *testing.T) {
 		}
 	}
 	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM scanfiles WHERE book_id IN (1,2)`).Scan(&n); err != nil || n != 0 {
-		t.Fatalf("scan records: %d %v", n, err)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM scanfiles WHERE book_id IN (1,2)`).Scan(&n); err != nil || n != 2 {
+		t.Fatalf("recoverable deletions must retain scan records: %d %v", n, err)
+	}
+	entries, err := library.ListTrashEntries(db, cfg.LibraryRoot)
+	if err != nil || len(entries) != 2 {
+		t.Fatalf("bulk deletes missing from trash: %v %v", entries, err)
+	}
+	restored, err := adminTrashRestore(cfg, pluginCtx(t, db, http.MethodPatch, rAdminTrash, `{"idlist":[1,2]}`, 1, true))
+	if err != nil || len(restored["restored"].([]int64)) != 2 {
+		t.Fatalf("bulk restore: %v %v", restored, err)
 	}
 }
 
