@@ -31,6 +31,11 @@ def engine_config():
 
 
 class NetworkBaseHandler(ListHandler):
+    def public_book(self, item, source_key):
+        from webserver.handlers.network_comic import comic_book
+
+        return comic_book(self, item, source_key)
+
     def get_catalog(self):
         return SourceCatalogService(self.session, CONF, self.user_id())
 
@@ -128,6 +133,8 @@ class NetworkSearchStatus(NetworkBaseHandler):
                     connection.health = "healthy" if update["healthy"] else "degraded"
                     connection.health_message = update["message"][:500]
             self.session.commit()
+        for group in status.get("results", []):
+            group["books"] = [self.public_book(dict(book), group["source_id"]) for book in group["books"]]
         return {"err": "ok", **status}
 
 
@@ -146,7 +153,12 @@ class NetworkExplore(NetworkBaseHandler):
             result = self.get_catalog().read(source, "browse", category_id, {"page": page})
         except JsRuleUnsupported:
             return {"err": "source.js_unsupported", "msg": _("该书源依赖 JS，暂不支持")}
-        return {"err": "ok", "books": [book.to_dict() for book in result.items]}
+        return {
+            "err": "ok",
+            "books": [self.public_book(book.to_dict(), source.key) for book in result.items],
+            "has_more": result.has_more if source.plugin_key == "talebook.source.venera" else None,
+            "next_cursor": result.next_cursor,
+        }
 
 
 class NetworkCategories(NetworkBaseHandler):
@@ -178,7 +190,7 @@ class NetworkBook(NetworkBaseHandler):
             return {"err": getattr(exc, "code", "source.fetch_failed"), "msg": str(exc)}
         return {
             "err": "ok",
-            "book": detail.to_dict(),
+            "book": self.public_book(detail.to_dict(), source.key),
             "toc_url": detail.toc_ref,
             "download_mode": source.download_mode,
         }

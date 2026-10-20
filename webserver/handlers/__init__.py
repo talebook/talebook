@@ -16,6 +16,7 @@ def routes():
         comic,
         files,
         meta,
+        network_comic,
         network_library,
         opds,
         plugins,
@@ -37,6 +38,7 @@ def routes():
     routes += meta.routes()
     routes += booksource_admin.routes()
     routes += network_library.routes()
+    routes += network_comic.routes()
     routes += audiobook.routes()
     routes += plugins.routes()
     captcha_routes = captcha.routes()

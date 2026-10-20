@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="{{ LANGUAGE | e }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{{ reader_messages.title | e }}</title>
+  <link rel="stylesheet" href="{{BASE_PATH}}/static/komga-reader/style.css?v={{ READER_VERSION | e }}" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body, #host { margin: 0; width: 100%; height: 100%; }
+    body { background: #111827; color: #f8fafc; font: 16px/1.6 system-ui, sans-serif; }
+    #state { position: absolute; inset: 0; display: grid; place-content: center; gap: 16px; padding: 24px; text-align: center; }
+    #state[hidden] { display: none; }
+    button, a { color: inherit; background: #1e293b; border: 1px solid #64748b; border-radius: 8px; padding: 12px 18px; font: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+    #notice { position: fixed; bottom: calc(12px + env(safe-area-inset-bottom)); left: 12px; right: 12px; background: #450a0a; padding: 12px; z-index: 30; }
+  </style>
+</head>
+<body>
+  <main id="host" aria-label="{{ reader_messages.reader | e }}"></main>
+  <section id="state" aria-live="polite">
+    <p id="message">{{ reader_messages.loading | e }}</p>
+    <button id="retry" type="button" hidden>{{ reader_messages.retry | e }}</button>
+    <a id="back" href="{{BASE_PATH}}/library/network">{{ reader_messages.back | e }}</a>
+  </section>
+  <aside id="notice" role="alert" hidden><span id="notice-message"></span> <button id="refresh" type="button">{{ reader_messages.refresh | e }}</button></aside>
+  <script id="messages" type="application/json">{{ reader_messages | tojson }}</script>
+  <script type="module">
+    const messages = JSON.parse(document.getElementById('messages').textContent);
+    const query = new URLSearchParams(location.search);
+    const sourceId = query.get('source_id') || '';
+    const chapter = query.get('chapter_url') || '';
+    const title = query.get('title') || messages.title;
+    const detail = new URLSearchParams({source_id: sourceId, book_url: query.get('book_url') || ''});
+    const backUrl = `{{BASE_PATH}}/network/book?${detail}`;
+    const state = document.getElementById('state');
+    const message = document.getElementById('message');
+    const retry = document.getElementById('retry');
+    const notice = document.getElementById('notice');
+    document.getElementById('back').href = backUrl;
+    document.title = title;
+    let reader;
+    let active = true;
+    async function start() {
+      reader?.destroy();
+      document.getElementById('host').replaceChildren();
+      state.hidden = false;
+      retry.hidden = true;
+      notice.hidden = true;
+      message.textContent = messages.loading;
+      try {
+        const params = new URLSearchParams({source_id: sourceId, chapter_url: chapter});
+        const [module, response] = await Promise.all([
+          import('{{BASE_PATH}}/static/komga-reader/komga-reader.es.js?v={{ READER_VERSION | e }}'),
+          fetch(`{{BASE_PATH}}/api/book-sources/comic/pages?${params}`, {credentials: 'same-origin'}),
+        ]);
+        const data = await response.json();
+        if (!response.ok || data.err !== 'ok') throw new Error(data.msg || messages.session);
+        if (!Array.isArray(data.pages) || data.pages.length === 0) throw new Error(messages.empty);
+        const pages = data.pages.map((page, index) => {
+          if (!page.url.startsWith('{{BASE_PATH}}/api/book-sources/comic/image?')) throw new Error(messages.invalid);
+          return {id: page.id, src: page.url, alt: `${title} · ${index + 1}`};
+        });
+        if (!active) return;
+        reader = new module.Reader(document.getElementById('host'), {
+          manifest: {id: `${sourceId}:${chapter}`, title, pages},
+          initialProgress: {pageIndex: 0},
+          onExit: () => location.assign(backUrl),
+          onError: () => {
+            document.getElementById('notice-message').textContent = messages.image;
+            notice.hidden = false;
+          },
+        });
+        state.hidden = true;
+      } catch (error) {
+        message.textContent = error instanceof Error ? error.message : messages.failure;
+        retry.hidden = false;
+      }
+    }
+    retry.addEventListener('click', start);
+    document.getElementById('refresh').addEventListener('click', start);
+    window.addEventListener('pagehide', () => { active = false; reader?.destroy(); }, {once: true});
+    start();
+  </script>
+</body>
+</html>

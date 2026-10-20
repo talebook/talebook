@@ -1,13 +1,22 @@
 <template>
     <ThemeRuntimeProvider>
         <NuxtLayout>
-            <NuxtPage />
+            <NuxtPage
+                v-if="!loginBlocksPage"
+                :key="store.authEpoch"
+            />
         </NuxtLayout>
     </ThemeRuntimeProvider>
 </template>
 
 <script setup>
 import ThemeRuntimeProvider from '@/components/ThemeRuntimeProvider.vue';
+import { useMainStore } from '@/stores/main';
+
+// 需要登录的页面在登录前不渲染；登录成功后 authEpoch 递增，当前页面重新挂载并加载内容。
+const store = useMainStore();
+const route = useRoute();
+const loginBlocksPage = computed(() => store.loginPrompt.requiredPath === route.path);
 </script>
 
 <style>

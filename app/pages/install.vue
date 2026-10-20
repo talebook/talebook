@@ -2,6 +2,7 @@
 <template>
     <ClientOnly>
         <v-row
+            class="ma-0"
             align="center"
             justify="center"
         >
@@ -15,8 +16,9 @@
                         dark
                         color="primary"
                     >
-                        <v-toolbar-title>{{ $t('install.installTaleBook') }}</v-toolbar-title>
-                        <v-spacer />
+                        <v-toolbar-title class="install-title text-subtitle-1">
+                            {{ $t('install.installTaleBook') }}
+                        </v-toolbar-title>
                         <!-- 多语言切换入口 -->
                         <v-menu
                             offset-y
@@ -24,6 +26,7 @@
                         >
                             <template #activator="{ props }">
                                 <v-btn
+                                    :aria-label="$t('book.language')"
                                     v-bind="props"
                                     icon
                                     variant="text"
@@ -345,3 +348,10 @@ useHead({
     title: $t('install.installTaleBook')
 });
 </script>
+
+<style scoped>
+.install-title :deep(.v-toolbar-title__placeholder) {
+    white-space: normal;
+    line-height: 1.4;
+}
+</style>

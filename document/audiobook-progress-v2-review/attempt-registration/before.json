@@ -1,0 +1,41 @@
+{
+  "lease_owner": "replacement-worker",
+  "attempt_id": "a7ab4306-6e3e-4639-997b-c3b58ebcacda",
+  "seq": 1,
+  "completed": null,
+  "data_after_old_commit": {
+    "inspected": true,
+    "revision": {
+      "source_edition_id": 1,
+      "scope": "chapter",
+      "chapter_number": 1,
+      "structural_changed": false
+    },
+    "plan": {
+      "version": 1,
+      "chapters": [],
+      "phases": {
+        "queue": {
+          "started_at": "2026-10-03T04:03:28.859013"
+        },
+        "generate": {
+          "started_at": "2026-10-03T04:03:28.932645"
+        }
+      },
+      "last_active_phase": "generate",
+      "review_status": "pending"
+    },
+    "voicebook_invocation": {
+      "version": 2,
+      "task_id": "talebook-job-1",
+      "attempt_id": "a7ab4306-6e3e-4639-997b-c3b58ebcacda",
+      "started_at": "2026-10-02T20:03:28.932632+00:00"
+    }
+  },
+  "previous_attempt_before_registration": "6ac5799b-9cc4-4b96-909a-033cbf54a8ae",
+  "new_attempt_before_old_commit": "182d6c4b-4c84-4c60-8802-27efb84badca",
+  "interleaving_executed": true,
+  "stale_registration_overwrote_new_attempt": true,
+  "replacement_heartbeat_accepted": false,
+  "old_call_stopped": []
+}

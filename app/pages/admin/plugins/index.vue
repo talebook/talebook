@@ -366,6 +366,14 @@
                         >
                             {{ configurationActionLabel(selectedPlugin) }}
                         </v-btn>
+                        <v-btn
+                            v-if="selectedPlugin.plugin_key === 'talebook.source.venera' && selectedConnection"
+                            variant="outlined"
+                            :loading="connectionTesting"
+                            @click="testComicConnection"
+                        >
+                            {{ t('pluginManagement.testConnection') }}
+                        </v-btn>
                     </div>
 
                     <v-form
@@ -581,6 +589,7 @@ const opdsDialog = ref(null);
 const metadataSettings = ref(null);
 const globalDeviceSettings = ref(null);
 const selectedPluginKey = ref(typeof route.query.plugin === 'string' ? route.query.plugin : '');
+const connectionTesting = ref(false);
 const activeGroupKey = ref('');
 let filterTimer = null;
 let groupScrollRaf = 0;
@@ -792,6 +801,21 @@ function connectionFieldLabel(key) {
     const translationKey = `pluginManagement.field_${key}`;
     const translated = t(translationKey);
     return translated === translationKey ? key : translated;
+}
+
+async function testComicConnection() {
+    const connection = selectedConnection.value;
+    if (!connection || connectionTesting.value) return;
+    connectionTesting.value = true;
+    try {
+        const rsp = await $backend(`/admin/plugins/connections/${connection.id}/test`, {
+            method: 'POST', body: JSON.stringify({}),
+        });
+        if (rsp.err === 'ok') await navigateTo(`/admin/plugins/runs/${rsp.run.id}`);
+        else $alert?.('error', rsp.msg || rsp.err);
+    } finally {
+        connectionTesting.value = false;
+    }
 }
 
 function credentialAutocomplete(key) {

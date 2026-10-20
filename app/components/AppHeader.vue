@@ -153,6 +153,7 @@
                     >
                         <template #activator="{ props }">
                             <v-btn
+                                :aria-label="t('book.language')"
                                 v-bind="props"
                                 icon
                             >
@@ -276,6 +277,7 @@
                     >
                         <template #activator="{ props }">
                             <v-btn
+                                :aria-label="t('book.language')"
                                 v-bind="props"
                                 icon
                             >
@@ -304,7 +306,8 @@
 
                     <v-btn
                         class="px-xs-1 login-btn mr-4"
-                        to="/login"
+                        data-testid="header-login"
+                        @click="store.openLoginPrompt()"
                         color="#304ffe"
                         variant="elevated"
                     >

@@ -1,0 +1,9 @@
+{
+  "baseline_sha": "db5744b13e245414762bafc6219c6056fcb33837",
+  "talebook_sha": "9cb3633be8fd1bb8f7b9ef782ceabd11a84a05a3",
+  "voicebook_sha": "3316bae6a7372e82d7037d31b9ffb32633ef2aa4",
+  "selected_failure_count": 10,
+  "same_test_names_outcomes_messages_after_normalizing_object_address": true,
+  "git_executable_present": false,
+  "full_suite_rerun": false
+}

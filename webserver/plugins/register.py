@@ -32,6 +32,7 @@ from webserver.plugins.source.legado import PROVIDER as LEGADO_PROVIDER
 from webserver.plugins.source.opds import PROVIDER as OPDS_PROVIDER
 from webserver.plugins.source.standard_ebooks import PROVIDER as STANDARD_EBOOKS_PROVIDER
 from webserver.plugins.source.tomato_downloader import PROVIDER as TOMATO_DOWNLOADER_PROVIDER
+from webserver.plugins.source.venera import PROVIDER as VENERA_PROVIDER
 from webserver.plugins.source.watch_folder import PROVIDER as WATCH_FOLDER_PROVIDER
 from webserver.plugins.source.webdav import PROVIDER as WEBDAV_PROVIDER
 from webserver.plugins.tool.epub_beautify.provider import PROVIDER as EPUB_BEAUTIFY_PROVIDER
@@ -52,6 +53,7 @@ SOURCE_PROVIDERS = (
     WEBDAV_PROVIDER,
     WATCH_FOLDER_PROVIDER,
     TOMATO_DOWNLOADER_PROVIDER,
+    VENERA_PROVIDER,
 )
 META_PROVIDERS = (
     DOUBAN_V2_PROVIDER,

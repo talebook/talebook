@@ -457,6 +457,70 @@ class TestCaptchaModule(unittest.TestCase):
         self.assertEqual(config["scenes"]["reset"], True)
 
 
+class TestTurnstileProvider(unittest.TestCase):
+    def setUp(self):
+        from webserver.plugins.captcha.turnstile import TurnstileProvider
+
+        self.provider = TurnstileProvider({"TURNSTILE_SITE_KEY": "test-site", "TURNSTILE_SECRET_KEY": "test-secret"})
+
+    def test_public_config_contains_no_secret(self):
+        self.assertTrue(self.provider.is_configured())
+        self.assertEqual(self.provider.get_frontend_config()["siteKey"], "test-site")
+        self.assertNotIn("test-secret", str(self.provider.get_frontend_config()))
+
+    def test_missing_config_and_token_fail_without_network(self):
+        from webserver.plugins.captcha.turnstile import TurnstileProvider
+
+        with patch("webserver.plugins.captcha.turnstile.requests.post") as post:
+            self.assertFalse(TurnstileProvider({}).verify(turnstile_token="token"))
+            self.assertFalse(self.provider.verify())
+            self.assertFalse(self.provider.verify(turnstile_token="x" * 2049))
+            post.assert_not_called()
+
+    @patch("webserver.plugins.captcha.turnstile.requests.post")
+    def test_server_verifies_token_and_action(self, post):
+        post.return_value.status_code = 200
+        post.return_value.json.return_value = {"success": True, "action": "read"}
+        self.assertTrue(self.provider.verify(turnstile_token="token", scene="read", remote_ip="127.0.0.1"))
+        self.assertEqual(
+            post.call_args.kwargs["data"], {"secret": "test-secret", "response": "token", "remoteip": "127.0.0.1"}
+        )
+        self.assertEqual(post.call_args.kwargs["timeout"], 10)
+        self.assertFalse(self.provider.verify(turnstile_token="token", scene="download"))
+
+    @patch("webserver.plugins.captcha.turnstile.requests.post")
+    def test_failed_malformed_and_unavailable_verification_fail_closed(self, post):
+        import requests
+
+        post.return_value.status_code = 200
+        for body in ({"success": False}, {"success": "true"}, [], None):
+            post.return_value.json.return_value = body
+            self.assertFalse(self.provider.verify(turnstile_token="token"))
+        post.return_value.json.side_effect = ValueError("invalid JSON")
+        self.assertFalse(self.provider.verify(turnstile_token="token"))
+        post.return_value.status_code = 500
+        self.assertFalse(self.provider.verify(turnstile_token="token"))
+        post.side_effect = requests.Timeout()
+        self.assertFalse(self.provider.verify(turnstile_token="token"))
+
+    def test_book_scenes_are_configured_and_keys_can_be_updated(self):
+        settings = {
+            "CAPTCHA_PROVIDER": "turnstile",
+            "TURNSTILE_SITE_KEY": "site",
+            "TURNSTILE_SECRET_KEY": "secret",
+            "CAPTCHA_ENABLE_FOR_DOWNLOAD": True,
+            "CAPTCHA_ENABLE_FOR_READ": True,
+        }
+        config = captcha_module.get_captcha_config(settings)
+        self.assertTrue(config["scenes"]["download"])
+        self.assertTrue(config["scenes"]["read"])
+        self.assertIn("turnstile", captcha_module.get_available_providers())
+        settings["TURNSTILE_SITE_KEY"] = "updated"
+        self.assertEqual(captcha_module.get_captcha_config(settings)["siteKey"], "updated")
+        copied = dict(settings, TURNSTILE_SITE_KEY="other")
+        self.assertEqual(captcha_module.get_captcha_config(copied)["siteKey"], "other")
+
+
 if __name__ == "__main__":
     # 运行测试
     unittest.main(verbosity=2)

@@ -1,0 +1,88 @@
+[
+  {
+    "case": "qa-registration-review-real-page-API-scheduler-CLI-recovery",
+    "trace_sha256": "430fd338c23bf8f6788d923622210a0db538a3a962ad10f4b72aa2e166f7aea5",
+    "network_failures": []
+  },
+  {
+    "case": "qa-registration-review-real-page-API-scheduler-CLI-waiting",
+    "trace_sha256": "4dfb133b6aa8bb7ce3a524793bb021293ad00b95c13fcb711ac6ff4a9ea0f621",
+    "network_failures": []
+  },
+  {
+    "case": "qa-registration-review-rea-f8490-PI-scheduler-CLI-generation",
+    "trace_sha256": "fa985b124833314900f257f0ebf4b7d11474268bdb4c09498084cdcb906f5d7b",
+    "network_failures": [
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VEmptyState/VEmptyState.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/components/AudiobookGenerationProgress.vue?vue&type=style&index=0&scoped=3d391019&lang.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VSelect/VSelect.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VWindow/VWindow.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VVirtualScroll/VVirtualScroll.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VCheckbox/VCheckbox.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VSelectionControl/VSelectionControl.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VTextarea/VTextarea.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VSelectionControlGroup/VSelectionControlGroup.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VTabs/VTabs.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VDialog/VDialog.css",
+        "status": -1,
+        "failure": "net::ERR_ABORTED"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VChipGroup/VChipGroup.css",
+        "status": -1,
+        "failure": "net::ERR_INSUFFICIENT_RESOURCES"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/node_modules/vuetify/lib/components/VSlideGroup/VSlideGroup.css",
+        "status": -1,
+        "failure": "net::ERR_INSUFFICIENT_RESOURCES"
+      },
+      {
+        "url": "http://127.0.0.1:3011/_nuxt/components/SidebarHelpMenu.vue?vue&type=style&index=0&scoped=3d709a93&lang.css",
+        "status": -1,
+        "failure": "net::ERR_INSUFFICIENT_RESOURCES"
+      }
+    ]
+  }
+]

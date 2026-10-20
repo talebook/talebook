@@ -13,7 +13,7 @@ from collections import defaultdict
 
 from jinja2 import Environment, FileSystemLoader
 from sqlalchemy import func as sql_func
-from tornado import web
+from tornado import escape, web
 
 from webserver import demo_mode, loader, utils
 from webserver.base_path import BASE_PATH, PublicPathMixin, public_url
@@ -106,6 +106,20 @@ class BaseHandler(PublicPathMixin, web.RequestHandler):
     _path_to_env = {}
     # 添加一个锁来保护数据库连接的访问
     _db_lock = threading.Lock()
+
+    def write_error(self, status_code, **kwargs):
+        exc_info = kwargs.get("exc_info")
+        error = exc_info[1] if exc_info else None
+        if isinstance(error, web.HTTPError) and error.reason and not self.settings.get("serve_traceback"):
+            # Localized reasons belong in the body; Tornado validates the HTTP
+            # status line independently to prevent header injection.
+            message = escape.xhtml_escape(error.reason)
+            self.finish(
+                "<html><title>%(code)d: %(message)s</title>"
+                "<body>%(code)d: %(message)s</body></html>" % {"code": status_code, "message": message}
+            )
+            return
+        super().write_error(status_code, **kwargs)
 
     def _request_summary(self) -> str:
         userid = 0

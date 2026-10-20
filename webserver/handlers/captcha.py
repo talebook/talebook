@@ -1,13 +1,15 @@
-#!/usr/bin/env python3
-# -*- coding: UTF-8 -*-
-"""
-人机验证相关接口
-"""
+"""Human verification and scoped access grants for books."""
 
-import datetime
-import logging
+import base64
+import hashlib
+import json
+import time
+import urllib.parse
+
+from tornado import web
 
 from webserver import loader
+from webserver.base_path import public_url
 from webserver.handlers.base import BaseHandler, js
 from webserver.i18n import _
 from webserver.plugins import captcha as captcha_module
@@ -15,147 +17,172 @@ from webserver.plugins.captcha.image_captcha import ImageCaptchaProvider
 
 
 CONF = loader.get_settings()
+BOOK_CAPTCHA_TTL = 30 * 60
 
-# 启动时记录验证码配置状态
-if CONF.get("CAPTCHA_PROVIDER"):
-    logging.info("CAPTCHA enabled with provider: %s", CONF["CAPTCHA_PROVIDER"])
-    for scene in ["REGISTER", "LOGIN", "WELCOME", "RESET"]:
-        key = f"CAPTCHA_ENABLE_FOR_{scene}"
-        if CONF.get(key):
-            logging.info("CAPTCHA enabled for %s", scene.lower())
-else:
-    logging.info("CAPTCHA disabled")
+
+def check_captcha(handler, scene, consume=True, required=False):
+    """Verify only the configured provider; consume image answers on submission."""
+    if not required and not captcha_module.is_captcha_enabled(CONF, scene):
+        return True, None
+    provider = captcha_module.get_captcha_provider(CONF)
+    if not provider or not provider.is_configured():
+        return False, _("人机验证未正确配置，请联系管理员")
+    if provider.name == "image":
+        code = handler.get_argument("captcha_code", "")
+        answer = handler.get_secure_cookie("captcha_answer")
+        generated = handler.get_secure_cookie("captcha_generate_time")
+        if not code:
+            return False, _("请完成人机验证")
+        try:
+            age = time.time() - float(generated)
+            if not answer or not 0 <= age <= 120:
+                return False, _("验证码已过期，请刷新")
+            passed = provider.verify(captcha_code=code, captcha_answer=answer.decode("utf-8"))
+        except (TypeError, ValueError, UnicodeError):
+            return False, _("验证码已过期，请刷新")
+        if passed and consume:
+            handler.clear_cookie("captcha_answer")
+            handler.clear_cookie("captcha_generate_time")
+    elif provider.name == "turnstile":
+        passed = provider.verify(
+            turnstile_token=handler.get_argument("turnstile_token", ""),
+            remote_ip=handler.request.remote_ip,
+            scene=scene,
+        )
+    else:
+        parameters = {key: handler.get_argument(key, "") for key in ("lot_number", "captcha_output", "pass_token", "gen_time")}
+        if not all(parameters.values()):
+            return False, _("请完成人机验证")
+        passed = provider.verify(**parameters)
+    return (True, None) if passed else (False, _("人机验证失败，请重试"))
+
+
+def _grant_context(handler):
+    # Invalidate grants when the account or the provider credentials change.
+    credentials = [
+        CONF.get(key, "")
+        for key in (
+            "CAPTCHA_PROVIDER",
+            "TURNSTILE_SITE_KEY",
+            "TURNSTILE_SECRET_KEY",
+            "GEETEST_CAPTCHA_ID",
+            "GEETEST_CAPTCHA_KEY",
+        )
+    ]
+    principal = handler.current_user
+    admin = handler.admin_user
+    return {
+        "user": principal.id if principal else None,
+        "admin": admin.id if admin else None,
+        "provider": hashlib.sha256(json.dumps(credentials).encode()).hexdigest(),
+    }
+
+
+def _book_grants(handler, scene):
+    try:
+        payload = json.loads(handler.get_secure_cookie("captcha_" + scene) or b"{}")
+        if payload.get("context") == _grant_context(handler):
+            now = time.time()
+            return {
+                bid: issued
+                for bid, issued in payload.get("books", {}).items()
+                if isinstance(issued, (int, float)) and 0 <= now - issued < BOOK_CAPTCHA_TTL
+            }
+    except (ValueError, TypeError, AttributeError, UnicodeError):
+        pass
+    return {}
+
+
+def book_captcha_enabled(scene):
+    return captcha_module.is_captcha_enabled(CONF, scene)
+
+
+def require_book_captcha(handler, book_id, scene, redirect=False):
+    if not book_captcha_enabled(scene):
+        return True
+    handler.set_header("Cache-Control", "private, no-store")
+    if str(int(book_id)) in _book_grants(handler, scene):
+        return True
+    if redirect:
+        # Router URL normalization can split escaped query separators; use a URL-safe payload.
+        target = base64.urlsafe_b64encode(public_url(handler.request.uri).encode()).decode().rstrip("=")
+        query = urllib.parse.urlencode({"scene": scene, "next_b64": target})
+        handler.redirect("/book/%d/verify?%s" % (int(book_id), query))
+    else:
+        handler.set_status(403)
+        handler.set_header("Cache-Control", "no-store")
+        handler.finish({"err": "captcha.required", "msg": _("请完成人机验证")})
+    return False
 
 
 class CaptchaBaseHandler(BaseHandler):
-    """验证码基类 - 不需要邀请验证"""
-
     def should_be_invited(self):
-        # 验证码接口不需要邀请验证
         pass
 
 
 class CaptchaConfigHandler(CaptchaBaseHandler):
-    """获取验证码配置（前端初始化用）"""
-
     @js
     def get(self):
-        """获取当前启用的验证码配置"""
-        config = captcha_module.get_captcha_config(CONF)
-        return {"err": "ok", "config": config}
-
-
-class CaptchaImageHandler(CaptchaBaseHandler):
-    """图形验证码生成接口"""
-
-    @js
-    def get(self):
-        """生成新的图形验证码"""
-        provider = ImageCaptchaProvider(CONF)
-        result = provider.generate()
-
-        # 将正确答案存入 cookie，2分钟过期
-        # 使用本地时间，因为 Tornado 的 expires 参数需要本地时间
-        expires = datetime.datetime.now() + datetime.timedelta(minutes=2)
-        self.set_secure_cookie("captcha_answer", result["code"], expires=expires)
-
-        # 同时存储生成时间，用于精确判断（使用 UTC 时间戳）
-        self.set_secure_cookie(
-            "captcha_generate_time",
-            str(datetime.datetime.utcnow().timestamp()),
-            expires=expires,
-        )
-
-        logging.info("=== 验证码生成调试 ===")
-        logging.info(f"验证码答案: {result['code']}")
-        logging.info(f"过期时间: {expires}")
-        logging.info(f"所有Cookies: {dict(self.request.cookies)}")
-
         return {
             "err": "ok",
-            "captcha_id": result["captcha_id"],
-            "image": result["image"],
+            "config": captcha_module.get_captcha_config(CONF),
+            "scenes": {
+                scene: captcha_module.is_captcha_enabled(CONF, scene)
+                for scene in ("register", "login", "welcome", "reset", "download", "read")
+            },
         }
 
 
-class CaptchaVerifyHandler(CaptchaBaseHandler):
-    """验证码二次验证接口（供前端测试用）"""
+class CaptchaImageHandler(CaptchaBaseHandler):
+    @js
+    def get(self):
+        result = ImageCaptchaProvider(CONF).generate()
+        for key, value in (("captcha_answer", result["code"]), ("captcha_generate_time", str(time.time()))):
+            web.RequestHandler.set_secure_cookie(self, key, value, expires_days=120 / 86400, httponly=True, samesite="Lax")
+        return {"err": "ok", "captcha_id": result["captcha_id"], "image": result["image"]}
 
+
+class CaptchaVerifyHandler(CaptchaBaseHandler):
     @js
     def post(self):
-        """执行验证码验证"""
-        provider_name = self.get_argument("provider", "")
-
-        # 图形验证码验证
-        if provider_name == "image":
-            captcha_code = self.get_argument("captcha_code", "")
-            captcha_answer = self.get_secure_cookie("captcha_answer")
-            generate_time = self.get_secure_cookie("captcha_generate_time")
-
-            # 添加调试日志
-            logging.info("=== 验证码验证调试 ===")
-            logging.info(f"用户输入: {captcha_code}")
-            logging.info(f"Cookie中的答案: {captcha_answer}")
-            logging.info(f"Cookie中的生成时间: {generate_time}")
-            logging.info(f"所有Cookies: {dict(self.request.cookies)}")
-            logging.info(f"请求头: {dict(self.request.headers)}")
-
-            # 检查是否存在验证码
-            if not captcha_answer or not generate_time:
-                return {"err": "captcha.expired", "msg": _("验证码已过期，请刷新")}
-
-            # 检查是否过期（双重验证）
+        provider = self.get_argument("provider", "")
+        if not provider or provider != CONF.get("CAPTCHA_PROVIDER"):
+            return {"err": "params.invalid", "msg": _("验证提供商不匹配")}
+        scene = self.get_argument("scene", "")
+        if scene:
+            if scene not in ("download", "read"):
+                return {"err": "params.invalid", "msg": _("验证场景无效")}
             try:
-                gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode("utf-8")))
-                now = datetime.datetime.utcnow()
-                elapsed = (now - gen_time).total_seconds()
-                remaining = 60 - elapsed
-                logging.info(
-                    f"验证码过期检查 - 生成时间: {gen_time}, 当前时间: {now}, 已过去: {elapsed:.1f}秒, 剩余: {remaining:.1f}秒"
-                )
-                if elapsed > 120:  # 超过2分钟
-                    logging.info("验证码已过期 - 超过2分钟")
-                    self.clear_cookie("captcha_answer")
-                    self.clear_cookie("captcha_generate_time")
-                    return {"err": "captcha.expired", "msg": _("验证码已过期，请刷新")}
-            except Exception as e:
-                logging.warning(f"验证码时间解析失败: {e}")
-
-            # 先验证
-            result = captcha_module.verify_captcha(
-                CONF,
-                captcha_code=captcha_code,
-                captcha_answer=captcha_answer.decode("utf-8"),
-            )
-
-            # 验证成功后保留cookie（供后续表单提交时验证），失败不清除（允许重试）
-            if result:
-                return {"err": "ok", "msg": _("验证通过")}
-            else:
-                return {"err": "captcha.invalid", "msg": _("验证码错误，请重试")}
-
-        # 极验验证码验证
-        lot_number = self.get_argument("lot_number", "")
-        captcha_output = self.get_argument("captcha_output", "")
-        pass_token = self.get_argument("pass_token", "")
-        gen_time = self.get_argument("gen_time", "")
-
-        if not provider_name:
-            return {"err": "params.invalid", "msg": _("验证提供商不能为空")}
-
-        # 执行验证
-        result = captcha_module.verify_captcha(
-            CONF,
-            lot_number=lot_number,
-            captcha_output=captcha_output,
-            pass_token=pass_token,
-            gen_time=gen_time,
-        )
-
-        if result:
-            return {"err": "ok", "msg": _("验证通过")}
+                book_id = int(self.get_argument("book_id", ""))
+            except ValueError:
+                return {"err": "params.invalid", "msg": _("书籍编号无效")}
+            if not self.get_book(book_id, raise_exception=False):
+                return {"err": "not_found", "msg": _("抱歉，这本书不存在")}
+            if not captcha_module.is_captcha_enabled(CONF, scene):
+                return {"err": "ok"}
         else:
-            return {"err": "captcha.invalid", "msg": _("验证失败，请重试")}
+            # ImageCaptchaWidget previews the answer before its parent submits it.
+            if provider != "image":
+                return {"err": "params.invalid", "msg": _("验证场景无效")}
+            scene = "preview"
+        valid, message = check_captcha(self, scene, consume=scene != "preview", required=True)
+        if not valid:
+            return {"err": "captcha.invalid", "msg": message}
+        if scene != "preview":
+            grants = _book_grants(self, scene)
+            grants[str(book_id)] = time.time()
+            grants = dict(sorted(grants.items(), key=lambda item: item[1])[-20:])
+            web.RequestHandler.set_secure_cookie(
+                self,
+                "captcha_" + scene,
+                json.dumps({"context": _grant_context(self), "books": grants}),
+                expires_days=BOOK_CAPTCHA_TTL / 86400,
+                httponly=True,
+                samesite="Lax",
+                secure=self.request.protocol == "https",
+            )
+            self.set_header("Cache-Control", "no-store")
+        return {"err": "ok", "msg": _("验证通过")}
 
 
 def routes():

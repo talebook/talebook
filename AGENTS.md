@@ -173,6 +173,7 @@ cd app && npm run lint   # 前端：eslint 必须通过
 - 后端新增 JSON 接口默认使用 `@js` + `@auth` 装饰器，返回 `{"err": "ok", ...}`，禁止直接抛出 HTTP 异常。与公开阅读能力绑定的只读 JSON 可以不加 `@auth`，但必须逐资源调用 `can_view_book()` 或等价权限校验，并补游客、私有资源和所有者测试。媒体流、Podcast、OPDS 等非 JSON 协议可以使用标准 HTTP 状态码，但不得绕过资源权限。
 - 前端 API 调用统一使用 `plugins/talebook.js` 的 `backend()` 函数，禁止直接使用 `fetch`。
 - 前端 i18n 文案（`app/i18n/locales/*.json` ）中**禁止出现字面量 `@` 和 `<`**：vue-i18n 把 `@`（如 `@js:`）当链接消息语法（报 `Invalid linked format`）、把 `<`（如 `<js>`）当 HTML（报 `Detected HTML`），任一出现都会让**整个 locale 编译失败**——页面所有文案显示为原始 key、dev server 返回 500，而 `JSON.parse` 与 eslint 均不报错（只有 dev server 日志里有 `[unplugin-vue-i18n]` 错误）。文案应改写绕开这两个符号，必须保留时用字面插值 `{'@'}`。新增 key 后 HMR 常不热更，需重启 `nuxt dev`。
+- **不要假设容器内 umask 是 `0022`**：飞牛 fnOS 等 NAS 的 Docker 会以 umask `0002` 启动容器（#1086），不显式指定权限新建的目录和文件会变成组可写。启动脚本和以 root 运行的代码凡是创建目录或文件后又校验权限（如升级执行器要求 root 所有、组/其他不可写），必须显式传 `mode` 或先设置 `os.umask(0o022)`，否则会被自己的校验拒绝、导致容器无限重启；对应测试要覆盖 umask `0002` 场景。
 
 ### 目录规范
 

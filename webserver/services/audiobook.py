@@ -17,6 +17,9 @@ import time
 import uuid
 from pathlib import Path, PurePosixPath
 
+from sqlalchemy import func
+from sqlalchemy.orm import object_session
+
 from webserver import loader
 from webserver.models import AudiobookChapter, AudiobookEdition, AudiobookJob
 from webserver.services.convert import ConvertService
@@ -39,6 +42,147 @@ NORMALIZATION_REPORT_KEYS = (
     "removed_noncontent_block_count",
     "locator_unmapped_count",
 )
+PROGRESS_SCHEMA = "voicebook-progress.v2"
+PROGRESS_COUNTS = (
+    "total",
+    "completed",
+    "active",
+    "retrying",
+    "failed",
+    "cancelled",
+    "pending",
+    "queued",
+    "active_requests",
+    "concurrency",
+    "retries",
+    "cache_hits",
+    "chapters_total",
+    "chapters_completed",
+    "requests_started",
+)
+PROGRESS_STATUSES = {
+    "running",
+    "rate_queued",
+    "rate_limit_retry",
+    "retrying",
+    "cooling_down",
+    "cancelling",
+    "completed",
+    "failed",
+    "cancelled",
+}
+WAIT_REASONS = {
+    "request_interval",
+    "fair_queue",
+    "global_concurrency",
+    "starting_request",
+    "request_budget",
+    "network_error",
+    "provider_error",
+    "clock_skew_adjustment",
+    "shared_cooldown",
+    "rate_limited",
+}
+
+
+def _progress_snapshot(value):
+    """Keep supported, bounded v2 fields; reject inconsistent absolute counts."""
+    if not isinstance(value, dict) or value.get("schema") != PROGRESS_SCHEMA or value.get("unit") != "speech_segment":
+        return None
+    if value.get("status") not in PROGRESS_STATUSES:
+        return None
+    if value.get("stage") not in {"preparing", "synthesizing", "assembling", "finalizing", "completed"}:
+        return None
+    result = {key: value[key] for key in ("schema", "unit", "status", "stage")}
+    for key in PROGRESS_COUNTS:
+        count = value.get(key, 0)
+        if isinstance(count, bool) or not isinstance(count, int) or not 0 <= count <= 1_000_000_000:
+            return None
+        result[key] = count
+    if result["total"] != sum(
+        result[key] for key in ("completed", "active", "retrying", "failed", "cancelled", "pending", "queued")
+    ):
+        return None
+    result["updated_at"] = str(value.get("updated_at") or "")[:80]
+    wait_seconds = value.get("wait_seconds", 0)
+    if isinstance(wait_seconds, (int, float)) and not isinstance(wait_seconds, bool) and 0 <= wait_seconds <= 86400:
+        result["wait_seconds"] = wait_seconds
+    waiting = value.get("waiting")
+    result["waiting"] = None
+    if isinstance(waiting, dict):
+        retry_count = waiting.get("retry_count", 0)
+        result["waiting"] = {
+            "reason": waiting.get("reason") if waiting.get("reason") in WAIT_REASONS else "unknown",
+            "retry_count": retry_count if isinstance(retry_count, int) and 0 <= retry_count <= 10 else 0,
+            "next_request_at": str(waiting.get("next_request_at") or "")[:80] or None,
+        }
+    budget = value.get("edge_budget")
+    if isinstance(budget, dict):
+        result["edge_budget"] = {
+            key: item
+            for key, item in budget.items()
+            if key in {"requests", "rate_limits", "retries", "cooldowns", "cooldown_until"}
+            and isinstance(item, (int, float))
+            and not isinstance(item, bool)
+            and 0 <= item <= 1_000_000_000_000
+        }
+    return result
+
+
+def _reset_generation_progress(job):
+    data = dict(job.data or {})
+    for key in (
+        "generation",
+        "voicebook_invocation",
+        "last_event",
+        "current_chapter",
+        "completed_segments",
+        "chapter_segments",
+    ):
+        data.pop(key, None)
+    plan = _copy_job_plan(data, job.mode)
+    for key in ("generate", "finalize", "complete"):
+        plan.get("phases", {}).pop(key, None)
+    for chapter in plan.get("chapters", []):
+        chapter.update(status="pending", completed_segments=0, cache_hits=0, resumed=False, duration_ms=0, size_bytes=0)
+        for key in ("started_at", "completed_at", "completed_indices"):
+            chapter.pop(key, None)
+    data["plan"] = plan
+    job.data = data
+    job.progress = 0.0
+    job.last_event_seq = -1
+
+
+def audiobook_job_generation(job):
+    """Public generation state is independent of the scheduler's lease heartbeat."""
+    data = job.data or {}
+    invocation = data.get("voicebook_invocation") or {}
+    snapshot = data.get("generation")
+    connection = "idle"
+    if job.status in {"inspecting", "generating"}:
+        connection = "unknown"
+        received = invocation.get("last_received_at") or invocation.get("started_at")
+        if received:
+            try:
+                age = (
+                    datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromisoformat(received)
+                ).total_seconds()
+                connection = "stale" if age > max(3, float(CONF.get("AUDIOBOOK_PROGRESS_STALE_SECONDS", 15))) else "live"
+            except (TypeError, ValueError):
+                pass
+        if job.lease_until and job.lease_until < utcnow():
+            connection = "interrupted"
+    if data.get("generation_interrupted"):
+        connection = "interrupted"
+    return {
+        "available": bool(snapshot),
+        "protocol_version": invocation.get("version", 1),
+        "task_id": invocation.get("task_id"),
+        "attempt_id": invocation.get("attempt_id"),
+        "seq": job.last_event_seq,
+        "connection": connection,
+        "snapshot": snapshot,
+    }
 
 
 def utcnow():
@@ -245,7 +389,7 @@ def confirm_audiobook_job_plan(job):
     _mark_plan_phase(plan, "review", "completed")
     data["plan"] = plan
     job.data = data
-    job.progress = max(float(job.progress or 0), 0.20)
+    job.progress = 0.0
 
 
 def _terminal_phase_status(job, key, plan):
@@ -263,7 +407,10 @@ def audiobook_job_plan(job):
     data = job.data or {}
     stored = data.get("plan") or {}
     plan = _copy_job_plan(data, job.mode)
-    chapters = sorted(plan.get("chapters", []), key=lambda item: int(item.get("number", 0)))
+    chapters = sorted(
+        ({key: value for key, value in item.items() if key != "completed_indices"} for item in plan.get("chapters", [])),
+        key=lambda item: int(item.get("number", 0)),
+    )
     chapters_total = len(chapters)
     chapters_completed = sum(1 for item in chapters if item.get("status") == "completed")
     segments_total = sum(max(0, int(item.get("total_segments", 0))) for item in chapters)
@@ -272,21 +419,8 @@ def audiobook_job_plan(job):
     )
     cache_hits = sum(max(0, int(item.get("cache_hits", 0))) for item in chapters)
 
-    derived_progress = 0.0
-    if job.status == "inspecting":
-        derived_progress = 0.05
-    elif data.get("inspected"):
-        derived_progress = 0.15
-    if plan.get("review_status") in {"completed", "skipped"}:
-        derived_progress = max(derived_progress, 0.20)
-    if segments_total:
-        derived_progress = max(derived_progress, 0.20 + 0.75 * segments_completed / segments_total)
-    if job.status == "finalizing":
-        derived_progress = max(derived_progress, 0.98)
-    if job.status == "completed":
-        derived_progress = 1.0
-    overall_percent = int(max(float(job.progress or 0), derived_progress) * 100 + 0.5000001)
-    overall_percent = max(0, min(100, overall_percent))
+    # There is no meaningful denominator across inspect, human review and publication.
+    overall_percent = 100 if job.status == "completed" else None
 
     phase_times = plan.get("phases", {})
     phase_statuses = {
@@ -486,6 +620,10 @@ class ScriptValidationError(ValueError):
         self.errors = errors
 
 
+class AudiobookLeaseLost(RuntimeError):
+    """A stale invocation must stop without writing another worker's state."""
+
+
 class VoicebookProcess:
     def __init__(self, storage):
         self.storage = storage
@@ -501,6 +639,33 @@ class VoicebookProcess:
             return {"ok": False, "reason": str(exc)}
         return {"ok": result.returncode == 0, "version": result.stdout.strip(), "reason": result.stderr.strip()}
 
+    def progress_version(self):
+        health = self.health()
+        match = re.search(r"\b(\d+)\.(\d+)\.(\d+)\b", health.get("version", ""))
+        return 2 if health.get("ok") and match and tuple(map(int, match.groups())) >= (0, 8, 0) else 1
+
+    def generation_options(self, engine):
+        """Every worker uses the same persistent Edge budget, including retries."""
+        configured = str(CONF.get("VOICEBOOK_EDGE_BUDGET_PATH") or "")
+        budget = Path(configured).expanduser() if configured else self.storage.root / "rate-limits/edge-budget.sqlite3"
+        if not budget.is_absolute():
+            raise ValueError("VOICEBOOK_EDGE_BUDGET_PATH 必须是绝对路径")
+        options = ["--edge-budget-path", str(budget.resolve())]
+        settings = {
+            "--concurrency": ("VOICEBOOK_EDGE_CONCURRENCY", 1) if engine == "edgetts" else ("VOICEBOOK_QWEN_CONCURRENCY", 2),
+            "--edge-max-concurrency": ("VOICEBOOK_EDGE_MAX_CONCURRENCY", 1),
+            "--edge-interval": ("VOICEBOOK_EDGE_INTERVAL", 5),
+            "--max-retries": ("VOICEBOOK_MAX_RETRIES", 2),
+            "--retry-backoff": ("VOICEBOOK_RETRY_BACKOFF", 1),
+            "--max-wait-seconds": ("VOICEBOOK_MAX_WAIT_SECONDS", 300),
+            "--edge-cooldown-seconds": ("VOICEBOOK_EDGE_COOLDOWN_SECONDS", 30),
+            "--edge-request-limit": ("VOICEBOOK_EDGE_REQUEST_LIMIT", 0),
+            "--edge-window-seconds": ("VOICEBOOK_EDGE_WINDOW_SECONDS", 3600),
+        }
+        for option, (key, default) in settings.items():
+            options.extend((option, str(CONF.get(key, default))))
+        return options
+
     def run(self, job, arguments, on_event, on_control=None):
         job_dir = self.storage.job_dir(job.id)
         job_dir.mkdir(parents=True, exist_ok=True)
@@ -508,6 +673,14 @@ class VoicebookProcess:
         events_file = job_dir / "events.jsonl"
         log_file = job_dir / "stderr.log"
         command = self.command + arguments + ["--progress-format", "jsonl", "--cancel-file", str(cancel_file)]
+        invocation = (getattr(job, "data", None) or {}).get("voicebook_invocation") or {}
+        if invocation.get("version") == 2:
+            command.extend(
+                ("--progress-version", "2", "--task-id", invocation["task_id"], "--attempt-id", invocation["attempt_id"])
+            )
+            if arguments[0] == "generate":
+                engine = arguments[arguments.index("--engine") + 1] if "--engine" in arguments else "edgetts"
+                command.extend(self.generation_options(engine))
         with log_file.open("a", encoding="utf-8") as errors, events_file.open("a", encoding="utf-8") as events:
             process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=errors, text=True, bufsize=1)
             output = queue.Queue()
@@ -544,7 +717,7 @@ class VoicebookProcess:
                     try:
                         on_event(json.loads(line))
                     except (ValueError, TypeError):
-                        logging.warning("invalid voicebook event: %s", line[:300])
+                        logging.warning("invalid voicebook event for job %s", job.id)
 
                 now = time.monotonic()
                 if on_control and now - last_control_at >= heartbeat:
@@ -552,8 +725,11 @@ class VoicebookProcess:
                     last_control_at = now
                 if control.get("lease_owned") is False:
                     lease_lost = True
-                    if process.poll() is None:
+                    if process.poll() is None and term_sent_at is None:
                         process.terminate()
+                        term_sent_at = now
+                    if process.poll() is None and now - term_sent_at >= kill_after:
+                        process.kill()
                 if control.get("cancel_requested"):
                     cancel_seen_at = cancel_seen_at or now
                     if process.poll() is None and now - cancel_seen_at >= term_after and term_sent_at is None:
@@ -562,6 +738,8 @@ class VoicebookProcess:
                     if process.poll() is None and term_sent_at is not None and now - term_sent_at >= kill_after:
                         process.kill()
             status = process.wait()
+            reader.join()
+            process.stdout.close()
         if lease_lost:
             raise RuntimeError("有声书任务租约已丢失，已停止重复进程")
         if cancel_seen_at is not None:
@@ -614,23 +792,36 @@ class AudiobookScheduler:
         session = self.session_maker()
         try:
             now = utcnow()
-            (
+            expired = (
                 session.query(AudiobookJob)
                 .filter(
                     AudiobookJob.status.in_(("inspecting", "generating", "finalizing")),
                     AudiobookJob.lease_until.isnot(None),
                     AudiobookJob.lease_until < now,
                 )
-                .update(
-                    {
-                        AudiobookJob.status: "queued",
-                        AudiobookJob.phase: "QUEUED",
-                        AudiobookJob.lease_owner: "",
-                        AudiobookJob.last_event_seq: -1,
-                    },
-                    synchronize_session=False,
-                )
+                .all()
             )
+            for job in expired:
+                # Recovery competes with lease heartbeats and other workers: compare again on write.
+                conditions = self._job_write_conditions(job)
+                with session.no_autoflush:
+                    _reset_generation_progress(job)
+                    reset_data = {**job.data, "generation_interrupted": True}
+                    session.expire(job)
+                    session.query(AudiobookJob).filter(
+                        *conditions,
+                    ).update(
+                        {
+                            AudiobookJob.data: reset_data,
+                            AudiobookJob.status: "queued",
+                            AudiobookJob.phase: "QUEUED",
+                            AudiobookJob.lease_owner: "",
+                            AudiobookJob.lease_until: None,
+                            AudiobookJob.progress: 0.0,
+                            AudiobookJob.last_event_seq: -1,
+                        },
+                        synchronize_session=False,
+                    )
             session.commit()
             self._run_maintenance()
             job = (
@@ -645,11 +836,14 @@ class AudiobookScheduler:
                 logging.warning("audiobook scheduler paused: free disk space is below AUDIOBOOK_MIN_FREE_GB")
                 return False
             job_id = job.id
+            now = utcnow()
+            conditions = self._job_write_conditions(job)
+            identity = (self.worker_id, int(job.attempts or 0) + 1, self._job_identity(job)[2])
             status = "inspecting" if not job.data.get("inspected") else "generating"
             phase = "INSPECTING" if not job.data.get("inspected") else "GENERATING"
             claimed = (
                 session.query(AudiobookJob)
-                .filter(AudiobookJob.id == job_id, AudiobookJob.status == "queued")
+                .filter(*conditions)
                 .update(
                     {
                         AudiobookJob.status: status,
@@ -669,7 +863,7 @@ class AudiobookScheduler:
                 return True
         finally:
             session.close()
-        self._process(job_id)
+        self._process(job_id, identity)
         return True
 
     def _has_capacity(self):
@@ -712,29 +906,82 @@ class AudiobookScheduler:
         finally:
             session.close()
 
-    def _control(self, job_id):
+    @staticmethod
+    def _job_identity(job):
+        invocation = (job.data or {}).get("voicebook_invocation") or {}
+        return job.lease_owner, int(job.attempts or 0), invocation.get("attempt_id")
+
+    def _owned_job(self, session, job_id, identity=None, *, allow_cancel=False):
+        job = session.get(AudiobookJob, job_id)
+        if (
+            not job
+            or job.lease_owner != self.worker_id
+            or job.status not in {"inspecting", "generating", "finalizing"}
+            or not job.lease_until
+            or job.lease_until <= utcnow()
+            or (identity is not None and self._job_identity(job) != identity)
+            or (job.cancel_requested and not allow_cancel)
+        ):
+            raise AudiobookLeaseLost("有声书任务租约或尝试已丢失，已停止旧调用")
+        return job
+
+    def _worker_write_conditions(self, session, job):
+        conditions = (*self._job_write_conditions(job), AudiobookJob.lease_until > utcnow())
+        if session.get_bind().dialect.name == "sqlite":
+            # SQLite executes this clock after a blocked UPDATE resumes. Its local
+            # timezone matches the existing naive datetime.now() lease storage.
+            conditions += (AudiobookJob.lease_until > func.strftime("%Y-%m-%d %H:%M:%f", "now", "localtime"),)
+        return conditions
+
+    @staticmethod
+    def _write_worker_job(session, job, conditions, values):
+        with session.no_autoflush:
+            session.expire(job)
+            updated = session.query(AudiobookJob).filter(*conditions).update(values, synchronize_session=False)
+        if not updated:
+            session.rollback()
+            raise AudiobookLeaseLost("有声书任务写入竞争失败，已停止旧调用")
+
+    def _control(self, job_id, identity=None):
         session = self.session_maker()
+        checked_identity = None
         try:
-            job = (
-                session.query(AudiobookJob)
-                .filter(
-                    AudiobookJob.id == int(job_id),
-                    AudiobookJob.lease_owner == self.worker_id,
-                    AudiobookJob.status.in_(("inspecting", "generating", "finalizing")),
-                )
-                .first()
-            )
-            if not job:
-                return {"lease_owned": False, "cancel_requested": False}
-            job.lease_until = utcnow() + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30))))
-            job.update_time = utcnow()
+            job = self._owned_job(session, int(job_id), identity, allow_cancel=True)
+            checked_identity = self._job_identity(job)
             state = {
                 "lease_owned": True,
                 "cancel_requested": bool(job.cancel_requested),
                 "cancel_requested_at": job.cancel_requested_at,
             }
+            self._write_worker_job(
+                session,
+                job,
+                self._worker_write_conditions(session, job),
+                {
+                    AudiobookJob.lease_until: utcnow()
+                    + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30)))),
+                    AudiobookJob.update_time: utcnow(),
+                },
+            )
             session.commit()
             return state
+        except AudiobookLeaseLost:
+            if checked_identity is not None:
+                # A progress event or user cancellation can win this UPDATE while
+                # the same invocation remains valid. Re-read its identity without
+                # adopting a replacement claim/attempt or renewing a stale lease.
+                session.expire_all()
+                try:
+                    current = self._owned_job(session, int(job_id), checked_identity, allow_cancel=True)
+                except AudiobookLeaseLost:
+                    pass
+                else:
+                    return {
+                        "lease_owned": True,
+                        "cancel_requested": bool(current.cancel_requested),
+                        "cancel_requested_at": current.cancel_requested_at,
+                    }
+            return {"lease_owned": False, "cancel_requested": False}
         finally:
             session.close()
 
@@ -859,10 +1106,60 @@ class AudiobookScheduler:
                 raise RuntimeError("TXT 转规范 EPUB 失败")
         return converted
 
-    def _process(self, job_id):
+    def _begin_invocation(self, job_id, version, phase, identity=None):
         session = self.session_maker()
         try:
-            job = session.get(AudiobookJob, job_id)
+            job = self._owned_job(session, job_id, identity)
+            if job.status == "finalizing" or (phase == "INSPECTING" and job.status != "inspecting"):
+                raise AudiobookLeaseLost("有声书任务阶段已改变，已停止旧调用")
+            conditions = self._worker_write_conditions(session, job)
+            if phase == "GENERATING":
+                _reset_generation_progress(job)
+            data = dict(job.data or {})
+            data.pop("generation_interrupted", None)
+            data["voicebook_invocation"] = {
+                "version": version,
+                "task_id": f"talebook-job-{job.id}",
+                "attempt_id": str(uuid.uuid4()),
+                "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            }
+            plan = _copy_job_plan(data, job.mode)
+            _mark_plan_phase(plan, "generate" if phase == "GENERATING" else "inspect", "started")
+            data["plan"] = plan
+            job.data = data
+            job.last_event_seq = -1
+            job.error_code = ""
+            job.error_message = ""
+            job.status = "generating" if phase == "GENERATING" else "inspecting"
+            job.phase = phase
+            invocation_identity = self._job_identity(job)
+            self._write_worker_job(
+                session,
+                job,
+                conditions,
+                {
+                    column: getattr(job, column.key)
+                    for column in (
+                        AudiobookJob.data,
+                        AudiobookJob.last_event_seq,
+                        AudiobookJob.error_code,
+                        AudiobookJob.error_message,
+                        AudiobookJob.status,
+                        AudiobookJob.phase,
+                        AudiobookJob.progress,
+                    )
+                },
+            )
+            session.commit()
+            return invocation_identity
+        finally:
+            session.close()
+
+    def _process(self, job_id, identity=None):
+        session = self.session_maker()
+        try:
+            job = self._owned_job(session, job_id, identity)
+            identity = self._job_identity(job)
             edition = session.get(AudiobookEdition, job.edition_id)
             job_dir = self.storage.job_dir(job.id)
             edition_dir = self.storage.edition_dir(edition.id)
@@ -871,49 +1168,63 @@ class AudiobookScheduler:
             script = edition_dir / "book.script"
             source = self._source_path(job, job_dir)
             process = VoicebookProcess(self.storage)
+            version = process.progress_version()
 
             def on_event(event):
-                self._consume_event(job_id, event)
+                self._consume_event(job_id, event, identity)
 
             def on_control():
-                return self._control(job_id)
+                return self._control(job_id, identity)
 
             if not job.data.get("inspected"):
+                identity = self._begin_invocation(job_id, version, "INSPECTING", identity)
+                session.expire_all()
                 args = ["inspect", str(source), "-o", str(script)]
                 if job.chapter_selection:
                     args.extend(("--chapters", job.chapter_selection))
                 status = process.run(job, args, on_event, on_control)
                 if status == 3:
-                    self._finish_cancelled(job_id)
+                    self._finish_cancelled(job_id, identity)
                     return
                 session.expire_all()
-                job = session.get(AudiobookJob, job_id)
+                job = self._owned_job(session, job_id, identity)
+                conditions = self._worker_write_conditions(session, job)
                 edition = session.get(AudiobookEdition, job.edition_id)
                 job.data = {**job.data, "inspected": True}
                 edition.script_path = self.storage.relative(script)
                 self._apply_generation_defaults(script, job, edition)
                 workspace = read_script_workspace(script)
                 initialize_audiobook_job_plan(job, workspace)
-                job.progress = max(float(job.progress or 0), 0.15)
+                job.progress = 0.0
                 job.update_time = utcnow()
                 if job.mode == "advanced":
                     job.status = "awaiting_review"
                     job.phase = "AWAITING_REVIEW"
-                    session.commit()
-                    return
-                job.progress = max(float(job.progress or 0), 0.20)
+                    job.lease_owner = ""
+                    job.lease_until = None
+                self._write_worker_job(
+                    session,
+                    job,
+                    conditions,
+                    {
+                        column: getattr(job, column.key)
+                        for column in (
+                            AudiobookJob.data,
+                            AudiobookJob.progress,
+                            AudiobookJob.update_time,
+                            AudiobookJob.status,
+                            AudiobookJob.phase,
+                            AudiobookJob.lease_owner,
+                            AudiobookJob.lease_until,
+                        )
+                    },
+                )
                 session.commit()
+                if job.mode == "advanced":
+                    return
 
-            job.status = "generating"
-            job.phase = "GENERATING"
-            job.last_event_seq = -1
-            data = dict(job.data or {})
-            plan = _copy_job_plan(data, job.mode)
-            _mark_plan_phase(plan, "generate", "started")
-            data["plan"] = plan
-            job.data = data
-            job.progress = max(float(job.progress or 0), 0.20)
-            session.commit()
+            identity = self._begin_invocation(job_id, version, "GENERATING", identity)
+            session.expire_all()
             revision = (job.data or {}).get("revision") or {}
             output_dir = job_dir / "revision-output" if revision else edition_dir
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -926,12 +1237,15 @@ class AudiobookScheduler:
                 args.append("--resume")
             status = process.run(job, args, on_event, on_control)
             if status == 3:
-                self._finish_cancelled(job_id)
+                self._finish_cancelled(job_id, identity)
                 return
+            session.expire_all()
+            job = self._owned_job(session, job_id, identity)
             if revision:
                 self._commit_revision_output(job, edition, output_dir)
             session.expire_all()
-            job = session.get(AudiobookJob, job_id)
+            job = self._owned_job(session, job_id, identity)
+            conditions = self._worker_write_conditions(session, job)
             data = dict(job.data or {})
             plan = _copy_job_plan(data, job.mode)
             timestamp = utcnow().isoformat()
@@ -941,17 +1255,45 @@ class AudiobookScheduler:
             job.data = data
             job.status = "finalizing"
             job.phase = "FINALIZING"
-            job.progress = max(float(job.progress or 0), 0.98)
+            job.progress = 0.0
             job.update_time = utcnow()
+            self._write_worker_job(
+                session,
+                job,
+                conditions,
+                {
+                    column: getattr(job, column.key)
+                    for column in (
+                        AudiobookJob.data,
+                        AudiobookJob.status,
+                        AudiobookJob.phase,
+                        AudiobookJob.progress,
+                        AudiobookJob.update_time,
+                    )
+                },
+            )
             session.commit()
-            self._finalize(job_id)
-            if revision:
+            published = self._finalize(job_id, identity)
+            if published and revision:
                 shutil.rmtree(output_dir, ignore_errors=True)
+        except AudiobookLeaseLost:
+            session.rollback()
+            self._finish_cancelled(job_id, identity, requested_only=True)
         except Exception as exc:
             logging.exception("audiobook job %s failed", job_id)
             session.rollback()
-            job = session.get(AudiobookJob, job_id)
-            if job:
+            self._finish_failed(job_id, identity, exc)
+        finally:
+            session.close()
+
+    def _finish_failed(self, job_id, identity, exc):
+        session = self.session_maker()
+        try:
+            job = self._owned_job(session, job_id, identity, allow_cancel=True)
+            if job.cancel_requested:
+                self._finish_cancelled(job_id, identity, requested_only=True)
+            else:
+                conditions = self._worker_write_conditions(session, job)
                 data = dict(job.data or {})
                 plan = _copy_job_plan(data, job.mode)
                 plan["last_active_phase"] = {
@@ -965,21 +1307,82 @@ class AudiobookScheduler:
                 job.data = data
                 job.status = "failed"
                 job.phase = "FAILED"
-                job.error_code = type(exc).__name__
-                job.error_message = str(exc)[:4000]
+                job.error_code = job.error_code or type(exc).__name__
+                job.error_message = job.error_message or str(exc)[:4000]
                 job.lease_owner = ""
                 job.lease_until = None
                 job.finished_at = utcnow()
                 job.update_time = utcnow()
+                self._write_worker_job(
+                    session,
+                    job,
+                    conditions,
+                    {
+                        column: getattr(job, column.key)
+                        for column in (
+                            AudiobookJob.data,
+                            AudiobookJob.status,
+                            AudiobookJob.phase,
+                            AudiobookJob.error_code,
+                            AudiobookJob.error_message,
+                            AudiobookJob.lease_owner,
+                            AudiobookJob.lease_until,
+                            AudiobookJob.finished_at,
+                            AudiobookJob.update_time,
+                        )
+                    },
+                )
                 session.commit()
+        except AudiobookLeaseLost:
+            session.rollback()
         finally:
             session.close()
 
-    def _consume_event(self, job_id, event):
+    @staticmethod
+    def _job_write_conditions(job):
+        # JSONType stores text. Comparing the complete original value also fences
+        # attempt_id changes without relying on database-specific JSON operators.
+        data = json.loads(json.dumps(job.data)) if job.data is not None else None
+        return (
+            AudiobookJob.id == job.id,
+            AudiobookJob.lease_owner == job.lease_owner,
+            AudiobookJob.status == job.status,
+            AudiobookJob.last_event_seq == job.last_event_seq,
+            AudiobookJob.data == data,
+            AudiobookJob.attempts == job.attempts,
+            AudiobookJob.lease_until == job.lease_until,
+            AudiobookJob.cancel_requested == bool(job.cancel_requested),
+        )
+
+    def _consume_event(self, job_id, event, identity=None):
         session = self.session_maker()
         try:
             job = session.get(AudiobookJob, job_id)
-            if not job:
+            if not job or job.lease_owner != self.worker_id or job.status not in {"inspecting", "generating"}:
+                return
+            if identity is not None and self._job_identity(job) != identity:
+                return
+            if not isinstance(event, dict):
+                return
+            write_conditions = self._worker_write_conditions(session, job)
+            data = dict(job.data or {})
+            invocation = data.get("voicebook_invocation") or {}
+            if invocation.get("version") == 2:
+                if (
+                    event.get("schema") != PROGRESS_SCHEMA
+                    or event.get("task_id") != invocation.get("task_id")
+                    or event.get("attempt_id") != invocation.get("attempt_id")
+                    or job.lease_owner != self.worker_id
+                    or job.status not in {"inspecting", "generating"}
+                    or isinstance(event.get("seq"), bool)
+                    or not isinstance(event.get("seq"), int)
+                    or event.get("seq", 0) < 1
+                ):
+                    return
+            elif event.get("schema") not in {None, "voicebook-progress.v1"}:
+                return
+            snapshot = _progress_snapshot(event.get("snapshot")) if invocation.get("version") == 2 else None
+            if invocation.get("version") == 2 and "snapshot" in event and snapshot is None:
                 return
             try:
                 sequence = int(event.get("seq"))
@@ -989,9 +1392,15 @@ class AudiobookScheduler:
                 return
             if sequence is not None:
                 job.last_event_seq = sequence
+            if invocation:
+                data["voicebook_invocation"] = {
+                    **invocation,
+                    "last_received_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                }
+            if snapshot is not None:
+                data["generation"] = snapshot
             name = event.get("event")
             timestamp = str(event.get("at") or utcnow().isoformat())
-            data = dict(job.data or {})
             plan = _copy_job_plan(data, job.mode)
             if name == "phase_started":
                 job.phase = str(event.get("job_phase", job.phase))
@@ -999,7 +1408,6 @@ class AudiobookScheduler:
                 if phase_key:
                     _mark_plan_phase(plan, "queue", "completed", timestamp)
                     _mark_plan_phase(plan, phase_key, "started", timestamp)
-                    job.progress = max(float(job.progress or 0), 0.05 if phase_key == "inspect" else 0.20)
             public_event_keys = {
                 "seq",
                 "event",
@@ -1016,6 +1424,9 @@ class AudiobookScheduler:
                 "code",
                 "message",
                 "retryable",
+                "schema",
+                "task_id",
+                "attempt_id",
             }
             data["last_event"] = {key: value for key, value in event.items() if key in public_event_keys}
             chapters = plan.setdefault("chapters", [])
@@ -1054,13 +1465,19 @@ class AudiobookScheduler:
                     chapter["cache_hits"] = 0
                     chapter["started_at"] = timestamp
             elif name == "segment_completed":
-                data["completed_segments"] = int(data.get("completed_segments", 0)) + 1
                 chapter = chapter_record()
                 if chapter is not None:
                     total = max(0, int(chapter.get("total_segments", 0)))
-                    completed = int(chapter.get("completed_segments", 0)) + 1
+                    indices = list(chapter.get("completed_indices") or [])
+                    index = event.get("segment_index")
+                    duplicate = isinstance(index, int) and index in indices
+                    if isinstance(index, int) and not duplicate:
+                        indices.append(index)
+                        chapter["completed_indices"] = indices
+                    completed = len(indices) if indices else int(chapter.get("completed_segments", 0)) + 1
                     chapter["completed_segments"] = min(completed, total) if total else completed
-                    if event.get("cache_hit"):
+                    data["completed_segments"] = chapter["completed_segments"]
+                    if event.get("cache_hit") and not duplicate:
                         chapter["cache_hits"] = int(chapter.get("cache_hits", 0)) + 1
             elif name == "chapter_completed":
                 chapter = chapter_record()
@@ -1087,45 +1504,87 @@ class AudiobookScheduler:
                     data["normalization"] = normalization
             elif name == "completed" and job.status == "generating":
                 _mark_plan_phase(plan, "generate", "completed", timestamp)
-                job.progress = max(float(job.progress or 0), 0.95)
+            elif name == "failed":
+                job.error_code = str(event.get("code") or "VoicebookError")[:100]
+                job.error_message = str(event.get("message") or "语音生成失败")[:4000]
+                data["generation_retryable"] = bool(event.get("retryable"))
             data["plan"] = plan
             job.data = data
-            summary = audiobook_job_plan(job)["summary"]
-            if summary["segments_total"]:
-                progress = 0.20 + 0.75 * summary["segments_completed"] / summary["segments_total"]
-                job.progress = max(float(job.progress or 0), min(0.95, progress))
-            if "progress" in event:
-                job.progress = max(float(job.progress or 0), max(0.0, min(1.0, float(event["progress"]))))
+            job.progress = 0.0
             job.lease_until = utcnow() + datetime.timedelta(seconds=max(5, int(CONF.get("AUDIOBOOK_LEASE_SECONDS", 30))))
             job.update_time = utcnow()
+            values = {
+                column: getattr(job, column.key)
+                for column in (
+                    AudiobookJob.data,
+                    AudiobookJob.phase,
+                    AudiobookJob.last_event_seq,
+                    AudiobookJob.progress,
+                    AudiobookJob.lease_until,
+                    AudiobookJob.update_time,
+                    AudiobookJob.error_code,
+                    AudiobookJob.error_message,
+                )
+            }
+            with session.no_autoflush:
+                # Discard the pending ORM write before executing the guarded UPDATE.
+                session.expire(job)
+                updated = session.query(AudiobookJob).filter(*write_conditions).update(values, synchronize_session=False)
+            if not updated:
+                session.rollback()
+                return
             session.commit()
         finally:
             session.close()
 
-    def _finish_cancelled(self, job_id):
+    def _finish_cancelled(self, job_id, identity=None, *, requested_only=False):
         session = self.session_maker()
         try:
-            job = session.get(AudiobookJob, job_id)
+            job = self._owned_job(session, job_id, identity, allow_cancel=True)
+            if requested_only and not job.cancel_requested:
+                return
+            write_conditions = self._worker_write_conditions(session, job)
             data = dict(job.data or {})
             plan = _copy_job_plan(data, job.mode)
             plan["last_active_phase"] = plan.get("last_active_phase", "queue")
             _mark_current_chapter_terminal(data, plan, "cancelled")
             data["plan"] = plan
-            job.data = data
-            job.status = "cancelled"
-            job.phase = "CANCELLED"
-            job.lease_owner = ""
-            job.lease_until = None
-            job.finished_at = utcnow()
-            job.update_time = utcnow()
+            updated = (
+                session.query(AudiobookJob)
+                .filter(*write_conditions)
+                .update(
+                    {
+                        AudiobookJob.data: data,
+                        AudiobookJob.status: "cancelled",
+                        AudiobookJob.phase: "CANCELLED",
+                        AudiobookJob.progress: 0.0,
+                        AudiobookJob.lease_owner: "",
+                        AudiobookJob.lease_until: None,
+                        AudiobookJob.finished_at: utcnow(),
+                        AudiobookJob.update_time: utcnow(),
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if not updated:
+                session.rollback()
+                return
             session.commit()
+        except AudiobookLeaseLost:
+            session.rollback()
         finally:
             session.close()
 
-    def _finalize(self, job_id):
+    def _finalize(self, job_id, identity=None):
         session = self.session_maker()
         try:
-            job = session.get(AudiobookJob, job_id)
+            job = self._owned_job(session, job_id, identity, allow_cancel=True)
+            if job.cancel_requested:
+                self._finish_cancelled(job_id, identity)
+                return False
+            if job.status != "finalizing":
+                return False
+            write_conditions = self._worker_write_conditions(session, job)
             edition = session.get(AudiobookEdition, job.edition_id)
             edition_dir = self.storage.edition_dir(edition.id)
             data = dict(job.data or {})
@@ -1137,6 +1596,8 @@ class AudiobookScheduler:
             else:
                 manifest_path = edition_dir / "manifest.v2.json"
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if manifest.get("status") != "completed":
+                raise ValueError("Voicebook manifest 尚未完成")
             manifest_chapters = _manifest_chapter_map(manifest, "Voicebook manifest")
             if revision:
                 baseline_path = self.storage.resolve(edition.manifest_path, must_exist=True)
@@ -1144,7 +1605,7 @@ class AudiobookScheduler:
                 baseline_chapters = _manifest_chapter_map(baseline, "修订来源 manifest")
                 if set(manifest_chapters) != set(baseline_chapters):
                     raise ValueError("修订候选 manifest 章节集合与来源版本不一致")
-            session.query(AudiobookChapter).filter(AudiobookChapter.edition_id == edition.id).delete()
+            chapters = []
             for record in manifest.get("chapters", []):
                 _audio_relative, audio = _safe_manifest_asset(edition_dir, record.get("audio"), "Voicebook 音频")
                 _timeline_relative, timeline = _safe_manifest_asset(
@@ -1152,6 +1613,8 @@ class AudiobookScheduler:
                     record.get("timeline"),
                     "Voicebook 时间轴",
                 )
+                if not audio.stat().st_size or not isinstance(json.loads(timeline.read_text(encoding="utf-8")), dict):
+                    raise ValueError("Voicebook 音频或时间轴不可用")
                 chapter = AudiobookChapter(
                     edition_id=edition.id,
                     source_key=str(record.get("source_key", "")),
@@ -1164,7 +1627,43 @@ class AudiobookScheduler:
                     content_hash=str(record.get("sha256", "")),
                     episode_guid=stable_json_hash([stable_site_uuid(), job.book_id, record.get("source_key")]),
                 )
-                session.add(chapter)
+                chapters.append(chapter)
+            plan = _copy_job_plan(data, job.mode)
+            timestamp = utcnow().isoformat()
+            _mark_plan_phase(plan, "finalize", "completed", timestamp)
+            _mark_plan_phase(plan, "complete", "completed", timestamp)
+            data["plan"] = plan
+            # This write decides publication versus cancellation/recovery. It holds
+            # the job's write lock through all chapter/edition changes and commit.
+            updated = (
+                session.query(AudiobookJob)
+                .filter(
+                    *write_conditions,
+                    AudiobookJob.cancel_requested.is_(False),
+                    AudiobookJob.lease_until > utcnow(),
+                )
+                .update(
+                    {
+                        AudiobookJob.data: data,
+                        AudiobookJob.status: "completed",
+                        AudiobookJob.phase: "COMPLETED",
+                        AudiobookJob.progress: 1.0,
+                        AudiobookJob.lease_owner: "",
+                        AudiobookJob.lease_until: None,
+                        AudiobookJob.finished_at: utcnow(),
+                        AudiobookJob.update_time: utcnow(),
+                    },
+                    synchronize_session=False,
+                )
+            )
+            if not updated:
+                session.rollback()
+                current = session.get(AudiobookJob, job_id)
+                if current and current.cancel_requested and current.lease_owner == self.worker_id:
+                    self._finish_cancelled(job_id, identity, requested_only=True)
+                return False
+            session.query(AudiobookChapter).filter(AudiobookChapter.edition_id == edition.id).delete()
+            session.add_all(chapters)
             edition.manifest_path = self.storage.relative(manifest_path)
             edition.chapter_count = len(manifest.get("chapters", []))
             edition.completed_count = edition.chapter_count
@@ -1182,34 +1681,55 @@ class AudiobookScheduler:
             else:
                 edition.status = "ready" if complete else "partial"
             edition.update_time = utcnow()
-            plan = _copy_job_plan(data, job.mode)
-            timestamp = utcnow().isoformat()
-            _mark_plan_phase(plan, "finalize", "completed", timestamp)
-            _mark_plan_phase(plan, "complete", "completed", timestamp)
-            data["plan"] = plan
-            job.data = data
-            job.status = "completed"
-            job.phase = "COMPLETED"
-            job.progress = 1.0
-            job.lease_owner = ""
-            job.lease_until = None
-            job.finished_at = utcnow()
-            job.update_time = utcnow()
             session.commit()
+            return True
+        except AudiobookLeaseLost:
+            return False
         finally:
             session.close()
 
 
 def request_cancel(storage, job):
-    job.cancel_requested = True
-    job.cancel_requested_at = job.cancel_requested_at or utcnow()
-    job.update_time = utcnow()
+    session = object_session(job)
+    if session is None:
+        raise ValueError("取消请求必须在任务数据库事务中执行")
+    now = utcnow()
+    with session.no_autoflush:
+        updated = (
+            session.query(AudiobookJob)
+            .filter(AudiobookJob.id == job.id, AudiobookJob.status.in_(ACTIVE_JOB_STATUSES))
+            .update(
+                {
+                    AudiobookJob.cancel_requested: True,
+                    AudiobookJob.cancel_requested_at: func.coalesce(AudiobookJob.cancel_requested_at, now),
+                    AudiobookJob.update_time: now,
+                },
+                synchronize_session="fetch",
+            )
+        )
+    if not updated:
+        return False
     directory = storage.job_dir(job.id)
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "cancel").touch()
+    return True
 
 
 def reset_for_retry(storage, job):
+    session = object_session(job)
+    if session is None or job.status not in {"failed", "cancelled"}:
+        return False
+    try:
+        # Reserve the original terminal row before touching cancellation/staging
+        # files. A concurrent retry/claim cannot be cleared by this stale request.
+        AudiobookScheduler._write_worker_job(
+            session,
+            job,
+            AudiobookScheduler._job_write_conditions(job),
+            {AudiobookJob.update_time: utcnow()},
+        )
+    except AudiobookLeaseLost:
+        return False
     cancel = storage.job_dir(job.id) / "cancel"
     cancel.unlink(missing_ok=True)
     revision = (job.data or {}).get("revision") or {}
@@ -1222,7 +1742,9 @@ def reset_for_retry(storage, job):
     job.cancel_requested_at = None
     job.status = "queued"
     job.phase = "QUEUED"
+    _reset_generation_progress(job)
     data = dict(job.data or {})
+    data.pop("generation_retryable", None)
     plan = _copy_job_plan(data, job.mode)
     _mark_plan_phase(plan, "queue", "started")
     data["plan"] = plan
@@ -1234,3 +1756,4 @@ def reset_for_retry(storage, job):
     job.lease_until = None
     job.finished_at = None
     job.update_time = utcnow()
+    return True

@@ -1,11 +1,14 @@
 import datetime
 import json
+import os
 import sys
 import tempfile
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -257,6 +260,38 @@ def test_cancel_escalates_to_term_and_returns_cancelled_status():
         assert status == 3
 
 
+def test_lease_loss_reaps_a_child_that_ignores_termination():
+    with tempfile.TemporaryDirectory() as directory:
+        storage = AudiobookStorage(directory)
+        storage.ensure()
+        command = [
+            sys.executable,
+            "-u",
+            "-c",
+            "import os, signal, json, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+            "print(json.dumps({'ready': os.getpid()}), flush=True); time.sleep(30)",
+        ]
+        events = []
+        started = time.monotonic()
+        with (
+            mock.patch.object(VoicebookProcess, "command", new_callable=mock.PropertyMock, return_value=command),
+            mock.patch.dict(
+                "webserver.services.audiobook.CONF",
+                {"AUDIOBOOK_HEARTBEAT_SECONDS": 0.05, "AUDIOBOOK_CANCEL_KILL_SECONDS": 0.1},
+            ),
+            pytest.raises(RuntimeError, match="租约已丢失"),
+        ):
+            VoicebookProcess(storage).run(
+                SimpleNamespace(id=3),
+                ["ignored"],
+                events.append,
+                lambda: {"lease_owned": not bool(events), "cancel_requested": False},
+            )
+        assert time.monotonic() - started < 3
+        with pytest.raises(ProcessLookupError):
+            os.kill(events[0]["ready"], 0)
+
+
 def test_event_sequence_is_idempotent_and_renews_lease():
     session_maker = _session_maker()
     with tempfile.TemporaryDirectory() as directory:
@@ -282,7 +317,7 @@ def test_event_sequence_is_idempotent_and_renews_lease():
             config={},
             config_hash="seq-test",
             lease_owner="test-worker",
-            lease_until=now,
+            lease_until=now + datetime.timedelta(minutes=1),
             data={"plan": create_audiobook_job_plan("quick", now)},
             create_time=now,
             update_time=now,
@@ -321,8 +356,8 @@ def test_event_sequence_is_idempotent_and_renews_lease():
         assert updated.data["plan"]["chapters"][0]["completed_segments"] == 1
         assert updated.data["plan"]["chapters"][0]["cache_hits"] == 1
         assert "fingerprint" not in updated.data["last_event"]
-        assert updated.progress == 0.575
-        assert audiobook_job_plan(updated)["overall_percent"] == 58
+        assert updated.progress == 0
+        assert audiobook_job_plan(updated)["overall_percent"] is None
         assert updated.lease_until > now
         session.close()
 
@@ -351,6 +386,8 @@ def test_inspect_completion_keeps_only_bounded_voicebook_quality_counters():
             phase="INSPECTING",
             config={},
             config_hash="inspect-report",
+            lease_owner="test-worker",
+            lease_until=now + datetime.timedelta(minutes=1),
             data={"plan": create_audiobook_job_plan("advanced", now)},
             create_time=now,
             update_time=now,
@@ -488,7 +525,8 @@ def test_cancelled_revision_keeps_edition_manifest_and_retry_commits_complete_ve
             session.commit()
             session.close()
 
-            scheduler._process(fixture.job_id)
+            with mock.patch.object(scheduler, "_has_capacity", return_value=True):
+                assert scheduler.run_once()
 
         session = session_maker()
         completed = session.get(models.AudiobookJob, fixture.job_id)
@@ -546,7 +584,8 @@ def test_revision_merge_failure_keeps_baseline_and_retry_reuses_staging():
             session.commit()
             session.close()
 
-            scheduler._process(fixture.job_id)
+            with mock.patch.object(scheduler, "_has_capacity", return_value=True):
+                assert scheduler.run_once()
 
         session = session_maker()
         completed = session.get(models.AudiobookJob, fixture.job_id)
@@ -569,6 +608,9 @@ def test_revision_finalize_rejects_manifest_with_fewer_chapters_than_baseline():
         scheduler = _scheduler(session_maker, storage)
         fixture = _revision_fixture(session_maker, storage)
         invalid_dir = storage.edition_dir(fixture.edition_id) / "manifests"
+        with session_maker() as session:
+            session.get(models.AudiobookJob, fixture.job_id).status = "finalizing"
+            session.commit()
         invalid_chapter = _write_chapter_files(storage.edition_dir(fixture.edition_id), 1, "invalid")
         _write_manifest(
             invalid_dir,

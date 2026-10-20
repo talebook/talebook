@@ -312,5 +312,15 @@
     "已将书籍设置为%s": "Book set as %s",
     "漫画": "comic",
     "电子书": "ebook",
-    "；失败：%s": "; Failed: %s"
+    "；失败：%s": "; Failed: %s",
+    "在线漫画": "Online comic",
+    "漫画阅读器": "Comic reader",
+    "正在加载在线漫画…": "Loading online comic…",
+    "返回漫画详情": "Back to comic details",
+    "重新加载章节": "Reload chapter",
+    "登录已失效，请重新登录": "Your session has expired. Please sign in again.",
+    "该章节没有可读取的页面": "This chapter has no readable pages.",
+    "漫画页面列表无效": "The comic page manifest is invalid.",
+    "漫画加载失败": "Unable to load comic",
+    "漫画页面加载失败。请重新打开章节，或检查源连接与登录状态。": "A comic page could not load. Reload the chapter or check the source connection and your session."
 }

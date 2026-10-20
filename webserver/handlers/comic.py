@@ -13,6 +13,7 @@ import tornado.web
 
 from webserver.base_path import public_url
 from webserver.handlers.base import BaseHandler, auth, js
+from webserver.handlers.captcha import book_captcha_enabled, require_book_captcha
 from webserver.i18n import _, get_language
 from webserver.models import Item, Reader, ReadingState
 from webserver.services.comic_archive import ComicArchiveError, comic_archive_service, select_comic_container
@@ -119,6 +120,8 @@ class ComicReaderHandler(ComicHandlerMixin, BaseHandler):
         except ComicArchiveError as error:
             raise tornado.web.HTTPError(error.status, reason=error.message) from error
 
+        if not require_book_captcha(self, book_id, "read", redirect=True):
+            return
         self.set_header("X-Content-Type-Options", "nosniff")
         self.set_header("Referrer-Policy", "same-origin")
         messages = {
@@ -153,6 +156,8 @@ class ComicManifestHandler(ComicHandlerMixin, BaseHandler):
     async def get(self, book_id):
         try:
             book, archive_path, archive_format = self.get_authorized_comic(book_id)
+            if not require_book_captcha(self, book_id, "read"):
+                return
             manifest = await self.load_comic_manifest(archive_path, archive_format)
         except ComicArchiveError as error:
             return self.error_envelope(error)
@@ -190,6 +195,8 @@ class ComicPageHandler(ComicHandlerMixin, BaseHandler):
             revision = self.get_argument("revision", "")
             token_user = None if self.current_user else self.page_token_user(book_id, page_index, revision)
             _book, archive_path, archive_format = self.get_authorized_comic(book_id, token_user)
+            if not require_book_captcha(self, book_id, "read"):
+                return
             callback = functools.partial(
                 comic_archive_service.read_page,
                 archive_path,
@@ -205,7 +212,8 @@ class ComicPageHandler(ComicHandlerMixin, BaseHandler):
 
         self.set_header("Content-Type", content.page.mime_type)
         self.set_header("Content-Length", str(len(content.data)))
-        self.set_header("Cache-Control", "private, max-age=3600, immutable")
+        cache_control = "private, no-store" if book_captcha_enabled("read") else "private, max-age=3600, immutable"
+        self.set_header("Cache-Control", cache_control)
         self.set_header("Vary", "Cookie")
         self.set_header("X-Content-Type-Options", "nosniff")
         self.set_header("Content-Security-Policy", "default-src 'none'; sandbox")

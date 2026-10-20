@@ -12,9 +12,9 @@ from tornado import web
 from webserver import demo_mode, loader, utils
 from webserver.base_path import public_url
 from webserver.handlers.base import BaseHandler, auth, js
+from webserver.handlers.captcha import check_captcha
 from webserver.i18n import _
 from webserver.models import Device, Message, Reader
-from webserver.plugins import captcha as captcha_module
 from webserver.plugins.push.base import PUSH_CAPABILITY
 from webserver.services.mail import MailService
 from webserver.services.plugin_runtime import PluginRuntime, ensure_runtime_installations
@@ -24,75 +24,6 @@ from webserver.version import VERSION
 
 CONF = loader.get_settings()
 COOKIE_REDIRECT = "login_redirect"
-
-
-def check_captcha(handler, scene):
-    """
-    检查验证码
-    :param handler: RequestHandler 实例
-    :param scene: 场景名称 (register, login, welcome, reset)
-    :return: (bool, str) - (是否通过, 错误信息)
-    """
-    if not captcha_module.is_captcha_enabled(CONF, scene):
-        return True, None
-
-    # 检查是否是图形验证码
-    captcha_code = handler.get_argument("captcha_code", "")
-    if captcha_code:
-        # 直接从cookie中获取正确答案进行验证
-        captcha_answer = handler.get_secure_cookie("captcha_answer")
-        generate_time = handler.get_secure_cookie("captcha_generate_time")
-
-        # 检查验证码是否存在
-        if not captcha_answer or not generate_time:
-            return False, _("验证码已过期，请刷新")
-
-        # 检查是否过期
-        try:
-            import datetime
-
-            gen_time = datetime.datetime.fromtimestamp(float(generate_time.decode("utf-8")))
-            now = datetime.datetime.utcnow()
-            elapsed = (now - gen_time).total_seconds()
-            if elapsed > 120:  # 超过2分钟
-                handler.clear_cookie("captcha_answer")
-                handler.clear_cookie("captcha_generate_time")
-                return False, _("验证码已过期，请刷新")
-        except Exception:
-            return False, _("验证码验证失败")
-
-        # 验证用户输入的验证码
-        result = captcha_module.verify_captcha(CONF, captcha_code=captcha_code, captcha_answer=captcha_answer.decode("utf-8"))
-
-        if result:
-            # 验证通过后清除cookie，防止重复使用
-            handler.clear_cookie("captcha_answer")
-            handler.clear_cookie("captcha_generate_time")
-            return True, None
-        else:
-            return False, _("验证码错误")
-
-    # 极验验证码
-    lot_number = handler.get_argument("lot_number", "")
-    captcha_output = handler.get_argument("captcha_output", "")
-    pass_token = handler.get_argument("pass_token", "")
-    gen_time = handler.get_argument("gen_time", "")
-
-    if not all([lot_number, captcha_output, pass_token, gen_time]):
-        return False, _("请完成人机验证")
-
-    result = captcha_module.verify_captcha(
-        CONF,
-        lot_number=lot_number,
-        captcha_output=captcha_output,
-        pass_token=pass_token,
-        gen_time=gen_time,
-    )
-
-    if result:
-        return True, None
-    else:
-        return False, _("人机验证失败，请重试")
 
 
 class Done(BaseHandler):

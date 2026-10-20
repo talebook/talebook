@@ -45,6 +45,16 @@ export const useMainStore = defineStore('main', () => {
   })
   const messages = ref<any[]>([])
 
+  // 登录浮窗：任何页面需要登录时，在当前页面上叠加全页蒙版和登录表单，而不是跳转登录页。
+  // requiredPath 是本身需要登录的页面路径：停留在该页面时内容在登录前不渲染，取消时离开该页面；
+  // authEpoch 在登录成功后递增，用于让当前页面重新挂载、以登录身份重新加载内容。
+  const loginPrompt = ref({
+    show: false,
+    requiredPath: '',
+    hint: '',
+  })
+  const authEpoch = ref(0)
+
   const site_title = ref("首页")
   const site_title_template = ref("%s | talebook")
 
@@ -71,7 +81,35 @@ export const useMainStore = defineStore('main', () => {
     }
   }
 
+  function openLoginPrompt(options: { requiredPath?: string, hint?: string } = {}) {
+    loginPrompt.value = {
+      show: true,
+      requiredPath: options.requiredPath || loginPrompt.value.requiredPath,
+      hint: options.hint || loginPrompt.value.hint,
+    }
+    // 未登录引发的页面错误提示会盖在登录浮窗上，登录浮窗出现时先收起它。
+    alert.value.show = false
+  }
+
+  // 只关闭浮窗；requiredPath 保留到离开该页面的导航完成，避免导航途中先渲染出需要登录的页面。
+  function closeLoginPrompt() {
+    loginPrompt.value = { ...loginPrompt.value, show: false, hint: '' }
+  }
+
+  function releaseLoginRequirement(path: string) {
+    if (loginPrompt.value.requiredPath && loginPrompt.value.requiredPath !== path) {
+      loginPrompt.value = { ...loginPrompt.value, requiredPath: '' }
+    }
+  }
+
+  function completeLogin() {
+    loginPrompt.value = { show: false, requiredPath: '', hint: '' }
+    authEpoch.value++
+  }
+
   function setAlert(v: any) {
+    // 登录浮窗打开期间，页面因未登录产生的错误提示没有意义，登录表单自己展示登录错误。
+    if (loginPrompt.value.show) return
     alert.value.to = v.to
     alert.value.type = v.type
     alert.value.msg = v.msg
@@ -142,12 +180,18 @@ export const useMainStore = defineStore('main', () => {
     alert,
     sys,
     messages,
+    loginPrompt,
+    authEpoch,
     site_title,
     site_title_template,
     setLoading,
     setNavbar,
     increment,
     login,
+    openLoginPrompt,
+    closeLoginPrompt,
+    releaseLoginRequirement,
+    completeLogin,
     setAlert,
     closeAlert,
     setTitle,

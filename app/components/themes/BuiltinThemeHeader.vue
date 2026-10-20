@@ -105,6 +105,7 @@
             <v-menu>
                 <template #activator="{ props }">
                     <v-btn
+                        :aria-label="t('book.language')"
                         v-bind="props"
                         icon
                         class="tb-theme-icon"
@@ -173,7 +174,8 @@
             <v-btn
                 v-else
                 class="tb-theme-login"
-                to="/login"
+                data-testid="header-login"
+                @click="store.openLoginPrompt()"
                 variant="flat"
             >
                 {{ t('messages.pleaseLogin') }}

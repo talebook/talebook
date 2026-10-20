@@ -144,10 +144,11 @@
                             <span class="job-config">{{ modeLabel(job.mode) }} · {{ engineLabel(job.config?.engine) }} · {{ job.config?.speed || 'x1.0' }}</span>
                             <span class="phase-heading">
                                 <span>{{ phaseLabel(job.phase) }}</span>
-                                <strong>{{ overallPercent(job) }}%</strong>
+                                <strong v-if="job.status === 'completed'">100%</strong>
                             </span>
                             <v-progress-linear
-                                :model-value="overallPercent(job)"
+                                v-if="job.status === 'completed'"
+                                :model-value="100"
                                 color="amber-darken-2"
                                 rounded
                             />
@@ -157,6 +158,10 @@
                             </span>
                         </button>
                     </div>
+                    <AudiobookGenerationProgress
+                        :job="job"
+                        :connection-error="Boolean(error)"
+                    />
                     <p
                         v-if="job.error_message"
                         class="job-error"
@@ -176,7 +181,7 @@
                                 <p class="eyebrow">
                                     {{ t('audiobook.generationPlan') }}
                                 </p>
-                                <h3>{{ t('audiobook.overallProgress', { percent: overallPercent(job) }) }}</h3>
+                                <h3>{{ phaseLabel(job.phase) }}</h3>
                             </div>
                             <span>{{ t('audiobook.progressMethodHint') }}</span>
                         </div>
@@ -569,6 +574,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
+import AudiobookGenerationProgress from '@/components/AudiobookGenerationProgress.vue';
 
 interface JobBook {
     id: number;
@@ -600,7 +606,7 @@ interface JobChapter {
 
 interface JobPlan {
     detailed: boolean;
-    overall_percent: number;
+    overall_percent: number | null;
     phases: JobPhase[];
     summary: {
         chapters_total: number;
@@ -628,6 +634,8 @@ interface AudiobookJob {
     error_message?: string;
     created_at?: string;
     updated_at?: string;
+    cancel_requested?: boolean;
+    generation?: InstanceType<typeof AudiobookGenerationProgress>['$props']['job']['generation'];
 }
 
 const { t, locale } = useI18n();
@@ -652,15 +660,21 @@ let pollTimer: ReturnType<typeof setInterval> | null = null;
 let previewAudio: HTMLAudioElement | null = null;
 store.setNavbar(true);
 
+const lastConfirmedJobs = ref<AudiobookJob[]>([]);
 const { data, pending, error, refresh } = await useAsyncData<{ jobs: AudiobookJob[] }>('audiobook-jobs', async () => {
     const response = await $backend('/audio-jobs');
     if (response.err !== 'ok') throw new Error(response.msg || t('audiobook.loadFailed'));
+    lastConfirmedJobs.value = response.jobs || [];
     return response;
 }, { default: () => ({ jobs: [] }) });
+// Hydration can use the SSR payload without invoking the request handler.
+lastConfirmedJobs.value = data.value?.jobs || [];
 
-const filteredJobs = computed(() => statusFilter.value
-    ? (data.value?.jobs || []).filter(job => job.status === statusFilter.value)
-    : (data.value?.jobs || []));
+const filteredJobs = computed(() => {
+    // useAsyncData resets data to its default on refresh errors; keep confirmed progress visible.
+    const jobs = error.value ? lastConfirmedJobs.value : (data.value?.jobs || []);
+    return statusFilter.value ? jobs.filter(job => job.status === statusFilter.value) : jobs;
+});
 const voiceOptions = computed(() => voices.value.map(item => ({
     label: `${item.name} · ${item.gender === 'male' ? t('audiobook.male') : t('audiobook.female')} · ${item.engine}`,
     value: `${item.engine}=${item.voice_id}`,
@@ -782,11 +796,6 @@ function previewVoice(voice: any) {
 
 function toggleJob(jobId: number) {
     expandedJobId.value = expandedJobId.value === jobId ? null : jobId;
-}
-
-function overallPercent(job: AudiobookJob) {
-    const value = job.plan?.overall_percent ?? Math.round(Number(job.progress || 0) * 100);
-    return Math.max(0, Math.min(100, Math.round(value)));
 }
 
 function phaseIcon(status: string) {

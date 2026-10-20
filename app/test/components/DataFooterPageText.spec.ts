@@ -33,6 +33,12 @@ function mountTable(localeName: string) {
 }
 
 describe('dataFooter pageText', () => {
+    it('ru-RU footer shows item range and total count', () => {
+        const wrapper = mountTable('ru-RU');
+        expect(wrapper.text()).toContain('1–12 из 12');
+        expect(wrapper.text()).toContain('Элементов на странице');
+    });
+
     it('zh-CN 页脚显示条目范围与总条数', () => {
         const wrapper = mountTable('zh-CN');
         expect(wrapper.text()).toContain('第 1-12 条，共 12 条');

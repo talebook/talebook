@@ -1,0 +1,21 @@
+{
+  "lease_interleaving": {
+    "lease_owner": "replacement-worker",
+    "attempt_id": "e78a949d-13a5-4c52-818e-ca1e60e8cd39",
+    "seq": 7,
+    "completed": 2,
+    "old_attempt": "e78a949d-13a5-4c52-818e-ca1e60e8cd39",
+    "new_attempt_before_old_commit": "5594f3fc-c228-43d1-ab7b-5289377c10dd",
+    "interleaving_executed": true,
+    "old_event_overwrote_new_attempt": true,
+    "replacement_heartbeat_accepted": false
+  },
+  "cancel_during_finalize": {
+    "cancel_received_before_publication": true,
+    "cancel_requested": true,
+    "status": "completed",
+    "progress": 1.0,
+    "edition_status": "published",
+    "cancelled_request_still_published": true
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "talebook_parent_sha": "e0e2220caa6c91277c93005664a92f20727e67d7",
+  "voicebook_sha": "3316bae6a7372e82d7037d31b9ffb32633ef2aa4",
+  "installed_python_files_verified": 21,
+  "candidate_sources": {
+    "webserver/services/audiobook.py": "7bb54b8f3bd84dd63cd3955c7f850c36b16bdc671305dd47c39676cf088b8b0b",
+    "webserver/handlers/audiobook.py": "1612186068d9cac51f312a7194a8eaee7f09fe7f373885a46538d035e9ef4d5d",
+    "app/pages/audios/create.vue": "2e9064b9712b697e610f3c0cc44253a5e29efbf7806c2c98697d36cee431e7bc"
+  }
+}

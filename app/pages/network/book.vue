@@ -1,5 +1,19 @@
 <template>
     <div>
+        <v-alert
+            v-if="loadError"
+            type="error"
+            variant="tonal"
+            class="mb-4"
+        >
+            {{ loadError }}
+            <v-btn
+                variant="text"
+                @click="loadBook"
+            >
+                {{ $t('common.retry') }}
+            </v-btn>
+        </v-alert>
         <v-row v-if="book">
             <v-col
                 cols="12"
@@ -35,7 +49,7 @@
                 </div>
                 <div class="mt-4">
                     <v-btn
-                        v-if="downloadMode === 'by_chapters'"
+                        v-if="downloadMode === 'by_chapters' || book.online_readable"
                         color="primary"
                         class="mr-2"
                         :disabled="chapters.length === 0"
@@ -118,7 +132,7 @@
             </v-col>
 
             <v-col
-                v-if="downloadMode === 'by_chapters'"
+                v-if="downloadMode === 'by_chapters' || book.online_readable"
                 cols="12"
             >
                 <v-divider class="my-3" />
@@ -136,6 +150,13 @@
                     />
                     {{ $t('network.searching') }}
                 </div>
+                <v-alert
+                    v-else-if="chapters.length === 0 && !loadError"
+                    type="info"
+                    variant="tonal"
+                >
+                    {{ $t('network.noChapters') }}
+                </v-alert>
                 <v-row v-else>
                     <v-col
                         v-for="(ch, idx) in chapters"
@@ -145,9 +166,18 @@
                         md="4"
                     >
                         <a
+                            v-if="book.media_type === 'comic'"
+                            :href="onlineReaderUrl(ch)"
+                            class="chapter-link"
+                        >{{ ch.name }}</a>
+                        <button
+                            v-else
+                            type="button"
                             class="chapter-link"
                             @click="readFrom(idx)"
-                        >{{ ch.name }}</a>
+                        >
+                            {{ ch.name }}
+                        </button>
                     </v-col>
                 </v-row>
             </v-col>
@@ -169,18 +199,20 @@ import { useI18n } from 'vue-i18n';
 import SerializeStatusBadge from '~/components/SerializeStatusBadge.vue';
 import SaveOnlineDialog from '~/components/SaveOnlineDialog.vue';
 import { useMainStore } from '@/stores/main';
+import { withBasePath } from '@/utils/base-path';
 
 const { t } = useI18n();
 const store = useMainStore();
 const route = useRoute();
 const router = useRouter();
-const { $backend, $alert } = useNuxtApp();
+const { $backend } = useNuxtApp();
 
 store.setNavbar(true);
 
 const sourceId = ref(route.query.source_id);
 const bookUrl = ref(route.query.book_url || '');
 const book = ref(null);
+const loadError = ref('');
 const chapters = ref([]);
 const downloadMode = ref('none');
 const tocUrl = ref('');
@@ -275,9 +307,23 @@ const resumeSave = async () => {
     }
 };
 
+const onlineReaderUrl = (ch) => {
+    const q = new URLSearchParams({
+        source_id: sourceId.value,
+        chapter_url: ch.url,
+        book_url: bookUrl.value,
+        title: `${book.value.name} · ${ch.name}`,
+    });
+    return withBasePath(`/read-online-comic?${q.toString()}`);
+};
+
 const readFrom = (idx) => {
     const ch = chapters.value[idx];
     if (!ch) return;
+    if (book.value?.media_type === 'comic') {
+        window.location.assign(onlineReaderUrl(ch));
+        return;
+    }
     const q = new URLSearchParams({
         source_id: sourceId.value,
         chapter_url: ch.url,
@@ -303,27 +349,39 @@ const loadToc = async () => {
         if (rsp.err === 'ok') {
             chapters.value = rsp.chapters || [];
             serializeStatus.value = rsp.serialize_status || 'unknown';
-        } else if ($alert) {
-            $alert('error', rsp.msg || rsp.err);
+        } else {
+            loadError.value = rsp.msg || rsp.err;
         }
+    } catch {
+        loadError.value = t('network.detailLoadFailed');
     } finally {
         tocLoading.value = false;
     }
 };
 
-onMounted(async () => {
-    const rsp = await $backend(
-        `/book-sources/book?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
-    );
-    if (rsp.err === 'ok') {
-        book.value = rsp.book;
-        tocUrl.value = rsp.toc_url;
-        downloadMode.value = rsp.download_mode || 'none';
-        if (downloadMode.value === 'by_chapters') await loadToc();
-        else tocLoading.value = false;
-    } else if ($alert) {
-        $alert('error', rsp.msg || rsp.err);
+const loadBook = async () => {
+    loadError.value = '';
+    chapters.value = [];
+    try {
+        const rsp = await $backend(
+            `/book-sources/book?source_id=${sourceId.value}&book_url=${encodeURIComponent(bookUrl.value)}`,
+        );
+        if (rsp.err === 'ok') {
+            book.value = rsp.book;
+            tocUrl.value = rsp.toc_url;
+            downloadMode.value = rsp.download_mode || 'none';
+            if (downloadMode.value === 'by_chapters' || book.value.online_readable) await loadToc();
+            else tocLoading.value = false;
+        } else {
+            loadError.value = rsp.msg || rsp.err;
+        }
+    } catch {
+        loadError.value = t('network.detailLoadFailed');
     }
+};
+
+onMounted(async () => {
+    await loadBook();
 
     // 进入/刷新页面时，仅当本会话发起过保存才恢复其进度
     await resumeSave();
@@ -344,11 +402,29 @@ useHead(() => ({ title: book.value?.name || t('network.title') }));
     overflow-y: auto;
 }
 .chapter-link {
+    border: 0;
+    background: transparent;
+    font: inherit;
+    text-align: left;
+    width: 100%;
+    padding: 8px 0;
     cursor: pointer;
     color: rgb(var(--v-theme-primary));
     display: block;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    min-height: 40px;
+    text-decoration: none;
+}
+.chapter-link:focus-visible {
+    outline: 2px solid rgb(var(--v-theme-primary));
+    outline-offset: 2px;
+}
+:global(.v-theme--dark .chapter-link) {
+    color: rgb(var(--v-theme-on-surface));
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 </style>

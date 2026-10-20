@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-10-03T07:26:43.685013+00:00",
+  "production_config": "conf/nginx/talebook.conf",
+  "public_prefix": "/team/books",
+  "nginx": true,
+  "backend": "real Talebook + Calibre",
+  "source_api_mocks": false,
+  "static_fallback_control": "VENERA_PROXY_SPA_FALLBACK",
+  "static_scope": "production location rules plus unchanged public Reader assets; SPA not rebuilt",
+  "reader": {
+    "status": 200,
+    "is_reader": true,
+    "spa_fallback": false,
+    "cache_control": "no-store"
+  },
+  "comic": {
+    "title": "薄花少女",
+    "chapters": 30,
+    "pages": 51
+  },
+  "images": [
+    {
+      "status": 200,
+      "type": "image/png",
+      "bytes": 63915
+    },
+    {
+      "status": 200,
+      "type": "image/png",
+      "bytes": 2993743
+    }
+  ],
+  "browser": {
+    "image_decoded": true,
+    "flipped": true,
+    "mobile_width": 320,
+    "overflow": false,
+    "reader_assets": [
+      "/team/books/static/komga-reader/style.css",
+      "/team/books/static/komga-reader/komga-reader.es.js"
+    ],
+    "exit_path": "/team/books/network/book"
+  }
+}
