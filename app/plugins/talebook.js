@@ -1,6 +1,8 @@
 import { withBasePath } from '@/utils/base-path';
 import { useMainStore } from '@/stores/main';
 
+const LOGIN_PROMPT_EXEMPT_PATHS = ['/login', '/signup'];
+
 export default defineNuxtPlugin((nuxtApp) => {
   // Capture request-scoped values while the plugin still has Nuxt context.
   const backendConfig = useRuntimeConfig();
@@ -10,7 +12,20 @@ export default defineNuxtPlugin((nuxtApp) => {
   const store = useMainStore();
   const activeRedirects = new Map();
 
+  // 页面首次加载期间（导航开始到页面渲染完成）发出的请求若返回未登录，说明页面本身需要登录：
+  // 记录该页面路径，让登录浮窗按「必须登录」处理（页面不渲染，取消即离开）。
+  let loadingPath = nuxtApp.$router.currentRoute.value.path;
+  let pageLoading = true;
+  nuxtApp.$router.beforeEach((to) => {
+    loadingPath = to.path;
+    pageLoading = true;
+  });
+  nuxtApp.hook('page:finish', () => {
+    pageLoading = false;
+  });
+
   nuxtApp.$router.afterEach((to) => {
+    store.releaseLoginRequirement(to.path);
     for (const [targetPath, reached] of activeRedirects) {
       if (to.path === targetPath) {
         activeRedirects.set(targetPath, true);
@@ -51,7 +66,7 @@ export default defineNuxtPlugin((nuxtApp) => {
     }
   }
 
-  async function handleErrorEnvelope(data) {
+  async function handleErrorEnvelope(data, pageLoadPath = null) {
     if (data.err === 'not_installed') {
       await redirectOnce('/install', '[Talebook] Redirecting to /install');
     } else if (data.err === 'not_invited') {
@@ -60,7 +75,11 @@ export default defineNuxtPlugin((nuxtApp) => {
       next = next ? '?next=' + next : '';
       await redirectOnce('/welcome' + next);
     } else if (data.err === 'user.need_login') {
-      await redirectOnce('/login');
+      // 在当前页面上弹出登录浮窗，登录后页面原地重新加载；登录/注册页自身不再叠加浮窗。
+      if (!LOGIN_PROMPT_EXEMPT_PATHS.includes(currentRoute().path)) {
+        const requiredPath = pageLoadPath && pageLoadPath === loadingPath ? pageLoadPath : '';
+        store.openLoginPrompt({ requiredPath });
+      }
     } else if (data.err === 'exception') {
       store.setAlert({ type: 'error', msg: data.msg, to: null });
     }
@@ -102,6 +121,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       args.headers = new Headers(args.headers);
       args.headers.set('X-Talebook-App-Version', applicationVersion);
     }
+    const pageLoadPath = pageLoading ? loadingPath : null;
     const quietMaintenance = args.quietMaintenance === true;
     delete args.quietMaintenance;
     try {
@@ -150,7 +170,7 @@ export default defineNuxtPlugin((nuxtApp) => {
         throw msg;
       }
 
-      await handleErrorEnvelope(data);
+      await handleErrorEnvelope(data, pageLoadPath);
       return data;
 
     } catch (e) {
@@ -176,6 +196,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       Object.assign(args, options);
     }
 
+    const pageLoadPath = pageLoading ? loadingPath : null;
     const rsp = await fetch(server + '/api' + url, args);
     if (!rsp.ok) {
       throw new Error('stream request failed: ' + rsp.status);
@@ -192,7 +213,7 @@ export default defineNuxtPlugin((nuxtApp) => {
       } catch (e) {
         return;
       }
-      await handleErrorEnvelope(data);
+      await handleErrorEnvelope(data, pageLoadPath);
       yield data;
       return;
     }

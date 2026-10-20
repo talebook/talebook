@@ -72,7 +72,8 @@ test.describe('Route-backed navigation sections', () => {
         await expect(page.locator('.app-access-card__connection')).toHaveCount(0);
 
         await page.goto('/me/shelf');
-        await expect(page).toHaveURL(/\/login\?next=\/me\/shelf$/);
+        await expect(page).toHaveURL(/\/me\/shelf$/);
+        await expect(page.locator('.login-prompt .v-overlay__content')).toBeVisible();
     });
 
     test('admin settings tabs replace standalone plugin and theme entries', async ({ page }) => {

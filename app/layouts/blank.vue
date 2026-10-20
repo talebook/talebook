@@ -44,6 +44,7 @@
                     </v-card-actions>
                 </v-card>
             </v-dialog>
+            <LoginPrompt />
         </v-main>
     </v-app>
 </template>
@@ -52,6 +53,7 @@
 import { useMainStore } from '@/stores/main';
 import { useThemeRuntime } from '@/composables/useThemeRuntime';
 import { useDisplay } from 'vuetify';
+import LoginPrompt from '@/components/LoginPrompt.vue';
 
 const store = useMainStore();
 const display = useDisplay();

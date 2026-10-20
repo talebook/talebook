@@ -894,6 +894,15 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
   }
 })));
 
+router.post('/api/user/sign_in', eventHandler(async (event) => {
+  const body = new URLSearchParams(await readBody(event) || '');
+  if (body.get('username') !== 'admin' || body.get('password') !== 'admin') {
+    return { err: 'params.invalid', msg: '用户名或密码错误' };
+  }
+  isLoggedIn = true;
+  return { err: 'ok', msg: 'ok' };
+}));
+
 router.get('/api/user/sign_out', eventHandler(() => {
   isLoggedIn = false;
   return { err: 'ok', msg: '你已成功退出登录。' };
@@ -1400,6 +1409,7 @@ const getShelfBooks = () => {
 };
 
 router.get('/api/shelf', eventHandler(() => {
+  if (!isLoggedIn) return { err: 'user.need_login', msg: '请先登录' };
   const shelfBooks = getShelfBooks();
   return {
     err: 'ok',

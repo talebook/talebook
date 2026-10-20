@@ -13,7 +13,7 @@
                     <v-btn
                         size="small"
                         variant="text"
-                        :to="{ path: '/login', query: { next: '/library/apps' } }"
+                        @click="store.openLoginPrompt()"
                     >
                         {{ t('messages.pleaseLogin') }}
                     </v-btn>

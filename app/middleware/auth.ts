@@ -6,10 +6,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
         try {
             await store.loadUserInfo();
         } catch {
-            // The login screen is the safe fallback when the session check fails.
+            // The login prompt is the safe fallback when the session check fails.
         }
     }
     if (!store.user.is_login) {
-        return navigateTo({ path: '/login', query: { next: to.fullPath } });
+        // 留在目标页面，用全页蒙版和登录浮窗代替跳转登录页；页面内容在登录后才渲染。
+        store.openLoginPrompt({ requiredPath: to.path });
     }
 });

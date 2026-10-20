@@ -24,6 +24,13 @@ async function mockReader(page: Page, wait = 30, que = 2) {
     return calls;
 }
 
+// 登录入口打开登录浮窗，经浮窗里的「注册」路由链接离开阅读页。
+async function leaveReader(page: Page) {
+    await page.getByRole('button', { name: '请登录' }).click();
+    await page.locator('.login-prompt').getByRole('link', { name: '注册' }).click();
+    await expect(page).toHaveURL(/\/signup$/);
+}
+
 async function openReader(page: Page, waitForPrepared = true) {
     await page.clock.install();
     await page.goto('/book/2/readtxt');
@@ -114,8 +121,7 @@ for (const phase of ['initial', 'poll', 'format']) {
         if (phase === 'poll') await page.clock.runFor(5000);
         await expect.poll(() => started).toBe(true);
         // A real router link exercises onUnmounted rather than closing the browser.
-        await page.getByRole('link', { name: '请登录' }).click();
-        await expect(page).toHaveURL(/\/login$/);
+        await leaveReader(page);
         const initial = calls.initial;
         const polls = calls.polls;
         release();
@@ -167,8 +173,7 @@ test('leaving between polls clears the pending timer', async ({ page }) => {
     const calls = await mockReader(page, 0);
     await openReader(page);
     await tickAndPoll(page, calls);
-    await page.getByRole('link', { name: '请登录' }).click();
-    await expect(page).toHaveURL(/\/login$/);
+    await leaveReader(page);
     await page.clock.runFor(20000);
     expect(calls.polls).toBe(1);
     expect(calls.chapters).toBe(0);

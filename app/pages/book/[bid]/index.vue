@@ -12,33 +12,6 @@
                     @confirm="confirm_conversion"
                 />
 
-                <v-dialog
-                    v-model="showReadingLoginDialog"
-                    max-width="420"
-                >
-                    <v-card data-testid="reading-login-dialog">
-                        <v-card-title>{{ t('messages.pleaseLogin') }}</v-card-title>
-                        <v-card-text>{{ t('book.readingStateLoginHint') }}</v-card-text>
-                        <v-card-actions>
-                            <v-spacer />
-                            <v-btn
-                                variant="text"
-                                @click="showReadingLoginDialog = false"
-                            >
-                                {{ t('common.cancel') }}
-                            </v-btn>
-                            <v-btn
-                                color="primary"
-                                variant="flat"
-                                :to="loginPath"
-                                @click="showReadingLoginDialog = false"
-                            >
-                                {{ t('auth.signIn') }}
-                            </v-btn>
-                        </v-card-actions>
-                    </v-card>
-                </v-dialog>
-
                 <!-- Send to Device Dialog -->
                 <v-dialog
                     v-model="dialog_send_to_device"
@@ -927,11 +900,6 @@ const router = useRouter();
 const store = useMainStore();
 const { $backend, $backend_stream, $alert } = useNuxtApp();
 const { t } = useI18n();
-const showReadingLoginDialog = ref(false);
-const loginPath = computed(() => ({
-    path: '/login',
-    query: { next: route.fullPath },
-}));
 
 const routeBookId = computed(() => {
     return typeof route.params.bid === 'string' && route.params.bid
@@ -1628,7 +1596,7 @@ const applyReadingState = async (newState) => {
 
 const selectReadingOption = async (newState) => {
     if (!store.user.is_login) {
-        showReadingLoginDialog.value = true;
+        store.openLoginPrompt({ hint: t('book.readingStateLoginHint') });
         return;
     }
     if (readingStateLoading.value || isReadingOptionSelected(newState)) {

@@ -260,7 +260,7 @@ test.describe('Book Detail Page', () => {
         }
     });
 
-    test('keeps the three reading choices for guests and opens the login dialog after a click', async ({ page, request }) => {
+    test('keeps the three reading choices for guests and opens the login prompt after a click', async ({ page, request }) => {
         await request.post(`${mockApiUrl}/_test/reset`, {
             data: { installed: true, loggedIn: false },
         });
@@ -288,14 +288,10 @@ test.describe('Book Detail Page', () => {
         await expect(page.getByTestId('metadata-shelf-action')).toHaveCount(0);
 
         await page.getByTestId('metadata-reading-option-finished').click();
-        const dialog = page.getByTestId('reading-login-dialog');
-        await expect(dialog).toBeVisible();
-        await expect(dialog).toContainText('登录后即可将书籍加入书架并设置阅读状态。');
-        const loginTarget = await dialog.getByRole('link', { name: '登录' }).evaluate(link => {
-            const url = new URL(link.href);
-            return { pathname: url.pathname, next: url.searchParams.get('next') };
-        });
-        expect(loginTarget).toEqual({ pathname: '/login', next: `/book/${bookId}` });
+        const prompt = page.locator('.login-prompt .v-overlay__content');
+        await expect(prompt).toBeVisible();
+        await expect(page.getByTestId('login-prompt-hint')).toHaveText('登录后即可将书籍加入书架并设置阅读状态。');
+        await expect(page).toHaveURL(new RegExp(`/book/${bookId}$`));
         expect(stateWrites).toEqual([]);
     });
 

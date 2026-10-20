@@ -174,7 +174,8 @@
             <v-btn
                 v-else
                 class="tb-theme-login"
-                to="/login"
+                data-testid="header-login"
+                @click="store.openLoginPrompt()"
                 variant="flat"
             >
                 {{ t('messages.pleaseLogin') }}

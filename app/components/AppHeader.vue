@@ -306,7 +306,8 @@
 
                     <v-btn
                         class="px-xs-1 login-btn mr-4"
-                        to="/login"
+                        data-testid="header-login"
+                        @click="store.openLoginPrompt()"
                         color="#304ffe"
                         variant="elevated"
                     >
