@@ -78,8 +78,36 @@ test.describe('Login prompt', () => {
         await expect(page).toHaveURL(/\/library\/apps$/);
     });
 
+    test('treats a login error during page load as a login-only page', async ({ page }) => {
+        await page.route('**/api/admin/log?*', route => route.fulfill({
+            json: { err: 'user.need_login', msg: '请先登录' },
+        }));
+
+        await page.goto('/admin/logs');
+        await expect(loginPrompt(page)).toBeVisible();
+        await expect(page).toHaveURL(/\/admin\/logs$/);
+
+        await page.getByTestId('login-prompt-close').click();
+        await expect(page).toHaveURL(/\/$/);
+        await expect(loginPrompt(page)).toBeHidden();
+    });
+
+    test('returns focus to the control that opened the prompt', async ({ page }) => {
+        await page.goto('/library/apps');
+        const trigger = page.getByTestId('header-login');
+        await trigger.focus();
+        await page.keyboard.press('Enter');
+        await expect(loginPrompt(page)).toBeVisible();
+
+        await page.keyboard.press('Escape');
+        await expect(loginPrompt(page)).toBeHidden();
+        await expect(trigger).toBeFocused();
+    });
+
     test('keeps the standalone login page for direct visits', async ({ page }) => {
         await page.goto('/login?next=/me/shelf');
+        await expect(loginPrompt(page)).toHaveCount(0);
+        await page.getByTestId('header-login').click();
         await expect(loginPrompt(page)).toHaveCount(0);
 
         const form = page.locator('.login-container');
