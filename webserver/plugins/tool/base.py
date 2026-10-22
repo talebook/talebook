@@ -32,12 +32,44 @@ class BuiltinCapabilityProvider:
 
 
 class TextTransformPlugin(BuiltinCapabilityProvider):
-    """正文工具共享契约；具体子类必须实现真实 preview/apply。"""
+    """正文工具共享契约；具体子类必须实现真实 preview/apply。
 
-    def __init__(self, manifest, supported_formats, supports_auto_trigger=False):
+    书籍工具统一经 ``/api/plugins/<plugin_key>/tool[/preview|/run]`` 暴露，HTTP 层不认识
+    具体插件：取哪种格式、接受哪些参数、允许哪些写回方式、新书后缀与元数据同步都由
+    插件在这里自述，新增工具不需要再改 handler 或注册路由。
+    """
+
+    # 写回方式：new 另存为新书；overwrite 覆盖原书对应格式（可回滚）。
+    output_modes = ("new", "overwrite")
+    new_book_suffix = ""
+    preview_timeout = 30
+    apply_timeout = None
+
+    def __init__(self, manifest, supported_formats, supports_auto_trigger=False, input_formats=None):
         super().__init__(manifest)
         self.supported_formats = frozenset(supported_formats)
         self.supports_auto_trigger = supports_auto_trigger
+        # 书籍同时有多种可处理格式时按此顺序挑选输入文件。
+        self.input_formats = tuple(input_formats or sorted(self.supported_formats))
+
+    def describe(self):
+        """无书籍依赖的选项元数据（预设、方向等），供工具页初始化渲染。"""
+        return {}
+
+    def tool_input(self, params, book):
+        """把客户端 params 收敛为 provider 输入；只取白名单字段，path/format 由平台注入。"""
+        return {}
+
+    def audit_fields(self, tool_input):
+        """写入审计记录的业务参数摘要，不含文件路径。"""
+        return {}
+
+    def book_updates(self, output):
+        """写回后需要同步到书库的元数据：title / authors / language，缺省不改。"""
+        return {}
+
+    def new_book_title_suffix(self, output):
+        return self.new_book_suffix
 
     def preview(self, src, context):
         raise NotImplementedError

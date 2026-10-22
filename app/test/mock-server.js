@@ -1709,12 +1709,16 @@ router.get('/api/plugins/tools/books', eventHandler(() => ({
   books: [{ id: 1, title: '测试书', authors: ['测试作者'], formats: ['EPUB', 'TXT'] }],
 })));
 
-router.post('/api/plugins/tools/text-replace/preview', eventHandler(() => ({
-  err: 'ok',
-  matches: 1,
-  truncated: false,
-  samples: [{ pre: '开始', match: '测试', post: '结束' }],
-})));
+async function mockTextReplacePreview(body) {
+  // 统一能力调用：工具参数放在 params 里，平台字段（book_id）在顶层。
+  if (!body?.book_id || !body?.params?.pattern) return { err: 'booktools.failed', msg: 'params.pattern is required' };
+  return {
+    err: 'ok',
+    matches: 1,
+    truncated: false,
+    samples: [{ pre: '开始', match: body.params.pattern, post: '结束' }],
+  };
+}
 
 router.get('/api/plugins/tools/book-actions', eventHandler((event) => {
   const bookId = Number(getQuery(event).book_id || 0);
@@ -1730,11 +1734,8 @@ router.get('/api/plugins/tools/book-actions', eventHandler((event) => {
   return { err: 'ok', actions };
 }));
 
-router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (event) => {
-  const pluginKey = getRouterParam(event, 'pluginKey');
-  const action = getRouterParam(event, 'action');
-  if (pluginKey !== 'talebook.combo.weread') return { err: 'plugin.not_found', msg: 'plugin not found' };
-  const body = await readBody(event);
+async function mockWereadFeature(pluginKey, action, body) {
+  if (pluginKey !== 'talebook.combo.weread') return { err: 'plugin.feature_not_supported', msg: 'Plugin feature is not supported' };
   if (body?.credentials?.api_key) wereadConfigured = true;
   const data = {
     search: {
@@ -1768,7 +1769,7 @@ router.post('/api/plugins/:pluginKey/features/:action', eventHandler(async (even
     connection: wereadConnection(),
     data,
   };
-}));
+}
 
 router.post('/api/plugins/connections/:id/:action', eventHandler(async (event) => {
   const body = await readBody(event);
@@ -2181,9 +2182,8 @@ router.post('/api/admin/plugins/preferences', eventHandler(async (event) => {
   return { err: 'ok', metadata: pluginMetadataPreferences, DEVICES: globalPluginDevices };
 }));
 
-router.post('/api/admin/plugins/:pluginKey/metadata/search', eventHandler(async (event) => {
-  const body = await readBody(event);
-  const query = body?.query || {};
+function mockMetadataSearch(body) {
+  const query = body?.params || {};
   return {
     err: 'ok',
     capability: 'metadata.lookup',
@@ -2196,16 +2196,15 @@ router.post('/api/admin/plugins/:pluginKey/metadata/search', eventHandler(async 
       provider_value: 'mock-metadata-result',
     }],
   };
-}));
+}
 
-router.post('/api/admin/plugins/:pluginKey/source/search', eventHandler(async (event) => {
-  const body = await readBody(event);
+function mockSourceSearch(body) {
   return {
     err: 'ok',
     capability: 'sources.search',
     items: [{
       external_id: 'standard-ebooks:pride-and-prejudice',
-      title: `${body?.query || 'Pride'} and Prejudice`,
+      title: `${body?.params?.query || 'Pride'} and Prejudice`,
       authors: ['Jane Austen'],
       format: 'epub',
       access: 'download',
@@ -2213,21 +2212,33 @@ router.post('/api/admin/plugins/:pluginKey/source/search', eventHandler(async (e
     failures: [],
     has_more: false,
   };
-}));
+}
 
-router.post('/api/admin/plugins/:pluginKey/reviews/lookup', eventHandler(async (event) => {
-  const body = await readBody(event);
+function mockReviewLookup(body) {
   return {
     err: 'ok',
     capability: 'reviews.lookup',
     items: [{
       source: 'Google Books',
-      external_id: `google-books:${body?.query?.isbn || 'unknown'}`,
+      external_id: `google-books:${body?.params?.isbn || 'unknown'}`,
       rating: { value: 4.5, scale: 5, sample_count: 120 },
     }],
     failures: [],
     has_more: false,
   };
+}
+
+// 插件能力统一调用：POST /api/plugins/<key>/exec/<action>。
+router.post('/api/plugins/:pluginKey/exec/:action', eventHandler(async (event) => {
+  const pluginKey = getRouterParam(event, 'pluginKey');
+  const action = getRouterParam(event, 'action');
+  const body = await readBody(event);
+  if (action === 'metadata.search') return mockMetadataSearch(body);
+  if (action === 'source.search') return mockSourceSearch(body);
+  if (action === 'review.lookup') return mockReviewLookup(body);
+  if (action === 'tool.preview' && pluginKey === 'talebook.tool.text-replace') return mockTextReplacePreview(body);
+  if (action.includes('.')) return { err: 'plugin.action_not_supported', msg: `Plugin action is not supported: ${action}` };
+  return mockWereadFeature(pluginKey, action, body);
 }));
 
 router.get('/api/admin/plugins/runs', eventHandler(() => ({ err: 'ok', runs: pluginRuns })));

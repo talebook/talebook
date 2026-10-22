@@ -77,7 +77,7 @@
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
-import { confirmDestructiveBookWrite } from '@/utils/book-tools';
+import { bookToolUrl, confirmDestructiveBookWrite } from '@/utils/book-tools';
 import { useBookToolSelection } from '@/composables/useBookToolSelection';
 
 const { t } = useI18n();
@@ -86,6 +86,7 @@ const router = useRouter();
 useMainStore().setNavbar(true);
 
 const { bookId, bookOptions, bookQuery, booksLoading, selectedBook, onBookSearch } = useBookToolSelection({ formats: ['TXT'] });
+const PLUGIN_KEY = 'talebook.tool.txt-fixer';
 const outputMode = ref('new');
 const busy = ref('');
 const error = ref('');
@@ -99,7 +100,7 @@ async function doAnalyze() {
     report.value = null;
     busy.value = 'analyze';
     try {
-        const rsp = await $backend('/plugins/tools/txt-fixer/analyze', { method: 'POST', body: JSON.stringify({ book_id: bookId.value }) });
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'preview'), { method: 'POST', body: JSON.stringify({ book_id: bookId.value }) });
         if (rsp.err === 'ok') report.value = rsp;
         else error.value = rsp.msg || rsp.err;
     } catch (e) { error.value = String(e); }
@@ -114,7 +115,7 @@ async function doRun() {
     success.value = '';
     busy.value = 'run';
     try {
-        const rsp = await $backend('/plugins/tools/txt-fixer/run', { method: 'POST', body: JSON.stringify({ book_id: bookId.value, output_mode: outputMode.value }) });
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'run'), { method: 'POST', body: JSON.stringify({ book_id: bookId.value, output_mode: outputMode.value }) });
         if (rsp.err === 'ok') {
             success.value = t(rsp.output_mode === 'new' ? 'bookTools.txtFixer.successNew' : 'bookTools.txtFixer.successOverwrite', { encoding: rsp.encoding, id: rsp.book_id });
         } else error.value = rsp.msg || rsp.err;
