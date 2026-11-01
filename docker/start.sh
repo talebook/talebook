@@ -50,7 +50,6 @@ chown -R talebook:talebook \
   /run/talebook \
   /data/books/ssl \
   /data/log/ \
-  /var/lib/nginx \
   /var/log/nginx \
   /root/.config/calibre \
   /root/.npm \
@@ -59,6 +58,8 @@ chown -R talebook:talebook \
   /var/www/talebook/webserver \
   /var/www/talebook/server.py \
   /var/www/talebook/status
+
+sh /var/www/talebook/docker/prepare-nginx-permissions.sh || exit 1
 
 if [ -f /data/books/ssl/ssl.crt ]; then
   chmod 0644 /data/books/ssl/ssl.crt
