@@ -67,3 +67,16 @@ READEST_BASELINE_URL=http://127.0.0.1:39209 READEST_CANDIDATE_URL=http://127.0.0
 ```
 
 基准要求页码和实际章节 iframe 内容均出现；不是只测启动页面消失，也不是完整导航索引耗时。书籍10《西游记》有12个章节文件、101项目录，首屏时0个片段索引，随后11个章节索引补全。上游 main 已另行合入 TB-205 的在线导航跳过策略；这里仍固定来源 SHA 加显式补丁，不将不同策略混入已验证构建。
+
+## Talebook KOSync 同源代理
+
+在 0003 后应用 `0004-talebook-kosync-proxy.patch` 。Talebook 同源嵌入网页的 KOSync 请求改为 `POST /api/kosync` ，不再经过 Readest 官方代理避免被瀏覽器的 cors 政策阻擋。原生 Tauri 与独立 Readest 的传输方式保留。独立 React 产物不能使用 Nuxt 插件，使用 `public/kosync-transport.js` 作为本站 API 适配器；该文件与 Talebook 的同名上游文件必须保持一致，更新时一起修改补丁、重建产物并运行前端测试。
+
+```bash
+git apply /path/to/talebook/scripts/readest/0003-progressive-navigation.patch
+git apply /path/to/talebook/scripts/readest/0004-talebook-kosync-proxy.patch
+NEXT_PUBLIC_APP_PLATFORM=web npx --yes pnpm@11.1.1 build
+npx --yes pnpm@11.1.1 typecheck
+npx --yes pnpm@11.1.1 test
+```
+
