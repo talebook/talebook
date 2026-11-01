@@ -685,6 +685,36 @@
     "passwordMismatch": "Passwords do not match"
   },
   "admin": {
+    "discovery": {
+      "title": "LAN discovery",
+      "help": "Share the site name, stable ID and address on selected LAN interfaces so Moke can discover the library. Discovery grants no access; access codes and login still apply. Off by default. Requires native Linux or host networking and a reachable external listener.",
+      "enable": "Allow LAN discovery of this library",
+      "override": "These effective settings are overridden by manual.py. Edit that file and restart:",
+      "name": "Public name",
+      "url": "External HTTP(S) URL",
+      "addresses": "External listener IPs, comma separated",
+      "addressHint": "Only RFC1918 IPv4 or IPv6 ULA on selected local interfaces. Do not use localhost, NAT container addresses or the internal backend port.",
+      "interfaces": "Publishing interfaces",
+      "remove": "Remove endpoint",
+      "empty": "No endpoints configured. Add a reachable URL and interface before enabling.",
+      "add": "Add discovery endpoint",
+      "saveHint": "Use Save at the top to apply without restarting. Saving records intent; check the actual state below. Mapping UDP 5353 does not enable discovery in Docker bridge mode.",
+      "saved": "Saved discovery intent",
+      "on": "On",
+      "off": "Off",
+      "actual": "Actual publishing state",
+      "id": "Public instance ID",
+      "loadError": "Unable to refresh status. Check your network or administrator session.",
+      "state": {
+                "unknown": "Unknown",
+        "loading": "Loading",
+        "disabled": "Not publishing",
+        "starting": "Starting",
+        "advertising": "Advertising",
+        "stopping": "Unregistering",
+        "error": "Publishing failed"
+      }
+    },
     "books": {
       "title": "Book Management",
       "button": {

@@ -4,6 +4,7 @@
 import logging
 import os
 import re
+import signal
 import sys
 
 import tornado.httpserver
@@ -273,6 +274,9 @@ def make_app():
         **app_settings,
     )
     app._engine = engine
+    from webserver.services.lan_discovery import DiscoveryManager
+
+    app.settings["discovery_manager"] = DiscoveryManager(CONF)
     _resume_pending_booksource_checks(ScopedSession)
     return app
 
@@ -361,7 +365,29 @@ def main():
     app = make_app()
     http_server = tornado.httpserver.HTTPServer(app, xheaders=True, max_buffer_size=get_upload_size())
     http_server.listen(options.port, options.host)
-    tornado.ioloop.IOLoop.instance().start()
+    loop = tornado.ioloop.IOLoop.current()
+    manager = app.settings["discovery_manager"]
+    loop.add_callback(manager.start)
+
+    async def shutdown():
+        http_server.stop()
+        await manager.close()
+        loop.stop()
+
+    stopping = False
+
+    def stop(signum, frame):
+        nonlocal stopping
+        if not stopping:
+            stopping = True
+            loop.add_callback_from_signal(shutdown)
+
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, stop)
+    try:
+        loop.start()
+    finally:
+        loop.run_sync(manager.close)
 
 
 if __name__ == "__main__":

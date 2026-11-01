@@ -962,6 +962,13 @@ router.post('/api/admin/install', eventHandler(async (event) => {
 }));
 
 // Admin Settings
+router.get('/api/admin/upgrade', eventHandler(() => ({
+  err: 'ok', status: { phase: 'idle', disabled: 'loader', current: { version: 'mock-1.0.0', sequence: 1 } },
+})));
+router.get('/api/admin/discovery', eventHandler(() => ({
+  err: 'ok', enabled: false, name: 'Talebook Mock', endpoints: [], overridden: [], interfaces: {}, demo: false,
+  status: { state: 'disabled', error: null, instance_id: null },
+})));
 router.get('/api/admin/settings', eventHandler(() => ({
   err: 'ok',
   site_url: 'http://localhost:8000',

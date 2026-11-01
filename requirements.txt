@@ -19,6 +19,7 @@ pymysql
 bcrypt
 cryptography>=38.0.0
 psutil
+zeroconf==0.148.0
 requests-toolbelt
 
 # Voicebook progress v2; 0.8.0 is not tagged yet. Keep the reviewed revision immutable.

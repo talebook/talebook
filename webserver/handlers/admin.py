@@ -19,6 +19,7 @@ from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
 from webserver.models import Item, Reader, ScanFile
+from webserver.services import lan_discovery
 from webserver.services.aliases import AliasService
 from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
@@ -416,6 +417,8 @@ class AdminSettings(BaseHandler):
         ):
             settings_dict.pop(plugin_setting, None)
 
+        if not self.is_demo_fake_admin():
+            settings_dict = lan_discovery.effective_config(settings_dict)
         return {"err": "ok", "settings": settings_dict, "sns": sns, "site_url": self.site_url}
 
     @js
@@ -433,6 +436,18 @@ class AdminSettings(BaseHandler):
         if not self.admin_user:
             return {"err": "permission", "msg": _("无权访问此接口")}
         data = tornado.escape.json_decode(self.request.body)
+        candidate = lan_discovery.effective_config(
+            dict(CONF, **{k: v for k, v in data.items() if k in (*lan_discovery.CONFIG_KEYS, "site_title")})
+        )
+        try:
+            endpoints = lan_discovery.validate_config(candidate)
+        except (TypeError, ValueError):
+            return {
+                "err": "params.lan_discovery",
+                "msg": _("局域网广播配置无效：请检查名称、HTTP(S) 地址、私网 IP 和网络接口"),
+            }
+        if "LAN_DISCOVERY_ENDPOINTS" in data and "LAN_DISCOVERY_ENDPOINTS" not in lan_discovery.manual_overrides():
+            data["LAN_DISCOVERY_ENDPOINTS"] = endpoints
         # 验证：如果启用了私人图书馆模式，访问码不能为空
         invite_mode = data.get("INVITE_MODE", False)
         invite_code = data.get("INVITE_CODE", "")
@@ -487,6 +502,8 @@ class AdminSettings(BaseHandler):
                 }
 
         KEYS = [
+            "LAN_DISCOVERY_ENABLED",
+            "LAN_DISCOVERY_ENDPOINTS",
             "ALLOW_GUEST_DOWNLOAD",
             "ALLOW_GUEST_PUSH",
             "ALLOW_GUEST_READ",
@@ -571,7 +588,36 @@ class AdminSettings(BaseHandler):
                 args[key] = val
 
         logic = SettingsSaverLogic()
-        return logic.save_extra_settings(args)
+        result = logic.save_extra_settings(args)
+        if result["err"] == "ok":
+            for key, value in lan_discovery.manual_overrides().items():
+                if key in lan_discovery.CONFIG_KEYS:
+                    CONF[key] = value
+            manager = self.application.settings.get("discovery_manager")
+            if manager:
+                manager.request()
+        return result
+
+
+class AdminDiscovery(AdminSettings):
+    @js
+    @auth
+    def get(self):
+        demo = self.is_demo_fake_admin()
+        if not self.admin_user and not demo:
+            return {"err": "permission", "msg": _("无权访问此接口")}
+        config = dict(DEFAULT_SETTINGS) if demo else lan_discovery.effective_config(CONF)
+        manager = None if demo else self.application.settings.get("discovery_manager")
+        return {
+            "err": "ok",
+            "status": manager.status() if manager else {"state": "disabled", "error": None, "instance_id": None},
+            "enabled": config.get("LAN_DISCOVERY_ENABLED", False),
+            "name": config.get("site_title", ""),
+            "endpoints": config.get("LAN_DISCOVERY_ENDPOINTS", []),
+            "overridden": [] if demo else list(lan_discovery.manual_overrides()),
+            "interfaces": {} if demo else lan_discovery.interface_inventory(),
+            "demo": demo,
+        }
 
 
 def _build_mysql_url(db_host, db_port, db_name, db_user, db_pass):
@@ -1466,6 +1512,7 @@ def routes():
         (r"/api/admin/users/batch", AdminUsersBatch),
         (r"/api/admin/install", AdminInstall),
         (r"/api/admin/settings", AdminSettings),
+        (r"/api/admin/discovery", AdminDiscovery),
         (r"/api/admin/testmail", AdminTestMail),
         (r"/api/admin/testdb", AdminTestDB),
         (r"/api/admin/migratedb", AdminMigrateDB),
