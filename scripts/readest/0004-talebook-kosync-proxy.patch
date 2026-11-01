@@ -1,0 +1,140 @@
+diff --git a/apps/readest-app/public/kosync-transport.js b/apps/readest-app/public/kosync-transport.js
+new file mode 100644
+index 0000000..1e2abc4
+--- /dev/null
++++ b/apps/readest-app/public/kosync-transport.js
+@@ -0,0 +1,34 @@
++/** Transport adapter for the standalone React reader; Nuxt plugins are unavailable here. */
++export function usesTalebookKOSync(location) {
++  if (!location) return false;
++  const params = new URLSearchParams(location.search);
++  if (params.get('moke') !== '1') return false;
++  try {
++    const source = new URL(params.get('mokeSourceServerUrl') || '');
++    return source.origin === location.origin && ['http:', 'https:'].includes(source.protocol);
++  } catch {
++    return false;
++  }
++}
++
++export async function requestTalebookKOSync(payload, fetchImpl = fetch, location = window.location) {
++  const proxyPath = new URL('../api/kosync', location.href).pathname;
++  const response = await fetchImpl(proxyPath, {
++    method: 'POST',
++    credentials: 'same-origin',
++    redirect: 'error',
++    headers: { 'Content-Type': 'application/json', 'X-Talebook-KOSync': '1' },
++    body: JSON.stringify(payload),
++  });
++  if (!response.ok) throw new Error(`Talebook KOSync proxy failed (HTTP ${response.status})`);
++  const result = await response.json();
++  if (result.err !== 'ok') throw new Error(result.msg || result.err || 'Talebook KOSync proxy failed');
++  if (!Number.isInteger(result.status) || result.status < 200 || result.status > 599 ||
++      !result.data || typeof result.data !== 'object' || Array.isArray(result.data)) {
++    throw new Error('Invalid Talebook KOSync proxy response');
++  }
++  return new Response(JSON.stringify(result.data), {
++    status: result.status,
++    headers: { 'Content-Type': 'application/json' },
++  });
++}
+diff --git a/apps/readest-app/src/__tests__/services/talebookKOSync.test.ts b/apps/readest-app/src/__tests__/services/talebookKOSync.test.ts
+new file mode 100644
+index 0000000..6b050b6
+--- /dev/null
++++ b/apps/readest-app/src/__tests__/services/talebookKOSync.test.ts
+@@ -0,0 +1,65 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const env = vi.hoisted(() => ({ native: false }));
++vi.mock('@/services/environment', () => ({
++  isTauriAppPlatform: () => env.native,
++  getAPIBaseUrl: () => 'https://web.readest.com/api',
++}));
++vi.mock('@/utils/misc', () => ({ getUserLang: () => 'en', makeSafeFilename: (s: string) => s }));
++vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }));
++import { fetch as nativeFetch } from '@tauri-apps/plugin-http';
++import { KOSyncClient } from '@/services/sync/KOSyncClient';
++import { KOSyncSettings } from '@/types/settings';
++
++const config = (serverUrl = 'https://sync.example'): KOSyncSettings => ({
++  serverUrl, username: 'alice', password: 'password', userkey: 'hash', enabled: true,
++  deviceName: 'test', deviceId: 'test-id', strategy: 'prompt', checksumMethod: 'binary',
++} as KOSyncSettings);
++const envelope = (status = 200, data: object = { authorized: 'OK' }) =>
++  new Response(JSON.stringify({ err: 'ok', status, data }));
++
++describe('Talebook KOSync client routing', () => {
++  beforeEach(() => {
++    env.native = false;
++    vi.clearAllMocks();
++    window.history.replaceState({}, '', '/readest/reader.html?moke=1&mokeSourceServerUrl=' + encodeURIComponent(location.origin));
++    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope()));
++  });
++
++  it.each(['https://sync.example', 'http://192.168.1.9:8080/kosync'])('uses Talebook for %s without a Readest account', async url => {
++    expect((await new KOSyncClient(config(url)).connect('alice', 'password')).success).toBe(true);
++    const [target, options] = vi.mocked(fetch).mock.calls[0]!;
++    expect(target).toBe('/api/kosync');
++    expect(JSON.parse(options!.body as string)).toMatchObject({
++      serverUrl: url, endpoint: '/users/auth', method: 'GET',
++      headers: { 'x-auth-user': 'alice', 'x-auth-key': 'hash' },
++    });
++    expect(options!.credentials).toBe('same-origin');
++  });
++
++  it.each([400, 401])('keeps Basic Auth retry working for HTTP %i', async status => {
++    vi.mocked(fetch).mockResolvedValueOnce(envelope(status, { message: 'KOSync authentication failed' })).mockResolvedValueOnce(envelope());
++    expect((await new KOSyncClient(config()).connect('alice', 'password')).success).toBe(true);
++    expect(JSON.parse(vi.mocked(fetch).mock.calls[1]![1]!.body as string).headers.authorization).toMatch(/^Basic /);
++  });
++
++  it('stops after one failed Basic Auth retry', async () => {
++    vi.mocked(fetch).mockImplementation(async () => envelope(401, { message: 'KOSync authentication failed' }));
++    expect((await new KOSyncClient(config())['request']('/users/auth')).status).toBe(401);
++    expect(fetch).toHaveBeenCalledTimes(2);
++  });
++
++  it('keeps native hosts on the native direct connection', async () => {
++    env.native = true;
++    vi.mocked(nativeFetch).mockResolvedValueOnce(new Response('{"authorized":"OK"}'));
++    expect((await new KOSyncClient(config()).connect('alice', 'password')).success).toBe(true);
++    expect(nativeFetch).toHaveBeenCalledWith('https://sync.example/users/auth', expect.any(Object));
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
++  it('keeps standalone Readest on its existing proxy', async () => {
++    window.history.replaceState({}, '', '/readest/reader.html');
++    vi.mocked(fetch).mockResolvedValueOnce(new Response('{"authorized":"OK"}'));
++    expect((await new KOSyncClient(config()).connect('alice', 'password')).success).toBe(true);
++    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('https://web.readest.com/api/kosync');
++  });
++});
+diff --git a/apps/readest-app/src/services/sync/KOSyncClient.ts b/apps/readest-app/src/services/sync/KOSyncClient.ts
+index 0e6e998..e106980 100644
+--- a/apps/readest-app/src/services/sync/KOSyncClient.ts
++++ b/apps/readest-app/src/services/sync/KOSyncClient.ts
+@@ -1,4 +1,5 @@
+ import { md5 } from 'js-md5';
++import { usesTalebookKOSync, requestTalebookKOSync } from '../../../public/kosync-transport.js';
+ import { Book } from '@/types/book';
+ import { KOSyncSettings } from '@/types/settings';
+ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+@@ -86,6 +87,18 @@ export class KOSyncClient {
+     const attempt = async (): Promise<Response> => {
+       const headers = buildHeaders();
+ 
++      // Same-origin Talebook embeds always use their own proxy, including LAN targets.
++      // Native hosts and standalone Readest retain their existing transports.
++      if (!isTauriAppPlatform() && usesTalebookKOSync(window.location)) {
++        return requestTalebookKOSync({
++          serverUrl: this.config.serverUrl,
++          endpoint,
++          method,
++          headers: Object.fromEntries(headers.entries()),
++          body: body ? JSON.parse(body as string) : undefined,
++        });
++      }
++
+       if (this.isLanServer || isTauriAppPlatform()) {
+         const fetch = isTauriAppPlatform() ? tauriFetch : window.fetch;
+         const directUrl = `${this.config.serverUrl}${endpoint}`;

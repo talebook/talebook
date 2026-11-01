@@ -7,7 +7,8 @@
   "patches": [
     "scripts/readest/0001-android-web-head.patch",
     "scripts/readest/0002-online-range-performance.patch",
-    "scripts/readest/0003-progressive-navigation.patch"
+    "scripts/readest/0003-progressive-navigation.patch",
+    "scripts/readest/0004-talebook-kosync-proxy.patch"
   ],
   "build": {
     "packageManager": "pnpm@11.1.1",
@@ -20,6 +21,7 @@
     "legacy-worker-cleanup.js",
     "sw.js",
     "talebook-launch.html",
-    "talebook-launch.js"
+    "talebook-launch.js",
+    "kosync-transport.js"
   ]
 }
