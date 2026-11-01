@@ -59,7 +59,7 @@ COPY webserver/ /var/www/talebook/webserver/
 COPY server.py /var/www/talebook/server.py
 RUN rm -rf /var/www/talebook/app/dist
 COPY app/dist/ /var/www/talebook/app/dist/
-COPY docker/start.sh /var/www/talebook/docker/start.sh
+COPY docker/start.sh docker/prepare-nginx-permissions.sh /var/www/talebook/docker/
 COPY conf/nginx/talebook.conf /etc/nginx/conf.d/talebook.conf
 COPY conf/supervisor/talebook.conf /etc/supervisor/conf.d/talebook.conf
 COPY scripts/upgrade/protocol.py scripts/upgrade/executor.py scripts/upgrade/fingerprint.py /opt/talebook-upgrade/
@@ -67,7 +67,7 @@ COPY webserver/self_check.py /opt/talebook-upgrade/self_check.py
 COPY fixture_executor.py fixture_server.py /test/
 COPY Dockerfile requirements.txt /opt/contract/
 COPY conf/ /opt/contract/conf/
-COPY docker/start.sh /opt/contract/docker/start.sh
+COPY docker/start.sh docker/prepare-nginx-permissions.sh /opt/contract/docker/
 COPY webserver/models.py webserver/migrate_db.py webserver/self_check.py /opt/contract/webserver/
 RUN python3 /opt/talebook-upgrade/fingerprint.py /opt/contract /opt/talebook-upgrade/image.json amd64 v1 1 {"1" * 40} \\
     && chmod +x /var/www/talebook/server.py /var/www/talebook/docker/start.sh \\
