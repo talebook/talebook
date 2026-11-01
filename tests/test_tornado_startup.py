@@ -23,6 +23,8 @@ class TestTornadoStartup(testing.AsyncHTTPTestCase):
         header_patch.start()
         self.addCleanup(header_patch.stop)
         super().setUp()
+        discovery = mock.Mock()
+        self._app.settings["discovery_manager"] = discovery
         # Exercise the production entry point without binding its configured
         # port, building a second book database, or starting a blocking loop.
         with (
@@ -30,12 +32,15 @@ class TestTornadoStartup(testing.AsyncHTTPTestCase):
             mock.patch.object(main, "setup_logging"),
             mock.patch.object(main, "make_app", return_value=self._app),
             mock.patch.object(main.tornado.httpserver, "HTTPServer") as server,
-            mock.patch.object(main.tornado.ioloop.IOLoop, "instance") as loop,
+            mock.patch.object(main.tornado.ioloop.IOLoop, "current") as loop,
+            mock.patch.object(main.signal, "signal"),
         ):
             main.main()
             server.assert_called_once_with(self._app, xheaders=True, max_buffer_size=main.get_upload_size())
             server.return_value.listen.assert_called_once_with(main.options.port, main.options.host)
             loop.return_value.start.assert_called_once_with()
+            loop.return_value.add_callback.assert_called_once_with(discovery.start)
+            loop.return_value.run_sync.assert_called_once_with(discovery.close)
 
     def test_startup_serves_normal_http_request(self):
         response = self.fetch("/", request_timeout=2)

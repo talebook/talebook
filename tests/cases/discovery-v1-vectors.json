@@ -1,0 +1,60 @@
+{
+  "profile": "talebook.discovery.v1",
+  "format": "Decoded DNS-SD input. Each case applies RFC7396 merge-patch to base; arrays replace in full. txt is an ordered array of UTF-8 key=value strings. txt_hex, when present, replaces txt with raw TXT RDATA hex. expected describes future implementation behavior, not executed product tests.",
+  "base": {
+    "service_type": "_talebook._tcp.local.",
+    "fullname": "Talebook-9f0c663b-8ffd-4e13-92d9-2b68572c08b1-1._talebook._tcp.local.",
+    "interface": "lan-a",
+    "srv": {"priority": 0, "weight": 0, "port": 8080, "target": "tb-9f0c663b-8ffd-4e13-92d9-2b68572c08b1-1.local."},
+    "addresses": ["192.168.50.10"],
+    "ttl": {"ptr": 120, "srv": 120, "txt": 120, "address": 120},
+    "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080"]
+  },
+  "cases": [
+    {"case_id": "valid_http", "patch": {}, "expected": {"decision": "candidate", "base_url": "http://192.168.50.10:8080"}},
+    {"case_id": "valid_https_prefix", "patch": {"srv": {"port": 8443}, "resolved_url_addresses": ["192.168.50.10"], "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=https://books.home.arpa:8443/team/books"]}, "expected": {"decision": "candidate", "base_url": "https://books.home.arpa:8443/team/books", "welcome_url": "https://books.home.arpa:8443/team/books/api/welcome"}},
+    {"case_id": "valid_ula", "patch": {"addresses": ["fd12:3456:789a::10"], "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://[fd12:3456:789a::10]:8080"]}, "expected": {"decision": "candidate", "base_url": "http://[fd12:3456:789a::10]:8080"}},
+    {"case_id": "valid_default_http_port", "patch": {"srv": {"port": 80}, "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10/"]}, "expected": {"decision": "candidate", "base_url": "http://192.168.50.10"}},
+    {"case_id": "name_as_text", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=<img src=x>", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "candidate", "display_text": "<img src=x>", "html_execution": false}},
+    {"case_id": "unknown_key", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080", "future=x"]}, "expected": {"decision": "candidate"}},
+    {"case_id": "duplicate_key_first_wins", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080", "URL=file:///bad"]}, "expected": {"decision": "candidate", "base_url": "http://192.168.50.10:8080"}},
+    {"case_id": "duplicate_invalid_first", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=file:///bad", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "invalid_url"}},
+    {"case_id": "future_version", "patch": {"txt": ["txtvers=2", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "unsupported", "network_request": false}},
+    {"case_id": "missing_version", "patch": {"txt": ["id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "missing_required_key"}},
+    {"case_id": "missing_id", "patch": {"txt": ["txtvers=1", "name=家中书库", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "missing_required_key"}},
+    {"case_id": "bad_uuid", "patch": {"txt": ["txtvers=1", "id=not-a-uuid", "name=家中书库", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "invalid_id"}},
+    {"case_id": "name_control", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=书库\n伪造", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "invalid_name"}},
+    {"case_id": "name_too_long", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家家家家家家家家家家家家家家家家家家家家家家家家家家家家家家家家家", "url=http://192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "name_over_96_utf8_bytes"}},
+    {"case_id": "invalid_utf8", "patch": {"txt_hex": "096e616d653dffffffff"}, "expected": {"decision": "reject", "reason": "invalid_utf8"}},
+    {"case_id": "truncated_txt", "patch": {"txt_hex": "096162"}, "expected": {"decision": "reject", "reason": "truncated_txt"}},
+    {"case_id": "credential_url", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://example:example@192.168.50.10:8080"]}, "expected": {"decision": "reject", "reason": "url_userinfo"}},
+    {"case_id": "url_query", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080?x=1"]}, "expected": {"decision": "reject", "reason": "url_query"}},
+    {"case_id": "url_fragment", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080#x"]}, "expected": {"decision": "reject", "reason": "url_fragment"}},
+    {"case_id": "path_traversal", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080/books/../admin"]}, "expected": {"decision": "reject", "reason": "invalid_path_before_url_normalization"}},
+    {"case_id": "encoded_path", "patch": {"txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://192.168.50.10:8080/%2e%2e"]}, "expected": {"decision": "reject", "reason": "encoded_path"}},
+    {"case_id": "port_mismatch", "patch": {"srv": {"port": 8081}}, "expected": {"decision": "reject", "reason": "port_mismatch"}},
+    {"case_id": "zero_port", "patch": {"srv": {"port": 0}}, "expected": {"decision": "reject", "reason": "invalid_port"}},
+    {"case_id": "missing_srv", "patch": {"srv": null}, "expected": {"decision": "pending", "clickable": false}},
+    {"case_id": "no_addresses", "patch": {"addresses": []}, "expected": {"decision": "pending", "clickable": false}},
+    {"case_id": "ip_mismatch", "patch": {"addresses": ["192.168.50.11"]}, "expected": {"decision": "reject", "reason": "address_mismatch"}},
+    {"case_id": "loopback", "patch": {"addresses": ["127.0.0.1"], "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://127.0.0.1:8080"]}, "expected": {"decision": "reject", "reason": "non_lan_address"}},
+    {"case_id": "public_address", "patch": {"addresses": ["203.0.113.10"], "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://203.0.113.10:8080"]}, "expected": {"decision": "reject", "reason": "outside_rfc1918_or_ula"}},
+    {"case_id": "link_local_v6", "patch": {"addresses": ["fe80::10"], "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://[fe80::10]:8080"]}, "expected": {"decision": "reject", "reason": "link_local_not_supported_v1"}},
+    {"case_id": "hostname_mismatch", "patch": {"resolved_url_addresses": ["192.168.50.11"], "txt": ["txtvers=1", "id=9f0c663b-8ffd-4e13-92d9-2b68572c08b1", "name=家中书库", "url=http://books.home.arpa:8080"]}, "expected": {"decision": "reject", "reason": "hostname_address_mismatch"}},
+    {"case_id": "different_service_type", "patch": {"service_type": "_http._tcp.local."}, "expected": {"decision": "ignore"}}
+  ],
+  "generated_cases": [
+    {"case_id": "txt_rdata_over_limit", "generation": {"base": true, "append_txt": [{"key": "x", "value_ascii": "a", "repeat": 200}, {"key": "y", "value_ascii": "b", "repeat": 200}]}, "expected": {"decision": "reject", "reason": "txt_rdata_over_400_bytes"}},
+    {"case_id": "txt_string_over_limit", "generation": {"base": true, "append_txt": [{"key": "x", "value_ascii": "a", "repeat": 254}]}, "expected": {"decision": "reject_before_wire_encoding", "reason": "txt_string_over_255_bytes"}}
+  ],
+  "lifecycle_cases": [
+    {"case_id": "duplicate_and_same_name", "events": ["resolve base on lan-a", "repeat base on lan-a", "resolve base on lan-b", "resolve different UUID same name"], "expected": {"rows": 2, "first_row_candidates": 1, "first_candidate_sources": 2}},
+    {"case_id": "partial_goodbye", "events": ["resolve base on lan-a and lan-b at t=0", "goodbye lan-a at t=10", "cache one-second grace elapses at t=11"], "expected": {"rows": 1, "sources": 1}},
+    {"case_id": "full_goodbye", "events": ["resolve base on lan-a at t=0", "goodbye last source at t=10", "cache grace elapses at t=11"], "expected": {"rows": 0, "ui_target_removed_by": 15}},
+    {"case_id": "silent_crash", "events": ["all required records last received at t=0 TTL120", "publisher crashes without goodbye", "no subsequent refresh received"], "expected": {"record_expiry": 120, "ui_target_removed_by": 125}},
+    {"case_id": "unchanged_record_refresh", "events": ["all required records received t=0 TTL120", "same RR data received t=90 TTL120; no new UI resolved callback", "clock t=121", "clock t=210 without further responses"], "expected": {"present_at_121": true, "record_expiry": 210, "ui_target_removed_by": 215}},
+    {"case_id": "address_update", "events": ["resolve base at t=0", "same id new IP/url 192.168.50.11 with cache-flush and old-source invalidation at t=20"], "expected": {"rows": 1, "new_candidate": "http://192.168.50.11:8080", "saved_server_changed": false}},
+    {"case_id": "leave_and_late_event", "events": ["open discovery session generation1", "leave and stop generation1", "late resolved from generation1", "open generation2"], "expected": {"generation1_event_ignored": true, "generation2_initial_rows": 0, "old_subscriptions": 0}},
+    {"case_id": "click_join_failure", "events": ["discover valid base", "click candidate", "existing server validation returns failure"], "expected": {"credentials_sent_before_click": false, "saved_server_changed": false, "retry_available": true}}
+  ]
+}

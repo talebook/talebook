@@ -442,6 +442,10 @@
                             <SSLManager />
                         </template>
 
+                        <LanDiscoverySettings
+                            v-if="card.show_discovery"
+                            v-model="settings"
+                        />
                         <template v-if="card.show_update">
                             <AdminApplicationUpgrade :current-version="updateInfo.current_version" />
                         </template>
@@ -524,6 +528,7 @@ import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n';
 import { useDisplay } from 'vuetify';
 import SSLManager from '~/components/SSLManager.vue';
+import LanDiscoverySettings from '~/components/admin/LanDiscoverySettings.vue';
 import RoutePageToolbar from '@/components/RoutePageToolbar.vue';
 import { useMainStore } from '@/stores/main';
 
@@ -789,6 +794,7 @@ const cards = computed(() => [
         ],
     },
 
+    { key: 'lanDiscovery', title: t('admin.discovery.title'), fields: [], show_discovery: true },
     {
         key: 'databaseManagement',
         title: t('admin.settings.section.databaseManagement'),
@@ -819,7 +825,7 @@ const cards = computed(() => [
 const navGroupDefs = [
     { key: 'site', titleKey: 'admin.settings.group.site', keys: ['basicInfo', 'bookCategories', 'friendshipLinks'] },
     { key: 'access', titleKey: 'admin.settings.group.access', keys: ['userSettings', 'socialLogin', 'captchaSettings'] },
-    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'audiobookSettings', 'webdavSettings'] },
+    { key: 'services', titleKey: 'admin.settings.group.services', keys: ['emailService', 'audiobookSettings', 'webdavSettings', 'lanDiscovery'] },
     { key: 'system', titleKey: 'admin.settings.group.system', keys: ['advancedSettings', 'databaseManagement', 'sslManagement', 'trashManagement', 'updateCheck'] },
 ];
 

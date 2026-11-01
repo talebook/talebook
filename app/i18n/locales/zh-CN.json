@@ -690,6 +690,36 @@
     "passwordMismatch": "两次输入的密码不一致"
   },
   "admin": {
+    "discovery": {
+      "title": "局域网发现",
+      "help": "在所选局域网公开站点名称、稳定标识和地址，让 Moke 发现书库。发现不授予访问权限，仍需访问码或登录。默认关闭；需要 Linux 原生或 host 网络和可达的外部监听地址。",
+      "enable": "允许局域网发现此书库",
+      "override": "以下有效设置由 manual.py 覆盖，需修改该文件并重启：",
+      "name": "将公开的名称",
+      "url": "外部地址（HTTP/HTTPS）",
+      "addresses": "外部监听 IP（逗号分隔）",
+      "addressHint": "只允许所选本机接口上的 RFC1918 IPv4 或 IPv6 ULA；不能填写 localhost、容器映射地址或内部后端端口。",
+      "interfaces": "发布网络接口",
+      "remove": "移除此端点",
+      "empty": "尚未配置端点，开启前请添加可达地址和接口。",
+      "add": "添加广播端点",
+      "saveHint": "通过页面顶部“保存”应用设置，无需重启。保存成功表示意图已写入；请核对下方实际状态。默认 Docker bridge 不能通过映射 UDP 5353 获得此能力。",
+      "saved": "已保存的广播意图",
+      "on": "开启",
+      "off": "关闭",
+      "actual": "实际发布状态",
+      "id": "公开实例标识",
+      "loadError": "无法刷新实际状态，请检查网络或管理员登录。",
+      "state": {
+                "unknown": "状态未知",
+        "loading": "正在读取",
+        "disabled": "未发布",
+        "starting": "正在启动",
+        "advertising": "正在广播",
+        "stopping": "正在注销",
+        "error": "发布失败"
+      }
+    },
     "title": {},
     "button": {
       "importFromOpds": "从OPDS导入"
