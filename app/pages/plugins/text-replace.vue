@@ -74,7 +74,7 @@
 import { ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { useMainStore } from '@/stores/main';
-import { confirmDestructiveBookWrite } from '@/utils/book-tools';
+import { bookToolUrl, confirmDestructiveBookWrite } from '@/utils/book-tools';
 import { useBookToolSelection } from '@/composables/useBookToolSelection';
 
 const { t } = useI18n();
@@ -87,6 +87,7 @@ const pattern = ref('');
 const replacement = ref('');
 const useRegex = ref(false);
 const outputMode = ref('new');
+const PLUGIN_KEY = 'talebook.tool.text-replace';
 const suffix = ref('');
 const busy = ref('');
 const error = ref('');
@@ -100,15 +101,19 @@ watch(bookId, () => {
     success.value = '';
 });
 
+function ruleParams() {
+    return { pattern: pattern.value, replacement: replacement.value, use_regex: useRegex.value };
+}
+
 async function doPreview() {
     error.value = '';
     ruleError.value = '';
     previewResult.value = null;
     busy.value = 'preview';
     try {
-        const rsp = await $backend('/plugins/tools/text-replace/preview', {
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'preview'), {
             method: 'POST',
-            body: JSON.stringify({ book_id: bookId.value, pattern: pattern.value, replacement: replacement.value, use_regex: useRegex.value }),
+            body: JSON.stringify({ book_id: bookId.value, params: ruleParams() }),
         });
         if (rsp.err === 'ok') {
             previewResult.value = rsp;
@@ -132,15 +137,13 @@ async function doRun() {
     success.value = '';
     busy.value = 'run';
     try {
-        const rsp = await $backend('/plugins/tools/text-replace/run', {
+        const rsp = await $backend(bookToolUrl(PLUGIN_KEY, 'run'), {
             method: 'POST',
             body: JSON.stringify({
                 book_id: bookId.value,
-                pattern: pattern.value,
-                replacement: replacement.value,
-                use_regex: useRegex.value,
                 output_mode: outputMode.value,
                 suffix: suffix.value,
+                params: ruleParams(),
             }),
         });
         if (rsp.err === 'ok') {

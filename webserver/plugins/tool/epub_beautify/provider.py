@@ -46,6 +46,12 @@ class EpubBeautifyTransformPlugin(TextTransformPlugin):
             {"EPUB"},
         )
 
+    # 原书零改动：只生成新书，因此没有覆盖写回与回滚。
+    output_modes = ("new",)
+    new_book_suffix = "（美化版）"
+    preview_timeout = 120
+    apply_timeout = 600
+
     # ------------------------------------------------------------ 元数据
 
     @staticmethod
@@ -65,8 +71,7 @@ class EpubBeautifyTransformPlugin(TextTransformPlugin):
             items.append(item)
         return items
 
-    @staticmethod
-    def describe():
+    def describe(self):
         """无书籍依赖的选项元数据，供工具页初始化渲染。"""
         return {
             "presets": EpubBeautifyTransformPlugin.preset_items(),
@@ -75,6 +80,31 @@ class EpubBeautifyTransformPlugin(TextTransformPlugin):
         }
 
     # ------------------------------------------------------------ 参数归一
+
+    def tool_input(self, params, book):
+        """只做形状转换，参数合法性由 _plan 校验。"""
+        return {
+            "preset": str(params.get("preset") or ""),
+            "toc_style": str(params.get("toc_style") or "elegant"),
+            "use_system_fonts": params.get("use_system_fonts", True),
+            "font_overrides": params.get("font_overrides"),
+            "toc_depth": params.get("toc_depth"),
+            "cleanup": params.get("cleanup"),
+            "palette_overrides": params.get("palette_overrides"),
+            "page_tint": params.get("page_tint"),
+            "bg_texture": str(params.get("bg_texture") or ""),
+            "dialogue": bool(params.get("dialogue")),
+            "title_split": bool(params.get("title_split")),
+            "toc_columns": bool(params.get("toc_columns")),
+            "para_mode": params.get("para_mode"),
+            "para_indent": params.get("para_indent"),
+            "para_gap": params.get("para_gap"),
+            "notes": bool(params.get("notes")),
+            "note_mark": str(params.get("note_mark") or "orig"),
+        }
+
+    def audit_fields(self, tool_input):
+        return {"preset": tool_input.get("preset", "")}
 
     @staticmethod
     def _normalize_font_overrides(use_system_fonts, font_overrides):

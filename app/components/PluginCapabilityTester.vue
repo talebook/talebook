@@ -131,6 +131,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
+import { pluginExecUrl } from '@/utils/book-tools';
 
 type ProbeKind = 'metadata' | 'source' | 'review';
 type ProbeItem = Record<string, any>;
@@ -200,19 +201,19 @@ function labelFor(kindValue: ProbeKind) {
 }
 
 function requestFor(kindValue: ProbeKind) {
-    const base = `/admin/plugins/${props.plugin.plugin_key}`;
+    const pluginKey = props.plugin.plugin_key;
     if (kindValue === 'source') {
-        return { url: `${base}/source/search`, body: { query: form.value.keyword.trim() } };
+        return { url: pluginExecUrl(pluginKey, 'source.search'), body: { params: { query: form.value.keyword.trim() } } };
     }
-    const query = {
+    const params = {
         title: form.value.title.trim(),
         isbn: form.value.isbn.trim(),
         authors: form.value.authors.split(',').map(item => item.trim()).filter(Boolean),
         publisher: form.value.publisher.trim(),
     };
     return {
-        url: kindValue === 'metadata' ? `${base}/metadata/search` : `${base}/reviews/lookup`,
-        body: { query },
+        url: pluginExecUrl(pluginKey, kindValue === 'metadata' ? 'metadata.search' : 'review.lookup'),
+        body: { params },
     };
 }
 

@@ -7,7 +7,8 @@ from .engine import DIRECTION_LABELS, OpenCC
 from .transform import convert_epub, convert_txt_file
 
 
-ZH_DIRECTIONS = frozenset({"t2s", "tw2s", "tw2sp", "s2t", "s2tw", "s2twp", "t2tw", "tw2t"})
+ZH_DIRECTION_ORDER = ("t2s", "tw2s", "tw2sp", "s2t", "s2tw", "s2twp", "t2tw", "tw2t")
+ZH_DIRECTIONS = frozenset(ZH_DIRECTION_ORDER)
 ZH_DIRECTION_LANG = {
     "t2s": "zh",
     "tw2s": "zh",
@@ -18,6 +19,8 @@ ZH_DIRECTION_LANG = {
     "t2tw": "zht",
     "tw2t": "zht",
 }
+# 另存为新书时的标题后缀
+ZH_NEW_BOOK_SUFFIX = {"zh": "（简体版）", "zht": "（繁體版）"}
 A5_PHRASES_FILE = os.path.join(os.path.dirname(__file__), "a5_phrases.txt")
 
 
@@ -39,7 +42,36 @@ class ZhConverterTransformPlugin(TextTransformPlugin):
                 },
             ),
             {"EPUB", "TXT"},
+            # 优先处理 EPUB（保留目录结构），无 EPUB 时退回 TXT
+            input_formats=("EPUB", "TXT"),
         )
+
+    def describe(self):
+        return {"directions": [{"value": key, "label": DIRECTION_LABELS.get(key, key)} for key in ZH_DIRECTION_ORDER]}
+
+    def tool_input(self, params, book):
+        return {
+            "direction": str(params.get("direction") or ""),
+            "use_a5": bool(params.get("use_a5")),
+            "convert_title": bool(params.get("convert_title")),
+            "title": book.get("title") or "Unknown",
+            "authors": [str(author) for author in (book.get("authors") or [])],
+        }
+
+    def audit_fields(self, tool_input):
+        return {"direction": tool_input.get("direction", "")}
+
+    def book_updates(self, output):
+        """覆盖时同步库内标题/作者/语言（不加后缀），另存新书时作为新书元数据。"""
+        updates = {"language": output["language"]}
+        if output.get("converted_title"):
+            updates["title"] = output["converted_title"]
+        if output.get("converted_authors"):
+            updates["authors"] = list(output["converted_authors"])
+        return updates
+
+    def new_book_title_suffix(self, output):
+        return ZH_NEW_BOOK_SUFFIX.get(output.get("language"), "")
 
     def _engine(self, src):
         direction = str(src.get("direction") or "")
