@@ -2,7 +2,10 @@
 # -*- coding: UTF-8 -*-
 # @author: PoxenStudio, 2026-06
 
+import json
 import logging
+import re
+from types import SimpleNamespace
 
 from webserver.i18n import _
 
@@ -93,6 +96,7 @@ class DoubanV2MetaPlugin:
 class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
     legacy_sources = ("douban", "douban_v2")
     proxy_image_hosts = ("doubanio.com",)
+    REFERENCE_PREFIX = "douban_v2:v1:"
     manifest = meta_manifest(
         "talebook.meta.douban-v2",
         "豆瓣",
@@ -103,10 +107,38 @@ class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
     )
 
     def _search(self, query, context):
-        return self.search(title=query.title, isbn=query.isbn, publisher=query.publisher) or []
+        results = self.search(title=query.title, isbn=query.isbn, publisher=query.publisher) or []
+        for mi in results:
+            # 通用插件详情只收到 external_id，没有原书 mi：把重搜所需的 isbn/title
+            # 和豆瓣条目 id 一起编码进 provider_value，供 _fetch 还原查询词。
+            mi.provider_value = self.REFERENCE_PREFIX + json.dumps(
+                {"id": mi.provider_value, "isbn": getattr(mi, "isbn", None), "title": mi.title},
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        return results
 
     def _fetch(self, external_id, context):
-        return self.get_metadata_by_provider(external_id)
+        if not isinstance(external_id, str) or len(external_id) > 4096:
+            return None
+        if not external_id.startswith(self.REFERENCE_PREFIX):
+            return None
+        try:
+            reference = json.loads(external_id[len(self.REFERENCE_PREFIX) :])
+        except (ValueError, RecursionError):
+            return None
+        if not isinstance(reference, dict):
+            return None
+        item_id, isbn, title = (reference.get(key) for key in ("id", "isbn", "title"))
+        if not isinstance(item_id, str) or not re.fullmatch(r"[0-9]{1,20}", item_id):
+            return None
+        if not isinstance(title, str) or not title.strip() or len(title) > 512:
+            return None
+        if isbn is not None and (not isinstance(isbn, str) or len(isbn) > 64):
+            return None
+        # get_metadata_by_provider 只读 isbn/title/cover_url，不需要真正的 calibre Metadata。
+        mi = SimpleNamespace(title=title, isbn=isbn, cover_url=None)
+        return self.get_metadata_by_provider(item_id, mi)
 
     def get_cover(self, cover_url, context=None):
         return DoubanV2MetaPlugin.get_cover(self, cover_url)
