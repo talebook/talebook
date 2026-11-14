@@ -33,9 +33,26 @@
 
 下载的书籍存储在本地，在书架页面可以离线打开阅读。
 
+## 在 Mihon 中阅读 Talebook 漫画
+
+Android 用户还可以通过 [Talebook Mihon Plugin](https://github.com/hehetoshang/mihon-talebook-plugin) 将自托管 Talebook 书库接入 Mihon，浏览、搜索和阅读漫画。
+
+- **版本要求**：Mihon 0.20.0+、Android 8.0+，以及包含漫画 API 的 Talebook v26.09.01+。
+- **内容范围**：仅展示服务器明确标记为 `media_type = comic` 的书籍，普通 EPUB、PDF 等电子书不会出现在插件的浏览或搜索结果中。
+- **阅读方式**：每本 Talebook 漫画对应一个 Mihon 漫画条目和一个“完整漫画”章节，按服务端提供的页序加载图片。
+
+配置步骤：
+
+1. 从[插件仓库](https://github.com/hehetoshang/mihon-talebook-plugin)的 Releases 或 Actions 构建产物下载并安装 APK，在 Mihon 中确认信任该扩展。
+2. 打开 Mihon 的“浏览 → 扩展 → Talebook → 设置”，填写服务器地址、用户名、密码和访问码（未启用访问码时可留空）。
+3. 点击“测试连接”，成功后进入 Talebook 书源浏览或搜索漫画。
+
+插件目前无法完成登录或访问码的交互式验证码；具体配置与兼容性说明请参阅[插件 README](https://github.com/hehetoshang/mihon-talebook-plugin#readme)。
+
 ## 相关链接
 
 - [Talebook 服务器](https://github.com/talebook/talebook) — 自托管电子书服务端，Moke 的数据来源
+- [Talebook Mihon Plugin](https://github.com/hehetoshang/mihon-talebook-plugin) — 在 Android 的 Mihon 中连接 Talebook 并阅读漫画的书源扩展
 - [readest](https://github.com/readest/readest) — 内嵌的专业电子书阅读器
 - [报告 Bug](../../issues) — 发现 Bug？请告诉我们
 - [参与贡献](CONTRIBUTING.md) — 开发者贡献指南
