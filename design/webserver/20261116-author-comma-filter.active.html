@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>作者筛选逗号还原 · ACTIVE</title>
+<style>
+:root { color-scheme: light; font-family: system-ui, sans-serif; color: #1f2937; background: #f6f7fb; }
+* { box-sizing: border-box; }
+body { margin: 0; line-height: 1.7; }
+.page { width: min(960px, calc(100% - 32px)); margin: 24px auto; }
+.hero, .card { background: white; border: 1px solid #d7dfeb; border-radius: 16px; padding: 24px; margin-bottom: 16px; }
+h1 { font-size: clamp(26px, 4vw, 40px); line-height: 1.2; }
+h2 { font-size: 22px; }
+p, code { overflow-wrap: anywhere; }
+code { font-family: monospace; }
+a { color: #315f91; }
+a:focus-visible { outline: 3px solid #df6d16; outline-offset: 3px; }
+@media (max-width: 600px) { .hero, .card { padding: 16px; } }
+</style>
+</head><body><main class="page"><header class="hero"><h1>作者筛选逗号还原</h1><p>创建日期：2026-11-16 · 模块：webserver · 状态：ACTIVE</p><p>需求来源：GitHub #1098</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>作者“【法】安东尼·德·圣埃克苏佩里 著,丁克霞 译”在书库浏览中筛选为空，详情页作者入口可找到书。用最小合成元数据验证并修复，不使用用户附件或生产站点。</p></section>
+<section class="card"><h2>证据与方案</h2><p>基线 ec0d12c196e7a70d37dc7db970ff31b49e463968。临时 Calibre 书库 create_book_entry 后刷新 legacy data，SQL 作者名为竖线，field_for 返回逗号；原有 author 搜索表达式使用逗号返回 ID 1，竖线返回空。</p><p>get_category_with_count 直接查询 SQL，将 authors.name 原始转义值交给前端。仅在 field 为 author 时将竖线还原为逗号，保持 ID、计数、分页和其他分类不变。作者别名映射随后也收到公开作者名。无需修改搜索语义、前端、库表或权限。</p></section>
+<section class="card"><h2>边界与决策</h2><p>这是恢复已有作者筛选契约的局部低风险修复。已有授权足以确定实现边界，无新增产品决策。仓库未提供 grill 技能，按上述证据完成决策审查。偶发快速点击空结果缺少复现，不扩大范围。旧客户端已经缓存的竖线筛选需刷新分类选项。</p><p>影响：webserver/handlers/base.py、回归测试、spec/书库.md。规范补充作者名称标点一致性。不涉及授权、安全、隐私、迁移删除、兼容性破坏或大重构。不改变页面结构和交互；为局部缺陷修复，不属于大型功能，豁免 interface-review full。没有启动前端，无法提供浏览器截图；以真实后端 HTTP 响应验证。</p></section>
+<section class="card"><h2>测试结果</h2><p>在 CI 同款 talebook/talebook-base:latest 临时容器（Calibre 8.5.0，镜像 digest sha256:4bca029954123fe92f996786b073614a34fd451d5dfeb636cb61c8306060be5e）安装 requirements.txt、requirements-test.txt、git 和 ffmpeg。首次 make init 因容器缺宿主代理 CA 失败；复制宿主 CA 并通过 PIP_CERT 指定后成功，未禁用证书验证。</p><ul>
+<li>原代码 + 最终测试：pytest tests/test_author_filter.py -q：3 failed、1 passed；选项名称为竖线，普通和流式书库 total=0，作者详情 total=1。</li>
+<li>修复后：pytest tests/test_author_filter.py tests/test_meta_pagination.py tests/test_aliases.py -q：25 passed。</li>
+<li>最终 make pytest：2089 passed、40 skipped、265 warnings，退出 0。</li>
+<li>make lint-py-fix、make lint-py、ruff check tests/test_author_filter.py、ruff format --check tests/test_author_filter.py：通过，194 个后端文件无额外格式变化。</li>
+<li>make check-spec：25 篇通过；make check-design 与 git diff --check：通过。开发中 WIP 被方案门禁按预期拒绝，验证后转换为 ACTIVE 再执行。</li>
+</ul><p>首轮新增测试在共享书库创建再删除合成书籍，完整测试为 2088 passed、40 skipped、1 failed，已有文档上传测试报 items.book_id 唯一约束冲突；该用例单跑通过，移除新增测试并恢复原代码的完整基线为 2085 passed、40 skipped。将新回归改为每用例独立临时 Calibre 数据库并恢复应用数据库引用，最终全量通过；不修改其他业务代码或测试断言。</p><p>未运行前端 lint、构建和浏览器验收：没有修改前端，验证范围为真实 Calibre + Tornado HTTP 接口，不能代替 Edge 的端到端验证。40 项跳过不计为通过。未复现偶发快速点击问题。</p></section></main></body></html>
