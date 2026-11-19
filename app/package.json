@@ -33,7 +33,7 @@
   "devDependencies": {
     "@nuxt/test-utils": "^3.23.0",
     "@pinia/testing": "^1.0.3",
-    "@playwright/test": "^1.58.0",
+    "@playwright/test": "~1.64.1",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
     "@vue/eslint-config-typescript": "^14.6.0",

@@ -105,7 +105,7 @@ jobs:
           retention-days: 1
 
   test-library-browser:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
