@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import socket
+import ssl
 import subprocess
 import tempfile
 import threading
@@ -64,7 +65,7 @@ class TestNginxLargeResponse(unittest.TestCase):
         cls.thread.join()
 
     @contextlib.contextmanager
-    def proxy(self, variant, uid, *, original=False, writable=False):
+    def proxy(self, variant, uid, *, original=False, writable=False, tls=False):
         # Calibre sets tempfile.tempdir to a private (0700) directory. Both the
         # non-root master and root master's unprivileged worker need to traverse
         # this path. Never chmod that shared parent; create our own under /tmp.
@@ -79,9 +80,14 @@ class TestNginxLargeResponse(unittest.TestCase):
             # Keep the production proxy locations/directives; isolate only ports,
             # filesystem paths, optional TLS and unrelated frontend upstreams.
             site = (ROOT / "conf/nginx" / variant).read_text()
-            site = re.sub(r"listen\s+[^;]+;", "", site)
-            site = re.sub(r"ssl_certificate(?:_key)?\s+[^;]+;", "", site)
-            site = site.replace("server_name _;", f"listen 127.0.0.1:{port};\n    server_name _;")
+            if tls:
+                site = site.replace("listen 80;", "")
+                site = site.replace("listen 443 ", f"listen 127.0.0.1:{port} ")
+                site = site.replace("/data/books/ssl/", f"{ROOT / 'conf/nginx'}/")
+            else:
+                site = re.sub(r"listen\s+[^;]+;", "", site)
+                site = re.sub(r"ssl_certificate(?:_key)?\s+[^;]+;", "", site)
+                site = site.replace("server_name _;", f"listen 127.0.0.1:{port};\n    server_name _;")
             site = re.sub(r"server 127\.0\.0\.1:\d+;", f"server 127.0.0.1:{self.upstream.server_port};", site)
             site = re.sub(r"access_log\s+(?!off;)[^;]+;", "access_log off;", site)
             site = re.sub(r"error_log\s+[^;]+;", f"error_log {root}/error.log warn;", site)
@@ -147,6 +153,23 @@ class TestNginxLargeResponse(unittest.TestCase):
             except http.client.IncompleteRead as error:
                 body = error.partial
             return expected_length, body
+
+    def test_production_https_negotiates_only_http_1_1(self):
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE  # The bundled certificate is self-signed.
+        context.set_alpn_protocols(["h2", "http/1.1"])
+        for variant in ("talebook.conf", "server-side-render.conf"):
+            with self.subTest(variant=variant), self.proxy(variant, 911, tls=True) as (port, _):
+                with contextlib.closing(
+                    http.client.HTTPSConnection("127.0.0.1", port, context=context, timeout=5)
+                ) as connection:
+                    connection.connect()
+                    self.assertEqual(connection.sock.selected_alpn_protocol(), "http/1.1")
+                    connection.request("GET", "/api/welcome")
+                    response = connection.getresponse()
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(response.read(), SMALL)
 
     def test_original_config_truncates_large_json_when_proxy_temp_is_unwritable(self):
         with self.proxy("talebook.conf", 0, original=True) as (port, log):
