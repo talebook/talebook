@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="TB-445 局域网广播、管理开关、协议、生命周期与自测记录。" />
+    <link rel="icon" href="data:," />
+    <title>局域网服务广播与管理员开关 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body><main class="page" id="main"><header class="hero"><h1>局域网服务广播与管理员开关</h1><p>创建日期：2026-11-01 · 所属模块：webserver / app · 状态：ACTIVE · 来源：TB-445</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>按 TB-444 v1 发布 _talebook._tcp.local.；默认关闭，管理员显式配置可达 URL、地址和接口，热切换并区分保存意图与真实发布状态。</p><p>基线 master@b2d60b33b7476f7e64a125e22761b0194a6e1e48，与报告一致。不修改 Moke、不启动 QA、不自动部署或合并。</p></section>
+<section class="card"><h2>设计决策与边界核对</h2><p>共同协议和 Mika 当前执行决定已明确默认、TTL、独立身份、外部端点、权限、manual 覆盖与部署范围，无需重复询问批准过的决策。grill 未安装，采用本节逐项记录既定决策与实现判断。</p><ul><li>zeroconf 固定版本；host_ttl / other_ttl 均 120；有序原始 TXT 只含四个公开字段。</li><li>独立 UUIDv4 文件原子持久化；关闭不建发布 socket；每个选定接口一组受限资源，同 URL 配置去重。</li><li>进程级 asyncio 管理器在 listener 就绪后启动，串行 reconcile；后台库异步广播不阻塞 HTTP；网卡消失注销对应来源；部分端点无效时保留仍有效来源并显示警告，恢复后重建发布。</li><li>管理员保存先校验并原子写 auto.py，发现字段再应用 manual.py 有效覆盖；失败不改变实际状态。演示账号不读真实状态、不写配置。</li><li>仅发布与选定接口实际地址匹配的 RFC1918 / ULA；不猜 NAT。Linux 原生 / host network 首测，默认 bridge、Docker Desktop 和 macvlan 另列未支持/未验证。</li><li>前端使用现有 backend()；可编辑多端点并展示名称、URL、地址、接口、有效覆盖和运行错误。</li></ul></section>
+<section class="card"><h2>影响范围</h2><p>webserver/settings.py、loader.py、main.py、handlers/admin.py；新增 services/lan_discovery.py；管理设置组件与三语言文案、测试；spec/系统设置.md；document/lan-discovery.md。身份不复用 cookie secret，不改变认证/TLS。</p></section>
+<section class="card"><h2>测试结果</h2>
+<p>后端新增协议/配置/身份/生命周期和权限 17 项，加启动回归 4 项，共 21 项通过；覆盖共享样例中 19 个服务端适用消息。固定 zeroconf 0.148.0，额外验证编译版 ServiceInfo 的有序 TXT 和全部必要记录 TTL。</p>
+<p>完整容器回归命令 pytest tests -q --disable-warnings：2101 通过、40 跳过、1 失败（191.86 秒）。唯一失败为 test_scan.py 的长标题导入，镜像 html5-parser/libxml2 2.9.14 与 lxml/libxml2 2.14.6 冲突并缺 calibre-parallel；在未修改基线 b2d60b33 的独立导出树复现同一失败，不修改无关扫描代码。最初并发运行集成测试曾干扰共享测试库，最终结果来自停止其他测试后的顺序单次完整运行。</p>
+<p>make lint-py-fix、make lint-py、make check-spec（25篇）、前端 npm run lint 与 API_URL=http://127.0.0.1:18186 npm run build 通过；既有前端 warnings 保留。npx vitest run test/components/LanDiscoverySettings.spec.ts：4 通过；playwright.discovery.config.ts：8 通过（23.4 秒），最终组件截图复跑 1 通过。工具使用 Ubuntu24.04 的兼容 headless shell；本机 Ubuntu26.04 不在 Playwright 默认下载支持表中。</p>
+<p>真实 Talebook host-network listener http://10.1.0.14:18185，管理员登录后默认关闭→保存开启→advertising→关播→重开，独立标准库 raw UDP 接收器确认 PTR/SRV/TXT/A TTL120 与 goodbye TTL0。有序公开 TXT、独立 ID 重开复用、关播后 welcome 可用；管理器开播 1.797 秒、关播 0.326 秒。仅同宿主机 eth0 证据；不是独立 LAN 设备、Moke 或客户端时限验收。</p>
+<p>本地 interface-review full：相对 master@b2d60b33 的全部 28 个文件（排除锁与3张图片，24个文本），0个提交加全部未提交内容；扩展 GeneralSettingsContent、管理设置页和导航。已应用六个 better-* 领域，读取删除侧。修正提示正文对比度与 320px 长文本/标签/间距后重跑；正文采样浅色 11.81:1、深色 14.22:1，最终无 HIGH/MEDIUM/LOW；本地界面 verdict Approve，不是 PR 审批或独立 QA。</p>
+<p>浏览器页面 http://127.0.0.1:18187/admin/settings/general：1280×720 与 320×800、浅/深色、reduced-motion、空/错误/覆盖锁定、Space/Enter 和可见焦点、无横向溢出；pageerror、console.error、requestfailed、HTTP≥400 均空。截图为组件裁图并临时隐藏其他固定 chrome，未作为真实产品环境交付；测试服务已停止。</p>
+<p>会话没有 Playwright MCP / Chrome DevTools MCP 工具；本轮只完成自动化浏览器替代证据，不声称 MCP 交互完成。真实屏幕阅读器、多网卡物理LAN、IPv6、独立客户端首次/注销/静默过期时限、默认bridge/Desktop/macvlan、HTTPS/重定向/原生Cookie范围与Moke双端仍未验证。列表依赖继续由 TB-272/TB-446 承接，未启动 TB-447 或 QA，不改变 TLS/Readest。</p>
+</section></main></body></html>

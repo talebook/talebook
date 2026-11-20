@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>邀请拒绝响应的跨源一致性 · ACTIVE</title><style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style></head><body><main class="page"><header class="hero"><p class="eyebrow">TB-445 · INT-01</p><h1>邀请拒绝响应的跨源一致性</h1><p class="sub">创建日期：2026-11-01 · 所属模块：webserver · 状态：ACTIVE</p><p>需求来源：TB-443 / TB-445 当前 INT-01 修复阶段；固定起点 32f8109f2daab34be84495ed2aac998a1c48b7aa。</p></header>
+<section class="card"><h2>原始诉求与目标</h2><p>Moke Web 首次读取真实邀请模式书库时，公共拒绝响应缺 CORS，浏览器不能读取 not_invited，也无法进入访问码表单。本轮恢复该既有流程，不授予邀请、账号或管理权限。</p></section>
+<section class="card"><h2>已核定的决策与边界</h2><p>现有 @js 响应反射 Origin（缺省为 *），允许 credentials，未发现全局可信来源白名单。这是既有宽松 API 策略，不能作为可信来源证明。只将相同响应头用于固定公开的邀请拒绝 envelope，不推广到 prepare、默认头、异常、其他早退或敏感响应；不改 Cookie、TLS、OPTIONS 或客户端。</p><p>本轮不修 SELF-01、不改 Moke/Reader/依赖；原生/独立物理 LAN 等已有证据不代替此路径。</p></section>
+<section class="card"><h2>实现方案与影响范围</h2><ol><li>仅在 BaseHandler.send_error_of_not_invited 写入 Access-Control-Allow-Origin、Access-Control-Allow-Credentials 和 Cache-Control，保留 HTTP200、精确 not_invited JSON 与 Finish。</li><li>OPDS、下载和封面的独立401覆盖不改；升级跨源写保护不改。</li><li>补邀请挑战、welcome、无Origin、权限、其他早退/原始协议与预检边界回归。</li></ol><p>影响 spec/用户.md 的邀请模式规则；产品仅变更 webserver/handlers/base.py，另有针对性 tests/test_invite_cors.py。</p></section>
+<section class="card"><h2>风险与兼容</h2><p>反射来源策略原已存在，本补丁只公开无敏感字段的拒绝状态。可读拒绝不等于授权；跨站Cookie、后续预检及认证能力仍依赖原有浏览器/服务器策略。不会声称其严格隔离或兼容所有跨站部署。</p></section>
+<section class="card"><h2>验证计划与结果</h2>
+<p>2026-11-01：新增定点先在未修复32f8109上因缺ACAO失败（1 failed，6.55秒）。补丁后相关46项通过；对齐固定voicebook包后，邀请、权限、升级、演示及原失败用例共49项通过（11.38秒）。13项新增回归覆盖公开拒绝、无Origin、welcome/有效与错误访问码、普通账号权限、原始401、其他早退与预检边界。</p>
+<p>首次全量2112通过/40跳过/3失败（371.42秒）；两项因现成镜像仍带旧voicebook0.7.1，已在未修改固定head复现。仅任务环境安装清单固定3316bae6a7372e82d7037d31b9ffb32633ef2aa4归档，使用真实0.8.0生产者与EdgeBudget；不改产品依赖。最终一致环境全量2114通过/40跳过/1失败，退出1（108.87秒）。</p>
+<p>剩余test_scan_runtime.py:59缓存失效测试在未修改32f8109的整类复现（10通过/1失败）；其单例曾通过，保留两种结果。独立tmpfs文件系统探针100次同大小改写/恢复mtime，100次签名相同而真实内容哈希不同，触发既有ctime签名边界。未改扫描代码或测试、未跳过/xfail/加延迟；全量未全绿，不视为发布门禁通过。</p>
+<p>实际官方stdio Playwright MCP0.0.84、SDK1.32.2、独立headless Chromium142：3场景共83次工具调用，工具错误0。固定Moke8430285e的PC1280×900/移动390×844，从真实保存列表另点连接：修前CORS失败，修后可读not_invited并出现具名访问码表单，错误码拒绝正常。同站不同端口127.0.0.1:3010→127.0.0.1:18495另以独立profile完成真实访问码、错误密码重试及普通账号登录，管理GET/POST仍permission，配置前后哈希相同。实际自定义请求头预检仍拒绝，没有扩展OPTIONS。</p>
+<p>原跨站127.0.0.1→192.168.99.102形态正确访问码POST返回ok后，info仍not_invited；本轮未更改或证明跨站Cookie策略闭合，不称其认证成功，也未将新profile同站试验冒充原会话恢复。可选后续：按既有Cookie规则采用同站部署；若必须跨站，另行评审HTTPS、SameSite/Secure、来源及CSRF策略后才实施。favicon404与有意的预检拒绝分别保留，非零网络错误未写成全绿。</p>
+<p>已按仓库interface-review技能full模式审查固定master基线到本分支的全部已提交/未提交差异，32文件、排除后27文件；六领域完成，结论Approve，无确认的新增/回归HIGH或MEDIUM。SELF-01仍为既有Low/P3，不修复。复用旧LAN界面证据不冒充本轮新实测；对比度全组合、200%/屏幕阅读器等未验证项另列报告。该审查是开发自审，不是Sol/Grok QA。</p>
+<p>make lint-py-fix、最终lint/规格/方案检查结果见交付报告。Moke仅临时生成next-env.d.ts，停止前端后已恢复固定内容，工作树干净。所有浏览器/MCP、页面/真实后端及测试容器在前台收齐并清理；保留任务镜像以复用。未跑无关前端全矩阵或原生发现/TTL整套，不把旧2102结果代表新head；独立物理LAN、跨站Cookie、TLS、Reader及独立QA继续保留。</p></section></main></body></html>

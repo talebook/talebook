@@ -204,6 +204,11 @@ class BaseHandler(PublicPathMixin, web.RequestHandler):
             self.send_error_of_demo_read_only()
 
     def send_error_of_not_invited(self):
+        # prepare() finishes before @js. Only this public denial envelope uses
+        # the existing JSON CORS policy; do not extend it to other early exits.
+        self.set_header("Access-Control-Allow-Origin", self.request.headers.get("Origin", "*"))
+        self.set_header("Access-Control-Allow-Credentials", "true")
+        self.set_header("Cache-Control", "max-age=0")
         self.write({"err": "not_invited"})
         self.set_status(200)
         raise web.Finish()

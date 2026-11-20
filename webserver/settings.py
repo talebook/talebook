@@ -6,6 +6,8 @@
 import os
 
 settings = {
+    "LAN_DISCOVERY_ENABLED": False,
+    "LAN_DISCOVERY_ENDPOINTS": [],
     'installed'     : False,
     "autoreload"    : True,
     "xsrf_cookies"  : False,

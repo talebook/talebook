@@ -35,8 +35,8 @@ test.describe('Admin Settings (GitHub-style layout)', () => {
             await expect(page.locator('.settings-nav-group', { hasText: g })).toBeVisible();
         }
 
-        // 元数据来源和全局设备已迁入插件中心，系统设置保留 14 个分类。
-        await expect(page.locator('.settings-section')).toHaveCount(14);
+        // 包含新增的局域网发现分类。
+        await expect(page.locator('.settings-section')).toHaveCount(15);
         await expect(page.locator('.settings-nav-item', { hasText: '互联网书籍信息源' })).toHaveCount(0);
         await expect(page.locator('.settings-nav-item', { hasText: '全局设备管理' })).toHaveCount(0);
 
