@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Talebook 嵌入式 Readest 的 KOSync 同源代理方案">
+<title>KOSync 同源代理 · ACTIVE</title>
+<style>
+:root{color-scheme:light;--ink:#202b3c;--muted:#58677b;--line:#d8e0eb;--panel:#fff;--bg:#f4f7fb;--accent:#a95112}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif}.page{max-width:960px;margin:auto;padding:24px 18px 56px}.hero,section{padding:24px;margin:16px 0;background:var(--panel);border:1px solid var(--line);border-radius:16px}.hero{border-top:5px solid var(--accent)}h1{margin:0;font-size:clamp(26px,5vw,40px);line-height:1.25}h2{font-size:22px;margin:0 0 12px}.muted{color:var(--muted)}.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}.chip{padding:4px 10px;border-radius:999px;background:#edf1f6;font-size:13px}.wip{background:#fff1df;color:#87440d}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{text-align:left;vertical-align:top;padding:10px;border-bottom:1px solid var(--line)}th{width:25%;color:var(--muted)}code{overflow-wrap:anywhere;background:#eff2f6;padding:1px 4px;border-radius:4px}@media(max-width:600px){.page{padding:10px}.hero,section{padding:18px}th,td{display:block;width:100%;border:0;padding:4px 0}tr{display:block;padding:8px 0;border-bottom:1px solid var(--line)}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body><main class="page">
+<header class="hero"><h1>为 Readest KOSync 使用 Talebook 同源代理</h1><p>浏览器内嵌的 Readest 通过本站转送 KOSync 请求，使读者可以使用自选的外部同步服务，同时由后端限制代理目标和资源消耗。</p><div class="chips"><span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-11-20</span><span class="chip">所属模块：webserver</span><span class="chip">影响：webserver、app/public/readest、scripts/readest；spec/阅读器.md</span><span class="chip">来源：PR #1095 评审意见</span></div></header>
+<section><h2>1. 原始诉求</h2><p>“嵌入式 Readest 原本透过 Readest 官方代理存取 KOSync，在浏览器端会受到跨域限制导致无法正常使用。这个 PR 改为由 Talebook 转送，让使用者使用自己的 KOSync 帳號同步 KOReader 阅读进度。”</p><p>评审还要求为新增的 JSON API、出站代理和 Readest 传输切换补充领域规格及设计记录。</p></section>
+<section><h2>2. 目标与边界</h2><table><tr><th>目标</th><td>网页 Readest 使用同源接口代理 KOSync 认证、注册、进度读取和更新；要求 Talebook 登录；限制目标 URL、转发字段、大小、超时和并发。</td></tr><tr><th>非目标</th><td>Talebook 不托管 KOSync 账号或数据，不改变本站阅读进度存储；不代理通用 HTTP 请求；原生 Readest 桌面端沿用原生网络行为。</td></tr></table></section>
+<section><h2>3. 现状与证据</h2><p>浏览器跨域规则阻止嵌入式 Readest 直接访问用户选择的 KOSync 服务。当前实现增加 <code>POST /api/kosync</code>，静态传输适配器使用相对路径构造同源地址，支持站点子路径。</p><p>目标服务由用户配置，因此必须防止协议滥用、重定向逃逸、DNS 解析切换以及过大或过慢的请求消耗。</p></section>
+<section><h2>4. 方案</h2><p>Readest 网页端将有限格式的操作、目标服务地址及 KOSync 数据提交至本站。后端依次验证请求来源、登录态、JSON 结构、目标 URL 和允许的操作，再解析 DNS 并固定本次连接地址，向上游发送请求并返回状态与 JSON 数据。</p><table><tr><th>边界</th><th>规则</th></tr><tr><td>浏览器入口</td><td>同源 JSON 请求并带 Talebook 标记；跨站 Fetch Metadata 或不匹配 Origin 拒绝。</td></tr><tr><td>操作范围</td><td>仅允许认证、创建用户、更新进度及按 32 位十六进制 ID 读取进度。</td></tr><tr><td>目标地址</td><td>仅 HTTP/HTTPS；拒绝凭据、查询、片段、路径穿越和非法字符；不跟随重定向。</td></tr><tr><td>资源约束</td><td>请求体 16 KiB、响应体 64 KiB；DNS 5 秒、连接 5 秒、总请求 15 秒；并发槽位 8，等待槽位 2 秒。</td></tr><tr><td>失败语义</td><td>上游 400/401 即使响应为空或 HTML，也以安全 JSON 保留状态供 Readest 认证回退；其他无效响应作为上游失败。</td></tr></table></section>
+<section><h2>5. 影响范围、风险与回滚</h2><p>涉及后端处理器与传输校验、Readest 静态产物及上游补丁，领域行为写入 <code>spec/阅读器.md</code>。不涉及数据库迁移或 Talebook 进度数据。</p><p>主要风险是用户指定的外部服务可能不可达或返回非标准响应；操作白名单、固定 DNS、禁止重定向、时限与体积限制控制代理边界。回滚可整体移除代理处理器和 Readest 适配器及对应静态产物，不需数据清理。</p></section>
+<section>
+  <h2>6. 测试结果</h2>
+  <ul>
+    <li>在 <code>app/</code> 执行 <code>npx vitest run test/utils/readestKOSync.spec.ts</code>，14 项通过。</li>
+    <li>在 <code>app/</code> 执行 <code>node --test test/readest-kosync-browser.test.cjs</code>，2 项通过。Chromium 在根路径和 <code>/team/books</code> 子路径加载实际传输模块，使用模拟 Talebook 接口验证同源路径、会话 Cookie 和上游认证失败状态的传递。</li>
+    <li><code>make check-spec</code>、<code>make check-design</code> 通过。</li>
+    <li>用 <code>docker build --build-arg BUILD_COUNTRY=CN -t talebook/test --target test -f Dockerfile .</code> 构建测试映像，在容器内执行 <code>pytest -q tests/test_kosync_proxy.py tests/test_kosync_transport.py</code>，51 项通过。后端传输测试使用本机模拟 KOSync 上游。</li>
+    <li>本地 Chromium 从 Nginx 入口打开《爱丽丝梦游仙境》，经真实 Docker 后端连接测试 KOSync 服务。登录 Talebook 后，Readest 的 KOReader 同步设置显示连接成功。游客提交后显示 <code>Failed to connect: 请先登录</code>。</li>
+    <li>提交者使用同一份 EPUB 和同一个 KOSync 账号，完成 KOReader 到 Readest、Readest 到 KOReader 的实际进度同步验证。</li>
+  </ul>
+  <p>直接从本地 Nuxt 开发端口进入时，Nuxt 的 API 代理改写 <code>Host</code>，登录后的 KOSync 请求会被后端以 <code>kosync.origin</code> 拒绝。Nginx 保留浏览器请求的 <code>Host</code>，通过该入口验证连接成功。完整的 <code>interface-review full</code> 仍待完成。</p>
+</section>
+<footer class="muted">Talebook internal design · webserver · 2026-11-20</footer>
+</main></body></html>
