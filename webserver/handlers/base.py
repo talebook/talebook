@@ -689,6 +689,11 @@ class BaseHandler(PublicPathMixin, web.RequestHandler):
         with self._db_lock:
             rows = self.cache.backend.conn.get(sql)
         items = [{"id": a, "name": b, "count": c} for a, b, c in rows]
+        if field == "author":
+            # Calibre stores commas in author names as pipes; its public API
+            # and search use the decoded name, as do book-detail author links.
+            for item in items:
+                item["name"] = item["name"].replace("|", ",")
         return items
 
     def books_by_id(self):
