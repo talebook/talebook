@@ -872,6 +872,6 @@ def test_auto_transform_service_only_dispatches_the_typed_transform_interface():
 def test_extra_feature_dispatch_uses_declared_mode():
     from webserver.handlers import plugins
 
-    source = inspect.getsource(plugins.UserPluginFeature)
+    source = inspect.getsource(plugins.run_feature)
     assert 'feature["mode"]' in source
     assert "runtime.read(" not in source

@@ -1,6 +1,8 @@
-"""通用插件管理接口：目录、安装、连接、功能、动作与运行历史。
+"""通用插件管理接口：目录、安装、连接、连接动作与运行历史。
 
-内置文本工具的书籍选择与文件写入编排见 handlers/plugin_booktools.py。
+对单个插件的能力调用统一走 ``/api/plugins/<plugin_key>/exec/<action>``（handlers/plugin_exec.py），
+本模块中的 ``metadata_search`` / ``source_search`` / ``review_lookup`` / ``run_feature`` 是其动作实现；
+书籍工具的动作实现见 handlers/plugin_booktools.py。
 """
 
 from webserver import loader
@@ -72,9 +74,9 @@ def _capability_connection(handler, plugin_key, capability):
 
 
 def _book_query(handler):
-    raw = _body(handler).get("query", {})
+    raw = _body(handler).get("params", {})
     if not isinstance(raw, dict):
-        raise PluginRuntimeError("plugin.request_invalid", "query must be an object")
+        raise PluginRuntimeError("plugin.request_invalid", "params must be an object")
     unknown = set(raw) - BOOK_QUERY_FIELDS
     if unknown:
         raise PluginRuntimeError("plugin.request_invalid", "unknown query fields: %s" % ", ".join(sorted(unknown)))
@@ -681,157 +683,142 @@ class UserPluginState(BaseHandler):
             return _error(exc)
 
 
-class UserPluginFeature(BaseHandler):
-    """插件自有、无法标准化的只读/写入动作的唯一逃生舱。"""
-
-    @js
-    @auth
-    def post(self, plugin_key, action):
+def run_feature(handler, plugin_key, action):
+    """exec 兜底：manifest extra_features 声明的插件自有动作（受控逃生舱）。"""
+    try:
+        req = _body(handler)
+        provider = REGISTRY.get(plugin_key)
+        manifest = PluginManifest.validate(provider.manifest)
+        feature = (manifest.raw.get("extra_features") or {}).get(action)
+        if feature is None or not isinstance(provider, ExtraFeatureProvider):
+            raise PluginRuntimeError("plugin.feature_not_supported", "Plugin feature is not supported")
+        params = req.get("params", {})
+        if params is None:
+            params = {}
+        if not isinstance(params, dict):
+            raise PluginRuntimeError("plugin.request_invalid", "Feature params must be an object")
         try:
-            req = _body(self)
-            provider = REGISTRY.get(plugin_key)
-            manifest = PluginManifest.validate(provider.manifest)
-            feature = (manifest.raw.get("extra_features") or {}).get(action)
-            if feature is None or not isinstance(provider, ExtraFeatureProvider):
-                raise PluginRuntimeError("plugin.feature_not_supported", "Plugin feature is not supported")
-            params = req.get("params", {})
-            if params is None:
-                params = {}
-            if not isinstance(params, dict):
-                raise PluginRuntimeError("plugin.request_invalid", "Feature params must be an object")
-            try:
-                validate_against_schema(feature.get("schema") or {}, params, where="feature")
-            except ValueError as exc:
-                raise PluginRuntimeError(getattr(exc, "code", "plugin.request_invalid"), str(exc)) from exc
+            validate_against_schema(feature.get("schema") or {}, params, where="feature")
+        except ValueError as exc:
+            raise PluginRuntimeError(getattr(exc, "code", "plugin.request_invalid"), str(exc)) from exc
 
-            _, installation = _active_user_installation(self.session, plugin_key, self.user_id())
-            credentials = req.get("credentials")
-            if credentials is not None:
-                if not isinstance(credentials, dict):
-                    raise PluginRuntimeError("plugin.credentials_invalid", "credentials must be an object")
-                connection = save_connection(
-                    self.session,
-                    loader.get_settings(),
-                    installation.id,
-                    "user",
-                    self.user_id(),
-                    credentials,
-                    role=DEFAULT_CONNECTION_ROLE,
-                    name=manifest.raw["name"],
+        _, installation = _active_user_installation(handler.session, plugin_key, handler.user_id())
+        credentials = req.get("credentials")
+        if credentials is not None:
+            if not isinstance(credentials, dict):
+                raise PluginRuntimeError("plugin.credentials_invalid", "credentials must be an object")
+            connection = save_connection(
+                handler.session,
+                loader.get_settings(),
+                installation.id,
+                "user",
+                handler.user_id(),
+                credentials,
+                role=DEFAULT_CONNECTION_ROLE,
+                name=manifest.raw["name"],
+            )
+        else:
+            connection = (
+                handler.session.query(PluginConnection)
+                .filter(
+                    PluginConnection.installation_id == installation.id,
+                    PluginConnection.owner_type == "user",
+                    PluginConnection.owner_id == handler.user_id(),
+                    PluginConnection.role == DEFAULT_CONNECTION_ROLE,
                 )
-            else:
-                connection = (
-                    self.session.query(PluginConnection)
-                    .filter(
-                        PluginConnection.installation_id == installation.id,
-                        PluginConnection.owner_type == "user",
-                        PluginConnection.owner_id == self.user_id(),
-                        PluginConnection.role == DEFAULT_CONNECTION_ROLE,
-                    )
-                    .first()
-                )
-            if connection is None or not connection.enabled:
-                raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not enabled")
-            runtime = PluginRuntime(self.session, loader.get_settings())
-            dispatch = getattr(runtime, feature["mode"])
-            data = dispatch(
-                connection,
-                "execute_feature",
-                action,
-                params,
-                required_scopes=tuple(feature.get("required_scopes") or ()),
+                .first()
             )
-            secret = self.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
-            return {"err": "ok", "connection": connection.to_public_dict(secret), "data": data}
-        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
-            return _error(exc)
+        if connection is None or not connection.enabled:
+            raise PluginRuntimeError("plugin.connection_missing", "Plugin connection is not enabled")
+        runtime = PluginRuntime(handler.session, loader.get_settings())
+        dispatch = getattr(runtime, feature["mode"])
+        data = dispatch(
+            connection,
+            "execute_feature",
+            action,
+            params,
+            required_scopes=tuple(feature.get("required_scopes") or ()),
+        )
+        secret = handler.session.get(PluginSecret, connection.secret_id) if connection.secret_id else None
+        return {"err": "ok", "connection": connection.to_public_dict(secret), "data": data}
+    except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+        return _error(exc)
 
 
-class AdminPluginMetadataSearch(BaseHandler):
-    """Test MetadataProvider.search_books with a structured MetadataQuery."""
-
-    @js
-    @is_admin
-    def post(self, plugin_key):
-        try:
-            query = _book_query(self)
-            runtime, connection = _capability_connection(self, plugin_key, "metadata.lookup")
-            records = runtime.read(
-                connection,
-                "search_books",
-                query,
-                required_scopes=("books.read",),
-                requested_by=self.user_id(),
-            )
-            result_items = getattr(records, "books", records) or []
-            items = [_metadata_summary(record) for record in list(result_items)[:CAPABILITY_RESULT_LIMIT]]
-            return {"err": "ok", "capability": "metadata.lookup", "items": items}
-        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
-            return _error(exc)
+def metadata_search(handler, plugin_key):
+    """exec 动作 metadata.search（仅管理员）：以结构化查询测试 MetadataProvider.search_books。"""
+    try:
+        query = _book_query(handler)
+        runtime, connection = _capability_connection(handler, plugin_key, "metadata.lookup")
+        records = runtime.read(
+            connection,
+            "search_books",
+            query,
+            required_scopes=("books.read",),
+            requested_by=handler.user_id(),
+        )
+        result_items = getattr(records, "books", records) or []
+        items = [_metadata_summary(record) for record in list(result_items)[:CAPABILITY_RESULT_LIMIT]]
+        return {"err": "ok", "capability": "metadata.lookup", "items": items}
+    except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+        return _error(exc)
 
 
-class AdminPluginSourceSearch(BaseHandler):
-    """Test SourceProvider.search without creating a generic preview/run job."""
-
-    @js
-    @is_admin
-    def post(self, plugin_key):
-        try:
-            query = _body(self).get("query", "")
-            if not isinstance(query, str) or not query.strip():
-                raise PluginRuntimeError("plugin.request_invalid", "query must be a non-empty string")
-            runtime, connection = _capability_connection(self, plugin_key, "sources.search")
-            page = runtime.read(
-                connection,
-                "search",
-                query.strip()[:300],
-                {},
-                required_scopes=("books.read",),
-                requested_by=self.user_id(),
-            )
-            return {
-                "err": "ok",
-                "capability": "sources.search",
-                "items": [_source_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
-                "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
-                "has_more": bool(page.has_more),
-                "health_message": str(page.health_message or ""),
-            }
-        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
-            return _error(exc)
+def source_search(handler, plugin_key):
+    """exec 动作 source.search（仅管理员）：测试 SourceProvider.search，不创建运行任务。"""
+    try:
+        params = _body(handler).get("params") or {}
+        query = params.get("query", "") if isinstance(params, dict) else ""
+        if not isinstance(query, str) or not query.strip():
+            raise PluginRuntimeError("plugin.request_invalid", "query must be a non-empty string")
+        runtime, connection = _capability_connection(handler, plugin_key, "sources.search")
+        page = runtime.read(
+            connection,
+            "search",
+            query.strip()[:300],
+            {},
+            required_scopes=("books.read",),
+            requested_by=handler.user_id(),
+        )
+        return {
+            "err": "ok",
+            "capability": "sources.search",
+            "items": [_source_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
+            "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
+            "has_more": bool(page.has_more),
+            "health_message": str(page.health_message or ""),
+        }
+    except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+        return _error(exc)
 
 
-class AdminPluginReviewLookup(BaseHandler):
-    """Test ReviewProvider.get_reviews with the provider's typed read contract."""
-
-    @js
-    @is_admin
-    def post(self, plugin_key):
-        try:
-            query = _book_query(self)
-            runtime, connection = _capability_connection(self, plugin_key, "reviews.lookup")
-            page = runtime.read(
-                connection,
-                "get_reviews",
-                {
-                    "title": query.title,
-                    "isbn": query.isbn,
-                    "publisher": query.publisher,
-                    "authors": list(query.authors),
-                },
-                required_scopes=("books.read",),
-                requested_by=self.user_id(),
-            )
-            return {
-                "err": "ok",
-                "capability": "reviews.lookup",
-                "items": [_review_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
-                "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
-                "has_more": bool(page.has_more),
-                "health_message": str(page.health_message or ""),
-            }
-        except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
-            return _error(exc)
+def review_lookup(handler, plugin_key):
+    """exec 动作 review.lookup（仅管理员）：测试 ReviewProvider.get_reviews。"""
+    try:
+        query = _book_query(handler)
+        runtime, connection = _capability_connection(handler, plugin_key, "reviews.lookup")
+        page = runtime.read(
+            connection,
+            "get_reviews",
+            {
+                "title": query.title,
+                "isbn": query.isbn,
+                "publisher": query.publisher,
+                "authors": list(query.authors),
+            },
+            required_scopes=("books.read",),
+            requested_by=handler.user_id(),
+        )
+        return {
+            "err": "ok",
+            "capability": "reviews.lookup",
+            "items": [_review_summary(record) for record in list(page.items or [])[:CAPABILITY_RESULT_LIMIT]],
+            "failures": [_failure_summary(item) for item in list(page.failures or [])[:CAPABILITY_RESULT_LIMIT]],
+            "has_more": bool(page.has_more),
+            "health_message": str(page.health_message or ""),
+        }
+    except (PluginRuntimeError, SecretCipherError, UpstreamError, TypeError, ValueError) as exc:
+        return _error(exc)
 
 
 class AdminPluginAction(BaseHandler):
@@ -953,9 +940,6 @@ def routes():
         (r"/api/admin/plugins/install", AdminPluginInstall),
         (r"/api/admin/plugins/opds-service", AdminPluginOpdsService),
         (r"/api/admin/plugins/preferences", AdminPluginPreferences),
-        (r"/api/admin/plugins/([a-z0-9.-]+)/metadata/search", AdminPluginMetadataSearch),
-        (r"/api/admin/plugins/([a-z0-9.-]+)/source/search", AdminPluginSourceSearch),
-        (r"/api/admin/plugins/([a-z0-9.-]+)/reviews/lookup", AdminPluginReviewLookup),
         (r"/api/admin/plugins/installations/([0-9]+)/state", AdminPluginInstallationState),
         (r"/api/admin/plugins/connections", AdminPluginConnections),
         (r"/api/admin/plugins/connections/([0-9]+)/state", AdminPluginConnectionState),
@@ -964,7 +948,6 @@ def routes():
         (r"/api/admin/plugins/runs/([0-9]+)", AdminPluginRunDetail),
         (r"/api/plugins", UserPlugins),
         (r"/api/plugins/connections", UserPluginConnections),
-        (r"/api/plugins/([a-z0-9.-]+)/features/([a-z0-9_]+)", UserPluginFeature),
         (r"/api/plugins/connections/([0-9]+)/(test|preview|run|retry|rollback)", UserPluginAction),
         (r"/api/plugins/runs", UserPluginRuns),
         (r"/api/plugins/runs/([0-9]+)", UserPluginRunDetail),

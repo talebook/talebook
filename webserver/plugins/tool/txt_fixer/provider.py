@@ -30,6 +30,8 @@ class TxtFixerTransformPlugin(TextTransformPlugin):
             supports_auto_trigger=True,
         )
 
+    new_book_suffix = "（编码修复版）"
+
     def preview(self, src, context):
         content = src.get("content")
         if content is None and src.get("path"):

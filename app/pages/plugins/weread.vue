@@ -480,6 +480,7 @@ import { computed, defineComponent, h, onMounted, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
 import WeReadImportDialog from '~/components/WeReadImportDialog.vue';
 import { useMainStore } from '@/stores/main';
+import { pluginExecUrl } from '@/utils/book-tools';
 
 const EmptyState = defineComponent({ props: { text: String }, setup: props => () => h('p', { class: 'text-medium-emphasis mt-4' }, props.text) });
 const MetricCard = defineComponent({ props: { label: String, value: String }, setup: props => () => h('div', { class: 'pa-4 rounded border' }, [h('div', { class: 'text-caption text-medium-emphasis' }, props.label), h('div', { class: 'text-h6 mt-1' }, props.value)]) });
@@ -583,7 +584,7 @@ async function query(operation, params = {}, busyKey = operation) {
         if (apiKey.value.trim()) {
             body.credentials = { api_key: apiKey.value.trim() };
         }
-        const endpoint = `/plugins/talebook.combo.weread/features/${operation}`;
+        const endpoint = pluginExecUrl('talebook.combo.weread', operation);
         const response = await $backend(endpoint, { method: 'POST', body: JSON.stringify(body) });
         if (response.err !== 'ok') throw new Error(response.msg || response.err);
         connection.value = response.connection || connection.value;
