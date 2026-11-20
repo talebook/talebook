@@ -57,6 +57,7 @@ export function buildReadestReaderUrl(bootstrap, { bookId, origin }) {
   target.searchParams.set('mokeBookId', String(bookId));
   target.searchParams.set('mokeSourceServerUrl', origin);
   target.searchParams.set('mokeReturnTo', '/library');
+  if (bootstrap.capabilities?.kosync === true) target.searchParams.set('mokeKOSync', '1');
   return { target: target.href, ...validated };
 }
 

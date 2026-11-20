@@ -53,6 +53,7 @@ class TestReadestEmbed(TestWithUserLogin):
     def test_bootstrap_and_resource_support_epub_range_and_cache_revocation(self):
         bootstrap = self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
         self.assertEqual(bootstrap.code, 200)
+        self.assertEqual(bootstrap.headers["Cache-Control"], "private, no-store")
         body = json.loads(bootstrap.body)
         self.assertEqual(body["schema"], "talebook.reader.bootstrap.v1")
         self.assertEqual(body["book"]["format"], "epub")
@@ -72,6 +73,7 @@ class TestReadestEmbed(TestWithUserLogin):
                 "layoutSettings",
                 "appearanceSettings",
                 "languageSettings",
+                "kosync",
             ],
         )
 
@@ -137,6 +139,14 @@ class TestReadestEmbed(TestWithUserLogin):
         self.assertEqual(bootstrap.code, 302)
         self.assertEqual(resource.code, 302)
         self.assertEqual(bootstrap.headers["Location"], "/login")
+
+    def test_guest_can_open_readest_without_kosync_capability(self):
+        with mock.patch.dict(CONF, {"ALLOW_GUEST_READ": True}):
+            with mock.patch.object(BaseHandler, "get_current_user", return_value=None):
+                bootstrap = self.fetch("/api/book/%d/reader-bootstrap?engine=readest" % BID_EPUB)
+        self.assertEqual(bootstrap.code, 200)
+        self.assertEqual(bootstrap.headers["Cache-Control"], "private, no-store")
+        self.assertIs(json.loads(bootstrap.body)["capabilities"]["kosync"], False)
 
     def test_private_book_owner_admin_and_other_user(self):
         with temporary_book_scope(BID_EPUB, "private", collector_id=1):
