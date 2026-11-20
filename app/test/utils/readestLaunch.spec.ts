@@ -63,6 +63,15 @@ describe('Talebook Readest launcher', () => {
         expect(target.searchParams.get('mokeBookId')).toBe('1');
         expect(target.searchParams.get('mokeSourceServerUrl')).toBe('http://127.0.0.1:9000');
         expect(target.searchParams.get('mokeReturnTo')).toBe('/library');
+        expect(target.searchParams.has('mokeKOSync')).toBe(false);
+    });
+
+    it.each([true, false, 'true'])('enables KOSync only for an explicit bootstrap grant (%s)', kosync => {
+        const launch = buildReadestReaderUrl({ ...bootstrap, capabilities: { kosync } }, {
+            bookId: '1',
+            origin: 'http://127.0.0.1:9000',
+        });
+        expect(new URL(launch.target).searchParams.has('mokeKOSync')).toBe(kosync === true);
     });
 
     it('rejects cross-origin, unversioned, and mismatched resources', () => {

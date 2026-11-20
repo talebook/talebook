@@ -11,6 +11,11 @@ export function usesTalebookKOSync(location) {
   }
 }
 
+export function isKOSyncAvailable(location, native = false) {
+  return native || !usesTalebookKOSync(location) ||
+    new URLSearchParams(location.search).get('mokeKOSync') === '1';
+}
+
 export async function requestTalebookKOSync(payload, fetchImpl = fetch, location = window.location) {
   const proxyPath = new URL('../api/kosync', location.href).pathname;
   const response = await fetchImpl(proxyPath, {

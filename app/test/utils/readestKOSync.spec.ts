@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { usesTalebookKOSync, requestTalebookKOSync } from '../../public/readest/kosync-transport.js';
+import { isKOSyncAvailable, usesTalebookKOSync, requestTalebookKOSync } from '../../public/readest/kosync-transport.js';
 
 const location = (source = 'https://books.example') => ({
     origin: 'https://books.example',
@@ -16,6 +16,15 @@ describe('Readest KOSync Talebook transport', () => {
         expect(usesTalebookKOSync({ origin: location().origin, search: '' })).toBe(false);
         expect(usesTalebookKOSync(location('invalid'))).toBe(false);
         expect(usesTalebookKOSync(undefined)).toBe(false);
+    });
+
+    it('keeps KOSync available for signed-in embeds, standalone readers and native apps', () => {
+        const embedded = location();
+        expect(isKOSyncAvailable(embedded)).toBe(false);
+        expect(isKOSyncAvailable({ ...embedded, search: embedded.search + '&mokeKOSync=0' })).toBe(false);
+        expect(isKOSyncAvailable({ ...embedded, search: embedded.search + '&mokeKOSync=1' })).toBe(true);
+        expect(isKOSyncAvailable({ origin: embedded.origin, search: '' })).toBe(true);
+        expect(isKOSyncAvailable(embedded, true)).toBe(true);
     });
 
     it.each(['https://sync.example', 'http://192.168.1.20:8080/kosync'])('proxies %s through the same origin', async serverUrl => {

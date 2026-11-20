@@ -14,8 +14,8 @@
 <section><h2>1. 原始诉求</h2><p>“嵌入式 Readest 原本透过 Readest 官方代理存取 KOSync，在浏览器端会受到跨域限制导致无法正常使用。这个 PR 改为由 Talebook 转送，让使用者使用自己的 KOSync 帳號同步 KOReader 阅读进度。”</p><p>评审还要求为新增的 JSON API、出站代理和 Readest 传输切换补充领域规格及设计记录。</p></section>
 <section><h2>2. 目标与边界</h2><table><tr><th>目标</th><td>网页 Readest 使用同源接口代理 KOSync 认证、注册、进度读取和更新；要求 Talebook 登录；限制目标 URL、转发字段、大小、超时和并发。</td></tr><tr><th>非目标</th><td>Talebook 不托管 KOSync 账号或数据，不改变本站阅读进度存储；不代理通用 HTTP 请求；原生 Readest 桌面端沿用原生网络行为。</td></tr></table></section>
 <section><h2>3. 现状与证据</h2><p>浏览器跨域规则阻止嵌入式 Readest 直接访问用户选择的 KOSync 服务。当前实现增加 <code>POST /api/kosync</code>，静态传输适配器使用相对路径构造同源地址，支持站点子路径。</p><p>目标服务由用户配置，因此必须防止协议滥用、重定向逃逸、DNS 解析切换以及过大或过慢的请求消耗。</p></section>
-<section><h2>4. 方案</h2><p>Readest 网页端将有限格式的操作、目标服务地址及 KOSync 数据提交至本站。后端依次验证请求来源、登录态、JSON 结构、目标 URL 和允许的操作，再解析 DNS 并固定本次连接地址，向上游发送请求并返回状态与 JSON 数据。</p><table><tr><th>边界</th><th>规则</th></tr><tr><td>浏览器入口</td><td>同源 JSON 请求并带 Talebook 标记；跨站 Fetch Metadata 或不匹配 Origin 拒绝。</td></tr><tr><td>操作范围</td><td>仅允许认证、创建用户、更新进度及按 32 位十六进制 ID 读取进度。</td></tr><tr><td>目标地址</td><td>仅 HTTP/HTTPS；拒绝凭据、查询、片段、路径穿越和非法字符；不跟随重定向。</td></tr><tr><td>资源约束</td><td>请求体 16 KiB、响应体 64 KiB；DNS 5 秒、连接 5 秒、总请求 15 秒；并发槽位 8，等待槽位 2 秒。</td></tr><tr><td>失败语义</td><td>上游 400/401 即使响应为空或 HTML，也以安全 JSON 保留状态供 Readest 认证回退；其他无效响应作为上游失败。</td></tr></table></section>
-<section><h2>5. 影响范围、风险与回滚</h2><p>涉及后端处理器与传输校验、Readest 静态产物及上游补丁，领域行为写入 <code>spec/阅读器.md</code>。不涉及数据库迁移或 Talebook 进度数据。</p><p>主要风险是用户指定的外部服务可能不可达或返回非标准响应；操作白名单、固定 DNS、禁止重定向、时限与体积限制控制代理边界。回滚可整体移除代理处理器和 Readest 适配器及对应静态产物，不需数据清理。</p></section>
+<section><h2>4. 方案</h2><p>Readest 网页端将有限格式的操作、目标服务地址及 KOSync 数据提交至本站。后端依次验证请求来源、登录态、JSON 结构、目标 URL 和允许的操作，再解析 DNS 并固定本次连接地址，向上游发送请求并返回状态与 JSON 数据。</p><table><tr><th>边界</th><th>规则</th></tr><tr><td>浏览器入口</td><td>同源 JSON 请求并带 Talebook 标记；跨站 Fetch Metadata 或不匹配 Origin 拒绝。</td></tr><tr><td>入口可见性</td><td>阅读器启动时由 Talebook 根据当前会话提供 KOSync 能力。启动响应不缓存，启动页将该能力传给阅读器，无需另外请求用户资料。嵌入式 Readest 仅在能力开启时显示 KOReader 同步入口并启用后台同步。没有登录的读者仍可按原有权限阅读，独立 Readest 与原生应用沿用原行为。会话失效时，代理继续拒绝未登录请求。</td></tr><tr><td>操作范围</td><td>仅允许认证、创建用户、更新进度及按 32 位十六进制 ID 读取进度。</td></tr><tr><td>目标地址</td><td>仅 HTTP/HTTPS；拒绝凭据、查询、片段、路径穿越和非法字符；不跟随重定向。</td></tr><tr><td>资源约束</td><td>请求体 16 KiB、响应体 64 KiB；DNS 5 秒、连接 5 秒、总请求 15 秒；并发槽位 8，等待槽位 2 秒。</td></tr><tr><td>失败语义</td><td>上游 400/401 即使响应为空或 HTML，也以安全 JSON 保留状态供 Readest 认证回退；其他无效响应作为上游失败。</td></tr></table></section>
+<section><h2>5. 影响范围、风险与回滚</h2><p>涉及后端处理器与传输校验、Readest 静态产物及上游补丁，领域行为写入 <code>spec/阅读器.md</code>。不涉及数据库迁移或 Talebook 进度数据。</p><p>主要风险是用户指定的外部服务可能不可达或返回非标准响应；操作白名单、固定 DNS、禁止重定向、时限与体积限制控制代理边界。回滚可整体移除代理处理器、阅读启动能力和 Readest 适配器及对应静态产物，不需数据清理。</p></section>
 <section>
   <h2>6. 测试结果</h2>
   <ul>
@@ -26,7 +26,16 @@
     <li>本地 Chromium 从 Nginx 入口打开《爱丽丝梦游仙境》，经真实 Docker 后端连接测试 KOSync 服务。登录 Talebook 后，Readest 的 KOReader 同步设置显示连接成功。游客提交后显示 <code>Failed to connect: 请先登录</code>。</li>
     <li>提交者使用同一份 EPUB 和同一个 KOSync 账号，完成 KOReader 到 Readest、Readest 到 KOReader 的实际进度同步验证。</li>
   </ul>
-  <p>直接从本地 Nuxt 开发端口进入时，Nuxt 的 API 代理改写 <code>Host</code>，登录后的 KOSync 请求会被后端以 <code>kosync.origin</code> 拒绝。Nginx 保留浏览器请求的 <code>Host</code>，通过该入口验证连接成功。完整的 <code>interface-review full</code> 仍待完成。</p>
+  <p>直接从本地 Nuxt 开发端口进入时，Nuxt 的 API 代理改写 <code>Host</code>，登录后的 KOSync 请求会被后端以 <code>kosync.origin</code> 拒绝。Nginx 保留浏览器请求的 <code>Host</code>，通过该入口验证连接成功。本次调整沿用 Nginx 验收入口。</p>
+  <h3>游客入口调整</h3>
+  <ul>
+    <li>Docker 中 <code>make lint-py-fix</code> 和 <code>make lint-py</code> 通过。<code>make pytest</code> 通过 2,131 项，跳过 40 项，6 项发布流程用例因镜像缺少 Git 无法运行。使用含 Git 的独立 Python 环境执行 <code>python -m pytest -q tests/test_upgrade_release.py -k workflow_resolves_annotated_tag_and_validates_manual_commit</code>，这 6 项全部通过。前端 <code>npm run lint</code> 无错误，保留 572 项既有警告。</li>
+    <li>Docker 中执行 <code>pytest -q tests/test_readest_embed.py tests/test_kosync_proxy.py tests/test_kosync_transport.py</code>，69 项通过。覆盖带会话的启动能力、游客启动、禁止缓存，以及代理拒绝未登录请求。</li>
+    <li>Talebook 前端运行 <code>npx vitest run test/utils/readestLaunch.spec.ts test/utils/readestKOSync.spec.ts</code>、<code>node --test test/readest-kosync-browser.test.cjs</code>，分别通过 23 项、2 项。仓库根目录 <code>node --test scripts/readest/sync.test.mjs scripts/readest/layout.test.cjs</code> 通过 2 项。</li>
+    <li>固定 Readest 源版本应用补丁后，<code>npx --yes pnpm@11.1.1 test</code> 通过 4 项契约测试及 116 项 Vitest 测试，包含独立、原生及内嵌分支。<code>NEXT_PUBLIC_APP_PLATFORM=web npx --yes pnpm@11.1.1 build</code> 通过并完成 TypeScript 检查。未运行原生安装包。</li>
+    <li>使用 Playwright Chromium，通过 Nginx 连接真实 Docker 后端打开《爱丽丝梦游仙境》。已登录时，设置显示 KOReader，连接测试 KOSync 服务成功，保存后书籍菜单显示同步项。同一浏览器退出 Talebook 并重新开书后，公有 EPUB 仍正常打开，设置和书籍菜单都隐藏 KOSync，浏览器未发出后台代理请求。另检查了 320 px 宽度下的游客设置。</li>
+    <li><code>interface-review full</code> 复审范围为当前分支相对 <code>upstream/master</code> 的完整变更，共同祖先为 <code>b2d60b33</code>，包括两个已提交的变更和本地未提交内容。检查了启动流程、设置、书籍菜单、自动同步及错误状态，静态产物通过运行后的界面检查。游客无法再进入会显示混合语言错误的连接流程，原 MEDIUM 已解决，本轮结论为 Approve。会话在阅读器打开后失效时，界面可见性在下次打开时刷新；服务端每次请求仍校验会话。</li>
+  </ul>
 </section>
 <footer class="muted">Talebook internal design · webserver · 2026-11-20</footer>
 </main></body></html>
