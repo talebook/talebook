@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="修复 Nginx 缓存子目录属主与 worker 身份不匹配导致的电子书下载截断，并记录兼容边界与验证。" />
+    <link rel="icon" href="data:," />
+    <title>对齐 Nginx 缓存目录与 worker 身份 · ACTIVE</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #1f2937;
+        --muted: #5a6475;
+        --line: #d7dfeb;
+        --accent: #df6d16;
+        --accent-soft: #fff3e7;
+        --blue-soft: #eef5ff;
+        --green: #1f7a53;
+        --green-soft: #e7f5ee;
+        --warn-soft: #fff8eb;
+        --red: #a43d3d;
+        --red-soft: #fdecec;
+        --shadow: 0 12px 30px rgba(15, 23, 42, .08);
+        --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+        --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      }
+
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: radial-gradient(circle at top right, rgba(223, 109, 22, .10), transparent 25%), linear-gradient(180deg, #fbfcff 0%, var(--bg) 100%);
+        font-family: var(--sans);
+        line-height: 1.68;
+      }
+      a { color: #315f91; text-underline-offset: 3px; }
+      a:focus-visible, [tabindex="0"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+      code, .mono { font-family: var(--mono); font-size: .9em; }
+      code { padding: .1em .34em; border-radius: 4px; background: #f0f3f8; overflow-wrap: anywhere; }
+      .skip-link { position: fixed; z-index: 20; top: 8px; left: 8px; padding: 8px 12px; color: #fff; background: var(--ink); transform: translateY(-160%); }
+      .skip-link:focus { transform: translateY(0); }
+
+      .page { width: min(1160px, calc(100vw - 32px)); margin: 0 auto; padding: 24px 0 56px; }
+      .hero, .card { background: var(--panel); border: 1px solid rgba(215, 223, 235, .95); border-radius: 20px; box-shadow: var(--shadow); }
+      .hero { position: relative; margin-bottom: 18px; padding: 32px 34px; overflow: hidden; }
+      .hero::after { position: absolute; right: -46px; bottom: -56px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(223, 109, 22, .18), rgba(223, 109, 22, 0)); content: ""; pointer-events: none; }
+      h1 { position: relative; z-index: 1; max-width: 1060px; margin: 0 0 10px; font-size: clamp(30px, 4vw, 48px); line-height: 1.12; letter-spacing: -.025em; }
+      .sub { position: relative; z-index: 1; max-width: 1060px; margin: 0; color: var(--muted); font-size: 17px; }
+      .chips { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+      .chip { display: inline-flex; align-items: center; min-height: 32px; padding: 5px 11px; border-radius: 999px; color: #536176; background: #eef2f7; font-size: 12px; font-weight: 700; }
+      .chip.wip { color: #9a4d0c; background: var(--accent-soft); }
+      .chip.active { color: var(--green); background: var(--green-soft); }
+      .chip.superseded { color: var(--red); background: var(--red-soft); }
+
+      .content-grid { display: block; }
+      .main-column { min-width: 0; }
+      .card { margin-bottom: 18px; padding: 26px 28px; scroll-margin-top: 18px; }
+      .card:last-child { margin-bottom: 0; }
+      h2 { margin: 0 0 15px; font-size: 23px; line-height: 1.25; }
+      h3 { margin: 22px 0 10px; font-size: 17px; line-height: 1.35; }
+      p { margin: 0 0 13px; }
+      p, li { color: #283548; font-size: 14px; }
+      ul, ol { margin: 10px 0 0 20px; padding: 0; }
+      li + li { margin-top: 6px; }
+
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .choice { padding: 17px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+      .choice h3 { margin-top: 0; }
+      .choice.recommended { border-color: #efbe8c; background: linear-gradient(180deg, #fffaf5 0%, #fff 100%); }
+      .callout { margin-top: 14px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: #f8fafc; }
+      .callout.warn { border-color: #f0d7a8; background: var(--warn-soft); }
+      .callout.good { border-color: #bddcc4; background: var(--green-soft); }
+      .callout.danger { border-color: #e3b0b0; background: var(--red-soft); }
+      .callout p:last-child, .choice p:last-child { margin-bottom: 0; }
+
+      .flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+      .step { position: relative; min-height: 132px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #fafbfd 100%); }
+      .step + .step::before { position: absolute; top: 18px; left: -17px; display: grid; place-items: center; width: 23px; height: 23px; color: var(--accent); background: #fff; border: 1px solid #efbe8c; border-radius: 50%; content: "→"; font-weight: 800; }
+      .step b { display: block; margin-bottom: 6px; font-size: 14px; }
+      .step p { margin: 0; color: var(--muted); font-size: 13px; }
+      .label { display: block; margin-bottom: 7px; color: var(--accent); font: 800 10px/1.3 var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+
+      .matrix-legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .matrix-legend span, .matrix-state { display: inline-flex; min-height: 25px; align-items: center; justify-content: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }
+      .matrix-yes { color: #176443; background: var(--green-soft); }
+      .matrix-conditional { color: #9a4d0c; background: var(--accent-soft); }
+      .matrix-no { color: #526072; background: #eef2f7; }
+      .matrix-note { color: var(--muted); font-size: 12px; }
+
+      .table-wrap { margin-top: 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+      table { width: 100%; min-width: 680px; border-collapse: collapse; background: #fff; font-size: 13px; }
+      .feature-matrix { min-width: 1020px; }
+      .feature-matrix .matrix-cell { text-align: center; }
+      th, td { padding: 11px 12px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+      th { color: #556376; background: #f8fafc; font-size: 12px; }
+      th:last-child, td:last-child { border-right: 0; }
+      tr:last-child td { border-bottom: 0; }
+      pre { margin: 14px 0 0; padding: 15px 17px; overflow-x: auto; color: #eef3f8; background: #263244; border-radius: 14px; font: 13px/1.65 var(--mono); }
+      pre code { padding: 0; color: inherit; background: transparent; font: inherit; white-space: pre; }
+      .pending { color: #9a5c09; font-weight: 800; }
+      .verified { color: var(--green); font-weight: 800; }
+
+      .toc-edge { display: none; }
+      .toc-edge a { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 3px; align-items: center; width: 100%; min-height: 36px; padding: 6px 5px; color: #69778a; border-radius: 9px; text-decoration: none; }
+      .toc-edge a:hover { color: var(--accent); background: var(--accent-soft); }
+      .rail-index { font: 800 10px/1 var(--mono); text-align: center; }
+      .rail-title { min-width: 0; overflow: hidden; font-size: 12px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+      .toc-edge a[aria-current="location"] { color: #fff; background: #9a4d0c; box-shadow: 0 5px 14px rgba(154, 77, 12, .25); }
+
+      .toc-fab { position: fixed; z-index: 18; right: 18px; bottom: 18px; }
+      .toc-fab summary { display: flex; min-height: 46px; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: #263244; border-radius: 999px; box-shadow: 0 10px 28px rgba(15, 23, 42, .22); cursor: pointer; font-size: 12px; font-weight: 800; list-style: none; }
+      .toc-fab summary::-webkit-details-marker { display: none; }
+      .toc-fab summary::before { color: #ffad6c; content: "≡"; font-size: 17px; line-height: 1; }
+      .toc-fab[open] summary { background: var(--accent); }
+      .toc-fab nav { position: absolute; right: 0; bottom: 56px; width: min(310px, calc(100vw - 36px)); padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 16px 42px rgba(15, 23, 42, .20); }
+      .toc-fab strong { display: block; padding: 7px 9px 10px; color: var(--muted); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+      .toc-fab a { display: block; padding: 9px 10px; color: #536176; border-radius: 9px; text-decoration: none; font-size: 13px; }
+      .toc-fab a:hover { background: var(--accent-soft); }
+      .toc-fab a[aria-current="location"] { color: #9a4d0c; background: var(--accent-soft); font-weight: 800; }
+      footer { margin-top: 16px; color: var(--muted); font-size: 12px; text-align: center; }
+
+      @media (min-width: 1440px) {
+        .toc-edge { position: fixed; z-index: 18; top: 50%; right: max(4px, calc((100vw - 1160px) / 2 - 136px)); display: flex; flex-direction: column; gap: 3px; width: 124px; padding: 8px; background: rgba(255, 255, 255, .96); border: 1px solid rgba(215, 223, 235, .98); border-radius: 16px; box-shadow: 0 10px 28px rgba(15, 23, 42, .13); transform: translateY(-50%); }
+        .toc-fab { display: none; }
+      }
+      @media (max-width: 720px) {
+        .page { width: calc(100vw - 20px); padding-top: 10px; }
+        .hero, .card { border-radius: 16px; }
+        .hero { padding: 24px 20px; }
+        h1 { font-size: clamp(28px, 9vw, 40px); }
+        .sub { font-size: 15px; }
+        .card { padding: 21px 19px; }
+        .grid, .flow { grid-template-columns: 1fr; }
+        .step { min-height: 0; }
+        .step + .step::before { top: -17px; left: 17px; transform: rotate(90deg); }
+        .toc-fab { right: 10px; bottom: 10px; }
+      }
+      @media (max-width: 440px) {
+        .chip { width: fit-content; }
+      }
+      @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+      @page { margin: 14mm; }
+      @media print {
+        body { background: #fff; }
+        .page { width: 100%; padding: 0; }
+        .hero, .card { box-shadow: none; }
+        .content-grid { display: block; }
+        .toc-edge, .toc-fab, .skip-link { display: none; }
+        h1, h2, h3 { break-after: avoid; }
+        .choice, .callout, .step, .table-wrap, pre { break-inside: avoid; }
+        a { color: inherit; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到正文</a>
+    <div class="page">
+      <header class="hero">
+        <h1>对齐 Nginx 缓存目录与 worker 身份</h1>
+        <p class="sub">修复 root 部署中缓存子目录被递归改为 root 后，Nginx worker 无法缓冲大响应而截断电子书下载的问题。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip active">状态：ACTIVE</span>
+          <span class="chip">创建日期：2026-11-01</span>
+          <span class="chip">所属模块：docker</span>
+          <span class="chip">需求来源：开发者下载故障反馈与“那你修复一下”</span>
+        </div>
+      </header>
+      <main id="main-content" class="main-column">
+        <section id="request" class="card">
+          <h2>1. 原始诉求与根因</h2>
+          <div class="callout warn">开发者提供下载日志并询问：“这是服务端的问题还是客户端的问题，服务端可以直接 ssh 上去。”确认归因后要求：“那你修复一下。”</div>
+          <p>客户端收到 <code>206</code> 和正确的 <code>Content-Range</code> ，却只读取到部分正文。服务器 Nginx 同时记录缓存临时文件 <code>open() failed (13: Permission denied) while reading upstream</code> 。直接访问同容器 Tornado 能完整读取正文，经 Nginx 则提前断流。</p>
+          <p>启动脚本把 <code>/var/lib/nginx</code> 递归交给 <code>talebook</code> 。在默认 root 部署中，该账号 UID 为 0，而 Nginx root master 将 worker 降权为 <code>nobody</code> 。Nginx 只修复缓存顶层属主，已有哈希子目录仍为 <code>root:root 0700</code> ，worker 无法进入；启动时再次递归 chown 会让故障复发。</p>
+        </section>
+        <section id="goals" class="card">
+          <h2>2. 目标与边界</h2>
+          <ul>
+            <li>完整响应与 Range 响应均能读完声明的字节数，恢复既有下载行为。</li>
+            <li>生产与开发启动入口在 Nginx 启动前，将全部缓存子目录递归对齐实际 worker 身份。</li>
+            <li>保留现有 PUID/PGID、书库权限、认证、Range 语义和缓存目录模式；不更改线上 Compose 用户、不重建或重启生产服务。</li>
+            <li>仅修复部署权限实现，不改变产品领域规则，无需修改 <code>spec/</code> 。</li>
+          </ul>
+        </section>
+        <section id="design" class="card">
+          <h2>3. 方案与关键决策</h2>
+          <div class="callout good">在通用系统目录权限处理之后，通过生产与开发入口共享的 helper，按实际应用 UID 选择 Nginx 缓存 owner，递归修复已有哈希子目录；修复失败必须中止启动，避免继续提供会截断正文的服务。</div>
+          <div class="table-wrap" role="region" aria-label="缓存属主决策" tabindex="0">
+            <table>
+              <thead><tr><th>运行模式</th><th>缓存 owner</th><th>依据</th></tr></thead>
+              <tbody>
+                <tr><td>talebook 实际 UID 为 0</td><td><code>nobody</code></td><td>当前镜像 Nginx 的 root master 使用默认 nobody worker。</td></tr>
+                <tr><td>talebook 实际 UID 非 0</td><td><code>talebook</code></td><td>由该非 root 身份启动的 Nginx worker 继承实际应用 UID。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>属主判断使用账号解析后的实际 UID，避免仅比较环境变量字符串。递归 chown 仅改变 owner，保留 group 与 mode，不通过放宽目录权限绕过隔离。</p>
+          <p>源码影响范围：<code>docker/start.sh</code> 、<code>docker/start-dev.sh</code> 、共享权限 helper 及其回归测试。新增 helper 必须进入 <code>Dockerfile</code> 的运行时契约 COPY、<code>scripts/upgrade/fingerprint.py</code> 的 layout 指纹和 <code>scripts/upgrade/smoke_container.py</code> 的镜像测试 fixture，保证文件随镜像分发且升级运行时变化可被识别。</p>
+          <p>线上先对当前 proxy 缓存 owner 做定向修复，并备份、修正现容器启动脚本。该补丁保留于现容器重启；从旧镜像重新创建容器仍需包含源码修复的新镜像。</p>
+        </section>
+        <section id="impact" class="card">
+          <h2>4. 影响、风险与回滚</h2>
+          <p><strong>无界面影响。</strong> 本次仅处理容器缓存文件系统权限，不修改前端、页面、交互、界面文案或前端消费者契约，因此不需要界面截图或 interface-review。剩余风险是未来镜像更改 Nginx worker 配置时，身份决策必须同步更新。</p>
+          <p>变更不扩展书籍访问权限、不修改数据库、不改变 API 定义，不新增领域规则；只恢复既有下载与非 root 部署权限行为，所以 <code>spec/</code> 无需变更。</p>
+          <p>部署修复前保存启动脚本原件、缓存 owner/group/mode 清单、镜像与容器启动元数据。可恢复脚本原件回滚；将缓存子目录恢复为原 root owner 会重现故障，应仅在明确需要回滚权限策略时操作。线上服务不因本次修复重启。</p>
+        </section>
+        <section id="tests" class="card">
+          <h2>5. 测试计划与结果</h2>
+          <div class="table-wrap" role="region" aria-label="测试与验证记录" tabindex="0">
+            <table>
+              <thead><tr><th>验证层</th><th>命令与断言</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>线上公网下载</td><td><code>curl --output /dev/null --write-out '%{http_code} %{size_download}'</code> ；完整下载两次均为 <code>200 / 3193235</code> 字节，<code>Range: bytes=419100-</code> 两次均为 <code>206 / 2774135</code> 字节。</td><td class="verified">4 次通过</td></tr>
+                <tr><td>线上容器 Nginx 下载</td><td>同一下载 URL 经容器 <code>127.0.0.1:80</code> ，增加 <code>--limit-rate 256k</code> 验证缓冲落盘；完整下载与同一 Range 各两次，字节数与公网一致。</td><td class="verified">4 次通过</td></tr>
+                <tr><td>线上权限、语法与日志</td><td><code>sh -n /var/www/talebook/docker/start.sh</code> ；以 nobody 验证原失败子目录可进入、可写；修复后的 Nginx 错误日志新增 <code>0</code> 字节，容器启动时间及 Nginx PID 未变。</td><td class="verified">通过，未重启服务</td></tr>
+                <tr><td>源码权限回归</td><td>将 helper 与测试复制到容器隔离临时目录，执行 <code>python3 -m unittest discover -s &lt;isolated&gt;/tests -p test_nginx_cache_permissions.py -v</code> 。覆盖 root/非 root、既有多级缓存、重复启动、身份切换、失败路径和 Calibre 私有 TMPDIR，包含真实降权写入与拒绝写入断言。</td><td class="verified">8/8 通过，0 跳过，4.558 秒；隔离目录已清理，服务未重启</td></tr>
+                <tr><td>源码语法与契约</td><td>三个启动 Shell 文件均通过 <code>sh -n</code> ；修改的 Python 文件通过 <code>python3 -m py_compile</code> 。独立审查确认 production/dev/SSR、contract COPY、fingerprint 和 smoke fixture 一致，helper 不能被应用升级包覆盖。<code>make check-spec</code> 通过全部 25 篇领域规格。</td><td class="verified">通过</td></tr>
+                <tr><td>代码风格</td><td>临时安装 Ruff 后，<code>ruff check --fix tests/test_nginx_cache_permissions.py scripts/upgrade/fingerprint.py scripts/upgrade/smoke_container.py</code> 与 <code>ruff format</code> 通过；<code>make lint-py</code> 与 <code>make lint-py-fix</code> 均通过。</td><td class="verified">通过；仅新测试格式调整，业务代码无额外改动</td></tr>
+                <tr><td>方案与领域门禁</td><td><code>make check-design</code> 与 <code>make check-spec</code> 。</td><td class="verified">178 篇方案及 25 篇领域规格通过</td></tr>
+                <tr><td>环境与剩余验证</td><td>宿主非 root 权限用例按预期 8 项跳过，真实执行结果见上一行。<code>make pytest</code> 无法运行：宿主未安装 pytest/Calibre；未构建整张生产镜像或测试升级镜像重建。源码定向真实权限回归与当前线上下载验收作为替代验证，后续镜像发行需集成此补丁。</td><td>已记录环境限制；源码与业务代码 Ruff 检查均通过</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>线上 8 次下载验收与源码 8 项真实权限回归均已通过；新镜像构建、完整业务测试与旧镜像重建不在本次线上热修验收范围，保留上述限制。</p>
+        </section>
+        <section id="decisions" class="card">
+          <h2>6. 决策记录</h2>
+          <ol>
+            <li><strong>2026-11-01：</strong>开发者明确授权服务器诊断与修复。根因通过客户端日志、公网 curl、容器后端对照与 Nginx 权限错误闭环确认。</li>
+            <li><strong>2026-11-01：</strong>独立 review/grill 已核对 root → nobody、非 root → talebook 的身份与缓存契约；采用定向修复，不要求开发者再次确认已授权的实现细节。</li>
+            <li><strong>2026-11-01：</strong>编码前由服务器诊断代理创建本唯一 WIP；主代理推进共享 helper、入口与镜像契约修改，并负责整合回归结果。</li>
+          </ol>
+        </section>
+      </main>
+      <footer>Talebook internal design · docker · ACTIVE · 2026-11-01</footer>
+    </div>
+  </body>
+</html>

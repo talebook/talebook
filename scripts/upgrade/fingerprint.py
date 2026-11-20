@@ -41,6 +41,7 @@ def main():
                 "Dockerfile",
                 "requirements.txt",
                 "docker/start.sh",
+                "docker/prepare-nginx-permissions.sh",
                 "conf/supervisor/talebook.conf",
                 "conf/nginx/talebook.conf",
                 "webserver/self_check.py",
