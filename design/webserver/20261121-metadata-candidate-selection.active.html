@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>恢复 Calibre 和 NeoDB 元数据候选的详情查询 · ACTIVE</title>
+    <style>
+      body { max-width: 50rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.7 system-ui, sans-serif; }
+      h1, h2 { line-height: 1.3; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>恢复 Calibre 和 NeoDB 元数据候选的详情查询</h1>
+      <p>创建日期 2026-11-21 · 模块 webserver · 状态 ACTIVE · 来源 GitHub #1089</p>
+      <section>
+        <h2>原始诉求</h2>
+        <p>从互联网更新信息时，选中部分来源的候选后提示未获取到所选记录。</p>
+      </section>
+      <section>
+        <h2>目标与边界</h2>
+        <p>保留 Calibre 与 NeoDB 候选重查时需要的查询条件，区分 Calibre 的多条候选。豆瓣 V2 的修复由 #1096 跟踪。</p>
+      </section>
+      <section>
+        <h2>方案</h2>
+        <p>Calibre 用原查询重新定位来源与条目，避免返回其他候选。NeoDB 仍通过搜索匹配所选条目的 URL，避免将外部引用用作新网络目标。使用各来源独有的版本化候选引用。保留 Calibre 旧引用的查询行为。影响规格：插件／元数据源。</p>
+      </section>
+      <section>
+        <h2>测试结果</h2>
+        <p>在 master 复现引用冲突和候选丢失。修复后，tests/test_metadata_candidate_selection.py、tests/test_meta_provider.py 与 tests/test_meta_providers.py 合计 40 项通过。接口回归检查只把选中的条目交给书库写入，所选条目消失时返回错误且不再次写入。测试使用受控上游返回与书库替身。</p>
+      </section>
+    </main>
+  </body>
+</html>

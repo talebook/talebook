@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import json
 import logging
 
 
 from . import api
 from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+from webserver.plugins.runtime.domains import MetadataQuery
 
 from .api import KEY
 
@@ -68,6 +70,7 @@ class NeodbMetaPlugin:
 
 
 class NeodbProvider(MetaSourceMixin, NeodbMetaPlugin):
+    REFERENCE_PREFIX = "neodb:v1:"
     default_enabled = False
     legacy_sources = ("neodb",)
     manifest = meta_manifest(
@@ -80,10 +83,31 @@ class NeodbProvider(MetaSourceMixin, NeodbMetaPlugin):
     )
 
     def _search(self, query, context):
-        return self.search(title=query.title, isbn=query.isbn, publisher=query.publisher) or []
+        records = self.search(title=query.title, isbn=query.isbn, publisher=query.publisher)
+        for record in records:
+            if record.provider_value:
+                reference = [query.isbn, query.title, record.provider_value]
+                record.provider_value = self.REFERENCE_PREFIX + json.dumps(reference, ensure_ascii=False)
+        return records
 
     def _fetch(self, external_id, context):
-        return self.get_metadata_by_provider(external_id)
+        if not external_id.startswith(self.REFERENCE_PREFIX) or len(external_id) > 8192:
+            return None
+        try:
+            reference = json.loads(external_id.removeprefix(self.REFERENCE_PREFIX))
+        except (ValueError, RecursionError):
+            return None
+        if not isinstance(reference, list) or len(reference) != 3 or not all(isinstance(value, str) for value in reference):
+            return None
+        isbn, title, url = reference
+        query = MetadataQuery(isbn=isbn, title=title)
+        if query.is_empty() or not url:
+            return None
+        record = self.get_metadata_by_provider(url, query)
+        if record is not query and record is not None:
+            record.provider_value = external_id
+            return record
+        return None
 
     def get_cover(self, cover_url, context=None):
         return NeodbMetaPlugin.get_cover(self, cover_url)
