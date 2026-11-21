@@ -2,6 +2,8 @@
 
 ## 探测和读取
 
+客户端可用原服务器的规范地址与 `GET /api/user/info` 返回的 `user.id` 绑定本机下载归属。已登录时，普通与 `?detail=1` 响应提供相同的 64 位小写十六进制字符串，重登或改昵称后保持，作用域为该 Talebook 用户库。未登录时省略该字段。条件进度协议使用下文探针返回的 `instance_id` 与 `account_id`。
+
 请求使用 Talebook 现有登录会话（签名 Cookie 或服务器现有的 HTTP Basic 登录），路径基于当前服务器的公开地址和部署路径前缀。先请求 `GET /api/reading-progress/conditional`。仅当返回 `err: "ok"`、`protocol: "talebook.reading-progress.v1"`、非空实例和账号标识以及目标格式描述时，客户端才启用补传。旧服务器可能返回 404、HTML 或其他响应。遇到这些响应或以下错误，应保留本机队列。
 
 `GET /api/book/{book_id}/progress/conditional/EPUB` 返回以下字段，路径中的格式不区分大小写。响应使用 `Cache-Control: private, no-store`。

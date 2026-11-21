@@ -410,19 +410,25 @@ class UserInfo(BaseHandler):
         if not user:
             return d
 
+        created = user.create_time
+        # SQLite can reuse a deleted reader's primary key.
+        account_origin = created.isoformat() if created else user.username
+        account_key = f"user-info:{user.id}:{account_origin}"
+
         # 演示模式下，配置的 demo 账号即使数据库中不是真实管理员，也展示“管理员面板”
         # 入口，用于呈现只读的伪造管理员体验；handler 层单独保证不会暴露真实数据或写入。
         is_demo_fake_admin = demo_mode.is_demo_mode(CONF) and demo_mode.is_demo_user(CONF, user)
         d.update(
             {
                 "is_login": True,
+                "id": hashlib.sha256(account_key.encode("utf-8")).hexdigest(),
                 "is_admin": user.is_admin() or is_demo_fake_admin,
                 "is_active": user.is_active(),
                 "nickname": user.name or "",
                 "username": user.username,
                 "email": user.email,
                 "extra": {},
-                "create_time": user.create_time.strftime("%Y-%m-%d %H:%M:%S"),
+                "create_time": created.strftime("%Y-%m-%d %H:%M:%S") if created else "",
             }
         )
         if user and user.avatar:

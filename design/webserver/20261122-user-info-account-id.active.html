@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>当前会话账号标识 · ACTIVE</title>
+  <style>
+    body { max-width: 52rem; margin: auto; padding: 1rem; font: 16px/1.65 system-ui, sans-serif; }
+    section { border-top: 1px solid #bbb; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>当前会话账号标识</h1>
+    <p>2026-11-22 · webserver · ACTIVE · TB-532 / TB-515</p>
+  </header>
+  <section>
+    <h2>原始诉求与目标</h2>
+    <p>Moke 下载 EPUB 时需要把本机副本绑定到规范服务器地址和当前登录账号。<code>/api/user/info</code> 的两种响应缺少稳定账号字段，导致下载流程在条件能力探测前降级为设备本地阅读。</p>
+  </section>
+  <section>
+    <h2>方案与边界</h2>
+    <ul>
+      <li>普通和详情响应复用现有认证主体，在公共序列化路径返回字符串 <code>user.id</code>。它以当前用户库内的账号为作用域，来源为账号主键和创建时间的带前缀 SHA-256。创建时间缺失的旧记录回退到账号用户名。含创建时间的账号即使复用了已删除账号的主键，也会得到新的标识。</li>
+      <li>Moke 以原规范地址和 <code>user.id</code> 建立本机账号归属，再从条件探针独立取得 <code>instance_id</code> 和 <code>account_id</code>。服务端条件写入继续按认证会话、书籍权限、文件及进度版本和幂等规则校验。</li>
+      <li>影响 <code>spec/用户.md</code> 的响应说明。Talebook 页面、登录流程、权限配置与数据库结构沿用原实现，原生下载、重启及迁移由 TB-520 验证。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>测试结果</h2>
+    <ul>
+      <li><code>pytest -q tests/test_conditional_reading_progress.py</code> 通过 15 项。新增真实 HTTP 回归覆盖两种响应、游客、过期、改昵称、同库两账号、主键复用、旧数据与演示限制。</li>
+      <li>在 Windows 的真实 Calibre 8.5.0 双库运行 TB-520 原账号探针和 TB-532 修后账号探针。四个账号复现旧版缺字段，修订后通过两种响应、登出、重登、改昵称、账号隔离、首次写入及原 ID 重放。</li>
+      <li>TB-531 的 <code>run.py verify</code> 通过。验证书籍权限、EPUB 指纹、版本冲突、旧回执、服务重启和同书号换版。Windows 测试引导仅适配图书时间格式与证书模块导入。生产 Linux/MySQL、客户端原生流程和移动实机待对应环境验证。</li>
+    </ul>
+  </section>
+</body>
+</html>

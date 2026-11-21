@@ -2,6 +2,7 @@ import asyncio
 import datetime
 import hashlib
 import json
+import re
 import shutil
 import time
 import uuid
@@ -22,6 +23,8 @@ from tornado.testing import AsyncHTTPTestCase, gen_test
 from tornado.web import Application, create_signed_value
 
 from webserver.handlers.reading_progress import routes
+from webserver.handlers.user import UserInfo
+from webserver.handlers.user import routes as user_routes
 from webserver.models import Base, Item, ProgressIdentity, ProgressReceipt, Reader, ReadingState, user_syncdb
 from webserver.services.reading_progress import BookFingerprint
 
@@ -29,6 +32,7 @@ from webserver.services.reading_progress import BookFingerprint
 CAPABILITY = "/api/reading-progress/conditional"
 BOOK = "/api/book/1/progress/conditional/EPUB"
 LEGACY = "/api/book/1/progress"
+USER_INFO = "/api/user/info"
 EARLY = "epubcfi(/6/4!/4/2/2)"
 LATE = "epubcfi(/6/8!/4/2/4)"
 SECRET = "a test-only cookie signing key"
@@ -78,7 +82,7 @@ class TestConditionalReadingProgress(AsyncHTTPTestCase):
 
     def get_app(self, sessions=None):
         return Application(
-            routes(),
+            routes() + user_routes(),
             SessionMaker=sessions or self.sessions,
             legacy=self.library,
             build_time=None,
@@ -172,6 +176,67 @@ class TestConditionalReadingProgress(AsyncHTTPTestCase):
         finally:
             event.remove(self.engine, "before_cursor_execute", synchronize)
             second_engine.dispose()
+
+    def user_info(self, **session):
+        with patch.object(UserInfo, "get_sys_info", return_value={"books": 1}):
+            info = self.fetch_json(USER_INFO, **session)
+            detail = self.fetch_json(USER_INFO + "?detail=1", **session)
+        assert info["err"] == detail["err"] == "ok"
+        assert info["sys"] == {"books": 1} and detail["sys"] == {}
+        return info["user"], detail["user"]
+
+    def test_user_info_identifies_the_current_reader_in_both_responses(self):
+        ordinary, detailed = self.user_info()
+        assert ordinary["is_login"] is detailed["is_login"] is True
+        reader_id = ordinary["id"]
+        assert re.fullmatch(r"[0-9a-f]{64}", reader_id)
+        assert detailed["id"] == reader_id
+        assert self.fetch_json(CAPABILITY)["account_id"] != reader_id
+
+        other, other_detail = self.user_info(reader=2)
+        assert other["is_login"] is other_detail["is_login"] is True
+        assert other["id"] == other_detail["id"] != reader_id
+
+        with self.sessions.begin() as session:
+            session.get(Reader, 1).name = "New nickname"
+        ordinary, detailed = self.user_info()
+        assert ordinary["nickname"] == detailed["nickname"] == "New nickname"
+        assert ordinary["id"] == detailed["id"] == reader_id
+
+    def test_user_info_omits_id_for_guests_and_expired_sessions(self):
+        for session in ({"reader": None}, {"expired": True}):
+            for user in self.user_info(**session):
+                assert user["is_login"] is False
+                assert "id" not in user
+
+    def test_user_info_changes_when_a_reader_primary_key_is_reused(self):
+        former, _ = self.user_info(reader=2)
+        with self.sessions.begin() as session:
+            session.delete(session.get(Reader, 2))
+        with self.sessions.begin() as session:
+            session.add(Reader(id=2, username="reader_two", create_time=datetime.datetime(2026, 1, 3)))
+        current, _ = self.user_info(reader=2)
+        assert current["id"] != former["id"]
+
+    def test_legacy_reader_without_creation_time_still_has_a_stable_id(self):
+        with self.sessions.begin() as session:
+            session.get(Reader, 1).create_time = None
+
+        ordinary, detailed = self.user_info()
+        assert ordinary["id"] == detailed["id"]
+        assert re.fullmatch(r"[0-9a-f]{64}", ordinary["id"])
+        assert ordinary["create_time"] == ""
+
+    def test_demo_user_info_preserves_conditional_progress_restrictions(self):
+        with patch.dict("webserver.handlers.base.CONF", {"DEMO_MODE": True, "DEMO_USERNAME": "reader_one"}):
+            ordinary, detailed = self.user_info()
+            assert ordinary["is_admin"] is detailed["is_admin"] is True
+            assert ordinary["id"] == detailed["id"]
+            assert self.fetch_json(CAPABILITY)["err"] == "user.need_login"
+
+            for user in self.user_info(reader=2):
+                assert user["is_login"] is False
+                assert "id" not in user
 
     def test_capability_aliases_and_restart(self):
         capability = self.fetch_json(CAPABILITY)
