@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import hashlib
 import json
-from unittest import mock
+import uuid
 
-from tests.test_main import BID_EPUB, TestWithUserLogin, get_db, setUpModule as init, temporary_book_scope
+from tests.test_main import BID_EPUB, TestWithUserLogin, get_db, temporary_book_scope
+from tests.test_main import setUpModule as init
 
 
 def setUpModule():
@@ -234,6 +236,35 @@ class TestBookReadingProgress(TestWithUserLogin):
         body = json.dumps({"progress": {"percentage": 1}})
         d = self.json("/api/book/99999/progress", method="POST", body=body)
         self.assertEqual(d["err"], "params.book.invalid")
+
+    def test_conditional_progress_uses_calibre_epub(self):
+        self._clear_reading_state(BID_EPUB)
+        try:
+            capability = self.json("/api/reading-progress/conditional")
+            self.assertEqual(capability["err"], "ok", capability)
+            path = f"/api/book/{BID_EPUB}/progress/conditional/EPUB"
+            scope = self.json(path)
+            self.assertEqual(scope["err"], "ok", scope)
+            ebook = self.fetch(f"/api/book/{BID_EPUB}.epub")
+            self.assertEqual(ebook.code, 200)
+            self.assertEqual(scope["file_version"], "sha256:" + hashlib.sha256(ebook.body).hexdigest())
+            self.assertEqual(scope["instance_id"], capability["instance_id"])
+            position = {"kind": "epub_cfi", "cfi": "epubcfi(/6/4!/4/2/2)"}
+            payload = {
+                "instance_id": scope["instance_id"],
+                "account_id": scope["account_id"],
+                "file_version": scope["file_version"],
+                "expected_progress_version": None,
+                "write_id": str(uuid.uuid4()),
+                "operation": "save",
+                "position": position,
+            }
+            saved = self.json(path, method="POST", body=json.dumps(payload))
+            self.assertEqual(saved["err"], "ok", saved)
+            self.assertEqual(saved["current"]["position"], position)
+            self.assertEqual(self.json(path)["current"], saved["current"])
+        finally:
+            self._clear_reading_state(BID_EPUB)
 
 
 class TestReadingLists(TestWithUserLogin):

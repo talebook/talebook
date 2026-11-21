@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>条件阅读进度 · ACTIVE</title>
+  <style>
+    body { max-width: 52rem; margin: auto; padding: 1rem; font: 16px/1.65 system-ui, sans-serif; }
+    section { border-top: 1px solid #bbb; }
+    code { overflow-wrap: anywhere; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>条件阅读进度</h1>
+    <p>2026-11-21 · webserver · ACTIVE · TB-518 / TB-515</p>
+  </header>
+  <section>
+    <h2>原始诉求与目标</h2>
+    <p>客户端需要探测同一书库的同步能力，在离线重连后按实例、账号、书籍、真实 EPUB 版本与进度版本有条件地补传。提交成功但回执丢失时，同一写入标识应可安全重试。</p>
+  </section>
+  <section>
+    <h2>方案与边界</h2>
+    <ul>
+      <li>在现有认证与书籍访问规则下增加探测、读取以及条件保存或确认。EPUB 使用原文件的 SHA-256 与 CFI。</li>
+      <li>SQLite 在读取授权与进度前开启写事务。现有进度行继续作为共用记录，另存实例及成功回执。保留旧接口和旧进度表现。</li>
+      <li>预检异步读取原文件，最终校验持有 Calibre 读锁；检测文件在检查期间的变化。MySQL 及非 EPUB 格式使用现有路径降级。</li>
+      <li>影响《阅读状态》规格、Tornado 接口和 Talebook 用户数据库。无界面影响，本阶段仅提供供后续集成使用的服务端合同。客户端补传、跨库交互和原生验证属于后继工作。</li>
+    </ul>
+  </section>
+  <section>
+    <h2>测试结果</h2>
+    <ul>
+      <li><code>python -m pytest -q tests/test_conditional_reading_progress.py</code> 通过 10 项。测试在真实 Tornado HTTP 服务中验证签名会话，读写磁盘 SQLite 和 EPUB 文件。两个工作线程使用独立数据库连接并同时竞争写事务。</li>
+      <li>覆盖首次空记录、前进与回读冲突、重复提交、丢回执、旧写竞争、选择保留服务器位置、权限变更、文件变化和旧表兼容。HTTP 合同和实测交换收录于 <code>document/reading-progress-v1.md</code> 和 <code>document/reading-progress-v1.fixtures.json</code>。</li>
+      <li>本机使用 Calibre 目录适配器。仓库完整应用冒烟用例使用 Calibre 下载字节验证指纹，留待具备 Calibre 的 CI 环境执行。Windows 上规格及方案工具的部分自测受符号链接权限、路径分隔符及文件名大小写限制，直接运行仓库规格及方案校验通过。</li>
+    </ul>
+  </section>
+</body>
+</html>
