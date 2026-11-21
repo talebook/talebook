@@ -20,6 +20,7 @@ def routes():
         network_library,
         opds,
         plugins,
+        reading_progress,
         scan,
         theme,
         upgrade,
@@ -32,6 +33,7 @@ def routes():
     routes += scan.routes()
     routes += opds.routes()
     routes += book.routes()
+    routes += reading_progress.routes()
     routes += annotations.routes()
     routes += comic.routes()
     routes += user.routes()

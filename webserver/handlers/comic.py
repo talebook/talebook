@@ -17,6 +17,7 @@ from webserver.handlers.captcha import book_captcha_enabled, require_book_captch
 from webserver.i18n import _, get_language
 from webserver.models import Item, Reader, ReadingState
 from webserver.services.comic_archive import ComicArchiveError, comic_archive_service, select_comic_container
+from webserver.services.reading_progress import lock_progress_transaction, save_progress
 
 
 COMIC_PROGRESS_VERSION = 1
@@ -302,15 +303,8 @@ class ComicProgressHandler(ComicHandlerMixin, BaseHandler):
         ):
             return {"err": "comic.progress_stale", "msg": _("漫画页面列表已更新，请刷新阅读器")}
 
-        reading_state = (
-            self.session.query(ReadingState)
-            .filter(ReadingState.book_id == int(book_id), ReadingState.reader_id == self.user_id())
-            .first()
-        )
-        if not reading_state:
-            reading_state = ReadingState(int(book_id), self.user_id())
-            self.session.add(reading_state)
-        reading_state.set_progress(normalized)
+        lock_progress_transaction(self.session)
+        reading_state = save_progress(self.session, int(book_id), self.user_id(), normalized)
         reading_state.set_online_read(True)
         self.session.commit()
         return {"err": "ok", "msg": _("漫画阅读进度已保存"), "progress": normalized}

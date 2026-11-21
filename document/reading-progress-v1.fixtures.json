@@ -1,0 +1,319 @@
+{
+  "capability": {
+    "method": "GET",
+    "path": "/api/reading-progress/conditional",
+    "status": 200,
+    "response": {
+      "err": "ok",
+      "protocol": "talebook.reading-progress.v1",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "formats": {
+        "EPUB": {
+          "file_version": "sha256",
+          "position": "epub_cfi"
+        }
+      },
+      "msg": ""
+    }
+  },
+  "empty": {
+    "method": "GET",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "ok",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "book_id": 1,
+      "format": "EPUB",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "current": {
+        "progress_version": null,
+        "position": null,
+        "preview_progress": null,
+        "source": "empty"
+      },
+      "msg": ""
+    }
+  },
+  "save": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "ok",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "book_id": 1,
+      "format": "EPUB",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "current": {
+        "progress_version": "18a5f804094b6cd88e4cfaf59c29db1ee11b57160e4f140919fb033be8e19b43",
+        "position": {
+          "kind": "epub_cfi",
+          "cfi": "epubcfi(/6/4!/4/2/2)",
+          "percentage": 24.5
+        },
+        "source": "conditional",
+        "preview_progress": null
+      },
+      "receipt": {
+        "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+        "progress_version": "18a5f804094b6cd88e4cfaf59c29db1ee11b57160e4f140919fb033be8e19b43",
+        "replayed": false
+      },
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/4!/4/2/2)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "conflict": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "progress.version_conflict",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "book_id": 1,
+      "format": "EPUB",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "current": {
+        "progress_version": "18a5f804094b6cd88e4cfaf59c29db1ee11b57160e4f140919fb033be8e19b43",
+        "position": {
+          "kind": "epub_cfi",
+          "cfi": "epubcfi(/6/4!/4/2/2)",
+          "percentage": 24.5
+        },
+        "preview_progress": null,
+        "source": "conditional"
+      },
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "fc3c7be5-c9dc-4e42-832b-b436abaf2957",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/8!/4/2/4)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "newer_save": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "ok",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "book_id": 1,
+      "format": "EPUB",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "current": {
+        "progress_version": "35d219957cd45ad6be13772a390ff81f442cab8a26aadc527fd922a2da9c3074",
+        "position": {
+          "kind": "epub_cfi",
+          "cfi": "epubcfi(/6/8!/4/2/4)",
+          "percentage": 24.5
+        },
+        "source": "conditional",
+        "preview_progress": null
+      },
+      "receipt": {
+        "write_id": "9e7f3682-0caf-4539-a5e4-7eeada281a9d",
+        "progress_version": "35d219957cd45ad6be13772a390ff81f442cab8a26aadc527fd922a2da9c3074",
+        "replayed": false
+      },
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": "18a5f804094b6cd88e4cfaf59c29db1ee11b57160e4f140919fb033be8e19b43",
+      "write_id": "9e7f3682-0caf-4539-a5e4-7eeada281a9d",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/8!/4/2/4)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "replayed_after_newer_save": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "ok",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "book_id": 1,
+      "format": "EPUB",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "current": {
+        "progress_version": "35d219957cd45ad6be13772a390ff81f442cab8a26aadc527fd922a2da9c3074",
+        "position": {
+          "kind": "epub_cfi",
+          "cfi": "epubcfi(/6/8!/4/2/4)",
+          "percentage": 24.5
+        },
+        "preview_progress": null,
+        "source": "conditional"
+      },
+      "receipt": {
+        "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+        "progress_version": "18a5f804094b6cd88e4cfaf59c29db1ee11b57160e4f140919fb033be8e19b43",
+        "replayed": true
+      },
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/4!/4/2/2)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "expired_auth": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "user.need_login",
+      "msg": "请先登录"
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/4!/4/2/2)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "changed_account": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "progress.account_mismatch",
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/4!/4/2/2)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "wrong_instance": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "progress.instance_mismatch",
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "0000000000000000000000000000000000000000000000000000000000000000",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/4!/4/2/2)",
+        "percentage": 24.5
+      }
+    }
+  },
+  "legacy_get": {
+    "method": "GET",
+    "path": "/api/book/1/progress",
+    "status": 200,
+    "response": {
+      "err": "ok",
+      "progress": {
+        "cfi": "epubcfi(/6/8!/4/2/4)",
+        "percentage": 24.5
+      },
+      "update_time": "2026-11-21T16:07:34.678818",
+      "msg": ""
+    }
+  },
+  "changed_epub": {
+    "method": "POST",
+    "path": "/api/book/1/progress/conditional/EPUB",
+    "status": 200,
+    "response": {
+      "err": "progress.file_version_changed",
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "book_id": 1,
+      "format": "EPUB",
+      "file_version": "sha256:7df3554a9777f2bf0c906123c98eaf2ef271cc06e86625c4f9eed4505d26f16d",
+      "current": {
+        "progress_version": "35d219957cd45ad6be13772a390ff81f442cab8a26aadc527fd922a2da9c3074",
+        "position": null,
+        "preview_progress": {
+          "cfi": "epubcfi(/6/8!/4/2/4)",
+          "percentage": 24.5
+        },
+        "source": "different_file"
+      },
+      "msg": ""
+    },
+    "request": {
+      "instance_id": "e8a9fdb7b0d4df0acea68556d885d7e6c5920bbfe5073111e6f2b6b7d7fc1e0d",
+      "account_id": "ec756e9b7d5497176c1ab338e2c575823b4bbdc1198566114bb154cfdf2f1798",
+      "file_version": "sha256:ebdfd99ae233e06f63479f9b89daa220c07b0021531ec21a5f9b5fdf77780165",
+      "expected_progress_version": null,
+      "write_id": "208c126a-0fd0-4cb1-921c-15413239afdc",
+      "operation": "save",
+      "position": {
+        "kind": "epub_cfi",
+        "cfi": "epubcfi(/6/4!/4/2/2)",
+        "percentage": 24.5
+      }
+    }
+  }
+}

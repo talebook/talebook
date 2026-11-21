@@ -72,7 +72,8 @@ def js(func):
         origin = self.request.headers.get("origin", "*")
         self.set_header("Access-Control-Allow-Origin", origin)
         self.set_header("Access-Control-Allow-Credentials", "true")
-        self.set_header("Cache-Control", "max-age=0")
+        if "Cache-Control" not in self._headers:
+            self.set_header("Cache-Control", "max-age=0")
         self.write(rsp)
         self.finish()
         return

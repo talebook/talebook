@@ -583,10 +583,34 @@ class ReadingState(Base, SQLAlchemyMixin):
 
     def set_progress(self, progress):
         self.progress = progress or {}
-        self.progress_update_time = datetime.datetime.now()
+        now = datetime.datetime.now()
+        if self.progress_update_time is not None and now <= self.progress_update_time:
+            now = self.progress_update_time + datetime.timedelta(microseconds=1)
+        self.progress_update_time = now
 
     def get_progress(self):
         return self.progress or {}
+
+
+class ProgressIdentity(Base):
+    __tablename__ = "reading_progress_identity"
+
+    id = Column(Integer, primary_key=True)
+    value = Column(String(32), nullable=False)
+
+
+class ProgressReceipt(Base):
+    __tablename__ = "reading_progress_receipts"
+    __table_args__ = (Index("ix_progress_receipt_position", "instance_id", "account_id", "book_id", "progress_version"),)
+
+    instance_id = Column(String(64), primary_key=True)
+    account_id = Column(String(64), primary_key=True)
+    write_id = Column(String(36), primary_key=True)
+    book_id = Column(Integer, nullable=False)
+    payload_hash = Column(String(64), nullable=False)
+    progress_version = Column(String(64))
+    # Only position-changing receipts establish the provenance of a CFI.
+    file_version = Column(String(71))
 
 
 class Annotation(Base, SQLAlchemyMixin):

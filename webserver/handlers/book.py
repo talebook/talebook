@@ -2831,49 +2831,6 @@ class BookReadingState(BaseHandler):
         return utils.ReadingStateFormatter.format_reading_state_with_api_format(reading_state)
 
 
-class BookReadingProgress(BaseHandler):
-    """跨端同步指定书籍的阅读进度（如章节、CFI、百分比等，由客户端自定义结构）。"""
-
-    MAX_PROGRESS_BYTES = 8 * 1024
-
-    @js
-    @auth
-    def post(self, id):
-        book_id = int(id)
-        book = self.get_book(book_id, raise_exception=False)
-        if not book:
-            return {"err": "params.book.invalid", "msg": _("书籍已不存在")}
-        user_id = self.user_id()
-        data = tornado.escape.json_decode(self.request.body)
-        progress = data.get("progress")
-        if not isinstance(progress, dict):
-            return {"err": "params.invalid", "msg": _("阅读进度参数错误")}
-        if len(json.dumps(progress)) > self.MAX_PROGRESS_BYTES:
-            return {"err": "params.invalid", "msg": _("阅读进度数据过大")}
-        reading_state = (
-            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
-        )
-        if not reading_state:
-            reading_state = ReadingState(book_id, user_id)
-            self.session.add(reading_state)
-        reading_state.set_progress(progress)
-        self.session.commit()
-        return {"err": "ok", "msg": _("阅读进度已保存"), "progress": reading_state.get_progress()}
-
-    @js
-    @auth
-    def get(self, id):
-        book_id = int(id)
-        user_id = self.user_id()
-        reading_state = (
-            self.session.query(ReadingState).filter(ReadingState.book_id == book_id, ReadingState.reader_id == user_id).first()
-        )
-        if not reading_state:
-            return {"err": "ok", "progress": {}, "update_time": None}
-        update_time = reading_state.progress_update_time.isoformat() if reading_state.progress_update_time else None
-        return {"err": "ok", "progress": reading_state.get_progress(), "update_time": update_time}
-
-
 class BookReadingStats(BaseHandler):
     @js
     @auth
@@ -3003,7 +2960,6 @@ def routes():
         (r"/api/book/([0-9]+)/favorite", BookFavorite),
         (r"/api/book/([0-9]+)/shelf", BookShelf),
         (r"/api/book/([0-9]+)/readstate", BookReadingState),
-        (r"/api/book/([0-9]+)/progress", BookReadingProgress),
         (r"/api/favorites", BookFavorite),
         (r"/api/shelf", BookShelf),
         (r"/api/reading", BookReading),
