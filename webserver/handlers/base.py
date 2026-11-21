@@ -164,16 +164,24 @@ class BaseHandler(PublicPathMixin, web.RequestHandler):
         return self.get(*args, **kwargs)
 
     def mark_invited(self):
-        self.set_secure_cookie("invited", str(int(time.time())))
+        timestamp = str(int(time.time()))
+        version = CONF.get("INVITE_GRANT_VERSION", "")
+        self.set_secure_cookie("invited", f"{timestamp}:{version}" if version else timestamp)
 
     def need_invited(self):
         return CONF["INVITE_MODE"] is True
 
     def invited_code_is_ok(self):
-        t = self.get_secure_cookie("invited")
-        if t and int(float(t)) > int(time.time()) - 7 * 86400:
-            return True
-        return False
+        grant = self.get_secure_cookie("invited")
+        if not grant:
+            return False
+        # Timestamp-only cookies belong to configurations that predate grant rotation.
+        timestamp, _, version = escape.to_unicode(grant).partition(":")
+        return (
+            version == CONF.get("INVITE_GRANT_VERSION", "")
+            and timestamp.isdecimal()
+            and int(timestamp) > int(time.time()) - 7 * 86400
+        )
 
     def process_auth_header(self):
         auth_header = self.request.headers.get("Authorization", "")
