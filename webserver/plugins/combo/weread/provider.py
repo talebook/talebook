@@ -16,7 +16,14 @@ from .export import _as_list, _first, parse_weread_export
 WEREAD_PLUGIN_KEY = "talebook.combo.weread"
 WEREAD_GATEWAY = "https://i.weread.qq.com/api/agent/gateway"
 # Keep aligned with Tencent/WeChatReading skills/SKILL.md after reviewing its supporting documents.
-WEREAD_SKILL_VERSION = "1.0.5"
+WEREAD_SKILL_VERSION = "1.0.6"
+
+_NOTE_PAGE_FIELDS = {
+    "/user/notebooks": "books",
+    "/book/bookmarklist": "updated",
+    "/review/list/mine": "reviews",
+}
+_GATEWAY_ENVELOPE_FIELDS = {"upgrade_info", "errcode", "errmsg", "message", "hasMore", "lastSort", "synckey", "maxIdx"}
 
 WEREAD_QUERY_OPERATIONS = {
     "search": {
@@ -263,8 +270,11 @@ class WereadProvider:
             if not api_key:
                 raise UpstreamAuthError("WeRead API key is required when no export JSON is supplied")
             if context["action"] == "test":
-                self._gateway(api_key, "/user/notebooks", count=1)
-                return ProviderResult(health_message="WeRead API connection healthy")
+                page = self._gateway(api_key, "/user/notebooks", count=1)
+                health = "WeRead API connection healthy"
+                if page.get("upgrade_info") is not None:
+                    health += " (a WeRead skill update is available)"
+                return ProviderResult(health_message=health)
             items = self._fetch_all(api_key)
             health = "WeRead API import fetched"
 
@@ -430,8 +440,6 @@ class WereadProvider:
             raise UpstreamError("WeRead gateway request failed") from exc
         if not isinstance(data, dict):
             raise UpstreamError("WeRead gateway returned an invalid response")
-        if data.get("upgrade_info"):
-            raise UpstreamError(str(data["upgrade_info"].get("message") or "WeRead skill upgrade required"))
         if data.get("errcode") not in (None, 0, "0"):
             message = str(data.get("errmsg") or data.get("message") or "WeRead request rejected")
             if data.get("errcode") in {401, 403, -2010} or "认证" in message or "登录" in message:
@@ -439,6 +447,17 @@ class WereadProvider:
             if data.get("errcode") in {429, -2009} or "频率" in message:
                 raise UpstreamRateLimitError(message)
             raise UpstreamError(message)
+        notice = data.get("upgrade_info") is not None
+        field = _NOTE_PAGE_FIELDS.get(api_name)
+        if field and (api_name == "/user/notebooks" or notice) and not isinstance(data.get(field), list):
+            # A missing page is not a valid empty page, even when the gateway reports errcode 0.
+            raise UpstreamError(f"WeRead gateway response is missing a valid {field} list")
+        if (
+            notice
+            and field is None
+            and not any(key not in _GATEWAY_ENVELOPE_FIELDS and value is not None for key, value in data.items())
+        ):
+            raise UpstreamError("WeRead gateway returned an upgrade notice without business data")
         return data
 
 
