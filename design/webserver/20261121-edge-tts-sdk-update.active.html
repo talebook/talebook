@@ -7,6 +7,7 @@
     <style>
       body { max-width: 50rem; margin: 2rem auto; padding: 0 1rem; font: 1rem/1.7 system-ui, sans-serif; }
       h1, h2 { line-height: 1.3; }
+      code { overflow-wrap: anywhere; }
     </style>
   </head>
   <body>
@@ -23,7 +24,54 @@
       </section>
       <section>
         <h2>测试结果</h2>
-        <p>从 GitHub 提交归档安装确认 Voicebook 0.8.0 使用 Edge SDK 7.3.1。真实 Edge 请求在 7.2.8 返回 403，7.3.1 生成 9,504 字节音频。Voicebook 的共享预算回归 14 项、Talebook 的 tests/test_audiobook_progress_v2.py 29 项通过。Windows 回归使用 UTF-8、短临时路径和独立 FFmpeg、FFprobe。</p>
+        <h3>本轮评审修订：Linux、Python 3.12、FFmpeg/FFprobe</h3>
+        <ol>
+          <li>
+            <code>curl -fLsS --connect-timeout 10 --max-time 45 https://codeload.github.com/talebook/voicebook/tar.gz/215739b3badf840e272f3731c3b7414eb438a3c9 -o voicebook-215739b.tar.gz</code>；
+            <code>python -m venv .venv-review</code>；
+            <code>.venv-review/bin/python -m pip install --disable-pip-version-check --retries 1 --timeout 10 pytest ./voicebook-215739b.tar.gz</code>。
+            依赖安装成功；随后执行
+            <code>.venv-review/bin/python -m pip install --disable-pip-version-check --retries 1 --timeout 10 -r requirements-test.txt sqlalchemy tornado==6.5.10</code>
+            成功，将 pytest 对齐至仓库固定的 7.4.4。<code>.venv-review/bin/python -m pip check</code> 通过。
+          </li>
+          <li>
+            <code>.venv-review/bin/python -m pytest -q tests/test_audiobook_edge_sdk.py</code>：2 项通过。
+            安装版本断言确认 Edge SDK 7.3.1。离线用合成音频模拟 SDK 远端流和一次 403，保留实际 SDK 保存、Voicebook Edge 适配和 SQLite 共享预算；
+            验证恰好一次经新许可的重试、v2 任务和尝试标识、一章非空 MP3 及完成清单。未向真实上游发送请求。
+          </li>
+          <li>
+            <code>.venv-review/bin/python -m pip install --no-deps --target .edge-old edge-tts==7.2.8</code>；
+            <code>PYTHONPATH="$PWD/.edge-old" .venv-review/bin/python -m pytest -q tests/test_audiobook_edge_sdk.py</code>：
+            旧版真实安装对照 1 项失败、1 项通过（预期，退出码 1）；仅版本断言失败，实装值 7.2.8，期望 7.3.1。
+            传输模拟不声称重现旧版上游 403。
+          </li>
+          <li>
+            <code>ruff check --no-cache tests/test_audiobook_edge_sdk.py</code>、
+            <code>ruff format --check --no-cache tests/test_audiobook_edge_sdk.py</code>、
+            <code>make lint-py</code>、<code>make check-design check-spec</code>、<code>git diff --check</code>：通过。
+          </li>
+        </ol>
+        <h3>已有验证与本轮未执行项</h3>
+        <ul>
+          <li>
+            原 PR 提交人报告：真实 Edge 请求对照中，7.2.8 返回 403，7.3.1 生成 9,504 字节 MP3。
+            <code>python -m pytest -q tests/test_edge_budget.py</code> 在 Voicebook 通过 14 项；
+            <code>python -m pytest -q tests/test_audiobook_progress_v2.py</code> 在 Talebook 通过 29 项。
+            原环境使用 UTF-8、短临时路径和独立 FFmpeg/FFprobe；本轮未复跑真实供应商请求。
+          </li>
+          <li>
+            原 PR 的<a href="https://github.com/talebook/talebook/actions/runs/44899640753/job/136832637434">服务端 CI</a>
+            在临时合并提交 <code>43fd5193</code> 安装了 Edge SDK 7.3.1；
+            <code>pytest tests -v --cov=webserver --cov-report=term-missing</code> 为 2,099 项通过、40 项跳过，未包含本轮新增测试。
+          </li>
+          <li>
+            本轮本地 <code>.venv-review/bin/python -m pytest -q tests/test_audiobook_progress_v2.py</code>
+            初次运行在收集阶段缺少 SQLAlchemy；安装后重试
+            <code>.venv-review/bin/python -m pytest -q tests/test_audiobook_edge_sdk.py tests/test_audiobook_progress_v2.py</code>
+            仍在收集阶段缺少 bcrypt，未执行该次测试。完整服务端测试和容器构建未运行，因本环境缺少应用依赖、Calibre 和 Docker。
+            CI 将在新 head 上运行回归；本轮尚未验证镜像构建和生产镜像内依赖。
+          </li>
+        </ul>
       </section>
     </main>
   </body>
