@@ -109,10 +109,11 @@ class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
     def _search(self, query, context):
         results = self.search(title=query.title, isbn=query.isbn, publisher=query.publisher) or []
         for mi in results:
-            # 通用插件详情只收到 external_id，没有原书 mi：把重搜所需的 isbn/title
-            # 和豆瓣条目 id 一起编码进 provider_value，供 _fetch 还原查询词。
+            # 通用插件详情只收到 external_id，没有原书 mi：把初次搜索实际使用的查询词
+            # （query.isbn / query.title，而不是候选条目补出的 ISBN／标题）和豆瓣条目 id
+            # 分开编码进 provider_value，供 _fetch 用同一查询词重搜。
             mi.provider_value = self.REFERENCE_PREFIX + json.dumps(
-                {"id": mi.provider_value, "isbn": getattr(mi, "isbn", None), "title": mi.title},
+                {"id": mi.provider_value, "isbn": query.isbn or None, "title": query.title or None},
                 ensure_ascii=False,
                 separators=(",", ":"),
             )
@@ -132,13 +133,20 @@ class DoubanV2Provider(MetaSourceMixin, DoubanV2MetaPlugin):
         item_id, isbn, title = (reference.get(key) for key in ("id", "isbn", "title"))
         if not isinstance(item_id, str) or not re.fullmatch(r"[0-9]{1,20}", item_id):
             return None
-        if not isinstance(title, str) or not title.strip() or len(title) > 512:
+        if title is not None and (not isinstance(title, str) or len(title) > 512):
             return None
         if isbn is not None and (not isinstance(isbn, str) or len(isbn) > 64):
             return None
+        if not (isbn or "").strip() and not (title or "").strip():
+            return None
         # get_metadata_by_provider 只读 isbn/title/cover_url，不需要真正的 calibre Metadata。
         mi = SimpleNamespace(title=title, isbn=isbn, cover_url=None)
-        return self.get_metadata_by_provider(item_id, mi)
+        result = self.get_metadata_by_provider(item_id, mi)
+        # 重搜没找到所选条目或构建元数据失败时，旧 helper 会退回传入的 mi；这里的 mi
+        # 只是查询占位对象，不能当成元数据返回，交给调用方走 metadata.not_found。
+        if result is mi:
+            return None
+        return result
 
     def get_cover(self, cover_url, context=None):
         return DoubanV2MetaPlugin.get_cover(self, cover_url)

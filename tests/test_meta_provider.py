@@ -118,6 +118,45 @@ class TestDoubanV2ProviderReferences(TestCase):
         # 用还原出的 isbn 重搜，而不是只按标题（会漏掉 ISBN 搜到的条目）
         self.assertEqual(self.search.call_args.args[0], "9787000000000")
 
+    def test_title_only_search_keeps_original_query_when_candidate_has_isbn(self):
+        # 用户只按书名搜，豆瓣候选补出了 ISBN：重搜仍应使用原书名，而不是候选 ISBN。
+        self.search.return_value = ([{"id": 333}], "http://search")
+        self.build.side_effect = [
+            FakeMi(title="候选标题", isbn="9787111111111", provider_value="333"),
+            FakeMi(title="候选标题", isbn="9787111111111", provider_value="333"),
+        ]
+
+        records = self.provider.search_books({"title": "原书名"}, {})
+        value = records[0]["provider_value"]
+        self.assertEqual(
+            json.loads(value[len("douban_v2:v1:") :]),
+            {"id": "333", "isbn": None, "title": "原书名"},
+        )
+
+        detail = self.provider.get_metadata(value, {})
+        self.assertIsNotNone(detail)
+        self.assertEqual(self.search.call_args.args[0], "原书名")
+
+    def test_isbn_only_reference_is_accepted(self):
+        self.search.return_value = ([{"id": 444}], "http://search")
+        self.build.return_value = FakeMi(title="标题", isbn="9787000000000", provider_value="444")
+        value = 'douban_v2:v1:{"id":"444","isbn":"9787000000000","title":null}'
+        self.assertIsNotNone(self.provider.get_metadata(value, {}))
+        self.assertEqual(self.search.call_args.args[0], "9787000000000")
+
+    def test_selected_item_missing_on_research_returns_not_found(self):
+        # 重搜结果里没有所选 id：不能把查询占位对象包装成成功结果。
+        self.search.return_value = ([{"id": 999}], "http://search")
+        value = 'douban_v2:v1:{"id":"222","isbn":null,"title":"标题"}'
+        self.assertIsNone(self.provider.get_metadata(value, {}))
+        self.build.assert_not_called()
+
+    def test_build_failure_on_research_returns_not_found(self):
+        self.search.return_value = ([{"id": 222}], "http://search")
+        self.build.side_effect = RuntimeError("boom")
+        value = 'douban_v2:v1:{"id":"222","isbn":null,"title":"标题"}'
+        self.assertIsNone(self.provider.get_metadata(value, {}))
+
     def test_legacy_and_malformed_references_require_a_new_search_without_http(self):
         for value in (
             "222",
@@ -127,6 +166,8 @@ class TestDoubanV2ProviderReferences(TestCase):
             '{"id":"222","isbn":"","title":"标题"}',
             'douban_v2:v1:{"id":222,"isbn":"","title":"标题"}',
             'douban_v2:v1:{"id":"222","isbn":"","title":""}',
+            'douban_v2:v1:{"id":"222","isbn":null,"title":null}',
+            'douban_v2:v1:{"id":"222","isbn":"","title":123}',
             'douban_v2:v1:{"id":"../222","isbn":"","title":"标题"}',
             "x" * 4097,
         ):
