@@ -7,6 +7,7 @@ from unittest import mock
 
 from tests import test_main
 from webserver import models
+from webserver.handlers.ai import QuoteCardFeature
 from webserver.services.quote_card import (
     FEATURE_KEY,
     MAX_CHAPTER_CHARACTERS,
@@ -56,6 +57,12 @@ def create_payload(**changes):
 
 
 class QuoteCardValidationTest(unittest.TestCase):
+    def test_quote_task_serializer_does_not_read_summary_duck_artifact(self):
+        item = recommendation()
+        record = models.AITask(feature=FEATURE_KEY, status="succeeded", result_data={"items": [item]})
+        with mock.patch("webserver.services.summary_duck.artifact_payload", side_effect=AssertionError):
+            self.assertEqual(QuoteCardFeature.task_dict(record)["items"], [item])
+
     def test_validates_grounded_candidates_and_drops_invalid_ones(self):
         chapter = validate_chapter_input(CHAPTER, HREF, "第一章")
         invalid = recommendation("伪造原句", {"href": HREF, "start": 0, "end": 4})
@@ -237,9 +244,12 @@ class QuoteCardAPITest(test_main.TestWithUserLogin):
         self.assertEqual(response["err"], "quote_card.not_found")
 
     def test_chapter_recommendation_uses_generic_ai_task_surface(self):
-        with mock.patch.object(QuoteCardService, "submit"), mock.patch(
-            "webserver.handlers.ai.load_quote_card_chapter",
-            return_value=validate_chapter_input(CHAPTER, HREF, "第一章"),
+        with (
+            mock.patch.object(QuoteCardService, "submit"),
+            mock.patch(
+                "webserver.handlers.ai.load_quote_card_chapter",
+                return_value=validate_chapter_input(CHAPTER, HREF, "第一章"),
+            ),
         ):
             response = self.json(
                 f"/api/ai/{FEATURE_KEY}/tasks",

@@ -24,6 +24,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.orm import sessionmaker
 
 from webserver import loader, models
 
@@ -283,6 +284,17 @@ def main():
     # Perform migration
     try:
         success = compare_and_migrate(engine)
+        if success:
+            from webserver.services.ai_artifacts import migrate_legacy_summary_duck_artifacts
+
+            artifact_result = migrate_legacy_summary_duck_artifacts(sessionmaker(bind=engine), CONF)
+            logger.info(
+                "Summary Duck artifact migration: %d migrated, %d failed",
+                artifact_result["migrated"],
+                artifact_result["failed"],
+            )
+            if artifact_result["failed"]:
+                success = False
         return success
     except Exception as e:
         logger.error(f"Migration error: {e}")

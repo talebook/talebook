@@ -1,6 +1,7 @@
 <template>
     <div>
-        <v-row>
+        <HomeRecommendations v-if="showHomeRecommendations" />
+        <v-row v-else>
             <v-col cols="12">
                 <p class="ma-0 title">
                     {{ t('navigation.recommended') }}
@@ -111,6 +112,10 @@ const store = useMainStore();
 const { $backend, $alert } = useNuxtApp();
 const route = useRoute();
 const { t } = useI18n();
+
+const showHomeRecommendations = computed(() => (
+    store.user.is_login && store.sys.ai_recommendations_enabled === true
+));
 
 onMounted(() => {
     // 处理URL参数中的错误信息

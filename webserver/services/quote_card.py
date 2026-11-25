@@ -447,3 +447,25 @@ class QuoteCardService:
         if not self._configured:
             return False
         return self.runtime.cancel(record_id)
+
+
+def quote_task_dict(record: AITask) -> Dict[str, Any]:
+    data = record.user_revision or record.result_data or {}
+    return {
+        "id": record.id,
+        "feature": record.feature,
+        "book_id": record.book_id,
+        "book_version": record.book_version,
+        "chapter_href": record.chapter_href,
+        "chapter_title": record.chapter_title,
+        "status": record.status,
+        "progress_message": record.progress_message,
+        "items": data.get("items", []),
+        "schema_version": record.schema_version,
+        "prompt_version": record.prompt_version,
+        "runtime": record.runtime_name,
+        "usage": record.usage or {},
+        "error": {"code": record.error_code, "message": record.error_message} if record.error_code else None,
+        "created_at": record.create_time.isoformat() if record.create_time else None,
+        "updated_at": record.update_time.isoformat() if record.update_time else None,
+    }

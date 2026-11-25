@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TB-62 TaleAgent 的产品、交互、数据、目录产物与验证方案。" />
+  <link rel="icon" href="data:," />
+  <title>TaleAgent · ACTIVE</title>
+  <style>
+    :root { color-scheme:light dark; --bg:#eef2f6; --paper:#fff; --ink:#172033; --muted:#5e6878; --line:#d7dee8; --accent:#7c3aed; --soft:#f1ebff; --warn:#8a4b12; --good:#17643f; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font:15px/1.7 system-ui,-apple-system,"PingFang SC",sans-serif; }
+    main { width:min(1080px,calc(100% - 28px)); margin:28px auto 64px; }
+    header,section { margin-bottom:18px; padding:26px 30px; border:1px solid var(--line); border-radius:18px; background:var(--paper); }
+    h1 { margin:0 0 8px; font-size:clamp(30px,5vw,46px); line-height:1.15; }
+    h2 { margin:0 0 12px; font-size:22px; } h3 { margin:20px 0 8px; font-size:17px; }
+    p,ul,ol { margin:8px 0; } code { padding:2px 5px; border-radius:5px; background:var(--soft); overflow-wrap:anywhere; }
+    pre { overflow:auto; padding:15px; border-radius:12px; color:#f4efff; background:#24173b; }
+    .meta { display:flex; flex-wrap:wrap; gap:8px; color:var(--muted); }
+    .meta span { padding:4px 9px; border-radius:999px; background:var(--soft); }
+    .flow { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:14px; }
+    .flow div { padding:13px; border:1px solid var(--line); border-radius:12px; }
+    .flow b { display:block; color:var(--accent); }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:9px; border:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { background:var(--soft); } .pending { color:var(--warn); font-weight:700; } .verified { color:var(--good); font-weight:700; }
+    @media (max-width:760px) { header,section { padding:20px; } .flow { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+    @media (prefers-reduced-motion:reduce) { * { scroll-behavior:auto !important; } }
+    @media print { body { background:#fff; } main { width:100%; margin:0; } header,section { break-inside:avoid; } }
+  </style>
+</head>
+<body><main>
+  <header>
+    <h1>TaleAgent：人物思维伙伴</h1>
+    <p>从书中任意角色或真实人物的有限证据提炼思维模式、决策原则、解题步骤和盲区，创建帮助读者分析现实问题的私有 Agent。</p>
+    <div class="meta"><span>状态：ACTIVE</span><span>创建日期：2026-08-16</span><span>最近修订：2026-09-01</span><span>所属模块：webserver / app</span><span>需求来源：TB-62 / TB-52</span></div>
+  </header>
+
+  <section id="request">
+    <h2>1. 原始诉求与统一迭代</h2>
+    <p>初始诉求是创建具备作品主角抽象思维方式的私有交互 Agent。成员随后明确：产品不应只限主角，也不要用防剧透、版权引用和仿写拦截限制用户；核心是让用户借用人物思维解决自己的问题。创建对象必须支持 AI 推荐和自由输入。</p>
+    <p>同一未合并工作继续收到三轮约束：产品和代码统一命名为 <code>TaleAgent</code>；删除独立消息表，由单条 <code>TaleAgentConversation.messages</code> JSON 保存完整会话；目录产物使用不超过 80 行的标准 <code>AGENTS.md</code>，复杂内容拆到 <code>references/</code> 多文档。本文是 TB-62 唯一方案，直接吸收这些反馈，不保留同一工作的过程方案。</p>
+  </section>
+
+  <section id="goals">
+    <h2>2. 目标与边界</h2>
+    <table><tr><th>目标</th><th>非目标</th></tr><tr><td><ul>
+      <li>从 EPUB 全书证据中推荐人物，或由用户指定主角、配角、历史人物及书中讨论的真实人物。</li>
+      <li>创建前预览介绍、思维模式、决策原则、解题步骤、盲区和来源；聊天给出具体下一步和适用性反思。</li>
+      <li>Agent、会话和反馈默认创建者私有；每次访问重新校验创建者、书籍权限和书籍版本。</li>
+      <li>统一使用 <code>AgentRuntime</code> 与 Codex app-server，保留取消、超时、结构校验和脱敏错误。</li>
+      <li>目录是 Agent 内容权威来源；数据库只保存索引、相对路径、摘要和状态。</li>
+    </ul></td><td><ul>
+      <li>不做公共分享、角色本人声明、通用角色卡或对外知识库。</li>
+      <li>不保存 EPUB 正文、运行时 prompt 或完整进程输出到 Agent 目录和日志。</li>
+      <li>不保留旧 Protagonist API、独立消息表、<code>manifest.json</code>、版本目录或回滚接口；当前 PR 尚未生产落地。</li>
+      <li>不承诺思维提炼绝对准确，也不把单一人物视角包装成唯一答案。</li>
+    </ul></td></tr></table>
+  </section>
+
+  <section id="flow">
+    <h2>3. 产品与交互流程</h2>
+    <div class="flow"><div><b>1. 选择</b>AI 推荐，或自由输入任意人物。</div><div><b>2. 提炼</b>服务端解析 EPUB 并异步生成结构化思维模型。</div><div><b>3. 预览</b>展示模型、盲区、来源与 AI 衍生声明。</div><div><b>4. 解题</b>多轮聊天使用抽象模型和会话历史分析现实问题。</div><div><b>5. 管理</b>停止、重试、反馈、重建模型和级联删除。</div></div>
+    <h3>界面状态</h3>
+    <ul><li>书籍详情页只对已登录且具有 EPUB 的书籍展示 TaleAgent 入口；窄屏时入口收为带可访问名称的图标按钮，避免增加工具栏溢出。</li><li>创建页覆盖加载、失败、自选人物校验、生成中停止、成功预览、重新生成和确认创建。</li><li>聊天页覆盖空态、生成进度、停止、失败重试、反馈和删除确认；发送失败时保留用户草稿，避免输入丢失。</li><li>亮色主题使用深赭色强调文字，暗色主题改用浅赭色；白字气泡继续使用深色填充，分别满足文本对比。</li></ul>
+  </section>
+
+  <section id="data">
+    <h2>4. 数据、API 与运行时</h2>
+    <h3>数据模型</h3>
+    <pre><code>TaleAgent
+  id / creator_id / book_id / book_version / display_name
+  manifest_path / manifest_sha256 / artifact_status / cutoff index
+
+TaleAgentConversation
+  id / tale_agent_id / creator_id / cutoff index
+  messages = { "items": [
+    { "id", "user_content", "assistant_content", "status",
+      "feedback", "runtime", "usage", "error", "timestamps" }
+  ] }</code></pre>
+    <p>深层消息更新复制并重新赋值完整 JSON，确保 ORM 检测变化。同一会话只允许一个 queued/running 消息，避免整包并发覆盖。取消、重试和反馈仍通过逻辑消息 UUID 定位 JSON 项。</p>
+    <h3>HTTP 契约</h3>
+    <p><code>/api/ai/tale-agent/previews</code> 创建和轮询预览；<code>/agents</code> 确认、列表、重建模型和删除；<code>/conversations</code> 创建、读取和删除会话；消息子资源负责生成、NDJSON 流、取消、重试和反馈。JSON 接口使用 <code>@js</code> + <code>@auth</code>；流接口同样由 <code>@js</code> 处理未登录 JSON，再在登录后写 NDJSON。</p>
+    <p>重建模型时，身份校验比较新预览产物中的 <code>display_name</code> 与现有 Agent，而不是比较用户原始输入；因此 AI 推荐模式的空名称可以正常重建，同时阻止借重建入口切换人物。</p>
+  </section>
+
+  <section id="artifacts">
+    <h2>5. 目录权威 Agent 产物</h2>
+    <pre><code>books/ai/{workspace}/agents/
+  {agent-id}/
+    AGENTS.md                 # 标准入口，≤ 80 行
+    references/
+      profile.md              # 名称与介绍
+      thinking.md             # 思维、原则、步骤与盲点
+      sources.md              # 证据来源
+  previews/{task-id}/
+    AGENTS.md
+    references/
+      profile.md
+      thinking.md
+      sources.md</code></pre>
+    <ul><li><code>workspace</code> 由内部 reader id 确定性派生，不暴露邮箱、用户名或连续 id；“不透明”只描述目录名，Markdown 内容保持可读。</li><li><code>AGENTS.md</code> 列出必须读取的 references 文档和简短工作方法；写入与测试硬限制不超过 80 行。</li><li>摘要覆盖入口与全部受控 references；缺失、多出、篡改、路径越界或跨 workspace 均失败关闭。</li><li>新目录在同级临时目录写入并 fsync；只有旧目录已成功移到备份后，回滚才允许删除新目录并恢复备份。准备阶段失败不得删除仍在线的旧目录。</li><li>删除预览、Agent 或书籍同步清理整个受控目录；数据库不保存 manifest 正文。</li></ul>
+  </section>
+
+  <section id="risk">
+    <h2>6. 风险与控制</h2>
+    <table><tr><th>风险</th><th>控制</th><th>剩余风险</th></tr>
+      <tr><td>越权或撤权后访问</td><td>检索前 ACL、每次访问复核、书籍版本校验、创建者 workspace 限制。</td><td>撤权后的清理由下一次请求或书籍删除触发。</td></tr>
+      <tr><td>人物思维失真</td><td>显示 AI 衍生、来源与盲区，提供“不像他的思路”反馈。</td><td>模型仍是主观提炼，用户需判断适用性。</td></tr>
+      <tr><td>会话 JSON 增长或覆盖</td><td>单会话串行生成、输入输出长度限制、完整 JSON 重赋值。</td><td>达到容量阈值后需另行设计归档。</td></tr>
+      <tr><td>文件与数据库不一致</td><td>目录原子替换、全目录 SHA、数据库失败恢复、读取失败关闭。</td><td>进程在文件切换与数据库提交间被强杀时会留下可检测的不一致。</td></tr>
+      <tr><td>移动端入口拥挤</td><td>新增入口在 960px 以下缩为 40px 图标按钮，并保留明确可访问名称。</td><td>书籍详情既有工具栏仍需在整体重构中统一收纳。</td></tr>
+    </table>
+  </section>
+
+  <section id="tests">
+    <h2>7. 验证与 full interface review</h2>
+    <p class="verified">实现、回归测试、真实浏览器渲染和 full interface review 已完成；没有遗留阻断项。</p>
+    <ul>
+      <li>后端：<code>make test</code> 为 914 passed / 20 skipped；TaleAgent 定向 18 passed；<code>make lint-py</code> 通过。</li>
+      <li>前端：Vitest 单元与组件测试为 29 files / 126 tests；ESLint 0 errors；Nuxt 生产构建通过。</li>
+      <li>浏览器：Chromium Playwright 覆盖自选人物、预览、创建、会话、消息流、亮色桌面与暗色 390px 移动端，2 tests passed；基准截图保存于 <code>app/test/e2e/tale-agent.spec.ts-snapshots/</code>。</li>
+      <li>仓库：设计检查和 <code>git diff --check</code> 通过。</li>
+    </ul>
+    <h3>interface-review full pr 986 结论</h3>
+    <p>按完整 PR 范围审查书籍入口、创建、预览、空态、聊天、加载、错误、取消、反馈、删除、窄屏和亮暗主题。Accessibility 修复入口可访问名称与提交状态；Layout 修复窄屏入口溢出；Writing 保留明确的 AI 衍生与适用性提示；Typography 保持既有层级；Colors 为暗色主题使用独立高对比强调色；UI 在失败发送时保留草稿并阻止重复提交。真实 Chromium 截图确认预览、聊天和移动暗色界面，无新的阻断问题。</p>
+    <p>剩余风险：书籍详情既有工具栏仍需后续整体收纳；长会话 JSON 容量需后续归档设计。当前环境没有 Chrome DevTools MCP，因此使用项目 Playwright 配置和生产 Nuxt 服务完成真实浏览器验收，而非仅作源码复核。</p>
+  </section>
+</main></body></html>

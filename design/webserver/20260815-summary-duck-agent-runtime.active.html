@@ -56,7 +56,7 @@
           <div><strong>权限与输入</strong><br />后端再次校验书籍可见性；仅接收裁剪后的当前章节文本、标题和 locator 范围。</div>
           <div><strong>隔离运行</strong><br />临时空目录启动 <code>codex app-server --listen stdio://</code>，禁止审批、网络和写入。</div>
           <div><strong>终态校验</strong><br />仅接受 <code>turn/completed</code>；业务层重验 schema、Markdown 和章节内引用。</div>
-          <div><strong>成果交付</strong><br />按创建者保存 AI 原稿与用户修订稿；前端可编辑、回跳、导出、重试或删除。</div>
+          <div><strong>成果交付</strong><br />在 <code>books/ai/{workspace}/summary-duck</code> 保存当前 AI 原稿与用户修订稿；前端可编辑、回跳、导出、重试或删除。</div>
         </div>
       </section>
       <section>
@@ -67,8 +67,10 @@
       <section>
         <h2>5. 数据、权限与安全</h2>
         <ul>
-          <li>保存创建者、book id/version、章节 href/title/hash/长度、五问五答及 locator、AI 原稿、用户稿、schema/prompt 版本、状态、用量与时间。</li>
+          <li>完整成果以 <code>books/ai/{workspace}/summary-duck/{task}.json</code> 为唯一内容来源，只维护当前版本，不建设版本表、回滚或 <code>v{version}</code> 目录。</li>
+          <li><code>ai_tasks</code> 只保存创建者/工作空间、book 与章节索引、相对路径、SHA-256、schema/prompt、状态、用量与时间；五问五答、locator、AI 原稿和用户稿保存在产物文件。</li>
           <li>列表、详情、编辑、删除、取消与导出均限定创建者，同时每次读取重新校验书籍权限和版本。</li>
+          <li>写入采用同目录临时文件、fsync 与原子替换；读取校验相对路径、身份和 SHA-256，删除任务或书籍同步清理文件。数据库迁移会搬运旧 JSON 字段，<code>/data</code> 备份须同时覆盖数据库与 <code>books/ai</code>。</li>
           <li>不持久化章节正文或完整提示；任务目录为空且只读，无 MCP、动态工具、网络或书库目录。</li>
           <li>Markdown 仅支持纯文本与 <code>**</code>/<code>__</code> 强调；所有 HTML、style、script 和危险 URL 作为文本处理。</li>
         </ul>
@@ -110,6 +112,7 @@
           <li>版本解析不再依赖 CLI 输出中的 <code>codex-cli</code> 产品标签；实际执行命令始终是 <code>codex</code>。</li>
           <li>特性 key、schema/prompt 版本、服务/静态资源/测试/fixture 文件名统一使用 <code>summary_duck</code>，提示词版本为 <code>summary_duck.zh.v2</code>。</li>
           <li>提示词分别覆盖中心判断、关键机制、决定性证据、边界张力和后续含义，并为非虚构/叙事章节提供不同选题框架、逐条引用规则和输出前自检。</li>
+          <li>按 AI 中心统一规范将总结鸭完整成果迁移到 <code>books/ai/{workspace}/summary-duck</code> 当前版本文件，数据库仅保留相对路径和 SHA-256 索引。</li>
         </ul>
       </section>
     </main>
