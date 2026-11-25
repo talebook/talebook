@@ -48,6 +48,7 @@ mkdir -p /data/log/nginx /var/www/talebook/status
 chown talebook:talebook /var/www/talebook/app
 chown -R talebook:talebook \
   /run/talebook \
+  /data/books/ai \
   /data/books/ssl \
   /data/log/ \
   /var/lib/nginx \

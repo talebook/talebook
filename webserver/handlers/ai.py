@@ -27,7 +27,10 @@ from webserver.services.knowledge_graph import (
 from webserver.services.knowledge_graph import (
     KnowledgeGraphService,
     KnowledgeGraphValidationError,
+    cleanup_record_artifacts,
     extract_epub_chapters,
+    load_graph_artifact,
+    migrate_legacy_artifacts,
     scope_fingerprint,
 )
 from webserver.services.knowledge_graph import (
@@ -36,6 +39,8 @@ from webserver.services.knowledge_graph import (
 from webserver.services.knowledge_graph import (
     task_dict as knowledge_graph_task_dict,
 )
+from webserver.services.knowledge_graph_artifacts import AIArtifactError as KnowledgeGraphArtifactError
+from webserver.services.knowledge_graph_artifacts import AIArtifactStorage, ensure_workspace_id
 from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
@@ -301,7 +306,10 @@ class KnowledgeGraphFeature:
     """Grounded single-book graph behavior on the shared AI task surface."""
 
     key = KNOWLEDGE_GRAPH_FEATURE_KEY
-    task_dict = staticmethod(knowledge_graph_task_dict)
+
+    @staticmethod
+    def task_dict(record):
+        return knowledge_graph_task_dict(record, AIArtifactStorage(CONF))
 
     @staticmethod
     def enabled():
@@ -322,6 +330,12 @@ class KnowledgeGraphFeature:
             return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
         if _book_version(book) != record.book_version:
             return False, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，请重新生成"}
+        try:
+            if migrate_legacy_artifacts(handler.session, record, AIArtifactStorage(CONF)):
+                handler.session.commit()
+        except KnowledgeGraphArtifactError:
+            handler.session.rollback()
+            return False, {"err": "ai.artifact_unavailable", "msg": "知识图谱产物不可用，请重新生成"}
         if record.status in {"queued", "running"}:
             scope = (record.ai_draft or {}).get("scope") or {}
             hrefs = scope.get("chapter_hrefs") or []
@@ -351,6 +365,16 @@ class KnowledgeGraphFeature:
             .order_by(AITask.create_time.desc())
             .all()
         )
+        try:
+            changed = False
+            storage = AIArtifactStorage(CONF)
+            for record in records:
+                changed = migrate_legacy_artifacts(handler.session, record, storage) or changed
+            if changed:
+                handler.session.commit()
+        except KnowledgeGraphArtifactError:
+            handler.session.rollback()
+            return {"err": "ai.artifact_unavailable", "msg": "知识图谱产物不可用，请重新生成"}
         return {"err": "ok", "tasks": [cls.task_dict(record) for record in records]}
 
     @staticmethod
@@ -412,6 +436,10 @@ class KnowledgeGraphFeature:
         if bool(body.get("preview_only")):
             return {"err": "ok", "scope": scope, "estimate": estimate}
         version = _book_version(book)
+        try:
+            workspace = ensure_workspace_id(handler.session, handler.user_id())
+        except KnowledgeGraphArtifactError:
+            return {"err": "ai.artifact_unavailable", "msg": "无法准备知识图谱存储"}
         key = knowledge_graph_request_key(handler.user_id(), book_id, version, scope_hash)
         if bool(body.get("regenerate")):
             key = hashlib.sha256((key + ":" + uuid.uuid4().hex).encode("utf-8")).hexdigest()
@@ -422,7 +450,8 @@ class KnowledgeGraphFeature:
             if existing.status in {"failed", "cancelled"}:
                 draft = dict(existing.ai_draft or {})
                 draft["scope"] = scope
-                draft.setdefault("segments", {})
+                draft.setdefault("workspace", workspace)
+                draft.setdefault("completed_segments", 0)
                 existing.ai_draft = draft
                 existing.status = "queued"
                 existing.cancel_requested = False
@@ -446,7 +475,7 @@ class KnowledgeGraphFeature:
             chapter_length=character_count,
             status="queued",
             progress_message="等待提取",
-            ai_draft={"scope": scope, "segments": {}},
+            ai_draft={"workspace": workspace, "scope": scope, "completed_segments": 0},
             schema_version=KNOWLEDGE_GRAPH_SCHEMA_VERSION,
             prompt_version=KNOWLEDGE_GRAPH_PROMPT_VERSION,
         )
@@ -472,9 +501,22 @@ class KnowledgeGraphFeature:
             handler.write({"err": "ai.not_ready", "msg": "知识图谱尚未完成"})
             return
         filename = f"knowledge-graph-{record.book_id}-{record.id[:8]}.json"
+        try:
+            payload = load_graph_artifact(record, AIArtifactStorage(CONF))
+        except KnowledgeGraphArtifactError:
+            handler.set_header("Content-Type", "application/json; charset=UTF-8")
+            handler.write({"err": "ai.artifact_unavailable", "msg": "知识图谱产物不可用，请重新生成"})
+            return
         handler.set_header("Content-Type", "application/json; charset=UTF-8")
         handler.set_header("Content-Disposition", f'attachment; filename="{filename}"')
-        handler.write(json.dumps(record.result_data or {}, ensure_ascii=False, separators=(",", ":")))
+        handler.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
+
+    @staticmethod
+    def delete(handler, record):
+        try:
+            cleanup_record_artifacts(record, AIArtifactStorage(CONF))
+        except KnowledgeGraphArtifactError as exc:
+            raise AIArtifactError("ai.artifact_cleanup_failed", "AI 产物清理失败，请重试") from exc
 
 
 AI_FEATURES = {

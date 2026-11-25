@@ -1020,6 +1020,10 @@ class BookDelete(BaseHandler):
             TaleAgentArtifactError,
             TaleAgentArtifactStore,
         )
+        from webserver.services.knowledge_graph import FEATURE_KEY as GRAPH_FEATURE
+        from webserver.services.knowledge_graph import cleanup_record_artifacts
+        from webserver.services.knowledge_graph_artifacts import AIArtifactError as GraphArtifactError
+        from webserver.services.knowledge_graph_artifacts import AIArtifactStorage
         from webserver.services.tale_agent import FEATURE_KEY as TALE_AGENT_FEATURE_KEY
         from webserver.services.tale_agent import TaleAgentService, conversation_messages
 
@@ -1029,8 +1033,13 @@ class BookDelete(BaseHandler):
             for task in ai_tasks:
                 if task.feature == SUMMARY_DUCK_FEATURE:
                     artifact_store.delete_summary_duck(task)
+                elif task.feature == GRAPH_FEATURE:
+                    cleanup_record_artifacts(task, AIArtifactStorage(CONF))
         except AIArtifactError as exc:
             return {"err": exc.code, "msg": exc.safe_message}
+        except GraphArtifactError:
+            logging.exception("failed to clean knowledge-graph artifacts for book_id=%s", bid)
+            return {"err": "ai.artifact_cleanup_failed", "msg": _("知识图谱产物清理失败，请重试")}
 
         external_indexed = is_external_index_book(self.session, bid)
         if external_indexed:
