@@ -486,6 +486,48 @@ def test_external_pool_bridge_uses_retry_and_durable_audit(db_session):
     assert connection.lease_until is None
 
 
+@pytest.mark.parametrize("audit", [False, True])
+def test_external_pool_read_survives_expired_connection_config(db_session, audit):
+    registry = PluginRegistry()
+    plugin_id = "talebook.test.expired-connection"
+    plugin = _plugin(plugin_id, "metadata.lookup")
+    attempts = []
+
+    def transient_search(title, context):
+        attempts.append(context["attempt"])
+        if len(attempts) == 1:
+            raise UpstreamRateLimitError()
+        return [{"title": title}]
+
+    plugin.search_books = transient_search
+    registry.register(plugin)
+    connection = _install(db_session, registry, plugin)
+    connection.config = {"max_retries": 1, "backoff_seconds": 0.2}
+    db_session.commit()
+    sleeps = []
+    runtime = PluginRuntime(db_session, SETTINGS, registry=registry, sleeper=sleeps.append)
+
+    prepared, failures = runtime.prepare_read(
+        [connection], audit=audit, retry=not audit, requested_by=1, provider_method="search_books"
+    )
+    assert failures == {}
+    connection_id = prepared[0]["key"]
+
+    # 在请求线程加载/刷新仍然合法，但 worker 不得向请求 session 发 SQL。
+    db_session.expire(connection, ["config"])
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        outcome = executor.submit(prepared[0]["call"], "search_books", "三体").result(timeout=5)
+
+    assert outcome == [{"title": "三体"}]
+    assert attempts == [1, 2]
+    assert sleeps == [0.2]
+    assert "config" not in connection.__dict__
+    runtime.finish_read(prepared, {connection_id: outcome})
+    assert connection.health == "healthy"
+    runs = db_session.query(PluginRun).filter_by(connection_id=connection_id).all()
+    assert [(run.status, run.attempt) for run in runs] == ([("succeeded", 2)] if audit else [])
+
+
 def test_read_rejects_missing_mode_scope_before_dispatch(db_session):
     registry = PluginRegistry()
     plugin = _plugin("talebook.test.scope-denied", "metadata.lookup")

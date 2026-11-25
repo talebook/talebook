@@ -498,8 +498,8 @@ class BookRefer(BaseHandler):
                     task_name = "%s#%s" % (task_name, unit["key"])
                 self._plugin_task_keys[task_name] = unit["key"]
 
-                def _plugin_lookup(_unit=unit):
-                    return _unit["call"]("search_books", query) or []
+                def _plugin_lookup(_call=unit["call"]):
+                    return _call("search_books", query) or []
 
                 tasks[task_name] = _plugin_lookup
 
