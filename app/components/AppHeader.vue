@@ -226,6 +226,11 @@
                                 prepend-icon="mdi-shield-account"
                             />
                             <v-list-item
+                                to="/ai/skills"
+                                :title="$t('navigation.aiSkills')"
+                                prepend-icon="mdi-toolbox-outline"
+                            />
+                            <v-list-item
                                 v-if="store.sys.allow.FEEDBACK"
                                 target="_blank"
                                 :href="store.sys.FEEDBACK_URL"
@@ -488,7 +493,10 @@ const items = computed(() => {
             : []),
     ];
     var shelf_links = store.user.is_login
-        ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: t('navigation.myShelf') }]
+        ? [
+            { icon: 'mdi-bookshelf', href: '/user/shelf', text: t('navigation.myShelf') },
+            { icon: 'mdi-toolbox-outline', href: '/ai/skills', text: t('navigation.aiSkills') },
+        ]
         : [];
     var admin_links = [
         {
@@ -499,6 +507,7 @@ const items = computed(() => {
                 { icon: 'mdi-cog', href: '/admin/settings', text: t('navigation.settings') },
                 { icon: 'mdi-human-greeting', href: '/admin/users', text: t('navigation.users') },
                 { icon: 'mdi-library-shelves', href: '/admin/books', text: t('navigation.books') },
+                { icon: 'mdi-tag-multiple', href: '/admin/tags', text: t('navigation.tagOrganizer') },
                 { icon: 'mdi-playlist-music', href: '/audio-jobs', text: t('navigation.audiobookJobs') },
                 { icon: 'mdi-import', href: '/admin/imports', text: t('navigation.import') },
                 { icon: 'mdi-book-cog', href: '/admin/booksources', text: t('navigation.bookSources') },

@@ -437,6 +437,7 @@ class UserInfo(BaseHandler):
             "header": CONF["HEADER"],
             "show_sidebar_sys": CONF.get("SHOW_SIDEBAR_SYS", True),
             "show_network_library": CONF.get("SHOW_NETWORK_LIBRARY", True),
+            "ai_recommendations_enabled": bool(CONF.get("AI_ENABLED", True) and CONF.get("AI_RECOMMENDATIONS_ENABLED", True)),
             "FEEDBACK_URL": CONF["FEEDBACK_URL"],
             "allow": {
                 "register": CONF["ALLOW_REGISTER"] and not demo_mode.is_demo_mode(CONF),

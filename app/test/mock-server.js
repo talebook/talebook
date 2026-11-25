@@ -32,6 +32,17 @@ let audiobookManagedEditions = [];
 let audiobookCapacityOk = true;
 let audiobookWorkspace = null;
 let podcastTokenHint = '';
+let tagOrganizerTask = null;
+let recommendationFeedback = new Map();
+let recommendationFeedbackId = 0;
+let recommendationPreferences = {
+  personalization_enabled: true,
+  popular_enabled: true,
+  topics: [],
+  length: '',
+  difficulty: '',
+  seed_book_ids: [],
+};
 let importSettings = {
   scan_upload_path: '/mock/scan/dir',
   import_mode: 'copy',
@@ -212,6 +223,17 @@ router.post('/_test/reset', eventHandler(async (event) => {
   audiobookWorkspace = workspacePayload();
   audiobookCapacityOk = body?.audiobookCapacityOk !== false;
   podcastTokenHint = '';
+  tagOrganizerTask = null;
+  recommendationFeedback = new Map();
+  recommendationFeedbackId = 0;
+  recommendationPreferences = {
+    personalization_enabled: true,
+    popular_enabled: true,
+    topics: [],
+    length: '',
+    difficulty: '',
+    seed_book_ids: [],
+  };
   return { status: 'ok' };
 }));
 
@@ -753,6 +775,7 @@ router.get('/api/user/info', eventHandler(() => accessControlEnvelope() || ({
     users: 5,
     friends: [],
     show_network_library: showNetworkLibrary,
+    ai_recommendations_enabled: true,
     allow: { register: true, download: true, push: true, read: true },
     upload: { chunk_enabled: true, chunk_threshold: 8 * 1024 * 1024, chunk_size: 4 * 1024 * 1024 },
     demo_mode: demoMode
@@ -803,10 +826,149 @@ router.get('/api/index', eventHandler(() => {
   return readJson('api_index.json') || { err: 'error', msg: 'mock not found' };
 }));
 
+router.get('/api/ai/recommendations', eventHandler((event) => {
+  const query = getQuery(event);
+  const source = query.refresh === '1' ? 'agent' : 'deterministic';
+  const data = readJson('api_index.json') || { random_books: [] };
+  const excluded = new Set([...recommendationFeedback.values()].map(item => item.book_id));
+  const limit = Math.max(1, Math.min(12, Number(query.limit) || 8));
+  const books = (data.random_books || []).filter(book => !excluded.has(book.id)).slice(0, limit).map((book, index) => ({
+    ...book,
+    state: { favorite: 0, wants: shelfBookIds.has(book.id) ? 1 : 0, read_state: 0 },
+    recommendation: {
+      rank: index + 1,
+      reason: index === 0 ? '延续你选择的文学主题，同时保留不同作者的探索。' : '根据书库主题与评分选出的非剧透推荐。',
+      evidence: index === 0 ? ['topic:文学'] : ['library_rating'],
+      confidence: index === 0 ? 'medium' : 'low',
+    },
+  }));
+  return {
+    err: 'ok', books, source, fallback: source !== 'agent', fallback_reason: source === 'agent' ? '' : 'runtime.unavailable',
+    cached: false, generated_at: '2026-08-16T10:00:00',
+    signal_summary: { cold_start: recommendationPreferences.topics.length === 0, signal_count: recommendationPreferences.topics.length },
+    preferences: recommendationPreferences,
+  };
+}));
+
+router.patch('/api/ai/recommendations/preferences', eventHandler(async (event) => {
+  const body = await readBody(event);
+  recommendationPreferences = { ...recommendationPreferences, ...(body || {}) };
+  return { err: 'ok', preferences: recommendationPreferences };
+}));
+
+router.post('/api/ai/recommendations/feedback', eventHandler(async (event) => {
+  const body = await readBody(event);
+  recommendationFeedbackId += 1;
+  const feedback = { id: recommendationFeedbackId, book_id: Number(body.book_id), action: body.action };
+  recommendationFeedback.set(feedback.id, feedback);
+  return { err: 'ok', feedback, undo_seconds: 10 };
+}));
+
+router.delete('/api/ai/recommendations/feedback/:id', eventHandler((event) => {
+  const id = Number(getRouterParam(event, 'id'));
+  recommendationFeedback.delete(id);
+  return { err: 'ok', feedback_id: id };
+}));
+
+router.delete('/api/ai/recommendations/feedback', eventHandler(() => {
+  const cleared = recommendationFeedback.size;
+  recommendationFeedback.clear();
+  return { err: 'ok', cleared };
+}));
+
+router.post('/api/ai/recommendations/events', eventHandler(() => ({ err: 'ok' })));
+
 router.get('/api/welcome', eventHandler(() => {
   if (!inviteMode || isInvited) return { err: 'free', msg: 'No invitation required' };
   return { err: 'ok', msg: '', welcome: '请输入访问码' };
 }));
+
+const makeTagOrganizerTask = () => ({
+  id: '11111111-2222-3333-4444-555555555555',
+  feature: 'tag_organizer',
+  status: 'ready',
+  scope: { type: 'all', tags: [{ name: 'sci-fi', count: 2 }] },
+  books: [
+    { id: 1, title: '星海纪事', tags: ['sci-fi', '太空歌剧'] },
+    { id: 2, title: '未来简史', tags: ['sci-fi', '历史'] },
+  ],
+  suggestions: [
+    {
+      id: 'suggestion-one', source: 'sci-fi', action: 'merge', target: '科幻',
+      reason: '与书库现有中文标签语义一致，合并后更容易浏览。', confidence: 0.93,
+      selected: true, origin: 'agent', excluded_book_ids: [],
+    },
+    {
+      id: 'suggestion-two', source: '太空歌剧', action: 'keep', target: '',
+      reason: '标签具有独立且明确的细分语义，建议保留。', confidence: 0.74,
+      selected: false, origin: 'agent', excluded_book_ids: [],
+    },
+  ],
+  preview: {}, result: {}, metrics: { suggested: 2 }, error: null,
+});
+
+router.get('/api/ai/tag_organizer/tasks', eventHandler(() => ({
+  err: 'ok', tasks: tagOrganizerTask ? [tagOrganizerTask] : [],
+})));
+
+router.post('/api/ai/tag_organizer/tasks', eventHandler(() => {
+  tagOrganizerTask = makeTagOrganizerTask();
+  return { err: 'ok', task: tagOrganizerTask, idempotent: false };
+}));
+
+router.get('/api/ai/tag_organizer/tasks/:id', eventHandler(() => ({ err: 'ok', task: tagOrganizerTask })));
+
+router.patch('/api/ai/tag_organizer/tasks/:id', eventHandler(async (event) => {
+  const body = await readBody(event);
+  const edits = new Map((body?.adjustments || []).map(item => [item.id, item]));
+  tagOrganizerTask.suggestions = tagOrganizerTask.suggestions.map(item => ({ ...item, ...(edits.get(item.id) || {}) }));
+  return { err: 'ok', task: tagOrganizerTask };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/preview', eventHandler(() => {
+  const suggestion = tagOrganizerTask.suggestions.find(item => item.selected && item.source === 'sci-fi');
+  const excluded = new Set(suggestion?.excluded_book_ids || []);
+  const changes = suggestion
+    ? tagOrganizerTask.books
+      .filter(book => book.tags.includes(suggestion.source) && !excluded.has(book.id))
+      .map(book => ({
+        book_id: book.id,
+        title: book.title,
+        before_tags: book.tags,
+        after_tags: book.tags.map(tag => tag === suggestion.source ? suggestion.target : tag),
+      }))
+    : [];
+  tagOrganizerTask.status = 'previewed';
+  tagOrganizerTask.preview = {
+    token: 'preview-token',
+    summary: { changed_books: changes.length, conflicts: 0 },
+    conflicts: [],
+    changes,
+  };
+  return { err: 'ok', task: tagOrganizerTask };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/execute', eventHandler(() => {
+  const succeeded = tagOrganizerTask.preview?.changes?.length || 0;
+  tagOrganizerTask.status = 'executed';
+  tagOrganizerTask.result = { succeeded, skipped: 0, failed: 0, undone: 0 };
+  return { err: 'ok', task: tagOrganizerTask, idempotent: false };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/retry', eventHandler(() => ({
+  err: 'ok', task: tagOrganizerTask, idempotent: true,
+})));
+
+router.post('/api/ai/tag_organizer/tasks/:id/undo', eventHandler(() => {
+  tagOrganizerTask.result = {
+    ...tagOrganizerTask.result,
+    undone: tagOrganizerTask.result?.succeeded || 0,
+    undo_conflicts: 0,
+  };
+  return { err: 'ok', task: tagOrganizerTask, idempotent: false };
+}));
+
+router.post('/api/ai/tag_organizer/tasks/:id/analysis-retry', eventHandler(() => ({ err: 'ok', task: tagOrganizerTask })));
 
 router.post('/api/admin/install', eventHandler(async (event) => {
   const body = await readBody(event); // or parse multipart/form-data if needed
@@ -1252,6 +1414,8 @@ router.get('/api/shelf', eventHandler(() => {
     books: shelfBooks,
   };
 }));
+
+router.get('/api/favorites', eventHandler(() => ({ err: 'ok', title: '我的收藏', total: 0, books: [] })));
 
 router.post('/api/book/:id/shelf', eventHandler(async (event) => {
   const id = Number(getRouterParam(event, 'id'));

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Talebook 猜你喜欢：候选召回、Agent 排序、反馈、隐私与降级的实现方案。" />
+    <link rel="icon" href="data:," />
+    <title>让“猜你喜欢”可解释、可纠偏且不越权 · ACTIVE</title>
+    <style>
+      :root { color-scheme: light dark; --bg:#f4f1ea; --panel:#fffdf8; --ink:#24231f; --muted:#66635b; --line:#d8d1c4; --accent:#9b4d2f; --soft:#f7e8dd; --ok:#256247; --warn:#8a5a13; --mono:"SFMono-Regular",Consolas,monospace; --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+      * { box-sizing:border-box; } html { scroll-behavior:smooth; } body { margin:0; color:var(--ink); background:linear-gradient(135deg,#f7f3eb,#ece8df); font-family:var(--sans); line-height:1.65; }
+      .skip { position:fixed; top:8px; left:8px; z-index:2; padding:8px 12px; color:white; background:#222; transform:translateY(-160%); } .skip:focus { transform:none; }
+      .page { width:min(1080px,calc(100vw - 28px)); margin:auto; padding:26px 0 54px; } header,section { margin-bottom:18px; padding:26px 28px; border:1px solid var(--line); border-radius:18px; background:var(--panel); box-shadow:0 12px 30px rgba(40,32,20,.07); }
+      h1 { margin:0 0 10px; font-size:clamp(30px,5vw,48px); line-height:1.12; } h2 { margin:0 0 14px; font-size:23px; } h3 { margin:18px 0 8px; font-size:17px; } p { margin:0 0 12px; } ul,ol { margin:8px 0 0 20px; padding:0; } li+li { margin-top:6px; }
+      .sub,.muted { color:var(--muted); } .chips { display:flex; flex-wrap:wrap; gap:8px; margin-top:18px; } .chip { padding:5px 10px; border-radius:999px; color:#6d351f; background:var(--soft); font-size:12px; font-weight:700; }
+      .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; } .card { padding:16px; border:1px solid var(--line); border-radius:14px; } .flow { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; } .step { padding:14px; border-left:4px solid var(--accent); border-radius:8px; background:color-mix(in srgb,var(--panel) 86%,var(--soft)); }
+      .table-wrap { overflow-x:auto; border:1px solid var(--line); border-radius:12px; } table { width:100%; min-width:760px; border-collapse:collapse; } th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:color-mix(in srgb,var(--panel) 82%,var(--soft)); } code { padding:.1em .3em; border-radius:4px; background:color-mix(in srgb,var(--panel) 75%,var(--line)); font-family:var(--mono); overflow-wrap:anywhere; }
+      .callout { padding:14px 16px; border-left:4px solid var(--warn); background:color-mix(in srgb,var(--panel) 88%,#f3d9a6); } .pending { color:var(--warn); font-weight:800; } .ok { color:var(--ok); font-weight:800; }
+      @media (max-width:720px) { .page { width:calc(100vw - 18px); padding-top:10px; } header,section { padding:21px 18px; border-radius:14px; } .grid,.flow { grid-template-columns:1fr; } }
+      @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+      @media print { body { background:white; } .page { width:100%; } header,section { box-shadow:none; break-inside:avoid; } }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">跳到正文</a>
+    <div class="page">
+      <header>
+        <h1>让“猜你喜欢”可解释、可纠偏且不越权</h1>
+        <p class="sub">在用户当前可访问的书库中确定性召回候选，复用统一 Agent Runtime 排序与生成非剧透理由；所有失败都回落到透明的确定性推荐。</p>
+        <div class="chips" aria-label="方案元信息">
+          <span class="chip">状态：ACTIVE</span><span class="chip">创建日期：2026-08-16</span><span class="chip">所属模块：webserver</span><span class="chip">影响范围：webserver、app、tests</span><span class="chip">需求来源：TB-61</span>
+        </div>
+      </header>
+      <main id="main">
+        <section>
+          <h2>1. 原始诉求</h2>
+          <div class="callout">“只从用户已有且当前可访问的书库推荐；服务端确定性召回，Agent 仅负责候选排序与理由；支持冷启动、反馈撤销、隐私开关、缓存刷新与确定性降级；Runtime 前后双重 ACL 校验。”</div>
+          <p>现有 <code>feat/ai_1.0</code> 已有统一 <code>AgentRuntime</code> 与 Codex app-server 适配器，但还没有书库级推荐、独立反馈和推荐界面。</p>
+        </section>
+        <section>
+          <h2>2. 目标与边界</h2>
+          <div class="grid">
+            <article class="card"><h3>目标</h3><ul><li>登录用户在首页获得 10–12 本当前可读书籍及可追溯、非剧透理由；书库不足时返回全部合格项。</li><li>收藏、想读、在读、完读、最近阅读、全局书籍评分和显式反馈影响后续排序。</li><li>冷启动可选主题、长度、难度与种子书；信号不足时明确显示低置信度。</li><li>关闭行为个性化后只使用本次显式偏好；反馈可清空、单步撤销。</li></ul></article>
+            <article class="card"><h3>非目标</h3><ul><li>不推荐书库外资源、购买链接、广告或付费排序。</li><li>不使用其他成员的阅读状态或反馈，不建立敏感人格标签。</li><li>不发送全文、完整阅读历史或任何书库文件给 Runtime。</li><li>不让前端或业务层依赖 Codex 专有事件。</li></ul></article>
+          </div>
+        </section>
+        <section>
+          <h2>3. 产品功能矩阵</h2>
+          <div class="table-wrap" role="region" aria-label="产品功能矩阵" tabindex="0"><table>
+            <thead><tr><th>任务</th><th>游客</th><th>登录用户</th><th>Web / 移动端</th><th>验收</th></tr></thead>
+            <tbody>
+              <tr><td>浏览推荐与理由</td><td>保留原随机推荐</td><td>支持</td><td>首页 10–12 本低干扰模块；高级页提供完整理由与纠偏</td><td>首页每本可进入详情；降级可见，高级页可开始阅读与纠偏</td></tr>
+              <tr><td>冷启动选择</td><td>不支持</td><td>支持</td><td>主题、长度、难度、种子书</td><td>无历史仍能生成，且不宣称高置信个性化</td></tr>
+              <tr><td>纠偏与撤销</td><td>不支持</td><td>支持</td><td>不感兴趣、减少此类、已读过、撤销</td><td>反馈只影响当前用户，下一批结果生效</td></tr>
+              <tr><td>隐私控制</td><td>不支持</td><td>支持</td><td>关闭行为个性化、清除反馈</td><td>关闭后请求摘要不含历史信号</td></tr>
+            </tbody>
+          </table></div>
+        </section>
+        <section>
+          <h2>4. 数据与执行流</h2>
+          <div class="flow">
+            <div class="step"><strong>1. ACL 召回</strong><p>用 <code>get_books</code> 获取当前可见藏书，排除无文件、已明确不喜欢和删除项。</p></div>
+            <div class="step"><strong>2. 确定性评分</strong><p>基于元数据重合、阅读状态、新近信号、显式选择和少量探索生成候选。</p></div>
+            <div class="step"><strong>3. Runtime 重排</strong><p>仅发送候选 ID、书名、作者、标签、简介摘要与聚合信号，要求结构化输出。</p></div>
+            <div class="step"><strong>4. 二次校验</strong><p>校验 schema、候选集合、理由依据、去重和实时 ACL；异常则确定性降级。</p></div>
+          </div>
+          <h3>持久化</h3>
+          <ul><li><code>recommendation_preferences</code>：用户开关与显式冷启动选项。</li><li><code>recommendation_feedback</code>：独立的逐书反馈记录，可软撤销并清空。</li><li><code>recommendation_snapshots</code>：短期结果、输入摘要哈希、模式和过期时间；不保存提示词或完整历史。</li></ul>
+          <h3>API</h3>
+          <ul><li><code>GET /api/ai/recommendations</code>：读取缓存或生成；<code>refresh=1</code> 手动刷新，<code>batch</code> 换一批。</li><li><code>GET/PATCH /api/ai/recommendations/preferences</code>：读取或更新显式选择和行为个性化开关。</li><li><code>POST /api/ai/recommendations/feedback</code> 与 <code>DELETE .../feedback/:id</code>：写入与撤销；<code>DELETE .../feedback</code> 清空。</li></ul>
+        </section>
+        <section>
+          <h2>5. 排序、解释与隐私约束</h2>
+          <ul><li>确定性分数可复算：主题/作者重合、种子相似、书籍评分、收藏/想读/阅读信号与稳定哈希探索；同分按稳定哈希与 ID 排序。</li><li><code>not_interested</code> 直接排除该书；<code>less_like</code> 降低其作者/标签相似项；<code>read</code> 排除该书但保留其正向主题信号。</li><li>Runtime 理由必须引用输入中存在的作者、主题、种子或阅读信号；服务端拒绝未知依据、未知书 ID、重复项、超长文本和额外字段。</li><li>生成前后均调用等价于 <code>can_view_book</code> 的权限逻辑；缓存命中仍实时复核，删除或权限变化立即剔除。</li><li>未开启行为个性化时，候选和 prompt 不读取 <code>ReadingState</code> 或历史；仅用当前显式偏好和一般书籍元数据。</li></ul>
+        </section>
+        <section>
+          <h2>6. 风险与兼容性</h2>
+          <div class="grid">
+            <article class="card"><h3>权限或删除后的陈旧缓存</h3><p>响应前逐书实时复核；不足数量时返回剩余安全项，不回填未校验内容。</p></article>
+            <article class="card"><h3>Runtime 慢或不可用</h3><p>复用现有探测、超时、取消与 schema 门禁；失败不阻断页面，以 <code>deterministic</code> 模式和非敏感原因提示。</p></article>
+            <article class="card"><h3>信息茧房</h3><p>稳定保留约 15% 探索位，并提供换一批、减少此类和显式主题控制。</p></article>
+            <article class="card"><h3>历史产品缺少用户评分</h3><p>现有 Calibre <code>rating</code> 仅作为书籍质量元数据；不误称为用户评分，后续若增加个人评分再扩展信号接口。</p></article>
+          </div>
+        </section>
+        <section>
+          <h2>7. 测试结果</h2>
+          <p class="ok">2026-08-17 完成产品反馈修订并验证通过。</p>
+          <ul>
+            <li><code>make lint-py-fix</code> 与 <code>make lint-py</code>：通过。</li>
+            <li><code>docker run --rm -v "$PWD":"$PWD" -w "$PWD" talebook/test pytest -q tests</code>：857 passed、20 skipped；25 条均为既有弃用或 SQLAlchemy 警告。</li>
+            <li>推荐后端定向测试：16 passed；全量结果同时覆盖候选排序、显式种子依据、历史与书库评分开关、反馈/撤销/清空、缓存、Runtime schema、降级与 ACL。</li>
+            <li><code>cd app &amp;&amp; npm run lint</code>：0 errors；193 条为仓库既有 warning，本次新增文件无 warning。</li>
+            <li><code>npx vitest run test/components/HomeRecommendations.spec.ts test/components/RecommendationCard.spec.ts</code>：7 passed。</li>
+            <li><code>npx playwright test test/e2e/home.spec.ts test/e2e/recommendations.spec.ts</code>：12 passed；覆盖登录首页、游客回退、10 本首页书单、隐藏选项、开关持久化、高级页反馈与窄屏布局。</li>
+            <li>Playwright Chromium 实际渲染：<code>/</code> 与 <code>/recommendations</code> 在 1440×1000 与 320×720 下均为 0px 横向溢出；首页选项弹层在 320×720 内完整可见，40×40 px 图标按钮满足目标尺寸，Tab 可进入首个开关，Escape 关闭后焦点返回入口。Chrome DevTools MCP 在本运行环境不可用，因此以同一 Chromium 引擎的 Playwright 渲染、截图和计算样式检查替代。</li>
+            <li><code>npm test -- recommendations.spec.ts</code> 未作为结果：仓库既有脚本误写为 <code>pagewright</code>，会在启动测试前失败；改用项目文档指定的 <code>npx playwright test</code> 后全部通过。</li>
+          </ul>
+          <h3>interface-review full</h3>
+          <p>范围为当前分支相对 PR 基线 <code>origin/feat/ai_1.0</code>（merge-base <code>7207cf49ddf5b2a4b6dd5bc6fb1230b61c62a08f</code>）的 1 个已提交 commit 与 16 个排除后未提交源文件，共 22 个唯一变更路径；排除 <code>app/test-results/</code> 和两张本地验证 PNG。扩展检查首页、推荐卡、高级推荐页、登录侧栏及能力开关消费者；无未展开的直接消费者。</p>
+          <ul>
+            <li>可访问性、布局、文案、排版、颜色与 UI 状态均完成检查；最终结论为 <strong>Approve</strong>，无剩余 Introduced 或 Regression 的 HIGH、MEDIUM、LOW 问题。</li>
+            <li>本轮审查中修正：隐藏选项内容采用 dialog 语义后，入口仍被 Vuetify 默认声明为 menu；弹层宽度只设在子卡片上，导致定位层按 40 px 入口计算并在窄屏裁切；旧图标字体也不能渲染 <code>mdi-tune-variant</code>。现已统一 dialog 语义，把 320 px 宽度交给定位层，改用可渲染的 <code>mdi-tune</code>，并验证实际弹层边界与 Tab/Escape 焦点路径。此前审查已修正作者低对比 token、空/错状态下一步和种子书依据标记。</li>
+            <li>经渲染测量，首页提示与推荐理由在浅色表面的 WCAG 对比度均为 5.74:1；窄屏为 0px 横向溢出。主题色继续使用 Vuetify 语义 token，未引入孤立颜色系统。</li>
+            <li>审查后保留：10 秒撤销窗口是 TB-61 明确要求，且设置区仍提供清空反馈；首页书名/理由截断的完整内容可经同卡片详情入口访问；“你的笔记”保持禁用并解释缺少通用笔记索引，避免伪造推荐信号。</li>
+          </ul>
+        </section>
+        <section>
+          <h2>8. 决策记录</h2>
+          <ol><li>复用统一 AgentRuntime，不增加 OpenAI API/SDK；Claude Code 与 Trae 继续保持适配器边界。</li><li>HTTP 使用独立推荐资源 API，不把推荐伪装成以单书章节为中心的 <code>AITask</code>。</li><li>Codex 只重排候选和撰写理由；召回、权限、排除、缓存和最终验证全部由服务端掌控。</li><li>2026-08-17 产品反馈将主要入口由侧栏独立页改为首页模块，每批展示 10–12 本；高级页保留为首页低干扰设置入口，不再占用侧栏。</li><li>首页的隐蔽选项先提供“历史阅读”和“大家喜欢”：后者严格映射到书库评分，不读取其他成员行为；“你的笔记”在缺少通用笔记索引时只说明能力边界，不伪造信号。</li></ol>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

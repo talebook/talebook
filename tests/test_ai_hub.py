@@ -111,7 +111,7 @@ class AIHubAPITest(test_main.TestWithUserLogin):
         ids = [self._create(number) for number in range(1, 5)]
         session = test_main.get_db()
         statuses = ["queued", "running", "failed", "succeeded"]
-        for task_id, status in zip(ids, statuses):
+        for task_id, status in zip(ids, statuses, strict=True):
             record = session.get(models.AITask, task_id)
             record.status = status
             record.result_data = {"items": [{"answer": "must not leak"}]}
@@ -129,8 +129,18 @@ class AIHubAPITest(test_main.TestWithUserLogin):
         self.assertEqual(
             set(summary),
             {
-                "id", "feature", "object", "category", "status", "progress", "progress_message",
-                "created_at", "updated_at", "detail_url", "allowed_actions", "safe_error",
+                "id",
+                "feature",
+                "object",
+                "category",
+                "status",
+                "progress",
+                "progress_message",
+                "created_at",
+                "updated_at",
+                "detail_url",
+                "allowed_actions",
+                "safe_error",
             },
         )
         serialized = json.dumps(response, ensure_ascii=False)
@@ -199,6 +209,18 @@ class AIHubAPITest(test_main.TestWithUserLogin):
         response = self.json("/api/ai/hub/tasks")
         self.assertEqual(response["tasks"], [])
         self.assertEqual(response["partial_errors"], [{"feature": "future_feature", "code": "feature_unregistered"}])
+
+    def test_reader_only_task_is_not_projected_or_counted_as_hub_failure(self):
+        task_id = self._create()
+        session = test_main.get_db()
+        task = session.get(models.AITask, task_id)
+        task.feature = ai.QUOTE_CARD_FEATURE_KEY
+        session.commit()
+
+        self.assertIs(ai._feature(ai.QUOTE_CARD_FEATURE_KEY), ai.QuoteCardFeature)
+        response = self.json("/api/ai/hub/tasks")
+        self.assertEqual(response["tasks"], [])
+        self.assertEqual(response["partial_errors"], [])
 
     def test_events_accept_only_allowlisted_metadata_and_do_not_log_content(self):
         task_id = self._create()

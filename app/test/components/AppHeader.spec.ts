@@ -1,10 +1,11 @@
-// @vitest-environment nuxt
 import { mount } from '@vue/test-utils';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.stubGlobal('$t', (key: string) => key);
 
 vi.mock('#i18n', () => ({
     useI18n: () => ({
@@ -15,7 +16,8 @@ vi.mock('#i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { backendMock, pushMock, storeState } = vi.hoisted(() => ({
+    backendMock: vi.fn().mockResolvedValue({ err: 'ok', total: 0 }),
     pushMock: vi.fn(),
     storeState: {
         theme: 'light',
@@ -47,6 +49,10 @@ mockNuxtImport('useRouter', () => {
 
 mockNuxtImport('useRoute', () => {
     return () => ({ path: '/' });
+});
+
+mockNuxtImport('useNuxtApp', () => {
+    return () => ({ $backend: backendMock });
 });
 
 const vuetify = createVuetify({ components, directives });
@@ -110,6 +116,15 @@ describe('AppHeader.vue', () => {
         wrapper.unmount();
     });
 
+    it('shows the private AI SKILL center in navigation for signed-in users', () => {
+        storeState.user.is_login = true;
+        const wrapper = mountHeader();
+
+        expect(wrapper.text()).toContain('navigation.aiSkills');
+
+        wrapper.unmount();
+        storeState.user.is_login = false;
+    });
     it('shows the AI assistant only to signed-in users', async () => {
         storeState.user.is_login = false;
         let wrapper = mountHeader();

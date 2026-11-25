@@ -553,6 +553,11 @@ class AITask(Base, SQLAlchemyMixin):
     chapter_length = Column(Integer, nullable=False)
     status = Column(String(24), default="queued", nullable=False, index=True)
     progress_message = Column(String(256), default="")
+    # Durable payloads live below books/ai/{workspace}/{feature}; these fields
+    # are the database index needed to locate and verify the current artifact.
+    workspace_id = Column(String(64), default="", nullable=False, index=True)
+    artifact_path = Column(String(1024), default="", nullable=False)
+    artifact_sha256 = Column(String(64), default="", nullable=False)
     result_data = Column(MutableDict.as_mutable(JSONType), default={})
     ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
     user_revision = Column(MutableDict.as_mutable(JSONType), default={})
@@ -570,6 +575,251 @@ class AITask(Base, SQLAlchemyMixin):
     finished_at = Column(DateTime)
 
     creator = relationship(Reader, backref="ai_tasks")
+
+
+class TaleAgent(Base, SQLAlchemyMixin):
+    """A creator-private index for a directory-backed person manifest."""
+
+    __tablename__ = "tale_agents"
+
+    id = Column(String(36), primary_key=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_version = Column(String(128), nullable=False)
+    display_name = Column(String(200), nullable=False)
+    manifest_path = Column(String(1024), nullable=False)
+    manifest_sha256 = Column(String(64), nullable=False)
+    artifact_status = Column(String(24), default="ready", nullable=False, index=True)
+    cutoff_href = Column(String(1024), nullable=False)
+    cutoff_title = Column(String(512), default="")
+    cutoff_index = Column(Integer, nullable=False)
+    schema_version = Column(String(32), default="tale_agent_manifest.v2", nullable=False)
+    prompt_version = Column(String(32), default="tale_agent_manifest.zh.v2", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    creator = relationship(Reader, backref="tale_agents")
+
+
+class TaleAgentConversation(Base, SQLAlchemyMixin):
+    """One private TaleAgent conversation with all message state in one JSON field."""
+
+    __tablename__ = "tale_agent_conversations"
+
+    id = Column(String(36), primary_key=True)
+    tale_agent_id = Column(String(36), ForeignKey("tale_agents.id"), nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    cutoff_href = Column(String(1024), nullable=False)
+    cutoff_title = Column(String(512), default="")
+    cutoff_index = Column(Integer, nullable=False)
+    messages = Column(MutableDict.as_mutable(JSONType), default={}, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    tale_agent = relationship(TaleAgent, backref="conversations")
+    creator = relationship(Reader, backref="tale_agent_conversations")
+
+
+class Skill(Base, SQLAlchemyMixin):
+    """Creator-private index for a directory-authoritative Agent Skill."""
+
+    __tablename__ = "skills"
+
+    id = Column(String(36), primary_key=True)
+    owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    workspace_key = Column(String(64), nullable=False, index=True)
+    name = Column(String(120), nullable=False, index=True)
+    description = Column(String(500), default="")
+    status = Column(String(24), default="draft", nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    source = Column(MutableDict.as_mutable(JSONType), default={})
+    sensitive_acknowledged = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    last_run_at = Column(DateTime)
+
+    owner = relationship(Reader, backref="skills")
+    runs = relationship("SkillRun", back_populates="skill", cascade="all, delete-orphan")
+
+
+class SkillRun(Base, SQLAlchemyMixin):
+    """One isolated execution pinned to the directory path and SHA read at submission."""
+
+    __tablename__ = "skill_runs"
+
+    id = Column(String(36), primary_key=True)
+    skill_id = Column(String(36), ForeignKey("skills.id"), nullable=False, index=True)
+    owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    mode = Column(String(24), nullable=False)
+    status = Column(String(24), default="queued", nullable=False, index=True)
+    progress_message = Column(String(256), default="")
+    input_summary = Column(MutableDict.as_mutable(JSONType), default={})
+    authorization_context = Column(MutableDict.as_mutable(JSONType), default={})
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    runtime_name = Column(String(64), default="")
+    runtime_session_id = Column(String(128), default="")
+    usage = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    cancel_requested = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+    skill = relationship(Skill, back_populates="runs")
+
+
+class RecommendationPreference(Base, SQLAlchemyMixin):
+    """Current-user controls for explainable book recommendations."""
+
+    __tablename__ = "recommendation_preferences"
+
+    reader_id = Column(Integer, ForeignKey("readers.id"), primary_key=True)
+    personalization_enabled = Column(Boolean, default=True, nullable=False)
+    selections = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    reader = relationship(Reader, backref="recommendation_preference", uselist=False)
+
+
+class RecommendationFeedback(Base, SQLAlchemyMixin):
+    """Creator-private explicit feedback used to correct later recommendations."""
+
+    __tablename__ = "recommendation_feedback"
+    __table_args__ = (UniqueConstraint("reader_id", "book_id", "action", name="uq_recommendation_feedback"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    action = Column(String(32), nullable=False)
+    context = Column(MutableDict.as_mutable(JSONType), default={})
+    active = Column(Boolean, default=True, nullable=False, index=True)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    reader = relationship(Reader, backref="recommendation_feedback")
+
+
+class RecommendationSnapshot(Base, SQLAlchemyMixin):
+    """Short-lived, user-private recommendation cache without prompts or history."""
+
+    __tablename__ = "recommendation_snapshots"
+
+    reader_id = Column(Integer, ForeignKey("readers.id"), primary_key=True)
+    cache_key = Column(String(64), nullable=False, index=True)
+    source = Column(String(32), default="deterministic", nullable=False)
+    fallback_reason = Column(String(64), default="")
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)
+
+    reader = relationship(Reader, backref="recommendation_snapshot", uselist=False)
+
+
+class RecommendationEvent(Base, SQLAlchemyMixin):
+    """Minimal product event for recommendation quality and fallback metrics."""
+
+    __tablename__ = "recommendation_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    reader_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, default=0, nullable=False, index=True)
+    event_type = Column(String(48), nullable=False, index=True)
+    source = Column(String(32), default="", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False, index=True)
+
+    reader = relationship(Reader, backref="recommendation_events")
+
+
+class QuoteCard(Base, SQLAlchemyMixin):
+    """Creator-private, source-grounded quote card."""
+
+    __tablename__ = "quote_cards"
+    __table_args__ = (UniqueConstraint("creator_id", "book_id", "book_version", "source_hash", name="uq_quote_card_source"),)
+
+    id = Column(String(36), primary_key=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_version = Column(String(128), nullable=False)
+    book_title = Column(String(512), default="")
+    chapter_href = Column(String(1024), nullable=False)
+    chapter_title = Column(String(512), default="")
+    quote_type = Column(String(24), default="verbatim", nullable=False)
+    verbatim_quote = Column(Text, nullable=False)
+    quote_text = Column(Text, nullable=False)
+    locator = Column(MutableDict.as_mutable(JSONType), default={})
+    source_hash = Column(String(64), nullable=False, index=True)
+    source_valid = Column(Boolean, default=True, nullable=False)
+    ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
+    user_revision = Column(MutableDict.as_mutable(JSONType), default={})
+    explanation = Column(Text, default="")
+    topics = Column(MutableDict.as_mutable(JSONType), default={})
+    note = Column(Text, default="")
+    schema_version = Column(String(32), default="quote_card.v1", nullable=False)
+    prompt_version = Column(String(32), default="quote_card.zh.v1", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    creator = relationship(Reader, backref="quote_cards")
+
+
+class TagOrganizationTask(Base, SQLAlchemyMixin):
+    """Creator-private, preview-gated tag organization task."""
+
+    __tablename__ = "tag_organization_tasks"
+
+    id = Column(String(36), primary_key=True)
+    request_key = Column(String(64), unique=True, nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    status = Column(String(24), default="analyzing", nullable=False, index=True)
+    scope_data = Column(MutableDict.as_mutable(JSONType), default={})
+    suggestions = Column(MutableDict.as_mutable(JSONType), default={})
+    adjustments = Column(MutableDict.as_mutable(JSONType), default={})
+    preview_data = Column(MutableDict.as_mutable(JSONType), default={})
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    metrics = Column(MutableDict.as_mutable(JSONType), default={})
+    schema_version = Column(String(32), default="tag_organizer.v1", nullable=False)
+    prompt_version = Column(String(32), default="tag_organizer.zh.v1", nullable=False)
+    runtime_name = Column(String(64), default="")
+    runtime_session_id = Column(String(128), default="")
+    usage = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    execute_key = Column(String(64), unique=True, index=True)
+    undo_key = Column(String(64), unique=True, index=True)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    finished_at = Column(DateTime)
+
+    creator = relationship(Reader, backref="tag_organization_tasks")
+
+
+class TagOrganizationChange(Base, SQLAlchemyMixin):
+    """Per-book before/after state used for retry and conflict-safe undo."""
+
+    __tablename__ = "tag_organization_changes"
+    __table_args__ = (UniqueConstraint("task_id", "book_id", name="uq_tag_organization_task_book"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String(36), ForeignKey("tag_organization_tasks.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    title = Column(String(512), default="")
+    before_tags = Column(JSONType, default=list)
+    after_tags = Column(JSONType, default=list)
+    before_version = Column(String(64), default="")
+    after_version = Column(String(64), default="")
+    status = Column(String(24), default="pending", nullable=False, index=True)
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    undo_status = Column(String(24), default="")
+    undo_error = Column(String(500), default="")
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
 
 
 class BookSourceModel(Base, SQLAlchemyMixin):

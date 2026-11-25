@@ -1,0 +1,119 @@
+:root {
+  --quote-accent: #8d3d25;
+  --quote-on-accent: #ffffff;
+  --quote-accent-soft: #f8e9df;
+  --quote-surface: #fffdf9;
+  --quote-surface-raised: #ffffff;
+  --quote-text: #2b241f;
+  --quote-muted: #665b52;
+  --quote-line: #d9cdc2;
+  --quote-danger: #a32121;
+  --quote-warning: #885c00;
+  --quote-shadow: 0 18px 60px rgba(52, 34, 23, 0.24);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --quote-accent: #ff9a76;
+    --quote-on-accent: #211e1b;
+    --quote-accent-soft: #442b22;
+    --quote-surface: #211e1b;
+    --quote-surface-raised: #2b2723;
+    --quote-text: #fff7f1;
+    --quote-muted: #c9bbb1;
+    --quote-line: #574b43;
+    --quote-danger: #ff8888;
+    --quote-warning: #ffd078;
+    --quote-shadow: 0 18px 60px rgba(0, 0, 0, 0.56);
+  }
+}
+
+.quote-cards-launcher {
+  position: fixed;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: calc(132px + env(safe-area-inset-bottom));
+  z-index: 2700;
+  display: inline-flex;
+  min-width: 48px;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  color: var(--quote-on-accent);
+  border: 0;
+  border-radius: 999px;
+  background: var(--quote-accent);
+  box-shadow: var(--quote-shadow);
+  font: 700 14px/1.2 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.quote-cards-launcher:focus-visible,
+.quote-cards button:focus-visible,
+.quote-cards input:focus-visible,
+.quote-cards textarea:focus-visible {
+  outline: 3px solid var(--quote-text);
+  outline-offset: 3px;
+}
+
+html[data-quote-cards-open="true"] { overflow: hidden; }
+.quote-cards-backdrop { position: fixed; inset: 0; z-index: 2899; display: none; background: rgba(20, 14, 10, 0.44); }
+.quote-cards-backdrop[data-open="true"] { display: block; }
+
+.quote-cards {
+  position: fixed;
+  z-index: 2900;
+  top: 0;
+  right: 0;
+  display: none;
+  width: min(580px, 100vw);
+  height: 100dvh;
+  overflow: hidden;
+  color: var(--quote-text);
+  background: var(--quote-surface);
+  box-shadow: var(--quote-shadow);
+  font: 15px/1.6 system-ui, -apple-system, "PingFang SC", sans-serif;
+}
+
+.quote-cards[data-open="true"] { display: flex; flex-direction: column; }
+.quote-cards__header { display: flex; align-items: center; gap: 12px; padding: 20px 22px; border-bottom: 1px solid var(--quote-line); }
+.quote-cards__title { min-width: 0; flex: 1; }
+.quote-cards__title h2 { margin: 0; color: var(--quote-accent); font: 800 21px/1.3 Georgia, "Noto Serif SC", serif; }
+.quote-cards__title small { display: block; overflow: hidden; color: var(--quote-muted); text-overflow: ellipsis; white-space: nowrap; }
+.quote-cards__body { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 20px 22px; }
+.quote-cards__body h3 { margin: 0 0 8px; color: var(--quote-accent); font: 700 20px/1.35 Georgia, "Noto Serif SC", serif; }
+.quote-cards__footer { display: flex; flex: 0 0 auto; flex-wrap: wrap; gap: 8px; padding: 14px 22px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--quote-line); background: color-mix(in srgb, var(--quote-surface) 94%, transparent); backdrop-filter: blur(10px); }
+.quote-cards button { min-height: 40px; padding: 8px 13px; color: var(--quote-text); border: 1px solid var(--quote-line); border-radius: 10px; background: var(--quote-surface-raised); font: inherit; font-weight: 700; cursor: pointer; }
+.quote-cards button[data-primary="true"] { color: var(--quote-on-accent); border-color: var(--quote-accent); background: var(--quote-accent); }
+.quote-cards button[data-danger="true"] { color: var(--quote-danger); }
+.quote-cards button:disabled { cursor: not-allowed; opacity: 0.55; }
+.quote-cards__status { padding: 18px; border: 1px solid var(--quote-line); border-radius: 14px; background: var(--quote-surface-raised); }
+.quote-cards__status[role="alert"] { border-color: var(--quote-danger); }
+.quote-cards__spinner { display: inline-block; width: 16px; height: 16px; margin-right: 9px; border: 2px solid var(--quote-line); border-top-color: var(--quote-accent); border-radius: 50%; animation: quote-cards-spin 0.8s linear infinite; vertical-align: -2px; }
+@keyframes quote-cards-spin { to { transform: rotate(360deg); } }
+
+.quote-cards__item { position: relative; margin: 0 0 18px; padding: 18px; border: 1px solid var(--quote-line); border-radius: 15px; background: var(--quote-surface-raised); }
+.quote-cards__quote { margin: 8px 0 14px; color: var(--quote-text); font: 600 18px/1.75 Georgia, "Noto Serif SC", serif; white-space: pre-wrap; }
+.quote-cards__quote::before { color: var(--quote-accent); content: "“"; font-size: 28px; }
+.quote-cards__source,.quote-cards__hint { color: var(--quote-muted); font-size: 13px; }
+.quote-cards__why { margin: 10px 0; padding-left: 12px; border-left: 3px solid var(--quote-accent); white-space: pre-wrap; }
+.quote-cards__topics { color: var(--quote-accent); font-size: 13px; font-weight: 700; }
+.quote-cards__badge { display: inline-block; padding: 3px 8px; color: var(--quote-accent); border-radius: 999px; background: var(--quote-accent-soft); font-size: 12px; font-weight: 700; }
+.quote-cards__warning { color: var(--quote-warning); font-size: 13px; font-weight: 700; }
+.quote-cards__saved { color: var(--quote-accent); font-weight: 700; }
+.quote-cards__error { color: var(--quote-danger); }
+.quote-cards__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.quote-cards__field { margin-top: 12px; }
+.quote-cards label { display: block; margin: 0 0 4px; color: var(--quote-muted); font-size: 12px; font-weight: 700; }
+.quote-cards input,.quote-cards textarea { width: 100%; padding: 10px; color: var(--quote-text); border: 1px solid var(--quote-line); border-radius: 9px; background: var(--quote-surface); font: inherit; font-size: 16px; }
+.quote-cards textarea { min-height: 88px; resize: vertical; }
+.quote-cards__sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+@media (max-width: 620px) {
+  .quote-cards-launcher { right: 12px; bottom: calc(124px + env(safe-area-inset-bottom)); }
+  .quote-cards__header,.quote-cards__body,.quote-cards__footer { padding-right: 16px; padding-left: 16px; }
+  .quote-cards__footer button { flex: 1 1 auto; }
+  .quote-cards__quote { font-size: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .quote-cards__spinner { animation-duration: 2s; } }
