@@ -20,8 +20,8 @@ from xml.etree import ElementTree
 
 from webserver.models import AITask
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
-from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage, ensure_workspace_id
 from webserver.services.codex_app_server import CodexAppServerRuntime
+from webserver.services.knowledge_graph_artifacts import AIArtifactError, AIArtifactStorage, ensure_workspace_id
 
 
 LOG = logging.getLogger(__name__)

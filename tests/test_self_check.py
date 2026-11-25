@@ -59,6 +59,7 @@ class TestSelfCheckSteps(unittest.TestCase):
         self.assertEqual(library_probe.args[0][-1], os.path.join(self.data_dir, "books", "library"))
         self.assertEqual(settings_probe.args[0][0], "gosu")
         self.assertEqual(settings_probe.args[0][-1], os.path.join(self.data_dir, "books", "settings"))
+        self.assertEqual(ai_probe.args[0][0], "gosu")
         self.assertEqual(ai_probe.args[0][-1], os.path.join(self.data_dir, "books", "ai"))
 
     @mock.patch("webserver.self_check.run")

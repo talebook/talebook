@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Feature-routed API for creator-private AI tasks."""
 
+import asyncio
 import datetime
 import hashlib
 import json
+import logging
 import os
 import uuid
 
@@ -11,8 +13,8 @@ from sqlalchemy.exc import IntegrityError
 
 from webserver import loader
 from webserver.handlers.base import BaseHandler, auth, js
-from webserver.models import AITask
-from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage, ensure_workspace_id
+from webserver.models import AITask, ReadingState, TaleAgent, TaleAgentConversation
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore, TaleAgentArtifactError, TaleAgentArtifactStore
 from webserver.services.knowledge_graph import (
     FEATURE_KEY as KNOWLEDGE_GRAPH_FEATURE_KEY,
 )
@@ -37,19 +39,45 @@ from webserver.services.knowledge_graph import (
 from webserver.services.knowledge_graph import (
     task_dict as knowledge_graph_task_dict,
 )
+from webserver.services.knowledge_graph_artifacts import AIArtifactError as KnowledgeGraphArtifactError
+from webserver.services.knowledge_graph_artifacts import AIArtifactStorage, ensure_workspace_id
 from webserver.services.summary_duck import (
     FEATURE_KEY,
     PROMPT_VERSION,
     SCHEMA_VERSION,
     SummaryDuckService,
     SummaryDuckValidationError,
+    artifact_payload,
     chapter_hash,
     clean_markdown,
     export_markdown,
     request_key,
     task_dict,
-    task_items,
     validate_chapter_input,
+)
+from webserver.services.tale_agent import (
+    FEATURE_KEY as TALE_AGENT_FEATURE_KEY,
+)
+from webserver.services.tale_agent import (
+    MANIFEST_PROMPT_VERSION,
+    MANIFEST_SCHEMA_VERSION,
+    TaleAgentService,
+    TaleAgentValidationError,
+    agent_dict,
+    bounded_evidence,
+    conversation_dict,
+    conversation_messages,
+    epub_spine,
+    evidence_hash,
+    find_conversation_message,
+    message_dict,
+    new_id,
+    new_message,
+    preview_dict,
+    resolve_cutoff,
+    store_conversation_messages,
+    update_conversation_message,
+    validate_user_prompt,
 )
 
 
@@ -80,7 +108,14 @@ class SummaryDuckFeature:
     """Summary Duck behavior plugged into the stable AI task HTTP surface."""
 
     key = FEATURE_KEY
-    task_dict = staticmethod(task_dict)
+
+    @staticmethod
+    def task_dict(record):
+        return task_dict(record, CONF)
+
+    @staticmethod
+    def artifacts():
+        return AIArtifactStore(CONF)
 
     @staticmethod
     def enabled():
@@ -101,6 +136,12 @@ class SummaryDuckFeature:
             return False, {"err": "ai.not_found", "msg": "AI 结果不存在"}
         if _book_version(book) != record.book_version:
             return False, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，请重新生成"}
+        if record.status == "succeeded":
+            try:
+                SummaryDuckFeature.artifacts().migrate_summary_duck_record(handler.session, record)
+                SummaryDuckFeature.artifacts().read_summary_duck(record)
+            except AIArtifactError as exc:
+                return False, {"err": exc.code, "msg": exc.safe_message}
         return True, None
 
     @classmethod
@@ -125,7 +166,13 @@ class SummaryDuckFeature:
             .order_by(AITask.create_time.desc())
             .all()
         )
-        return {"err": "ok", "tasks": task_items(records)}
+        for record in records:
+            if record.status == "succeeded" and not record.artifact_sha256:
+                try:
+                    cls.artifacts().migrate_summary_duck_record(handler.session, record)
+                except AIArtifactError as exc:
+                    logging.warning("Summary Duck legacy artifact migration failed task_id=%s code=%s", record.id, exc.code)
+        return {"err": "ok", "tasks": [cls.task_dict(record) for record in records]}
 
     @classmethod
     def create(cls, handler, body):
@@ -157,7 +204,7 @@ class SummaryDuckFeature:
                 existing.update_time = datetime.datetime.now()
                 handler.session.commit()
                 cls.service(handler).submit(existing.id, chapter)
-            return {"err": "ok", "task": task_dict(existing), "idempotent": True}
+            return {"err": "ok", "task": cls.task_dict(existing), "idempotent": True}
         record = AITask(
             id=str(uuid.uuid4()),
             request_key=key,
@@ -174,6 +221,7 @@ class SummaryDuckFeature:
             schema_version=SCHEMA_VERSION,
             prompt_version=PROMPT_VERSION,
         )
+        cls.artifacts().prepare_summary_duck_record(record)
         handler.session.add(record)
         try:
             handler.session.commit()
@@ -183,15 +231,17 @@ class SummaryDuckFeature:
             if not record or record.creator_id != handler.user_id() or record.feature != cls.key:
                 return {"err": "ai.conflict", "msg": "无法创建总结"}
         cls.service(handler).submit(record.id, chapter)
-        return {"err": "ok", "task": task_dict(record), "idempotent": False}
+        return {"err": "ok", "task": cls.task_dict(record), "idempotent": False}
 
     @staticmethod
     def update(handler, record, body):
         if record.status != "succeeded":
             return {"err": "ai.not_editable", "msg": "仅成功结果可编辑"}
         try:
+            document = SummaryDuckFeature.artifacts().read_summary_duck(record)
             items = body.get("items")
-            original = (record.ai_draft or {}).get("items", [])
+            original_payload = document.get("ai_draft") or {}
+            original = original_payload.get("items", [])
             if not isinstance(items, list) or len(items) != 5 or len(original) != 5:
                 raise SummaryDuckValidationError("结果必须恰好包含五组问答")
             revision = []
@@ -211,11 +261,28 @@ class SummaryDuckFeature:
                 )
         except SummaryDuckValidationError as exc:
             return {"err": "params.invalid", "msg": str(exc)}
-        record.user_revision = {"items": revision}
-        record.result_data = {"items": revision}
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
         record.update_time = datetime.datetime.now()
+        try:
+            SummaryDuckFeature.artifacts().write_summary_duck(
+                record,
+                original_payload,
+                {"items": revision},
+                status="succeeded",
+                updated_at=record.update_time,
+            )
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
+        record.user_revision = {}
+        record.result_data = {}
+        record.ai_draft = {}
         handler.session.commit()
-        return {"err": "ok", "task": task_dict(record)}
+        return {"err": "ok", "task": SummaryDuckFeature.task_dict(record)}
+
+    @staticmethod
+    def delete(handler, record):
+        SummaryDuckFeature.artifacts().delete_summary_duck(record)
 
     @staticmethod
     def export(handler, record):
@@ -223,10 +290,16 @@ class SummaryDuckFeature:
             handler.set_header("Content-Type", "application/json; charset=UTF-8")
             handler.write({"err": "ai.not_ready", "msg": "总结尚未完成"})
             return
+        try:
+            markdown = export_markdown(record, artifact_payload(record, CONF))
+        except AIArtifactError as exc:
+            handler.set_header("Content-Type", "application/json; charset=UTF-8")
+            handler.write({"err": exc.code, "msg": exc.safe_message})
+            return
         filename = f"summary-duck-{record.book_id}-{record.id[:8]}.md"
         handler.set_header("Content-Type", "text/markdown; charset=UTF-8")
         handler.set_header("Content-Disposition", f'attachment; filename="{filename}"')
-        handler.write(export_markdown(record))
+        handler.write(markdown)
 
 
 class KnowledgeGraphFeature:
@@ -260,7 +333,7 @@ class KnowledgeGraphFeature:
         try:
             if migrate_legacy_artifacts(handler.session, record, AIArtifactStorage(CONF)):
                 handler.session.commit()
-        except AIArtifactError:
+        except KnowledgeGraphArtifactError:
             handler.session.rollback()
             return False, {"err": "ai.artifact_unavailable", "msg": "知识图谱产物不可用，请重新生成"}
         if record.status in {"queued", "running"}:
@@ -299,7 +372,7 @@ class KnowledgeGraphFeature:
                 changed = migrate_legacy_artifacts(handler.session, record, storage) or changed
             if changed:
                 handler.session.commit()
-        except AIArtifactError:
+        except KnowledgeGraphArtifactError:
             handler.session.rollback()
             return {"err": "ai.artifact_unavailable", "msg": "知识图谱产物不可用，请重新生成"}
         return {"err": "ok", "tasks": [cls.task_dict(record) for record in records]}
@@ -365,7 +438,7 @@ class KnowledgeGraphFeature:
         version = _book_version(book)
         try:
             workspace = ensure_workspace_id(handler.session, handler.user_id())
-        except AIArtifactError:
+        except KnowledgeGraphArtifactError:
             return {"err": "ai.artifact_unavailable", "msg": "无法准备知识图谱存储"}
         key = knowledge_graph_request_key(handler.user_id(), book_id, version, scope_hash)
         if bool(body.get("regenerate")):
@@ -430,7 +503,7 @@ class KnowledgeGraphFeature:
         filename = f"knowledge-graph-{record.book_id}-{record.id[:8]}.json"
         try:
             payload = load_graph_artifact(record, AIArtifactStorage(CONF))
-        except AIArtifactError:
+        except KnowledgeGraphArtifactError:
             handler.set_header("Content-Type", "application/json; charset=UTF-8")
             handler.write({"err": "ai.artifact_unavailable", "msg": "知识图谱产物不可用，请重新生成"})
             return
@@ -439,8 +512,11 @@ class KnowledgeGraphFeature:
         handler.write(json.dumps(payload, ensure_ascii=False, separators=(",", ":")))
 
     @staticmethod
-    def delete_artifact(record):
-        cleanup_record_artifacts(record, AIArtifactStorage(CONF))
+    def delete(handler, record):
+        try:
+            cleanup_record_artifacts(record, AIArtifactStorage(CONF))
+        except KnowledgeGraphArtifactError as exc:
+            raise AIArtifactError("ai.artifact_cleanup_failed", "AI 产物清理失败，请重试") from exc
 
 
 AI_FEATURES = {
@@ -524,16 +600,24 @@ class AITaskItem(_AITaskBase):
     @js
     @auth
     def delete(self, feature_name, task_id):
-        record, feature, error = self._visible_task(feature_name, task_id)
-        if error:
+        feature = _feature(feature_name)
+        if not feature:
+            return {"err": "ai.feature_not_found", "msg": "不支持的 AI 功能"}
+        record = self._own_task(feature.key, task_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "AI 任务不存在"}
+        visible, error = feature.can_access(self, record)
+        removable_artifact_errors = {"artifact.unavailable", "artifact.digest_mismatch", "artifact.invalid"}
+        if not visible and error.get("err") not in removable_artifact_errors:
             return error
         if record.status in {"queued", "running"}:
             feature.service(self).cancel(record.id)
         try:
-            if hasattr(feature, "delete_artifact"):
-                feature.delete_artifact(record)
-        except AIArtifactError:
-            return {"err": "ai.artifact_cleanup_failed", "msg": "AI 产物清理失败，请重试"}
+            delete = getattr(feature, "delete", None)
+            if delete:
+                delete(self, record)
+        except AIArtifactError as exc:
+            return {"err": exc.code, "msg": exc.safe_message}
         self.session.delete(record)
         self.session.commit()
         return {"err": "ok", "msg": "AI 任务已删除"}
@@ -571,10 +655,604 @@ class AITaskExport(_AITaskBase):
         feature.export(self, record)
 
 
+class _TaleAgentBase(BaseHandler):
+    def _artifacts(self):
+        return TaleAgentArtifactStore.from_config(CONF, "agents")
+
+    def _service(self):
+        service = TaleAgentService()
+        service.setup(self.settings["SessionMaker"], CONF)
+        return service
+
+    @staticmethod
+    def _artifact_error():
+        return {"err": "ai.artifact_unavailable", "msg": "Agent 产物缺失或未通过完整性校验"}
+
+    def _preview_manifest(self, record):
+        ref = record.result_data or {}
+        if ref.get("artifact_status") != "ready":
+            raise TaleAgentArtifactError("preview artifact is not ready")
+        return self._artifacts().read_agent(
+            record.creator_id,
+            ref.get("artifact_path", ""),
+            ref.get("artifact_sha256", ""),
+        )
+
+    def _agent_manifest(self, record):
+        if record.artifact_status != "ready":
+            raise TaleAgentArtifactError("agent artifact is not ready")
+        return self._artifacts().read_agent(record.creator_id, record.manifest_path, record.manifest_sha256)
+
+    def _preview_dict(self, record):
+        manifest = self._preview_manifest(record) if record.status == "succeeded" else {}
+        return preview_dict(record, manifest)
+
+    def _agent_dict(self, record):
+        return agent_dict(record, self._agent_manifest(record))
+
+    def _book(self, book_id, expected_version=""):
+        try:
+            book_id = int(book_id)
+        except (TypeError, ValueError):
+            return None, {"err": "params.invalid", "msg": "书籍参数无效"}
+        if not self.can_view_book(book_id):
+            return None, {"err": "book.not_found", "msg": "书籍不存在"}
+        book = self.get_book(book_id, raise_exception=False)
+        if not book or not book.get("fmt_epub"):
+            return None, {"err": "book.not_found", "msg": "仅支持可访问的 EPUB 书籍"}
+        if expected_version and _book_version(book) != expected_version:
+            return None, {"err": "ai.book_version_changed", "msg": "书籍版本已变化，派生 Agent 已暂停"}
+        return book, None
+
+    def _own_preview(self, preview_id):
+        return (
+            self.session.query(AITask)
+            .filter(
+                AITask.id == preview_id,
+                AITask.feature == TALE_AGENT_FEATURE_KEY,
+                AITask.creator_id == self.user_id(),
+            )
+            .first()
+        )
+
+    def _own_agent(self, agent_id):
+        return self.session.query(TaleAgent).filter(TaleAgent.id == agent_id, TaleAgent.creator_id == self.user_id()).first()
+
+    def _agent_access(self, agent_id):
+        agent = self._own_agent(agent_id)
+        if not agent:
+            return None, None, {"err": "ai.not_found", "msg": "Agent 不存在"}
+        book, error = self._book(agent.book_id, agent.book_version)
+        if error:
+            return None, None, error
+        return agent, book, None
+
+    def _conversation_access(self, conversation_id):
+        conversation = (
+            self.session.query(TaleAgentConversation)
+            .filter(
+                TaleAgentConversation.id == conversation_id,
+                TaleAgentConversation.creator_id == self.user_id(),
+            )
+            .first()
+        )
+        if not conversation:
+            return None, None, None, {"err": "ai.not_found", "msg": "会话不存在"}
+        agent, book, error = self._agent_access(conversation.tale_agent_id)
+        return conversation, agent, book, error
+
+    def _message_access(self, message_id):
+        conversations = self.session.query(TaleAgentConversation).filter(TaleAgentConversation.creator_id == self.user_id())
+        for conversation in conversations:
+            message, _index = find_conversation_message(conversation, message_id)
+            if message:
+                accessed, agent, book, error = self._conversation_access(conversation.id)
+                return message, accessed, agent, book, error
+        return None, None, None, None, {"err": "ai.not_found", "msg": "消息不存在"}
+
+    def _evidence(self, book, cutoff_index):
+        chapters = epub_spine(book["fmt_epub"])
+        return chapters, bounded_evidence(chapters, cutoff_index)
+
+
+class TaleAgentSpine(_TaleAgentBase):
+    @js
+    @auth
+    def get(self):
+        book, error = self._book(self.get_argument("book_id", ""))
+        if error:
+            return error
+        try:
+            chapters = epub_spine(book["fmt_epub"])
+            state = (
+                self.session.query(ReadingState)
+                .filter(ReadingState.book_id == book["id"], ReadingState.reader_id == self.user_id())
+                .first()
+            )
+            cutoff = resolve_cutoff(chapters, progress=state.get_progress() if state else {})
+        except TaleAgentValidationError as exc:
+            return {"err": "ai.source_invalid", "msg": str(exc)}
+        return {
+            "err": "ok",
+            "chapters": [{key: chapter[key] for key in ("index", "href", "title")} for chapter in chapters],
+            "default_cutoff": {key: cutoff[key] for key in ("index", "href", "title")},
+        }
+
+
+class TaleAgentPreviews(_TaleAgentBase):
+    @js
+    @auth
+    def post(self):
+        if not CONF.get("AI_ENABLED", True):
+            return {"err": "ai.disabled", "msg": "AI 功能未启用"}
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        book, error = self._book(body.get("book_id"))
+        if error:
+            return error
+        requested_name = str(body.get("name", "") or "").strip()
+        if len(requested_name) > 200:
+            return {"err": "params.invalid", "msg": "人物名称过长"}
+        try:
+            chapters = epub_spine(book["fmt_epub"])
+            requested_href = str(body.get("cutoff_href", "") or "")
+            cutoff = resolve_cutoff(chapters, requested_href=requested_href) if requested_href else chapters[-1]
+            evidence = bounded_evidence(chapters, cutoff["index"])
+        except TaleAgentValidationError as exc:
+            return {"err": "ai.source_invalid", "msg": str(exc)}
+        version = _book_version(book)
+        raw_key = ":".join(
+            [
+                TALE_AGENT_FEATURE_KEY,
+                str(self.user_id()),
+                str(book["id"]),
+                version,
+                cutoff["href"],
+                evidence_hash(evidence),
+                requested_name,
+                MANIFEST_SCHEMA_VERSION,
+                MANIFEST_PROMPT_VERSION,
+            ]
+        )
+        request_key_value = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
+        if body.get("regenerate"):
+            request_key_value = hashlib.sha256((request_key_value + uuid.uuid4().hex).encode("utf-8")).hexdigest()
+        existing = self.session.query(AITask).filter(AITask.request_key == request_key_value).first()
+        if existing:
+            try:
+                payload = self._preview_dict(existing)
+            except TaleAgentArtifactError:
+                return self._artifact_error()
+            return {"err": "ok", "preview": payload, "idempotent": True}
+        record = AITask(
+            id=new_id(),
+            request_key=request_key_value,
+            feature=TALE_AGENT_FEATURE_KEY,
+            creator_id=self.user_id(),
+            book_id=book["id"],
+            book_version=version,
+            chapter_href=cutoff["href"],
+            chapter_title=cutoff["title"],
+            chapter_text_hash=evidence_hash(evidence),
+            chapter_length=sum(len(chapter["text"]) for chapter in evidence),
+            status="queued",
+            progress_message="等待生成角色预览",
+            ai_draft={"requested_name": requested_name, "cutoff_index": cutoff["index"]},
+            schema_version=MANIFEST_SCHEMA_VERSION,
+            prompt_version=MANIFEST_PROMPT_VERSION,
+        )
+        self.session.add(record)
+        self.session.commit()
+        self._service().submit_preview(record.id, evidence, requested_name)
+        return {"err": "ok", "preview": self._preview_dict(record), "idempotent": False}
+
+
+class TaleAgentPreviewItem(_TaleAgentBase):
+    @js
+    @auth
+    def get(self, preview_id):
+        record = self._own_preview(preview_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "预览不存在"}
+        _book, error = self._book(record.book_id, record.book_version)
+        if error:
+            return error
+        try:
+            return {"err": "ok", "preview": self._preview_dict(record)}
+        except TaleAgentArtifactError:
+            return self._artifact_error()
+
+    @js
+    @auth
+    def delete(self, preview_id):
+        record = self._own_preview(preview_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "预览不存在"}
+        artifact_ref = dict(record.result_data or {})
+        owner_id = record.creator_id
+        if record.status in {"queued", "running"}:
+            self._service().cancel(record.id)
+        self.session.delete(record)
+        self.session.commit()
+        if artifact_ref.get("artifact_path"):
+            try:
+                self._artifacts().delete(owner_id, artifact_ref["artifact_path"])
+            except TaleAgentArtifactError:
+                logging.exception("Failed to clean TaleAgent preview artifact preview_id=%s", preview_id)
+                return {"err": "ai.artifact_cleanup_failed", "msg": "预览已删除，但产物目录清理失败"}
+        return {"err": "ok"}
+
+
+class TaleAgentPreviewCancel(_TaleAgentBase):
+    @js
+    @auth
+    def post(self, preview_id):
+        record = self._own_preview(preview_id)
+        if not record:
+            return {"err": "ai.not_found", "msg": "预览不存在"}
+        if record.status not in {"queued", "running"}:
+            try:
+                payload = self._preview_dict(record)
+            except TaleAgentArtifactError:
+                return self._artifact_error()
+            return {"err": "ok", "preview": payload, "idempotent": True}
+        record.cancel_requested = True
+        record.progress_message = "正在取消"
+        self.session.commit()
+        active = self._service().cancel(record.id)
+        if not active and record.status == "queued":
+            record.status = "cancelled"
+            record.finished_at = datetime.datetime.now()
+            self.session.commit()
+        return {"err": "ok", "preview": self._preview_dict(record), "idempotent": False}
+
+
+class TaleAgents(_TaleAgentBase):
+    @js
+    @auth
+    def get(self):
+        query = self.session.query(TaleAgent).filter(TaleAgent.creator_id == self.user_id())
+        book_id = self.get_argument("book_id", "")
+        if book_id:
+            try:
+                query = query.filter(TaleAgent.book_id == int(book_id))
+            except ValueError:
+                return {"err": "params.invalid", "msg": "书籍参数无效"}
+        records = query.order_by(TaleAgent.update_time.desc()).all()
+        visible = []
+        for record in records:
+            _book, error = self._book(record.book_id, record.book_version)
+            if not error:
+                try:
+                    visible.append(self._agent_dict(record))
+                except TaleAgentArtifactError:
+                    unavailable = agent_dict(record, {})
+                    unavailable["artifact_status"] = "unavailable"
+                    visible.append(unavailable)
+        return {"err": "ok", "agents": visible}
+
+    @js
+    @auth
+    def post(self):
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        preview = self._own_preview(str(body.get("preview_id", "")))
+        if not preview or preview.status != "succeeded" or not preview.result_data:
+            return {"err": "ai.preview_not_ready", "msg": "角色预览尚未就绪"}
+        _book, error = self._book(preview.book_id, preview.book_version)
+        if error:
+            return error
+        try:
+            manifest = self._preview_manifest(preview)
+        except TaleAgentArtifactError:
+            return self._artifact_error()
+        context = preview.ai_draft or {}
+        agent_id = new_id()
+        write = self._artifacts().replace_agent(self.user_id(), agent_id, manifest)
+        record = TaleAgent(
+            id=agent_id,
+            creator_id=self.user_id(),
+            book_id=preview.book_id,
+            book_version=preview.book_version,
+            display_name=manifest["display_name"],
+            manifest_path=write.ref.relative_path,
+            manifest_sha256=write.ref.sha256,
+            artifact_status=write.ref.status,
+            cutoff_href=preview.chapter_href,
+            cutoff_title=preview.chapter_title,
+            cutoff_index=int(context.get("cutoff_index", 0)),
+            schema_version=preview.schema_version,
+            prompt_version=preview.prompt_version,
+        )
+        try:
+            self.session.add(record)
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            self._artifacts().restore(self.user_id(), write)
+            raise
+        return {"err": "ok", "agent": agent_dict(record, manifest)}
+
+
+class TaleAgentItem(_TaleAgentBase):
+    @js
+    @auth
+    def get(self, agent_id):
+        agent, _book, error = self._agent_access(agent_id)
+        if error:
+            return error
+        try:
+            return {"err": "ok", "agent": self._agent_dict(agent)}
+        except TaleAgentArtifactError:
+            return self._artifact_error()
+
+    @js
+    @auth
+    def patch(self, agent_id):
+        agent, _book, error = self._agent_access(agent_id)
+        if error:
+            return error
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        preview = self._own_preview(str(body.get("preview_id", "")))
+        if (
+            not preview
+            or preview.status != "succeeded"
+            or preview.book_id != agent.book_id
+            or preview.book_version != agent.book_version
+        ):
+            return {"err": "ai.preview_required", "msg": "调整边界前需要生成并确认新的安全预览"}
+        new_index = int((preview.ai_draft or {}).get("cutoff_index", 0))
+        try:
+            manifest = self._preview_manifest(preview)
+        except TaleAgentArtifactError:
+            return self._artifact_error()
+        if manifest["display_name"] != agent.display_name:
+            return {"err": "ai.preview_required", "msg": "调整边界不能改变 TaleAgent 人物"}
+        write = self._artifacts().replace_agent(agent.creator_id, agent.id, manifest)
+        agent.display_name = manifest["display_name"]
+        agent.manifest_path = write.ref.relative_path
+        agent.manifest_sha256 = write.ref.sha256
+        agent.artifact_status = write.ref.status
+        agent.cutoff_href = preview.chapter_href
+        agent.cutoff_title = preview.chapter_title
+        agent.cutoff_index = new_index
+        agent.schema_version = preview.schema_version
+        agent.prompt_version = preview.prompt_version
+        agent.update_time = datetime.datetime.now()
+        try:
+            self.session.commit()
+        except Exception:
+            self.session.rollback()
+            self._artifacts().restore(agent.creator_id, write)
+            raise
+        return {"err": "ok", "agent": agent_dict(agent, manifest)}
+
+    @js
+    @auth
+    def delete(self, agent_id):
+        agent = self._own_agent(agent_id)
+        if not agent:
+            return {"err": "ai.not_found", "msg": "Agent 不存在"}
+        artifact_path = agent.manifest_path
+        owner_id = agent.creator_id
+        conversations = self.session.query(TaleAgentConversation).filter_by(tale_agent_id=agent.id).all()
+        for conversation in conversations:
+            for message in conversation_messages(conversation):
+                if message.get("status") in {"queued", "running"}:
+                    self._service().cancel(message["id"])
+        self.session.query(TaleAgentConversation).filter_by(tale_agent_id=agent.id).delete(synchronize_session=False)
+        self.session.delete(agent)
+        self.session.commit()
+        try:
+            self._artifacts().delete(owner_id, artifact_path)
+        except TaleAgentArtifactError:
+            logging.exception("Failed to clean TaleAgent artifact agent_id=%s", agent_id)
+            return {"err": "ai.artifact_cleanup_failed", "msg": "Agent 已删除，但产物目录清理失败"}
+        return {"err": "ok", "msg": "Agent、私有会话与反馈已删除"}
+
+
+class TaleAgentConversations(_TaleAgentBase):
+    @js
+    @auth
+    def post(self, agent_id):
+        agent, _book, error = self._agent_access(agent_id)
+        if error:
+            return error
+        record = TaleAgentConversation(
+            id=new_id(),
+            tale_agent_id=agent.id,
+            creator_id=self.user_id(),
+            cutoff_href=agent.cutoff_href,
+            cutoff_title=agent.cutoff_title,
+            cutoff_index=agent.cutoff_index,
+            messages={"items": []},
+        )
+        self.session.add(record)
+        self.session.commit()
+        return {"err": "ok", "conversation": conversation_dict(record)}
+
+
+class TaleAgentConversationItem(_TaleAgentBase):
+    @js
+    @auth
+    def get(self, conversation_id):
+        conversation, _agent, _book, error = self._conversation_access(conversation_id)
+        if error:
+            return error
+        return {"err": "ok", "conversation": conversation_dict(conversation)}
+
+    @js
+    @auth
+    def delete(self, conversation_id):
+        conversation, _agent, _book, error = self._conversation_access(conversation_id)
+        if error:
+            return error
+        for message in conversation_messages(conversation):
+            if message.get("status") in {"queued", "running"}:
+                self._service().cancel(message["id"])
+        self.session.delete(conversation)
+        self.session.commit()
+        return {"err": "ok"}
+
+
+class TaleAgentMessages(_TaleAgentBase):
+    def _create_message(self, conversation, agent, user_content):
+        try:
+            content = validate_user_prompt(user_content)
+        except TaleAgentValidationError as exc:
+            return None, {"err": "params.invalid", "msg": str(exc)}
+        try:
+            manifest = self._agent_manifest(agent)
+        except TaleAgentArtifactError:
+            return None, self._artifact_error()
+        messages = conversation_messages(conversation)
+        if any(message.get("status") in {"queued", "running"} for message in messages):
+            return None, {"err": "ai.busy", "msg": "当前会话仍有消息在生成"}
+        previous = [message for message in messages if message.get("status") == "succeeded"]
+        history = []
+        for message in previous[-6:]:
+            history.extend(
+                [
+                    {"role": "user", "content": message.get("user_content", "")},
+                    {"role": "assistant", "content": message.get("assistant_content", "")},
+                ]
+            )
+        record = new_message(content)
+        store_conversation_messages(conversation, [*messages, record])
+        self.session.commit()
+        self._service().submit_message(conversation.id, record["id"], manifest, history)
+        return record, None
+
+    @js
+    @auth
+    def post(self, conversation_id):
+        conversation, agent, _book, error = self._conversation_access(conversation_id)
+        if error:
+            return error
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        record, error = self._create_message(conversation, agent, body.get("content"))
+        return error or {"err": "ok", "message": message_dict(record)}
+
+
+class TaleAgentMessageCancel(_TaleAgentBase):
+    @js
+    @auth
+    def post(self, message_id):
+        message, conversation, _agent, _book, error = self._message_access(message_id)
+        if error:
+            return error
+        if message.get("status") not in {"queued", "running"}:
+            return {"err": "ok", "message": message_dict(message), "idempotent": True}
+        original_status = message.get("status")
+        updated = update_conversation_message(
+            conversation,
+            message_id,
+            {"cancel_requested": True, "progress_message": "正在取消"},
+        )
+        self.session.commit()
+        active = self._service().cancel(message_id)
+        if not active and original_status == "queued":
+            updated = update_conversation_message(
+                conversation,
+                message_id,
+                {"status": "cancelled", "finished_at": datetime.datetime.now().isoformat()},
+            )
+            self.session.commit()
+        return {"err": "ok", "message": message_dict(updated or message), "idempotent": False}
+
+
+class TaleAgentMessageRetry(TaleAgentMessages):
+    @js
+    @auth
+    def post(self, message_id):
+        message, conversation, agent, _book, error = self._message_access(message_id)
+        if error:
+            return error
+        if message.get("status") in {"queued", "running"}:
+            return {"err": "ai.busy", "msg": "消息仍在生成"}
+        record, error = self._create_message(conversation, agent, message.get("user_content", ""))
+        return error or {"err": "ok", "message": message_dict(record)}
+
+
+class TaleAgentMessageFeedback(_TaleAgentBase):
+    @js
+    @auth
+    def patch(self, message_id):
+        message, conversation, _agent, _book, error = self._message_access(message_id)
+        if error:
+            return error
+        try:
+            body = _json_body(self)
+        except SummaryDuckValidationError as exc:
+            return {"err": "params.invalid", "msg": str(exc)}
+        feedback = str(body.get("feedback", ""))
+        if feedback not in {"", "not_like", "not_useful", "too_vague", "spoiler", "too_much_quote"}:
+            return {"err": "params.invalid", "msg": "反馈类型无效"}
+        message = update_conversation_message(conversation, message_id, {"feedback": feedback})
+        self.session.commit()
+        return {"err": "ok", "message": message_dict(message)}
+
+
+class TaleAgentMessageStream(_TaleAgentBase):
+    @js
+    @auth
+    async def get(self, message_id):
+        message, conversation, _agent, _book, error = self._message_access(message_id)
+        if error:
+            self.set_header("Content-Type", "application/json; charset=UTF-8")
+            self.write(error)
+            return
+        self.set_header("Content-Type", "application/x-ndjson; charset=UTF-8")
+        self.set_header("Cache-Control", "no-cache, no-store")
+        self.set_header("X-Accel-Buffering", "no")
+        last_snapshot = None
+        for _attempt in range(240):
+            self.session.expire_all()
+            conversation = self.session.get(TaleAgentConversation, conversation.id)
+            message, _index = find_conversation_message(conversation, message_id) if conversation else (None, -1)
+            if not conversation or not message:
+                break
+            snapshot = message_dict(message)
+            serialized = json.dumps({"type": "message", "message": snapshot}, ensure_ascii=False)
+            if serialized != last_snapshot:
+                try:
+                    self.write(serialized + "\n")
+                    await self.flush()
+                except Exception:
+                    return
+                last_snapshot = serialized
+            if message.get("status") in {"succeeded", "failed", "cancelled"}:
+                break
+            await asyncio.sleep(0.5)
+
+
 def routes():
     return [
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks", AITaskCollection),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)", AITaskItem),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/cancel", AITaskCancel),
         (r"/api/ai/([a-z][a-z0-9_]*)/tasks/([0-9a-f-]+)/export", AITaskExport),
+        (r"/api/ai/tale-agent/spine", TaleAgentSpine),
+        (r"/api/ai/tale-agent/previews", TaleAgentPreviews),
+        (r"/api/ai/tale-agent/previews/([0-9a-f-]+)", TaleAgentPreviewItem),
+        (r"/api/ai/tale-agent/previews/([0-9a-f-]+)/cancel", TaleAgentPreviewCancel),
+        (r"/api/ai/tale-agent/agents", TaleAgents),
+        (r"/api/ai/tale-agent/agents/([0-9a-f-]+)", TaleAgentItem),
+        (r"/api/ai/tale-agent/agents/([0-9a-f-]+)/conversations", TaleAgentConversations),
+        (r"/api/ai/tale-agent/conversations/([0-9a-f-]+)", TaleAgentConversationItem),
+        (r"/api/ai/tale-agent/conversations/([0-9a-f-]+)/messages", TaleAgentMessages),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/stream", TaleAgentMessageStream),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/cancel", TaleAgentMessageCancel),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/retry", TaleAgentMessageRetry),
+        (r"/api/ai/tale-agent/messages/([0-9a-f-]+)/feedback", TaleAgentMessageFeedback),
     ]

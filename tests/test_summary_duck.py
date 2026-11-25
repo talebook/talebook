@@ -176,9 +176,17 @@ class CodexProtocolContractTest(unittest.TestCase):
 class SummaryDuckAPITest(test_main.TestWithUserLogin):
     def setUp(self):
         super().setUp()
+        self.artifact_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.artifact_directory.cleanup)
+        self.previous_artifact_root = test_main.main.CONF.get("AI_ARTIFACT_ROOT")
+        test_main.main.CONF["AI_ARTIFACT_ROOT"] = self.artifact_directory.name
+        self.addCleanup(self._restore_artifact_root)
         session = test_main.get_db()
         session.query(models.AITask).delete()
         session.commit()
+
+    def _restore_artifact_root(self):
+        test_main.main.CONF["AI_ARTIFACT_ROOT"] = self.previous_artifact_root
 
     def tearDown(self):
         session = test_main.get_db()
@@ -265,6 +273,15 @@ class SummaryDuckAPITest(test_main.TestWithUserLogin):
         self.assertEqual(response["err"], "ok")
         self.assertIn("用户修订", response["task"]["items"][0]["answer"])
 
+        session = test_main.get_db()
+        stored = session.get(models.AITask, record.id)
+        self.assertEqual(stored.result_data, {})
+        self.assertEqual(stored.ai_draft, {})
+        self.assertEqual(stored.user_revision, {})
+        self.assertTrue(stored.artifact_path.endswith(f"/summary-duck/{record.id}.json"))
+        artifact_path = Path(self.artifact_directory.name, stored.artifact_path)
+        self.assertTrue(artifact_path.is_file())
+
         export = self.fetch(f"/api/ai/{FEATURE_KEY}/tasks/{record.id}/export")
         self.assertEqual(export.code, 200)
         self.assertIn("text/markdown", export.headers["Content-Type"])
@@ -273,6 +290,7 @@ class SummaryDuckAPITest(test_main.TestWithUserLogin):
         response = self.json(f"/api/ai/{FEATURE_KEY}/tasks/{record.id}", method="DELETE")
         self.assertEqual(response["err"], "ok")
         self.assertIsNone(test_main.get_db().get(models.AITask, created["id"]))
+        self.assertFalse(artifact_path.exists())
 
     def test_book_version_change_fails_closed(self):
         task = self._create()["task"]
@@ -308,6 +326,7 @@ class StaticReaderContractTest(unittest.TestCase):
         delete_block = source[source.index("class BookDelete") : source.index("class BookDownload")]
         self.assertIn("AITask", delete_block)
         self.assertIn("AITask.book_id == bid", delete_block)
+        self.assertIn("delete_summary_duck", delete_block)
 
 
 if __name__ == "__main__":

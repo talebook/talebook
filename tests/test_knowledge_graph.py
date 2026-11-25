@@ -9,7 +9,6 @@ from unittest import mock
 from tests import test_main
 from webserver import models
 from webserver.services.agent_runtime import RuntimeResult
-from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage, ensure_workspace_id
 from webserver.services.knowledge_graph import (
     ARTIFACT_FEATURE_SLUG,
     FEATURE_KEY,
@@ -23,6 +22,7 @@ from webserver.services.knowledge_graph import (
     scope_fingerprint,
     validate_segment,
 )
+from webserver.services.knowledge_graph_artifacts import AIArtifactError, AIArtifactStorage, ensure_workspace_id
 
 
 def setUpModule():
@@ -175,6 +175,8 @@ class AIArtifactStorageTest(unittest.TestCase):
         self.storage.delete_task(self.workspace, ARTIFACT_FEATURE_SLUG, self.task_id)
         self.assertFalse(task_dir.exists())
         self.assertTrue(Path(self.temporary.name).exists())
+
+
 class KnowledgeGraphValidationTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

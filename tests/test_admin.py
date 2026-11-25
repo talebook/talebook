@@ -699,7 +699,7 @@ class TestAdminUsersBatch(TestWithAdminUser):
 class TestAdminUserArtifactCleanup(TestWithAdminUser):
     def test_delete_user_removes_ai_workspace_and_task_indexes(self):
         from webserver import models
-        from webserver.services.ai_artifacts import AIArtifactStorage
+        from webserver.services.knowledge_graph_artifacts import AIArtifactStorage
 
         username = "artifactcleanup"
         temporary = tempfile.TemporaryDirectory()

@@ -7,7 +7,7 @@ services:
     restart: always
     image: talebook/talebook
     volumes:
-      # 持久化配置、用户数据库和书库；可在 .env 中用 TALEBOOK_DATA_DIR 指定已有目录
+      # 持久化配置、用户数据库、书库及 books/ai 产物；备份/迁移时应整体保留此目录
       - "${TALEBOOK_DATA_DIR:-./data}:/data"
     ports:
       - "8080:80"

@@ -19,10 +19,10 @@ from webserver.handlers.admin_opds_sources import AdminOpdsSources
 from webserver.handlers.base import BaseHandler, auth, is_admin, js
 from webserver.i18n import _
 from webserver.models import AITask, Item, Reader, ScanFile
-from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStorage, workspace_id_from_reader
 from webserver.services.autofill import AutoFillService
 from webserver.services.batch_convert import BatchConvertService
 from webserver.services.external_index import delete_external_index_book_record, is_external_index_book
+from webserver.services.knowledge_graph_artifacts import AIArtifactError, AIArtifactStorage, workspace_id_from_reader
 from webserver.services.mail import MailService
 from webserver.services.opds_import import OPDSImportService
 from webserver.services.ssl_certificate import (

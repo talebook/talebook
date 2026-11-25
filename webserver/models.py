@@ -553,6 +553,11 @@ class AITask(Base, SQLAlchemyMixin):
     chapter_length = Column(Integer, nullable=False)
     status = Column(String(24), default="queued", nullable=False, index=True)
     progress_message = Column(String(256), default="")
+    # Durable payloads live below books/ai/{workspace}/{feature}; these fields
+    # are the database index needed to locate and verify the current artifact.
+    workspace_id = Column(String(64), default="", nullable=False, index=True)
+    artifact_path = Column(String(1024), default="", nullable=False)
+    artifact_sha256 = Column(String(64), default="", nullable=False)
     result_data = Column(MutableDict.as_mutable(JSONType), default={})
     ai_draft = Column(MutableDict.as_mutable(JSONType), default={})
     user_revision = Column(MutableDict.as_mutable(JSONType), default={})
@@ -570,6 +575,102 @@ class AITask(Base, SQLAlchemyMixin):
     finished_at = Column(DateTime)
 
     creator = relationship(Reader, backref="ai_tasks")
+
+
+class TaleAgent(Base, SQLAlchemyMixin):
+    """A creator-private index for a directory-backed person manifest."""
+
+    __tablename__ = "tale_agents"
+
+    id = Column(String(36), primary_key=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    book_id = Column(Integer, nullable=False, index=True)
+    book_version = Column(String(128), nullable=False)
+    display_name = Column(String(200), nullable=False)
+    manifest_path = Column(String(1024), nullable=False)
+    manifest_sha256 = Column(String(64), nullable=False)
+    artifact_status = Column(String(24), default="ready", nullable=False, index=True)
+    cutoff_href = Column(String(1024), nullable=False)
+    cutoff_title = Column(String(512), default="")
+    cutoff_index = Column(Integer, nullable=False)
+    schema_version = Column(String(32), default="tale_agent_manifest.v2", nullable=False)
+    prompt_version = Column(String(32), default="tale_agent_manifest.zh.v2", nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    creator = relationship(Reader, backref="tale_agents")
+
+
+class TaleAgentConversation(Base, SQLAlchemyMixin):
+    """One private TaleAgent conversation with all message state in one JSON field."""
+
+    __tablename__ = "tale_agent_conversations"
+
+    id = Column(String(36), primary_key=True)
+    tale_agent_id = Column(String(36), ForeignKey("tale_agents.id"), nullable=False, index=True)
+    creator_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    cutoff_href = Column(String(1024), nullable=False)
+    cutoff_title = Column(String(512), default="")
+    cutoff_index = Column(Integer, nullable=False)
+    messages = Column(MutableDict.as_mutable(JSONType), default={}, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+
+    tale_agent = relationship(TaleAgent, backref="conversations")
+    creator = relationship(Reader, backref="tale_agent_conversations")
+
+
+class Skill(Base, SQLAlchemyMixin):
+    """Creator-private index for a directory-authoritative Agent Skill."""
+
+    __tablename__ = "skills"
+
+    id = Column(String(36), primary_key=True)
+    owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    workspace_key = Column(String(64), nullable=False, index=True)
+    name = Column(String(120), nullable=False, index=True)
+    description = Column(String(500), default="")
+    status = Column(String(24), default="draft", nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    source = Column(MutableDict.as_mutable(JSONType), default={})
+    sensitive_acknowledged = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    last_run_at = Column(DateTime)
+
+    owner = relationship(Reader, backref="skills")
+    runs = relationship("SkillRun", back_populates="skill", cascade="all, delete-orphan")
+
+
+class SkillRun(Base, SQLAlchemyMixin):
+    """One isolated execution pinned to the directory path and SHA read at submission."""
+
+    __tablename__ = "skill_runs"
+
+    id = Column(String(36), primary_key=True)
+    skill_id = Column(String(36), ForeignKey("skills.id"), nullable=False, index=True)
+    owner_id = Column(Integer, ForeignKey("readers.id"), nullable=False, index=True)
+    artifact_path = Column(String(512), nullable=False)
+    content_hash = Column(String(64), nullable=False, index=True)
+    mode = Column(String(24), nullable=False)
+    status = Column(String(24), default="queued", nullable=False, index=True)
+    progress_message = Column(String(256), default="")
+    input_summary = Column(MutableDict.as_mutable(JSONType), default={})
+    authorization_context = Column(MutableDict.as_mutable(JSONType), default={})
+    result_data = Column(MutableDict.as_mutable(JSONType), default={})
+    runtime_name = Column(String(64), default="")
+    runtime_session_id = Column(String(128), default="")
+    usage = Column(MutableDict.as_mutable(JSONType), default={})
+    error_code = Column(String(128), default="")
+    error_message = Column(String(500), default="")
+    cancel_requested = Column(Boolean, default=False, nullable=False)
+    create_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    update_time = Column(DateTime, default=datetime.datetime.now, nullable=False)
+    started_at = Column(DateTime)
+    finished_at = Column(DateTime)
+
+    skill = relationship(Skill, back_populates="runs")
 
 
 class RecommendationPreference(Base, SQLAlchemyMixin):

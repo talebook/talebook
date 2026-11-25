@@ -25,7 +25,7 @@ sys.path.append(projdir)
 
 import webserver.handlers.base
 import webserver.handlers.book
-from webserver import loader, main, models, plugins  # nosq: E402
+from webserver import loader, main, models  # nosq: E402
 from webserver.handlers.base import BaseHandler
 
 
@@ -657,7 +657,7 @@ class TestBook(TestWithUserLogin):
                 self.assertEqual(m.call_count, 2)
 
     def test_delete_cleans_knowledge_graph_artifact_directory(self):
-        from webserver.services.ai_artifacts import AIArtifactStorage
+        from webserver.services.knowledge_graph_artifacts import AIArtifactStorage
 
         task_id = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
         temporary = tempfile.TemporaryDirectory()
@@ -685,9 +685,10 @@ class TestBook(TestWithUserLogin):
         session.commit()
         task_directory = os.path.dirname(os.path.join(temporary.name, metadata["relative_path"]))
         try:
-            with mock.patch.dict(
-                "webserver.handlers.book.CONF", {"AI_ARTIFACT_ROOT": temporary.name}, clear=False
-            ), mock.patch.object(_app.settings["legacy"], "delete_book", return_value="Yo"):
+            with (
+                mock.patch.dict("webserver.handlers.book.CONF", {"AI_ARTIFACT_ROOT": temporary.name}, clear=False),
+                mock.patch.object(_app.settings["legacy"], "delete_book", return_value="Yo"),
+            ):
                 with mock_permission():
                     response = self.json("/api/book/1/delete", method="POST", body="")
             self.assertEqual(response["err"], "ok", response)

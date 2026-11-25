@@ -536,6 +536,21 @@
                         </v-btn>
 
                         <v-btn
+                            v-if="book.id > 0 && store.user.is_login && hasEpubFormat"
+                            color="deep-orange-darken-2"
+                            variant="elevated"
+                            class="tale-agent-entry mx-2"
+                            :to="'/book/' + book.id + '/tale-agent'"
+                            :aria-label="t('taleAgent.title')"
+                            data-testid="open-tale-agent"
+                        >
+                            <v-icon start>
+                                mdi-account-star-outline
+                            </v-icon>
+                            <span class="tale-agent-entry__label">{{ t('taleAgent.title') }}</span>
+                        </v-btn>
+
+                        <v-btn
                             v-if="book.id > 0"
                             color="primary"
                             variant="elevated"
@@ -1164,6 +1179,11 @@ const hasCompatibleFormats = computed(() => {
     return formats.some(f => compatible.includes(f));
 });
 
+const hasEpubFormat = computed(() => {
+    if (!book.value || !book.value.files) return false;
+    return book.value.files.some(file => file.format.toLowerCase() === 'epub');
+});
+
 const selectedFormat = computed(() => {
     if (!book.value || !book.value.files) return 'N/A';
     const formats = book.value.files.map(x => x.format.toLowerCase());
@@ -1759,5 +1779,20 @@ onMounted(async () => {
 /* 减小管理菜单图标和文字的间距 */
 :deep(.v-list-item__spacer) {
     width: 8px !important;
+}
+
+@media (max-width: 960px) {
+    .tale-agent-entry {
+        min-width: 40px !important;
+        padding-inline: 8px !important;
+    }
+
+    .tale-agent-entry :deep(.v-icon--start) {
+        margin-inline-end: 0;
+    }
+
+    .tale-agent-entry__label {
+        display: none;
+    }
 }
 </style>
