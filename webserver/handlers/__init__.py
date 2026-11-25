@@ -15,6 +15,7 @@ def routes():
         captcha,
         comic,
         files,
+        kosync,
         meta,
         network_comic,
         network_library,
@@ -35,6 +36,7 @@ def routes():
     routes += book.routes()
     routes += reading_progress.routes()
     routes += annotations.routes()
+    routes += kosync.routes()
     routes += comic.routes()
     routes += user.routes()
     routes += meta.routes()

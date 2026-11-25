@@ -1,0 +1,293 @@
+diff --git a/apps/readest-app/public/kosync-transport.js b/apps/readest-app/public/kosync-transport.js
+new file mode 100644
+index 0000000..0820c27
+--- /dev/null
++++ b/apps/readest-app/public/kosync-transport.js
+@@ -0,0 +1,39 @@
++/** Transport adapter for the standalone React reader; Nuxt plugins are unavailable here. */
++export function usesTalebookKOSync(location) {
++  if (!location) return false;
++  const params = new URLSearchParams(location.search);
++  if (params.get('moke') !== '1') return false;
++  try {
++    const source = new URL(params.get('mokeSourceServerUrl') || '');
++    return source.origin === location.origin && ['http:', 'https:'].includes(source.protocol);
++  } catch {
++    return false;
++  }
++}
++
++export function isKOSyncAvailable(location, native = false) {
++  return native || !usesTalebookKOSync(location) ||
++    new URLSearchParams(location.search).get('mokeKOSync') === '1';
++}
++
++export async function requestTalebookKOSync(payload, fetchImpl = fetch, location = window.location) {
++  const proxyPath = new URL('../api/kosync', location.href).pathname;
++  const response = await fetchImpl(proxyPath, {
++    method: 'POST',
++    credentials: 'same-origin',
++    redirect: 'error',
++    headers: { 'Content-Type': 'application/json', 'X-Talebook-KOSync': '1' },
++    body: JSON.stringify(payload),
++  });
++  if (!response.ok) throw new Error(`Talebook KOSync proxy failed (HTTP ${response.status})`);
++  const result = await response.json();
++  if (result.err !== 'ok') throw new Error(result.msg || result.err || 'Talebook KOSync proxy failed');
++  if (!Number.isInteger(result.status) || result.status < 200 || result.status > 599 ||
++      !result.data || typeof result.data !== 'object' || Array.isArray(result.data)) {
++    throw new Error('Invalid Talebook KOSync proxy response');
++  }
++  return new Response(JSON.stringify(result.data), {
++    status: result.status,
++    headers: { 'Content-Type': 'application/json' },
++  });
++}
+diff --git a/apps/readest-app/src/__tests__/services/talebookKOSync.test.ts b/apps/readest-app/src/__tests__/services/talebookKOSync.test.ts
+new file mode 100644
+index 0000000..d06c6b4
+--- /dev/null
++++ b/apps/readest-app/src/__tests__/services/talebookKOSync.test.ts
+@@ -0,0 +1,76 @@
++import { beforeEach, describe, expect, it, vi } from 'vitest';
++const env = vi.hoisted(() => ({ native: false }));
++vi.mock('@/services/environment', () => ({
++  isTauriAppPlatform: () => env.native,
++  getAPIBaseUrl: () => 'https://web.readest.com/api',
++}));
++vi.mock('@/utils/misc', () => ({ getUserLang: () => 'en', makeSafeFilename: (s: string) => s }));
++vi.mock('@tauri-apps/plugin-http', () => ({ fetch: vi.fn() }));
++import { fetch as nativeFetch } from '@tauri-apps/plugin-http';
++import { canUseKOSync, KOSyncClient } from '@/services/sync/KOSyncClient';
++import { KOSyncSettings } from '@/types/settings';
++
++const config = (serverUrl = 'https://sync.example'): KOSyncSettings => ({
++  serverUrl, username: 'alice', password: 'password', userkey: 'hash', enabled: true,
++  deviceName: 'test', deviceId: 'test-id', strategy: 'prompt', checksumMethod: 'binary',
++} as KOSyncSettings);
++const envelope = (status = 200, data: object = { authorized: 'OK' }) =>
++  new Response(JSON.stringify({ err: 'ok', status, data }));
++
++describe('Talebook KOSync client routing', () => {
++  beforeEach(() => {
++    env.native = false;
++    vi.clearAllMocks();
++    window.history.replaceState({}, '', '/readest/reader.html?moke=1&mokeSourceServerUrl=' + encodeURIComponent(location.origin));
++    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(envelope()));
++  });
++
++  it('exposes KOSync only to eligible embeds while leaving native and standalone readers available', () => {
++    expect(canUseKOSync()).toBe(false);
++    window.history.replaceState({}, '', location.href + '&mokeKOSync=1');
++    expect(canUseKOSync()).toBe(true);
++    window.history.replaceState({}, '', '/readest/reader.html');
++    expect(canUseKOSync()).toBe(true);
++    window.history.replaceState({}, '', '/readest/reader.html?moke=1&mokeSourceServerUrl=' + encodeURIComponent(location.origin));
++    env.native = true;
++    expect(canUseKOSync()).toBe(true);
++  });
++
++  it.each(['https://sync.example', 'http://192.168.1.9:8080/kosync'])('uses Talebook for %s without a Readest account', async url => {
++    expect((await new KOSyncClient(config(url)).connect('alice', 'password')).success).toBe(true);
++    const [target, options] = vi.mocked(fetch).mock.calls[0]!;
++    expect(target).toBe('/api/kosync');
++    expect(JSON.parse(options!.body as string)).toMatchObject({
++      serverUrl: url, endpoint: '/users/auth', method: 'GET',
++      headers: { 'x-auth-user': 'alice', 'x-auth-key': 'hash' },
++    });
++    expect(options!.credentials).toBe('same-origin');
++  });
++
++  it.each([400, 401])('keeps Basic Auth retry working for HTTP %i', async status => {
++    vi.mocked(fetch).mockResolvedValueOnce(envelope(status, { message: 'KOSync authentication failed' })).mockResolvedValueOnce(envelope());
++    expect((await new KOSyncClient(config()).connect('alice', 'password')).success).toBe(true);
++    expect(JSON.parse(vi.mocked(fetch).mock.calls[1]![1]!.body as string).headers.authorization).toMatch(/^Basic /);
++  });
++
++  it('stops after one failed Basic Auth retry', async () => {
++    vi.mocked(fetch).mockImplementation(async () => envelope(401, { message: 'KOSync authentication failed' }));
++    expect((await new KOSyncClient(config())['request']('/users/auth')).status).toBe(401);
++    expect(fetch).toHaveBeenCalledTimes(2);
++  });
++
++  it('keeps native hosts on the native direct connection', async () => {
++    env.native = true;
++    vi.mocked(nativeFetch).mockResolvedValueOnce(new Response('{"authorized":"OK"}'));
++    expect((await new KOSyncClient(config()).connect('alice', 'password')).success).toBe(true);
++    expect(nativeFetch).toHaveBeenCalledWith('https://sync.example/users/auth', expect.any(Object));
++    expect(fetch).not.toHaveBeenCalled();
++  });
++
++  it('keeps standalone Readest on its existing proxy', async () => {
++    window.history.replaceState({}, '', '/readest/reader.html');
++    vi.mocked(fetch).mockResolvedValueOnce(new Response('{"authorized":"OK"}'));
++    expect((await new KOSyncClient(config()).connect('alice', 'password')).success).toBe(true);
++    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('https://web.readest.com/api/kosync');
++  });
++});
+diff --git a/apps/readest-app/src/app/reader/components/sidebar/BookMenu.tsx b/apps/readest-app/src/app/reader/components/sidebar/BookMenu.tsx
+index f345d47..232bc08 100644
+--- a/apps/readest-app/src/app/reader/components/sidebar/BookMenu.tsx
++++ b/apps/readest-app/src/app/reader/components/sidebar/BookMenu.tsx
+@@ -11,6 +11,7 @@ import { useTranslation } from '@/hooks/useTranslation';
+ import { useSettingsStore } from '@/store/settingsStore';
+ import { useParallelViewStore } from '@/store/parallelViewStore';
+ import { isWebAppPlatform } from '@/services/environment';
++import { canUseKOSync } from '@/services/sync/KOSyncClient';
+ import { eventDispatcher } from '@/utils/event';
+ import { FIXED_LAYOUT_FORMATS } from '@/types/book';
+ import { DOWNLOAD_READEST_URL } from '@/services/constants';
+@@ -30,6 +31,7 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
+   const _ = useTranslation();
+   const { envConfig } = useEnv();
+   const { settings } = useSettingsStore();
++  const showKOSync = settings.kosync.enabled && canUseKOSync();
+   const { bookKeys, recreateViewer, getViewSettings } = useReaderStore();
+   const { getVisibleLibrary } = useLibraryStore();
+   const { openParallelView } = useBooksManager();
+@@ -185,10 +187,10 @@ const BookMenu: React.FC<BookMenuProps> = ({ menuClassName, setIsDropdownOpen })
+         ) : (
+           <MenuItem label={_('Enter Parallel Read')} onClick={handleSetParallel} />
+         ))}
+-      {(settings.kosync.enabled || settings.readwise.enabled || settings.hardcover.enabled) && (
++      {(showKOSync || settings.readwise.enabled || settings.hardcover.enabled) && (
+         <hr aria-hidden='true' className='border-base-200 my-1' />
+       )}
+-      {settings.kosync.enabled && (
++      {showKOSync && (
+         <MenuItem label={_('KOReader Sync')} detailsOpen={false} buttonClass='py-2'>
+           <ul className='flex flex-col ps-1'>
+             <MenuItem label={_('Push Progress')} noIcon onClick={handlePushKOSync} />
+diff --git a/apps/readest-app/src/app/reader/hooks/useKOSync.ts b/apps/readest-app/src/app/reader/hooks/useKOSync.ts
+index 5d2cf13..4b1fa22 100644
+--- a/apps/readest-app/src/app/reader/hooks/useKOSync.ts
++++ b/apps/readest-app/src/app/reader/hooks/useKOSync.ts
+@@ -5,7 +5,7 @@ import { useReaderStore } from '@/store/readerStore';
+ import { useBookProgress } from '@/store/readerProgressStore';
+ import { useBookDataStore } from '@/store/bookDataStore';
+ import { useTranslation } from '@/hooks/useTranslation';
+-import { KOSyncClient, KoSyncProgress } from '@/services/sync/KOSyncClient';
++import { canUseKOSync, KOSyncClient, KoSyncProgress } from '@/services/sync/KOSyncClient';
+ import { Book, BookProgress, FIXED_LAYOUT_FORMATS } from '@/types/book';
+ import type { KOSyncSettings, SystemSettings } from '@/types/settings';
+ import { BookDoc } from '@/libs/document';
+@@ -87,7 +87,7 @@ export const useKOSync = (bookKey: string, provider: KosyncProgressProvider = ko
+   const progress = useBookProgress(bookKey);
+ 
+   useEffect(() => {
+-    const config = provider.selectConfig(settings);
++    const config = canUseKOSync() ? provider.selectConfig(settings) : null;
+     if (!config) {
+       setKOSyncClient(null);
+       return;
+diff --git a/apps/readest-app/src/components/settings/IntegrationsPanel.tsx b/apps/readest-app/src/components/settings/IntegrationsPanel.tsx
+index 5bdbfdd..de3b5ce 100644
+--- a/apps/readest-app/src/components/settings/IntegrationsPanel.tsx
++++ b/apps/readest-app/src/components/settings/IntegrationsPanel.tsx
+@@ -19,6 +19,7 @@ import { useCustomOPDSStore } from '@/store/customOPDSStore';
+ import { useFileSyncStore } from '@/store/fileSyncStore';
+ import { CatalogManager } from '@/app/opds/components/CatalogManager';
+ import { saveSysSettings } from '@/helpers/settings';
++import { canUseKOSync } from '@/services/sync/KOSyncClient';
+ import { navigateToLogin } from '@/utils/nav';
+ import BookOrbitForm from './integrations/BookOrbitForm';
+ import KOSyncForm from './integrations/KOSyncForm';
+@@ -102,6 +103,7 @@ const IntegrationsPanel: React.FC = () => {
+   const isWebDAVSyncing = useFileSyncStore((s) => s.byKind.webdav?.isSyncing ?? false);
+ 
+   const [subPage, setSubPage] = useState<SubPage>(null);
++  const showKOSync = canUseKOSync();
+ 
+   // Android Back / Esc: when any integrations sub-page (KOSync, WebDAV,
+   // Readwise, Hardcover, OPDS, Send-to-Readest) is open, intercept and
+@@ -132,7 +134,7 @@ const IntegrationsPanel: React.FC = () => {
+   useEffect(() => {
+     if (!requestedSubPage) return;
+     if (
+-      requestedSubPage === 'kosync' ||
++      (requestedSubPage === 'kosync' && showKOSync) ||
+       requestedSubPage === 'bookorbit' ||
+       requestedSubPage === 'webdav' ||
+       requestedSubPage === 'readwise' ||
+@@ -144,13 +146,13 @@ const IntegrationsPanel: React.FC = () => {
+       setSubPage(requestedSubPage);
+     }
+     setRequestedSubPage(null);
+-  }, [requestedSubPage, setRequestedSubPage]);
++  }, [requestedSubPage, setRequestedSubPage, showKOSync]);
+ 
+   // Sub-page wrapper matches the list-view's `my-4 w-full` so the
+   // SubPageHeader's "Integrations" label lands at the exact same Y position
+   // as the list-view's h2 — clicking a row reads as a navigation morph
+   // rather than a layout shift.
+-  if (subPage === 'kosync')
++  if (subPage === 'kosync' && showKOSync)
+     return (
+       <div className='my-4 w-full'>
+         <KOSyncForm onBack={() => setSubPage(null)} />
+@@ -267,12 +269,14 @@ const IntegrationsPanel: React.FC = () => {
+         <SectionTitle className='mb-2'>{_('Reading Sync')}</SectionTitle>
+         <div className='card eink-bordered border-base-200 bg-base-100 overflow-hidden border'>
+           <div className='divide-base-200 divide-y'>
+-            <IntegrationRow
+-              icon={RiBookOpenLine}
+-              title={_('KOReader')}
+-              status={koSyncStatus}
+-              onClick={() => setSubPage('kosync')}
+-            />
++            {showKOSync && (
++              <IntegrationRow
++                icon={RiBookOpenLine}
++                title={_('KOReader')}
++                status={koSyncStatus}
++                onClick={() => setSubPage('kosync')}
++              />
++            )}
+             <IntegrationRow
+               icon={RiBookOpenLine}
+               title={_('BookOrbit')}
+diff --git a/apps/readest-app/src/services/sync/KOSyncClient.ts b/apps/readest-app/src/services/sync/KOSyncClient.ts
+index 0e6e998..3c67446 100644
+--- a/apps/readest-app/src/services/sync/KOSyncClient.ts
++++ b/apps/readest-app/src/services/sync/KOSyncClient.ts
+@@ -1,4 +1,9 @@
+ import { md5 } from 'js-md5';
++import {
++  isKOSyncAvailable,
++  requestTalebookKOSync,
++  usesTalebookKOSync,
++} from '../../../public/kosync-transport.js';
+ import { Book } from '@/types/book';
+ import { KOSyncSettings } from '@/types/settings';
+ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+@@ -8,6 +13,11 @@ import { getUserLang, makeSafeFilename } from '@/utils/misc';
+ import { normalizeCustomHeaders } from '@/utils/customHeaders';
+ import { getAPIBaseUrl, isTauriAppPlatform } from '../environment';
+ 
++export function canUseKOSync() {
++  const location = typeof window === 'undefined' ? undefined : window.location;
++  return isKOSyncAvailable(location, isTauriAppPlatform());
++}
++
+ const getContributorName = (contributor: unknown): string => {
+   if (typeof contributor === 'string') return contributor.trim();
+   if (!contributor || typeof contributor !== 'object') return '';
+@@ -86,6 +96,18 @@ export class KOSyncClient {
+     const attempt = async (): Promise<Response> => {
+       const headers = buildHeaders();
+ 
++      // Same-origin Talebook embeds always use their own proxy, including LAN targets.
++      // Native hosts and standalone Readest retain their existing transports.
++      if (!isTauriAppPlatform() && usesTalebookKOSync(window.location)) {
++        return requestTalebookKOSync({
++          serverUrl: this.config.serverUrl,
++          endpoint,
++          method,
++          headers: Object.fromEntries(headers.entries()),
++          body: body ? JSON.parse(body as string) : undefined,
++        });
++      }
++
+       if (this.isLanServer || isTauriAppPlatform()) {
+         const fetch = isTauriAppPlatform() ? tauriFetch : window.fetch;
+         const directUrl = `${this.config.serverUrl}${endpoint}`;

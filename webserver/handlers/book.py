@@ -1890,8 +1890,9 @@ class BookReaderBootstrap(BaseHandler):
             self.set_status(404)
             return {"err": "reader.format_unsupported"}
         revision = reader_resource_revision(fpath)
-        return {
+        bootstrap = {
             "err": "ok",
+            "msg": "",
             "schema": "talebook.reader.bootstrap.v1",
             "engine": "readest",
             "book": {
@@ -1933,6 +1934,7 @@ class BookReaderBootstrap(BaseHandler):
                 "auth": False,
                 "cloud": False,
                 "sync": False,
+                "kosync": bool(self.current_user),
                 "payment": False,
                 "upgrade": False,
                 "updater": False,
@@ -1947,6 +1949,8 @@ class BookReaderBootstrap(BaseHandler):
                 "tauri": False,
             },
         }
+        self.set_header("Cache-Control", "private, no-store")
+        self.finish(bootstrap)
 
 
 class BookReaderResource(BaseHandler, web.StaticFileHandler):
