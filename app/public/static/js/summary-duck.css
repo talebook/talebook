@@ -108,6 +108,7 @@ html[data-summary-duck-open="true"] { overflow: hidden; }
   .summary-duck-launcher { right: 12px; bottom: calc(68px + env(safe-area-inset-bottom)); }
   .summary-duck__header, .summary-duck__body, .summary-duck__footer { padding-right: 16px; padding-left: 16px; }
   .summary-duck__footer button { flex: 1 1 auto; }
+  .summary-duck textarea { font-size: 16px; }
 }
 
-@media (prefers-reduced-motion: reduce) { .summary-duck__spinner { animation-duration: 2s; } }
+@media (prefers-reduced-motion: reduce) { .summary-duck__spinner { animation: none; } }

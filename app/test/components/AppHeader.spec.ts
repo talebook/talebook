@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.stubGlobal('$t', (key: string) => key);
 
-vi.mock('vue-i18n', () => ({
+vi.mock('#i18n', () => ({
     useI18n: () => ({
         locale: { value: 'zh-CN' },
         locales: { value: [{ code: 'zh-CN', name: '简体中文' }] },
@@ -71,6 +71,7 @@ describe('AppHeader.vue', () => {
     beforeEach(() => {
         pushMock.mockReset();
         storeState.sys.show_network_library = true;
+        storeState.user.is_login = false;
     });
 
     it('only wraps the site title text in the clickable/pointer area, not the whole title bar', () => {
@@ -121,6 +122,19 @@ describe('AppHeader.vue', () => {
 
         expect(wrapper.text()).toContain('navigation.aiSkills');
 
+        wrapper.unmount();
+        storeState.user.is_login = false;
+    });
+    it('shows the AI assistant only to signed-in users', async () => {
+        storeState.user.is_login = false;
+        let wrapper = mountHeader();
+        expect(wrapper.text()).not.toContain('navigation.aiAssistant');
+        wrapper.unmount();
+
+        storeState.user.is_login = true;
+        wrapper = mountHeader();
+        expect(wrapper.text()).toContain('navigation.aiAssistant');
+        expect(wrapper.findAllComponents({ name: 'VListItem' }).some(item => item.props('to') === '/ai-assistant')).toBe(true);
         wrapper.unmount();
         storeState.user.is_login = false;
     });
