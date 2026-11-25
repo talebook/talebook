@@ -175,6 +175,7 @@ class FakeHandler(BaseHandler):
         h.request.headers = {}
         h.request.remote_ip = "1.2.3.4"
         h.rsp_headers = {}
+        h._headers = h.rsp_headers
         h.rsp = None
         h.cookie = {}
         h._finished = False

@@ -105,6 +105,8 @@ def test_refer_writes_the_selected_candidate_and_skips_a_missing_record():
     handler = mock.Mock(spec=book.BookRefer)
     handler.current_user = object()
     handler.request = SimpleNamespace(headers={})
+    handler._headers = {}
+    handler.set_header.side_effect = handler._headers.__setitem__
     handler._finished = False
     handler.db = mock.Mock()
     handler.db.get_metadata.return_value = local
@@ -132,6 +134,7 @@ def test_refer_writes_the_selected_candidate_and_skips_a_missing_record():
 
         asyncio.run(book.BookRefer.post(handler, "42"))
         assert handler.write.call_args.args[0]["err"] == "ok"
+        assert handler._headers["Cache-Control"] == "max-age=0"
         handler.db.set_metadata.assert_called_once_with(42, local)
         assert handler.db.set_metadata.call_args.args[1].authors == ["Author B"]
 
