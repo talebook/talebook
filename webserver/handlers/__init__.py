@@ -21,6 +21,7 @@ def routes():
         recommendations,
         scan,
         skill_library,
+        tag_organizer,
         theme,
         user,
     )
@@ -35,6 +36,7 @@ def routes():
     routes += booksource_admin.routes()
     routes += network_library.routes()
     routes += audiobook.routes()
+    routes += tag_organizer.routes()
     routes += ai.routes()
     routes += quote_cards.routes()
     routes += skill_library.routes()

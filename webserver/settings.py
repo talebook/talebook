@@ -82,6 +82,7 @@ settings = {
     # AI 任务统一开关；具体能力挂载到 /api/ai/<feature>/tasks 的 feature registry。
     "AI_ENABLED": True,
     "AI_SUMMARY_DUCK_ENABLED": True,
+    "AI_TAG_ORGANIZER_ENABLED": True,
     "AI_QUOTE_CARD_ENABLED": True,
     "AI_SKILLS_ENABLED": True,
     "AI_SKILL_MAX_ACTIVE_RUNS": 2,
