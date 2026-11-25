@@ -1,10 +1,11 @@
-// @vitest-environment nuxt
 import { mount } from '@vue/test-utils';
 import { mockNuxtImport } from '@nuxt/test-utils/runtime';
 import { createVuetify } from 'vuetify';
 import * as components from 'vuetify/components';
 import * as directives from 'vuetify/directives';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.stubGlobal('$t', (key: string) => key);
 
 vi.mock('vue-i18n', () => ({
     useI18n: () => ({
@@ -15,7 +16,8 @@ vi.mock('vue-i18n', () => ({
     }),
 }));
 
-const { pushMock, storeState } = vi.hoisted(() => ({
+const { backendMock, pushMock, storeState } = vi.hoisted(() => ({
+    backendMock: vi.fn().mockResolvedValue({ err: 'ok', total: 0 }),
     pushMock: vi.fn(),
     storeState: {
         theme: 'light',
@@ -49,6 +51,10 @@ mockNuxtImport('useRoute', () => {
     return () => ({ path: '/' });
 });
 
+mockNuxtImport('useNuxtApp', () => {
+    return () => ({ $backend: backendMock });
+});
+
 const vuetify = createVuetify({ components, directives });
 global.ResizeObserver = require('resize-observer-polyfill');
 
@@ -57,7 +63,7 @@ import AppHeader from '@/components/AppHeader.vue';
 function mountHeader() {
     return mount(
         { components: { AppHeader }, template: '<v-app><AppHeader /></v-app>' },
-        { global: { plugins: [vuetify] } },
+        { global: { plugins: [vuetify], mocks: { $t: (key: string) => key } } },
     );
 }
 
@@ -107,5 +113,15 @@ describe('AppHeader.vue', () => {
         expect(wrapper.text()).not.toContain('navigation.networkLibrary');
 
         wrapper.unmount();
+    });
+
+    it('shows the private AI SKILL center in navigation for signed-in users', () => {
+        storeState.user.is_login = true;
+        const wrapper = mountHeader();
+
+        expect(wrapper.text()).toContain('navigation.aiSkills');
+
+        wrapper.unmount();
+        storeState.user.is_login = false;
     });
 });

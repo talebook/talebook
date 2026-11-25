@@ -226,6 +226,11 @@
                                 prepend-icon="mdi-shield-account"
                             />
                             <v-list-item
+                                to="/ai/skills"
+                                :title="$t('navigation.aiSkills')"
+                                prepend-icon="mdi-toolbox-outline"
+                            />
+                            <v-list-item
                                 v-if="store.sys.allow.FEEDBACK"
                                 target="_blank"
                                 :href="store.sys.FEEDBACK_URL"
@@ -485,7 +490,10 @@ const items = computed(() => {
         { icon: 'mdi-book-music', href: '/audios', text: $t('navigation.audiobooks'), badge: $t('audiobook.beta') },
     ];
     var shelf_links = store.user.is_login
-        ? [{ icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') }]
+        ? [
+            { icon: 'mdi-bookshelf', href: '/user/shelf', text: $t('navigation.myShelf') },
+            { icon: 'mdi-toolbox-outline', href: '/ai/skills', text: $t('navigation.aiSkills') },
+        ]
         : [];
     var admin_links = [
         {

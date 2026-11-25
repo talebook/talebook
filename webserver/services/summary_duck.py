@@ -9,10 +9,12 @@ import json
 import logging
 import re
 import threading
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, List, Optional
 
+from webserver import loader
 from webserver.models import AITask
 from webserver.services.agent_runtime import AgentRuntimeError, RuntimeEvent, RuntimeRequest
+from webserver.services.ai_artifacts import AIArtifactError, AIArtifactStore
 from webserver.services.codex_app_server import CodexAppServerRuntime
 
 
@@ -189,8 +191,13 @@ def request_key(creator_id: int, book_id: int, book_version: str, chapter_href: 
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def export_markdown(record: AITask) -> str:
-    data = record.user_revision or record.result_data or {}
+def artifact_payload(record: AITask, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    document = AIArtifactStore(config or loader.get_settings()).read_summary_duck(record)
+    return document.get("user_revision") or document.get("ai_draft") or {}
+
+
+def export_markdown(record: AITask, data: Optional[Dict[str, Any]] = None) -> str:
+    data = data if data is not None else artifact_payload(record)
     lines = [f"# 总结鸭 TOP5：{record.chapter_title or record.chapter_href}", ""]
     for number, item in enumerate(data.get("items", []), 1):
         lines.extend([f"## {number}. {item.get('question', '')}", "", item.get("answer", ""), "", "原文引用："])
@@ -217,6 +224,7 @@ class SummaryDuckService:
     def setup(self, session_maker, config: Dict[str, Any], runtime=None) -> None:
         self.session_maker = session_maker
         self.config = config
+        self.artifacts = AIArtifactStore(config)
         if runtime is not None:
             self.runtime = runtime
         elif not self._configured:
@@ -288,26 +296,47 @@ class SummaryDuckService:
             )
             checked = validate_summary_duck(result.output, chapter["text"], chapter["href"])
             session = self.session_maker()
+            artifact_written = False
             try:
                 record = session.get(AITask, record_id)
                 if not record:
                     return
+                finished_at = datetime.datetime.now()
                 if record.cancel_requested:
                     record.status = "cancelled"
                 else:
+                    self.artifacts.write_summary_duck(
+                        record,
+                        checked,
+                        checked,
+                        status="succeeded",
+                        updated_at=finished_at,
+                    )
+                    artifact_written = True
                     record.status = "succeeded"
-                    record.result_data = checked
-                    record.ai_draft = checked
-                    record.user_revision = checked
+                    record.result_data = {}
+                    record.ai_draft = {}
+                    record.user_revision = {}
                     record.usage = result.usage or {}
                     record.runtime_session_id = (result.session_id or "")[:128]
                     record.progress_message = "生成完成"
-                record.finished_at = datetime.datetime.now()
+                record.finished_at = finished_at
                 record.update_time = record.finished_at
                 session.commit()
+            except Exception:
+                if artifact_written:
+                    try:
+                        self.artifacts.delete_summary_duck(record)
+                    except AIArtifactError as cleanup_error:
+                        LOG.error(
+                            "Summary Duck artifact rollback failed record_id=%s code=%s",
+                            record_id,
+                            cleanup_error.code,
+                        )
+                raise
             finally:
                 session.close()
-        except (AgentRuntimeError, SummaryDuckValidationError) as exc:
+        except (AgentRuntimeError, SummaryDuckValidationError, AIArtifactError) as exc:
             session = self.session_maker()
             try:
                 record = session.get(AITask, record_id)
@@ -315,7 +344,8 @@ class SummaryDuckService:
                     return
                 cancelled = isinstance(exc, AgentRuntimeError) and exc.code.value == "runtime.cancelled"
                 record.status = "cancelled" if cancelled or record.cancel_requested else "failed"
-                record.error_code = getattr(getattr(exc, "code", None), "value", "result.invalid")
+                code = getattr(exc, "code", None)
+                record.error_code = getattr(code, "value", code) or "result.invalid"
                 record.error_message = str(getattr(exc, "safe_message", "AI 返回结果未通过校验"))[:500]
                 record.progress_message = record.error_message
                 record.finished_at = datetime.datetime.now()
@@ -351,12 +381,14 @@ class SummaryDuckService:
         self.submit(record_id, chapter)
 
 
-def task_items(records: Iterable[AITask]) -> List[Dict[str, Any]]:
-    return [task_dict(record) for record in records]
-
-
-def task_dict(record: AITask) -> Dict[str, Any]:
-    data = record.user_revision or record.result_data or {}
+def task_dict(record: AITask, config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    data: Dict[str, Any] = {}
+    artifact_error = None
+    if record.status == "succeeded":
+        try:
+            data = artifact_payload(record, config)
+        except AIArtifactError as exc:
+            artifact_error = {"code": exc.code, "message": exc.safe_message}
     return {
         "id": record.id,
         "feature": record.feature,
@@ -371,7 +403,8 @@ def task_dict(record: AITask) -> Dict[str, Any]:
         "prompt_version": record.prompt_version,
         "runtime": record.runtime_name,
         "usage": record.usage or {},
-        "error": {"code": record.error_code, "message": record.error_message} if record.error_code else None,
+        "error": artifact_error
+        or ({"code": record.error_code, "message": record.error_message} if record.error_code else None),
         "created_at": record.create_time.isoformat() if record.create_time else None,
         "updated_at": record.update_time.isoformat() if record.update_time else None,
     }

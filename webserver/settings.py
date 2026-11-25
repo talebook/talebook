@@ -83,6 +83,17 @@ settings = {
     "AI_ENABLED": True,
     "AI_SUMMARY_DUCK_ENABLED": True,
     "AI_TAG_ORGANIZER_ENABLED": True,
+    "AI_QUOTE_CARD_ENABLED": True,
+    "AI_SKILLS_ENABLED": True,
+    "AI_SKILL_MAX_ACTIVE_RUNS": 2,
+    "AI_SKILL_MAX_MARKDOWN_CHARACTERS": 40_000,
+    "AI_SKILL_MAX_INPUT_CHARACTERS": 32_000,
+    "AI_KNOWLEDGE_GRAPH_ENABLED": True,
+    "AI_KNOWLEDGE_GRAPH_MAX_CHAPTERS": 80,
+    "AI_KNOWLEDGE_GRAPH_MAX_CHAPTER_CHARACTERS": 16000,
+    "AI_KNOWLEDGE_GRAPH_MAX_TOTAL_CHARACTERS": 400000,
+    "AI_RECOMMENDATIONS_ENABLED": True,
+    "AI_RECOMMENDATIONS_CACHE_SECONDS": 900,
     "AI_CODEX_COMMAND": "codex",
     # 专用于 Talebook AI 任务的 Codex 身份目录，须包含由 `codex login` 生成的 auth.json。
     # 运行任务时只会把 auth.json 复制到临时 CODEX_HOME，不会把此目录或书库暴露给生成进程。
@@ -90,7 +101,12 @@ settings = {
     "AI_CODEX_MODEL": "",
     "AI_CODEX_MIN_VERSION": "0.147.0",
     "AI_CODEX_MAX_VERSION": "0.148.0",
+    # AI 持久化产物统一放在 /data/books 备份边界内；数据库仅保存相对路径和 SHA-256 索引。
+    "AI_ARTIFACT_ROOT": "/data/books/ai",
     "AI_TASK_ROOT": "/data/books/progress",
+    # AI 实体产物的唯一内容来源；数据库仅保存相对于此目录的路径、摘要和管理索引。
+    "AI_ARTIFACT_ROOT": "/data/books/ai",
+    "AI_ARTIFACT_MAX_BYTES": 128 * 1024 * 1024,
     "AI_HANDSHAKE_TIMEOUT_SECONDS": 10,
     "AI_FIRST_PROGRESS_TIMEOUT_SECONDS": 30,
     "AI_SILENCE_TIMEOUT_SECONDS": 45,
@@ -99,6 +115,7 @@ settings = {
 
     "AUDIOBOOK_ENABLED": True,
     "AUDIOBOOK_PATH": "/data/books/audiobooks",
+    "AI_ARTIFACT_ROOT": "/data/books/ai",
     "AUDIOBOOK_OWNER_GENERATE": False,
     "AUDIOBOOK_WORKERS": 1,
     "AUDIOBOOK_MIN_FREE_GB": 5,
