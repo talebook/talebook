@@ -23,11 +23,27 @@
       </section>
       <section>
         <h2>方案</h2>
-        <p>Calibre 用原查询重新定位来源与条目，避免返回其他候选。NeoDB 仍通过搜索匹配所选条目的 URL，避免将外部引用用作新网络目标。使用各来源独有的版本化候选引用。保留 Calibre 旧引用的查询行为。影响规格：插件／元数据源。</p>
+        <p>Calibre 用原查询重新定位来源与条目，避免返回其他候选。NeoDB 仍通过搜索匹配所选条目的 URL，避免将外部引用用作新网络目标。使用各来源独有的版本化候选引用。合法版本引用必须精确匹配原条目，查不到就要求重新搜索，绝不退回第一条。对以版本前缀开头、但不符合引用结构的旧标题，按原文查询并要求返回书名完全相同；不套用近似书名。影响规格：插件／元数据源。</p>
       </section>
       <section>
         <h2>测试结果</h2>
-        <p>在 master 复现引用冲突和候选丢失。修复后，tests/test_metadata_candidate_selection.py、tests/test_meta_provider.py 与 tests/test_meta_providers.py 合计 40 项通过。接口回归检查只把选中的条目交给书库写入，所选条目消失时返回错误且不再次写入。测试使用受控上游返回与书库替身。</p>
+        <h3>接口回归与工程检查</h3>
+        <ul>
+          <li><code>python -m pytest -q tests/test_metadata_candidate_selection.py tests/test_meta_provider.py tests/test_meta_providers.py tests/test_calibre_metadata.py tests/test_meta_pagination.py</code>：本环境缺少 bcrypt、bs4、social_tornado 等依赖，在收集阶段失败，未将该套件记为通过。真实 Calibre 书库及外部查书服务未连接。</li>
+          <li>受控替代：<code>python offline_endpoint.py</code>（本地临时夹具，非仓库文件）运行 <code>tests/test_metadata_candidate_selection.py</code>，执行仓库实际提供器代码和 <code>BookRefer.post</code>、<code>js</code>、<code>auth</code> 实现；只替换缺失依赖、上游、运行时连接和书库。原 PR 版本 4 失败、4 通过；修复后 8 通过。确认同名第二条写入、消失后提示重搜且不再写入、旧前缀标题能写入、近似标题不能被套用，以及 NeoDB 精确重查。</li>
+          <li><code>ruff check webserver/plugins/meta/calibre/api.py webserver/plugins/meta/neodb/plugin.py tests/test_metadata_candidate_selection.py</code>：通过。<code>ruff format --check webserver/plugins/meta/calibre/api.py webserver/plugins/meta/neodb/plugin.py tests/test_metadata_candidate_selection.py</code>：3 文件符合格式。</li>
+          <li><code>python scripts/check_spec.py</code>：25 篇通过。<code>python scripts/check_design_docs.py</code> 和 <code>git diff --check</code>：通过。</li>
+        </ul>
+        <h3>本地界面审查 · interface-review full</h3>
+        <p>范围：从远端默认分支 <code>master</code> 的 <code>f34a79a</code> 到本 PR 原提交 <code>9acd193</code> 及本次全部本地改动。用 <code>git log --oneline master..HEAD</code>、<code>git diff --name-status master HEAD</code>、<code>git diff master</code> 和 <code>git ls-files --others --exclude-standard</code> 汇总基线、已提交与未提交；共 1 个已有 PR 提交和同一次修订，最终 5 个文件。未纳入生成产物或第三方锁文件。</p>
+        <p>评审入口：书籍详情 → 管理 → 从互联网更新信息 → 候选列表 → 设置。阅读了两个提供器的增删行、<code>BookRefer</code>、Nuxt/Vuetify 书籍详情、管理操作、候选卡片和本地化文案。状态覆盖检索进行中、无候选、同名候选、仅信息／仅封面／同时套用、旧引用、所选条目失效并重搜，以及窄屏的组件布局规则。</p>
+        <ul>
+          <li>可访问性：引用只随现有表单传递；加载区 <code>aria-live</code>、按钮和菜单不变。旧版同名卡片的“设置”按钮名称本来相同，不是本次回归。</li>
+          <li>文案与反馈：保留“未获取到所选记录，请重新搜索”的下一步指引和成功反馈，不增加新字符串或错误类型。</li>
+          <li>布局、排版、颜色、动效：逐项比对候选卡片、样式和状态，没有改动布局、文字样式、色彩、控件或动效。未考虑以改写视觉或给所有卡片加新字段来解决引用问题；唯一候选引用是表单传输值，不是界面标识。</li>
+        </ul>
+        <p><code>CANDLE_READER_SKIP_SYNC=1 ./node_modules/.bin/nuxt build</code>（使用本机备用 Node 依赖、回环接口夹具）成功；构建产物在模拟 API 下成功返回 <code>GET /book/1</code>。<code>node browser.cjs</code> 未执行交互断言：本机 Chromium 启动器指向不存在的二进制。因此真实浏览器键盘、窄屏截图和像素样式均未验证。</p>
+        <p>结论：已解决一个可复现的旧引用兼容问题；合法引用失效时不回退到其他记录。全量变更的源码界面审查未发现待修的新增 HIGH/MEDIUM 项。以上浏览器和真实上游覆盖限制保留，不记为已通过。</p>
       </section>
     </main>
   </body>

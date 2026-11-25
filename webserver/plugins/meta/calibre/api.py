@@ -299,7 +299,7 @@ class CalibreProvider(MetaSourceMixin):
 
     @staticmethod
     def _candidate_key(record):
-        return [record.source, record.title, list(record.authors or ()), record.isbn or ""]
+        return [record.source, record.title or "", list(record.authors or ()), record.isbn or ""]
 
     def _search(self, query, context):
         records = self._find_candidates(query, context)
@@ -310,16 +310,21 @@ class CalibreProvider(MetaSourceMixin):
 
     def _fetch(self, external_id, context):
         if external_id.startswith(self.REFERENCE_PREFIX):
-            return self._fetch_candidate(external_id, context)
+            if len(external_id) > 8192:
+                return None
+            candidate = self._parse_candidate(external_id)
+            if candidate is not None:
+                return self._fetch_candidate(external_id, *candidate, context)
+            # Legacy clients sent literal titles, which can start with the same prefix.
+            records = CalibreMetadataApi.get_book_by_title(external_id, sources=self._sources(context)) or []
+            return next((record for record in records if record.title == external_id), None)
         sources = self._sources(context)
         records = CalibreMetadataApi.get_book_by_isbn(external_id, sources=sources) or []
         if not records:
             records = CalibreMetadataApi.get_book_by_title(external_id, sources=sources) or []
         return records[0] if records else None
 
-    def _fetch_candidate(self, external_id, context):
-        if len(external_id) > 8192:
-            return None
+    def _parse_candidate(self, external_id):
         try:
             reference = json.loads(external_id.removeprefix(self.REFERENCE_PREFIX))
         except (ValueError, RecursionError):
@@ -334,6 +339,14 @@ class CalibreProvider(MetaSourceMixin):
         query = MetadataQuery(isbn=isbn, title=title, authors=tuple(authors))
         if query.is_empty() or not isinstance(selected_key, list) or len(selected_key) != 4:
             return None
+        source, selected_title, selected_authors, selected_isbn = selected_key
+        if not all(isinstance(field, str) for field in (source, selected_title, selected_isbn)):
+            return None
+        if not isinstance(selected_authors, list) or not all(isinstance(author, str) for author in selected_authors):
+            return None
+        return query, selected_key
+
+    def _fetch_candidate(self, external_id, query, selected_key, context):
         for record in self._find_candidates(query, context):
             if self._candidate_key(record) == selected_key:
                 record.provider_value = external_id
