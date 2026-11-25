@@ -2,10 +2,13 @@
 # -*- coding: UTF-8 -*-
 
 import os
+import time
 from unittest import mock
 
+import pytest
+
 from webserver import loader, main
-from webserver.handlers import admin
+from webserver.handlers import admin, base
 
 
 def _candidate(nuxt_env_path):
@@ -77,6 +80,62 @@ def test_settings_saver_failure_keeps_runtime_and_disk_config(tmp_path):
     assert conf["site_title"] == "Original title"
     assert auto_path.read_text(encoding="utf-8") == "original auto config\n"
     assert (tmp_path / ".env").read_text(encoding="utf-8") == "original nuxt config\n"
+
+
+@pytest.mark.parametrize(
+    ("current_mode", "current_code", "new_code", "rotates"),
+    [(False, "old", "old", True), (True, "old", "new", True), (True, "old", "old", False)],
+)
+def test_invite_grants_follow_persisted_settings_change(tmp_path, current_mode, current_code, new_code, rotates):
+    conf = {**_candidate(tmp_path / ".env"), "INVITE_MODE": current_mode, "INVITE_CODE": current_code}
+    args = loader.SettingsLoader()
+    args.clear()
+    args.update(conf, INVITE_MODE=True, INVITE_CODE=new_code)
+    handler = mock.Mock(spec=base.BaseHandler)
+
+    with (
+        mock.patch.object(admin, "CONF", conf),
+        mock.patch.object(base, "CONF", conf),
+        mock.patch.object(args, "set_store_path", return_value=str(tmp_path)),
+    ):
+        base.BaseHandler.mark_invited(handler)
+        old_grant = handler.set_secure_cookie.call_args.args[1]
+        handler.get_secure_cookie.return_value = old_grant.encode()
+        assert base.BaseHandler.invited_code_is_ok(handler)
+
+        assert admin.SettingsSaverLogic().save_extra_settings(args)["err"] == "ok"
+        assert base.BaseHandler.invited_code_is_ok(handler) is (not rotates)
+
+        base.BaseHandler.mark_invited(handler)
+        grant = handler.set_secure_cookie.call_args.args[1]
+        handler.get_secure_cookie.return_value = grant.encode()
+        assert base.BaseHandler.invited_code_is_ok(handler)
+        with mock.patch.object(base.time, "time", return_value=time.time() + 7 * 86400):
+            assert not base.BaseHandler.invited_code_is_ok(handler)
+
+    if rotates:
+        assert repr(conf["INVITE_GRANT_VERSION"]) in (tmp_path / "auto.py").read_text(encoding="utf-8")
+
+
+def test_failed_invite_settings_save_preserves_current_grant_version(tmp_path):
+    conf = {
+        **_candidate(tmp_path / ".env"),
+        "INVITE_MODE": True,
+        "INVITE_CODE": "old",
+        "INVITE_GRANT_VERSION": "previous-version",
+    }
+    args = loader.SettingsLoader()
+    args.clear()
+    args.update(conf, INVITE_CODE="new")
+
+    with (
+        mock.patch.object(admin, "CONF", conf),
+        mock.patch.object(args, "dumpfile", side_effect=OSError("disk full")),
+    ):
+        assert admin.SettingsSaverLogic().save_extra_settings(args)["err"] == "file.permission"
+
+    assert conf["INVITE_GRANT_VERSION"] == "previous-version"
+    assert conf["INVITE_CODE"] == "old"
 
 
 def test_settings_dumpfile_replace_failure_is_atomic(tmp_path):

@@ -331,6 +331,11 @@ GOOGLE_ANALYTICS_ID=%(google_analytics_id)s
 
     def save_extra_settings(self, args):
         args["installed"] = True
+        invite_enabled = args.get("INVITE_MODE", CONF.get("INVITE_MODE")) is True
+        invite_code = args.get("INVITE_CODE", CONF.get("INVITE_CODE"))
+        if invite_enabled and (CONF.get("INVITE_MODE") is not True or invite_code != CONF.get("INVITE_CODE")):
+            args["INVITE_GRANT_VERSION"] = uuid.uuid4().hex
+
         candidate = dict(CONF)
         candidate.update(args)
         nuxt_env_path = candidate["nuxt_env_path"]
