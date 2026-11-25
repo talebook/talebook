@@ -1012,7 +1012,7 @@ class BookDelete(BaseHandler):
         if not can_manage or not (self.is_admin() or self.is_book_owner(bid, self.user_id())):
             return {"err": "permission", "msg": _("无权操作")}
 
-        from webserver.models import AITask, ScanFile, TaleAgent, TaleAgentConversation
+        from webserver.models import AITask, QuoteCard, ScanFile, TaleAgent, TaleAgentConversation
         from webserver.services.ai_artifacts import (
             SUMMARY_DUCK_FEATURE,
             AIArtifactError,
@@ -1069,6 +1069,7 @@ class BookDelete(BaseHandler):
             if ref.get("artifact_path"):
                 preview_artifacts.append((preview.creator_id, ref["artifact_path"]))
         self.session.query(AITask).filter(AITask.book_id == bid).delete()
+        self.session.query(QuoteCard).filter(QuoteCard.book_id == bid).delete()
         agents = self.session.query(TaleAgent).filter(TaleAgent.book_id == bid).all()
         agent_ids = [agent.id for agent in agents]
         agent_artifacts = [(agent.creator_id, agent.manifest_path) for agent in agents]
