@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: UTF-8 -*-
 
+import json
 import logging
 import threading
 import traceback
@@ -10,6 +11,7 @@ import requests
 from webserver.constants import CHROME_HEADERS, META_SOURCE_AMAZON, META_SOURCE_EDELWEISS, META_SOURCE_GOOGLE
 from webserver.i18n import _
 from webserver.plugins.meta.base import MetaSourceMixin, meta_manifest
+from webserver.plugins.runtime.domains import MetadataQuery
 
 KEY = "Calibre"
 
@@ -268,6 +270,7 @@ class CalibreMetadataApi:
 class CalibreProvider(MetaSourceMixin):
     """启用插件即默认查询 Calibre 内置的三个书籍信息来源。"""
 
+    REFERENCE_PREFIX = "calibre:v1:"
     legacy_sources = (META_SOURCE_GOOGLE, META_SOURCE_AMAZON)
 
     manifest = meta_manifest(
@@ -283,7 +286,7 @@ class CalibreProvider(MetaSourceMixin):
     def _sources(self, context):
         return [META_SOURCE_GOOGLE, META_SOURCE_AMAZON, META_SOURCE_EDELWEISS]
 
-    def _search(self, query, context):
+    def _find_candidates(self, query, context):
         sources = self._sources(context)
         if not sources:
             return []
@@ -294,12 +297,61 @@ class CalibreProvider(MetaSourceMixin):
             results = CalibreMetadataApi.get_book_by_title(query.title, authors=list(query.authors), sources=sources) or []
         return list(results)
 
+    @staticmethod
+    def _candidate_key(record):
+        return [record.source, record.title or "", list(record.authors or ()), record.isbn or ""]
+
+    def _search(self, query, context):
+        records = self._find_candidates(query, context)
+        for record in records:
+            reference = [query.isbn, query.title, list(query.authors), self._candidate_key(record)]
+            record.provider_value = self.REFERENCE_PREFIX + json.dumps(reference, ensure_ascii=False)
+        return records
+
     def _fetch(self, external_id, context):
+        if external_id.startswith(self.REFERENCE_PREFIX):
+            if len(external_id) > 8192:
+                return None
+            candidate = self._parse_candidate(external_id)
+            if candidate is not None:
+                return self._fetch_candidate(external_id, *candidate, context)
+            # Legacy clients sent literal titles, which can start with the same prefix.
+            records = CalibreMetadataApi.get_book_by_title(external_id, sources=self._sources(context)) or []
+            return next((record for record in records if record.title == external_id), None)
         sources = self._sources(context)
         records = CalibreMetadataApi.get_book_by_isbn(external_id, sources=sources) or []
         if not records:
             records = CalibreMetadataApi.get_book_by_title(external_id, sources=sources) or []
         return records[0] if records else None
+
+    def _parse_candidate(self, external_id):
+        try:
+            reference = json.loads(external_id.removeprefix(self.REFERENCE_PREFIX))
+        except (ValueError, RecursionError):
+            return None
+        if not isinstance(reference, list) or len(reference) != 4:
+            return None
+        isbn, title, authors, selected_key = reference
+        if not isinstance(isbn, str) or not isinstance(title, str):
+            return None
+        if not isinstance(authors, list) or not all(isinstance(author, str) for author in authors):
+            return None
+        query = MetadataQuery(isbn=isbn, title=title, authors=tuple(authors))
+        if query.is_empty() or not isinstance(selected_key, list) or len(selected_key) != 4:
+            return None
+        source, selected_title, selected_authors, selected_isbn = selected_key
+        if not all(isinstance(field, str) for field in (source, selected_title, selected_isbn)):
+            return None
+        if not isinstance(selected_authors, list) or not all(isinstance(author, str) for author in selected_authors):
+            return None
+        return query, selected_key
+
+    def _fetch_candidate(self, external_id, query, selected_key, context):
+        for record in self._find_candidates(query, context):
+            if self._candidate_key(record) == selected_key:
+                record.provider_value = external_id
+                return record
+        return None
 
     def get_cover(self, cover_url, context=None):
         return CalibreMetadataApi.get_cover(cover_url)
