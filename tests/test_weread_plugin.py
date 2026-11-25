@@ -206,6 +206,7 @@ def test_gateway_maps_auth_and_rate_limit_errors_without_leaking_key(status, err
 
     def public(*args, **kwargs):
         return [(2, 1, 6, "", ("93.184.216.34", 443))]
+
     provider = WereadProvider(http=SafeHttpClient(session=FakeSession(), resolver=public))
     with pytest.raises(error_type) as exc:
         provider._gateway("wrk-do-not-leak", "/user/notebooks", count=1)
@@ -267,12 +268,12 @@ def test_query_allowlist_forwards_all_documented_read_operations_without_seriali
             captured["body"] = kwargs.get("json")
             captured["authorization"] = (kwargs.get("headers") or {}).get("Authorization")
             captured["timeout"] = kwargs.get("timeout")
-            return {"errcode": 0, "items": []}
+            return {"errcode": 0, **({"books": []} if operation == "notebooks" else {"items": []})}
 
     result = WereadProvider(http=FakeHttp()).query("wrk-unit-test-secret", operation, params)
 
     assert result["errcode"] == 0
-    assert captured["body"] == {"api_name": api_name, "skill_version": "1.0.5", **params}
+    assert captured["body"] == {"api_name": api_name, "skill_version": "1.0.6", **params}
     assert "wrk-unit-test-secret" not in json.dumps(captured["body"])
     assert captured["authorization"] == "Bearer wrk-unit-test-secret"
     assert captured["timeout"] == 30
