@@ -5,17 +5,19 @@
 # 选择 refer 对话框中的结果后，应按 provider_value 重新匹配并构建完整元数据，
 # 而不是直接返回本地原始 mi（否则 smart_update 等于用书自身覆盖自身）。
 
+import json
 from unittest import TestCase, mock
 
-from webserver.plugins.meta.douban_v2.plugin import DoubanV2MetaPlugin
+from webserver.plugins.meta.douban_v2.plugin import DoubanV2MetaPlugin, DoubanV2Provider
 from webserver.plugins.meta.neodb.plugin import NeodbMetaPlugin
 
 
 class FakeMi:
-    def __init__(self, title=None, isbn=None, cover_url=None):
+    def __init__(self, title=None, isbn=None, cover_url=None, provider_value=None):
         self.title = title
         self.isbn = isbn
         self.cover_url = cover_url
+        self.provider_value = provider_value
 
 
 class TestNeodbProvider(TestCase):
@@ -78,3 +80,98 @@ class TestDoubanV2Provider(TestCase):
         self.assertIs(result, mi)
         m_build.assert_not_called()
         self.assertEqual(mi.cover_data, ("jpg", b"x"))
+
+
+class TestDoubanV2ProviderReferences(TestCase):
+    """验证通用插件详情路径（_search/_fetch）：_fetch 只收到 external_id，没有原书 mi。
+
+    talebook#1060：详情请求在这条路径下一直把 mi 当 None 传给
+    get_metadata_by_provider，重搜 query 变空，直接返回 None，书籍页报
+    "未获取到所选记录，请重新搜索"。provider_value 现在编码 isbn/title，
+    让 _fetch 能在没有 mi 的情况下还原查询词。
+    """
+
+    def setUp(self):
+        self.provider = DoubanV2Provider()
+        self.search = self.enterContext(mock.patch("webserver.plugins.meta.douban_v2.plugin.api.search"))
+        self.build = self.enterContext(mock.patch("webserver.plugins.meta.douban_v2.plugin.api.build_metadata"))
+
+    def test_search_reference_round_trips_through_fetch(self):
+        self.search.return_value = ([{"id": 222}], "http://search")
+        self.build.side_effect = [
+            FakeMi(title="标题", isbn="9787000000000", provider_value="222"),
+            FakeMi(title="标题", isbn="9787000000000", provider_value="222"),
+        ]
+
+        records = self.provider.search_books({"title": "标题", "isbn": "9787000000000"}, {})
+        self.assertEqual(len(records), 1)
+        value = records[0]["provider_value"]
+        self.assertTrue(value.startswith("douban_v2:v1:"))
+        self.assertEqual(
+            json.loads(value[len("douban_v2:v1:") :]),
+            {"id": "222", "isbn": "9787000000000", "title": "标题"},
+        )
+
+        detail = self.provider.get_metadata(value, {})
+        self.assertIsNotNone(detail)
+        self.assertEqual(detail["title"], "标题")
+        # 用还原出的 isbn 重搜，而不是只按标题（会漏掉 ISBN 搜到的条目）
+        self.assertEqual(self.search.call_args.args[0], "9787000000000")
+
+    def test_title_only_search_keeps_original_query_when_candidate_has_isbn(self):
+        # 用户只按书名搜，豆瓣候选补出了 ISBN：重搜仍应使用原书名，而不是候选 ISBN。
+        self.search.return_value = ([{"id": 333}], "http://search")
+        self.build.side_effect = [
+            FakeMi(title="候选标题", isbn="9787111111111", provider_value="333"),
+            FakeMi(title="候选标题", isbn="9787111111111", provider_value="333"),
+        ]
+
+        records = self.provider.search_books({"title": "原书名"}, {})
+        value = records[0]["provider_value"]
+        self.assertEqual(
+            json.loads(value[len("douban_v2:v1:") :]),
+            {"id": "333", "isbn": None, "title": "原书名"},
+        )
+
+        detail = self.provider.get_metadata(value, {})
+        self.assertIsNotNone(detail)
+        self.assertEqual(self.search.call_args.args[0], "原书名")
+
+    def test_isbn_only_reference_is_accepted(self):
+        self.search.return_value = ([{"id": 444}], "http://search")
+        self.build.return_value = FakeMi(title="标题", isbn="9787000000000", provider_value="444")
+        value = 'douban_v2:v1:{"id":"444","isbn":"9787000000000","title":null}'
+        self.assertIsNotNone(self.provider.get_metadata(value, {}))
+        self.assertEqual(self.search.call_args.args[0], "9787000000000")
+
+    def test_selected_item_missing_on_research_returns_not_found(self):
+        # 重搜结果里没有所选 id：不能把查询占位对象包装成成功结果。
+        self.search.return_value = ([{"id": 999}], "http://search")
+        value = 'douban_v2:v1:{"id":"222","isbn":null,"title":"标题"}'
+        self.assertIsNone(self.provider.get_metadata(value, {}))
+        self.build.assert_not_called()
+
+    def test_build_failure_on_research_returns_not_found(self):
+        self.search.return_value = ([{"id": 222}], "http://search")
+        self.build.side_effect = RuntimeError("boom")
+        value = 'douban_v2:v1:{"id":"222","isbn":null,"title":"标题"}'
+        self.assertIsNone(self.provider.get_metadata(value, {}))
+
+    def test_legacy_and_malformed_references_require_a_new_search_without_http(self):
+        for value in (
+            "222",
+            "douban_v2:v2:{}",
+            "douban_v2:v1:[]",
+            "douban_v2:v1:{",
+            '{"id":"222","isbn":"","title":"标题"}',
+            'douban_v2:v1:{"id":222,"isbn":"","title":"标题"}',
+            'douban_v2:v1:{"id":"222","isbn":"","title":""}',
+            'douban_v2:v1:{"id":"222","isbn":null,"title":null}',
+            'douban_v2:v1:{"id":"222","isbn":"","title":123}',
+            'douban_v2:v1:{"id":"../222","isbn":"","title":"标题"}',
+            "x" * 4097,
+        ):
+            with self.subTest(value=value[:80]):
+                self.assertIsNone(self.provider.get_metadata(value, {}))
+        self.search.assert_not_called()
+        self.build.assert_not_called()
