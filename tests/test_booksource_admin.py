@@ -62,6 +62,54 @@ class TestBookSourceAdmin(TestWithAdminUser):
         self.assertEqual(d["items"][0]["name"], "测试源")
         self.assertIn("测试", d["groups"])
 
+    def test_cross_page_selection_and_batch_mutations_stay_in_scope(self):
+        session = get_db()
+        fixtures = []
+        for n in range(507):
+            fixtures.append(
+                models.BookSourceModel(dict(CSS_SOURCE, bookSourceUrl=f"https://source-{n}.example", bookSourceName=f"匹配{n}"))
+            )
+        nonmatch = models.BookSourceModel(dict(CSS_SOURCE, bookSourceUrl="https://other.example", bookSourceName="其他"))
+        disabled = models.BookSourceModel(dict(CSS_SOURCE, bookSourceUrl="https://disabled.example", bookSourceName="匹配停用"))
+        disabled.enabled = False
+        session.add_all([*fixtures, nonmatch, disabled])
+        session.commit()
+        ids = [source.id for source in fixtures]
+        query = "/api/admin/booksource/list?enabled=true&q=%E5%8C%B9%E9%85%8D"
+        page = self.json(query + "&size=50")
+        self.assertEqual((len(page["items"]), page["count"]), (50, 507))
+        selection = self.json(query + "&selection=ids&page=2&size=50")
+        self.assertEqual(selection["ids"], ids)
+
+        # 一个源在确认前离开可用范围，另一条匹配源是选择后才加入的。
+        self.json("/api/admin/booksource/toggle", method="POST", body=json.dumps({"id": ids[0], "enabled": False}))
+        later = models.BookSourceModel(dict(CSS_SOURCE, bookSourceUrl="https://later.example", bookSourceName="匹配新增"))
+        session.add(later)
+        session.commit()
+        scope = {"enabled": "true", "q": "匹配", "before": selection["selected_before"]}
+        response = self.json(
+            "/api/admin/booksource/toggle",
+            method="POST",
+            body=json.dumps({"ids": [*ids, nonmatch.id, disabled.id, later.id], "selection_filter": scope, "enabled": False}),
+        )
+        self.assertEqual(response["updated"], 506)
+        remaining = self.json("/api/admin/booksource/list?enabled=true")
+        self.assertEqual({source["id"] for source in remaining["items"]}, {nonmatch.id, later.id})
+
+        # DELETE 使用 JSON 请求体；不把未选中的失效源或可用源一并删除。
+        selection = self.json("/api/admin/booksource/list?enabled=false&selection=ids")
+        scope = {"enabled": "false", "q": "", "before": selection["selected_before"]}
+        removed = self.json(
+            "/api/admin/booksource",
+            method="DELETE",
+            allow_nonstandard_methods=True,
+            headers={"Content-Type": "application/json"},
+            body=json.dumps({"ids": [*ids, nonmatch.id], "selection_filter": scope}),
+        )
+        self.assertEqual(removed["deleted"], 507)
+        remaining = self.json("/api/admin/booksource/list")
+        self.assertEqual({source["id"] for source in remaining["items"]}, {nonmatch.id, disabled.id, later.id})
+
     def test_create_duplicate_url(self):
         self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))
         d = self.json("/api/admin/booksource", method="POST", body=json.dumps({"raw": CSS_SOURCE}))
