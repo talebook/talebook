@@ -991,7 +991,7 @@
         "inviteMode": "开启私人图书馆模式",
         "inviteCode": "访问码",
         "inviteMessage": "提示语",
-        "allowRegister": "允许访客以邮箱注册账号",
+        "allowRegister": "允许访客注册账号（邮箱或社交账号）",
         "activationEmailTitle": "激活邮件标题",
         "activationEmailContent": "激活邮件正文",
         "resetPasswordEmailTitle": "重置密码邮件标题",

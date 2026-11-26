@@ -971,7 +971,7 @@
         "inviteMode": "Enable private library mode",
         "inviteCode": "Access code",
         "inviteMessage": "Invitation message",
-        "allowRegister": "Allow visitors to register with email",
+        "allowRegister": "Allow visitor registration (email or social account)",
         "activationEmailTitle": "Activation email title",
         "activationEmailContent": "Activation email content",
         "resetPasswordEmailTitle": "Password reset email title",

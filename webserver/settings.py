@@ -5,6 +5,8 @@
 
 import os
 
+from social_core.pipeline import DEFAULT_AUTH_PIPELINE
+
 settings = {
     'installed'     : False,
     "autoreload"    : True,
@@ -120,6 +122,11 @@ settings = {
     "SOCIAL_AUTH_LOGIN_URL"          : '/',
     "SOCIAL_AUTH_LOGIN_REDIRECT_URL" : '/api/done/',
     "SOCIAL_AUTH_USER_MODEL"         : 'webserver.models.Reader',
+    "SOCIAL_AUTH_PIPELINE": tuple(
+        "webserver.social_routes.create_user_if_registration_allowed"
+        if step == "social_core.pipeline.user.create_user" else step
+        for step in DEFAULT_AUTH_PIPELINE
+    ),
     "SOCIAL_AUTH_AUTHENTICATION_BACKENDS" : (
         'social_core.backends.qq.QQOAuth2',
         'social_core.backends.weibo.WeiboOAuth2',
