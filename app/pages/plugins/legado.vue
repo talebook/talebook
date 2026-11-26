@@ -211,21 +211,26 @@
             </v-btn>
             <v-spacer />
             <template v-if="items.length > 0">
-                <span class="text-caption text-medium-emphasis me-2">
+                <span
+                    class="text-caption text-medium-emphasis me-2"
+                    aria-live="polite"
+                >
                     {{ $t('booksource.selectedCount', { n: selected.length }) }}
                 </span>
                 <v-btn
+                    ref="pageSelectButton"
                     size="small"
                     variant="text"
+                    :disabled="!canChangeSelection"
                     @click="toggleSelectAll"
                 >
-                    {{ allSelected ? $t('booksource.selectNone') : $t('booksource.selectAll') }}
+                    {{ allSelected ? $t('booksource.clearPageSelection') : $t('booksource.selectPage') }}
                 </v-btn>
                 <v-btn
                     size="small"
                     variant="text"
                     color="primary"
-                    :disabled="selected.length === 0"
+                    :disabled="!canChangeSelection || selected.length === 0"
                     @click="batchEnable(true)"
                 >
                     {{ $t('booksource.enable') }}
@@ -233,7 +238,7 @@
                 <v-btn
                     size="small"
                     variant="text"
-                    :disabled="selected.length === 0"
+                    :disabled="!canChangeSelection || selected.length === 0"
                     @click="batchEnable(false)"
                 >
                     {{ $t('booksource.disable') }}
@@ -242,7 +247,7 @@
                     size="small"
                     variant="text"
                     color="error"
-                    :disabled="selected.length === 0"
+                    :disabled="!canChangeSelection || selected.length === 0"
                     @click="batchRemove"
                 >
                     {{ $t('booksource.delete') }}
@@ -277,8 +282,32 @@
                 @keyup.enter="doSearch"
                 @click:clear="doSearch"
             />
+            <div
+                v-if="selectionScope || (allSelected && total > items.length)"
+                class="d-flex flex-wrap align-center ga-2 mb-3"
+            >
+                <span
+                    v-if="selectionScope"
+                    class="text-body-2"
+                >
+                    {{ $t('booksource.crossPageSelected', { n: selected.length }) }}
+                </span>
+                <v-btn
+                    size="small"
+                    :variant="selectionScope ? 'text' : 'tonal'"
+                    :color="selectionScope ? undefined : 'primary'"
+                    :loading="selectingAll"
+                    :disabled="selectionScope ? operationPending : !canChangeSelection"
+                    class="selection-scope-button"
+                    @click="selectionScope ? clearCrossPageSelection() : selectMatchingSources()"
+                >
+                    {{ selectionScope ? $t('booksource.selectNone') : $t('booksource.selectMatching', { n: total }) }}
+                </v-btn>
+            </div>
             <v-data-table
-                v-model="selected"
+                v-model="tableSelection"
+                select-strategy="page"
+                :item-selectable="isSourceSelectable"
                 :headers="headers"
                 :items="items"
                 :loading="loading"
@@ -476,6 +505,14 @@ const headers = [
 
 const items = ref([]);
 const selected = ref([]);
+const pageSelectButton = ref(null);
+const selectionScope = ref(null);
+const eligibleCrossPageIds = shallowRef(null);
+const loadedFilter = ref(null);
+const selectingAll = ref(false);
+const operationPending = ref(false);
+let listRequest = 0;
+let selectionRequest = 0;
 const q = ref('');
 const sourceTab = ref('available');
 const page = ref(1);
@@ -493,9 +530,39 @@ const configurationInstallation = ref(null);
 const configurationConnection = ref(null);
 const configurationValues = ref({});
 const configurationForm = ref(null);
-const allSelected = computed(() => items.value.length > 0 && selected.value.length === items.value.length);
+const selectedIds = computed(() => new Set(selected.value));
+const isSourceSelectable = item => !eligibleCrossPageIds.value || eligibleCrossPageIds.value.has(item.id);
+const pageSelectionIds = computed(() => items.value.filter(isSourceSelectable).map(i => i.id));
+const allSelected = computed(() => (
+    pageSelectionIds.value.length > 0 && pageSelectionIds.value.every(id => selectedIds.value.has(id))
+));
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 const enabledFilter = computed(() => (sourceTab.value === 'invalid' ? 'false' : 'true'));
+const listFilter = computed(() => ({ enabled: enabledFilter.value, q: q.value?.trim() || '' }));
+const filterKey = computed(() => JSON.stringify(listFilter.value));
+const canChangeSelection = computed(() => (
+    !loading.value && !selectingAll.value && !operationPending.value && loadedFilter.value === filterKey.value
+));
+const tableSelection = computed({
+    get: () => selected.value,
+    set: (ids) => {
+        if (canChangeSelection.value) {
+            selected.value = eligibleCrossPageIds.value ? ids.filter(id => eligibleCrossPageIds.value.has(id)) : ids;
+        }
+    },
+});
+const clearSelection = () => {
+    selectionRequest += 1;
+    selectingAll.value = false;
+    selected.value = [];
+    selectionScope.value = null;
+    eligibleCrossPageIds.value = null;
+};
+const clearCrossPageSelection = async () => {
+    clearSelection();
+    await nextTick();
+    pageSelectButton.value?.$el?.focus();
+};
 const emptyText = computed(() => (
     sourceTab.value === 'invalid' ? t('booksource.emptyInvalid') : t('booksource.emptyAvailable')
 ));
@@ -605,17 +672,22 @@ const pollCheckStatus = async () => {
     const wasChecking = checkingSources.value;
     applyCheckTask(rsp);
     if (wasChecking && !rsp.running) {
-        selected.value = [];
+        clearSelection();
         await load();
     }
 };
 
 const load = async () => {
+    const request = ++listRequest;
+    const key = filterKey.value;
     loading.value = true;
+    loadedFilter.value = null;
     try {
-        const url = `/admin/booksource/list?page=${page.value}&size=${pageSize}&enabled=${enabledFilter.value}&q=${encodeURIComponent(q.value.trim())}`;
-        const rsp = await $backend(url);
+        const params = new URLSearchParams({ page: page.value, size: pageSize, ...listFilter.value });
+        const rsp = await $backend(`/admin/booksource/list?${params}`);
+        if (request !== listRequest || key !== filterKey.value) return;
         if (rsp.err === 'ok') {
+            loadedFilter.value = key;
             items.value = rsp.items || [];
             total.value = rsp.count || 0;
             applyCheckTask(rsp.check_task);
@@ -626,13 +698,13 @@ const load = async () => {
             }
         }
     } finally {
-        loading.value = false;
+        if (request === listRequest) loading.value = false;
     }
 };
 
 const doSearch = () => {
     page.value = 1;
-    selected.value = [];
+    clearSelection();
     load();
 };
 
@@ -660,7 +732,7 @@ const exportSources = async () => {
 
 const changePage = (n) => {
     page.value = n;
-    selected.value = [];
+    if (!selectionScope.value) clearSelection();
     load();
 };
 
@@ -683,31 +755,68 @@ const remove = async (item) => {
 };
 
 const toggleSelectAll = () => {
-    selected.value = allSelected.value ? [] : items.value.map((i) => i.id);
+    if (!canChangeSelection.value) return;
+    const pageIds = new Set(pageSelectionIds.value);
+    selected.value = allSelected.value
+        ? selected.value.filter(id => !pageIds.has(id))
+        : [...new Set([...selected.value, ...pageIds])];
 };
 
-const batchEnable = async (enabled) => {
-    if (selected.value.length === 0) return;
-    const rsp = await $backend('/admin/booksource/toggle', {
-        method: 'POST',
-        body: JSON.stringify({ ids: selected.value, enabled }),
-    });
-    if (rsp.err === 'ok') load();
-    else if ($alert) $alert('error', rsp.msg || rsp.err);
-};
-
-const batchRemove = async () => {
-    if (selected.value.length === 0) return;
-    if (!confirm(t('booksource.deleteSelectedConfirm', { n: selected.value.length }))) return;
-    const qs = selected.value.map((id) => 'ids=' + id).join('&');
-    const rsp = await $backend('/admin/booksource?' + qs, { method: 'DELETE' });
-    if (rsp.err === 'ok') {
-        selected.value = [];
-        load();
-    } else if ($alert) {
-        $alert('error', rsp.msg || rsp.err);
+const selectMatchingSources = async () => {
+    if (!canChangeSelection.value) return;
+    const request = ++selectionRequest;
+    const key = filterKey.value;
+    const filter = { ...listFilter.value };
+    selectingAll.value = true;
+    try {
+        const params = new URLSearchParams({ ...filter, selection: 'ids' });
+        const rsp = await $backend(`/admin/booksource/list?${params}`);
+        if (request !== selectionRequest || key !== filterKey.value) return;
+        if (rsp.err !== 'ok' || !Array.isArray(rsp.ids) || !rsp.selected_before) {
+            $alert?.('error', t('booksource.selectMatchingError'));
+            return;
+        }
+        selected.value = rsp.ids;
+        eligibleCrossPageIds.value = rsp.ids.length ? new Set(rsp.ids) : null;
+        selectionScope.value = rsp.ids.length ? { ...filter, before: rsp.selected_before } : null;
+    } catch {
+        if (request === selectionRequest) $alert?.('error', t('booksource.selectMatchingError'));
+    } finally {
+        if (request === selectionRequest) selectingAll.value = false;
     }
 };
+
+const batchChange = async (enabled) => {
+    if (!canChangeSelection.value || selected.value.length === 0) return;
+    const deleting = enabled === undefined;
+    const ids = [...selected.value];
+    if (deleting && !confirm(t('booksource.deleteSelectedConfirm', { n: ids.length }))) return;
+
+    const scope = selectionScope.value;
+    const payload = { ids };
+    if (scope) payload.selection_filter = scope;
+    if (!deleting) payload.enabled = enabled;
+    operationPending.value = true;
+    try {
+        const rsp = await $backend(deleting ? '/admin/booksource' : '/admin/booksource/toggle', {
+            method: deleting ? 'DELETE' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        if (rsp.err !== 'ok') {
+            $alert?.('error', rsp.msg || rsp.err);
+            return;
+        }
+        clearSelection();
+        const affected = deleting ? rsp.deleted : rsp.updated;
+        if (scope && affected < ids.length) $alert?.('info', t('booksource.selectionChanged', { n: affected }));
+        await load();
+    } finally {
+        operationPending.value = false;
+    }
+};
+const batchEnable = (enabled) => batchChange(enabled);
+const batchRemove = () => batchChange();
 
 const checkSourceValidity = async () => {
     if (!confirm(t('booksource.checkValidityConfirm'))) return;
@@ -765,10 +874,13 @@ const testSource = async (item) => {
     }
 };
 
+// 搜索输入发生变化时先撤销选择，即使新查询尚未提交。
+watch(q, clearSelection, { flush: 'sync' });
+
 // 切换 tab：回到第 1 页、清空选择与搜索词，重新加载
 watch(sourceTab, () => {
     page.value = 1;
-    selected.value = [];
+    clearSelection();
     q.value = '';
     load();
 });
@@ -786,6 +898,21 @@ useHead(() => ({ title: t('booksource.workbenchTitle') }));
 .legado-workbench {
     max-width: 1280px;
     margin: 0 auto;
+}
+.selection-scope-button {
+    max-width: 100%;
+    height: auto;
+    min-height: 36px;
+    padding-block: 5px;
+    white-space: normal;
+}
+.selection-scope-button :deep(.v-btn__content) {
+    white-space: normal;
+}
+@media (pointer: coarse) {
+    .selection-scope-button {
+        min-height: 44px;
+    }
 }
 .sample {
     white-space: pre-wrap;

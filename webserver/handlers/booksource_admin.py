@@ -519,23 +519,57 @@ def _engine_config():
     }
 
 
+def _filter_book_sources(query, enabled, group, keyword):
+    if enabled in ("1", "true", "0", "false"):
+        query = query.filter(BookSourceModel.enabled.is_(enabled in ("1", "true")))
+    if group:
+        query = query.filter(BookSourceModel.group == group)
+    if keyword:
+        query = query.filter(BookSourceModel.name.like("%%%s%%" % keyword))
+    return query
+
+
+def _batch_source_query(session, req):
+    """跨页选择用原筛选约束 ID 快照，避免处理已移出筛选的记录。"""
+    query = session.query(BookSourceModel)
+    scope = req.get("selection_filter")
+    if scope is None:
+        return query
+    if not isinstance(scope, dict) or scope.get("enabled") not in ("true", "false") or not isinstance(scope.get("q"), str):
+        return None
+    try:
+        cutoff = datetime.datetime.fromisoformat(scope["before"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if cutoff.tzinfo is not None:
+        return None
+    query = query.filter((BookSourceModel.create_time.is_(None)) | (BookSourceModel.create_time <= cutoff))
+    return _filter_book_sources(query, scope["enabled"], "", scope["q"])
+
+
+def _book_source_id_batches(ids):
+    # 单语句预留余量，兼容 SQLite 较低的参数上限。
+    for offset in range(0, len(ids), 500):
+        yield BookSourceModel.id.in_(ids[offset : offset + 500])
+
+
 class BookSourceList(BaseHandler):
     """书源列表。"""
 
     @js
     @is_admin
     def get(self):
-        query = self.session.query(BookSourceModel)
-        enabled = self.get_argument("enabled", "")
-        group = self.get_argument("group", "")
-        keyword = self.get_argument("q", "")
-        if enabled in ("1", "true", "0", "false"):
-            query = query.filter(BookSourceModel.enabled.is_(enabled in ("1", "true")))
-        if group:
-            query = query.filter(BookSourceModel.group == group)
-        if keyword:
-            like = "%%%s%%" % keyword
-            query = query.filter(BookSourceModel.name.like(like))
+        query = _filter_book_sources(
+            self.session.query(BookSourceModel),
+            self.get_argument("enabled", ""),
+            self.get_argument("group", ""),
+            self.get_argument("q", ""),
+        )
+        if self.get_argument("selection", "") == "ids":
+            cutoff = datetime.datetime.now()
+            query = query.filter((BookSourceModel.create_time.is_(None)) | (BookSourceModel.create_time <= cutoff))
+            ids = [sid for (sid,) in query.with_entities(BookSourceModel.id).order_by(BookSourceModel.id)]
+            return {"err": "ok", "ids": ids, "selected_before": cutoff.isoformat()}
         total = query.count()
         try:
             page = max(1, int(self.get_argument("page", 1)))
@@ -620,8 +654,8 @@ class BookSourceCRUD(BaseHandler):
     @js
     @is_admin
     def delete(self):
-        # DELETE 优先从查询参数取 id/ids（Tornado 测试客户端不允许 DELETE 带 body），
-        # 同时兼容请求体中的 JSON。
+        # 保留已有 id/ids 查询参数，较大的批量请求通过 JSON 请求体发送。
+        req = {}
         ids = self.get_arguments("ids")
         single = self.get_argument("id", None)
         if single:
@@ -629,13 +663,20 @@ class BookSourceCRUD(BaseHandler):
         if not ids and self.request.body:
             try:
                 req = tornado.escape.json_decode(self.request.body)
-                ids = req.get("ids") or ([req["id"]] if req.get("id") else [])
-            except Exception:
-                ids = []
-        ids = [int(i) for i in ids if str(i).strip()]
+            except (ValueError, TypeError):
+                req = {}
+            if not isinstance(req, dict):
+                req = {}
+            ids = req.get("ids") or ([req["id"]] if req.get("id") else [])
+        if not isinstance(ids, list):
+            return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
+        ids = _normalize_source_ids(ids)
         if not ids:
             return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
-        deleted = self.session.query(BookSourceModel).filter(BookSourceModel.id.in_(ids)).delete(synchronize_session=False)
+        query = _batch_source_query(self.session, req)
+        if query is None:
+            return {"err": "params.error", "msg": _("无效的书源筛选条件")}
+        deleted = sum(query.filter(batch).delete(synchronize_session=False) for batch in _book_source_id_batches(ids))
         self.session.commit()
         return {"err": "ok", "deleted": deleted}
 
@@ -694,19 +735,20 @@ class BookSourceToggle(BaseHandler):
         ids = req.get("ids")
         if not ids and req.get("id") is not None:
             ids = [req["id"]]
-        ids = [int(i) for i in (ids or []) if str(i).strip()]
+        if not isinstance(ids, list):
+            return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
+        ids = _normalize_source_ids(ids)
         if not ids:
             return {"err": "params.error", "msg": _("需要提供 id 或 ids")}
+        query = _batch_source_query(self.session, req)
+        if query is None:
+            return {"err": "params.error", "msg": _("无效的书源筛选条件")}
 
         if "enabled" in req:
             enabled = bool(req["enabled"])
-            updated = (
-                self.session.query(BookSourceModel)
-                .filter(BookSourceModel.id.in_(ids))
-                .update(
-                    {BookSourceModel.enabled: enabled, BookSourceModel.update_time: datetime.datetime.now()},
-                    synchronize_session=False,
-                )
+            values = {BookSourceModel.enabled: enabled, BookSourceModel.update_time: datetime.datetime.now()}
+            updated = sum(
+                query.filter(batch).update(values, synchronize_session=False) for batch in _book_source_id_batches(ids)
             )
             self.session.commit()
             return {"err": "ok", "updated": updated, "enabled": enabled}
@@ -714,7 +756,7 @@ class BookSourceToggle(BaseHandler):
         # 未指定 enabled：仅单个时按当前状态取反（兼容旧的单行开关）
         if len(ids) != 1:
             return {"err": "params.error", "msg": _("批量操作需指定 enabled")}
-        source = self.session.query(BookSourceModel).filter(BookSourceModel.id == ids[0]).first()
+        source = query.filter(BookSourceModel.id == ids[0]).first()
         if not source:
             return {"err": "params.not_found", "msg": _("未找到该书源")}
         source.enabled = not source.enabled

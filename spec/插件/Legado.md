@@ -113,6 +113,10 @@ Talebook 的引擎**刻意不与 Android 客户端功能对等**。目标是服�
 
 Legado 除了书源能力，还声明了元数据检索能力，用于给网文补全书名、作者、简介与封面——常规书目站查不到网文。见 [元数据源](元数据源.md)。
 
+### 工作台批量选择
+
+本页全选仅影响当前页。本页全部选中且还有其他匹配结果时，可进一步选中当前标签和搜索词命中的全部书源。跨页选择在翻页时保留，可取消个别条目或清空；编辑搜索词、重新搜索或切换标签时清空。批量启停和删除仅处理选中记录；跨页操作跳过筛选后新增或已不匹配的书源。删除前显示选中数量并要求确认。
+
 ## 6. 关联实体
 
 - [网络书库](../网络书库.md)——读者视角的搜索、试读与保存。
@@ -136,8 +140,8 @@ Legado 除了书源能力，还声明了元数据检索能力，用于给网文�
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/admin/booksource/list` | 分页、搜索、按有效性筛选 |
-| GET / POST / PUT / DELETE | `/api/admin/booksource` | 单个书源增删改查 |
+| GET | `/api/admin/booksource/list` | 分页、搜索、按有效性筛选，也可仅返回匹配的书源 ID |
+| GET / POST / PUT / DELETE | `/api/admin/booksource` | 单个书源增删改查，以及按选中 ID 批量删除 |
 | POST | `/api/admin/booksource/import` | 导入 |
 | GET | `/api/admin/booksource/export` | 导出 |
 | POST | `/api/admin/booksource/seed` | 导入内置示例 |
