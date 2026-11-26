@@ -85,6 +85,30 @@ test.describe('Admin Pages', () => {
         await expect(saveBtn).toBeVisible();
     });
 
+    test('Visitor registration setting names both signup methods', async ({ page }) => {
+        await page.route('**/api/admin/upgrade', route => route.fulfill({
+            json: { err: 'ok', status: { phase: 'idle' } },
+        }));
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.goto('/admin/settings');
+        await page.locator('button[data-navkey="userSettings"]').click();
+        const setting = page.getByRole('checkbox', { name: '允许访客注册账号（邮箱或社交账号）' });
+        await expect(setting).toBeVisible();
+        await expect(setting).toBeChecked();
+        if (process.env.SOCIAL_REG_SCREENSHOT) {
+            await setting.scrollIntoViewIfNeeded();
+            await page.screenshot({ path: process.env.SOCIAL_REG_SCREENSHOT });
+        }
+
+        await page.setViewportSize({ width: 320, height: 780 });
+        await setting.scrollIntoViewIfNeeded();
+        await expect(setting).toBeInViewport();
+        const label = page.getByText('允许访客注册账号（邮箱或社交账号）', { exact: true });
+        const bounds = await label.boundingBox();
+        expect(bounds?.x).toBeGreaterThanOrEqual(0);
+        expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(320);
+    });
+
     test('Books page interactions', async ({ page }) => {
         await page.goto('/admin/books');
         await expect(page.locator('.loading-page')).toBeHidden();

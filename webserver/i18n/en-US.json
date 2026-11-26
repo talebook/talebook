@@ -231,6 +231,7 @@
     "没有指定邮箱地址": "No email address specified",
     "没有等待导入书库的书籍！": "No books waiting to be imported!",
     "注册功能已关闭": "Registration is disabled",
+    "本站已关闭自助注册。需要账号时，请联系管理员。": "This site has disabled self-registration. Contact the administrator for an account.",
     "浏览目录失败": "Failed to browse directory",
     "浏览目录失败: {}": "Failed to browse directory: {}",
     "清理失败：%s": "Cleanup failed: %s",
