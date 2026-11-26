@@ -838,12 +838,13 @@ class PluginRuntime:
                     if callable(prepare_context)
                     else {}
                 )
+                connection_config = dict(connection.config or {})
                 context = PluginContext(
                     action=action,
                     attempt=1,
                     config={
                         **dict(installation.config or {}),
-                        **dict(connection.config or {}),
+                        **connection_config,
                         **dict(override.get("config") or {}),
                     },
                     cursor=dict(override.get("cursor") or connection.cursor or {}),
@@ -860,17 +861,19 @@ class PluginRuntime:
                 continue
             attempt_state = {"value": 0, "deadline": time.monotonic() + effective_timeout}
             if audit or retry:
+                # 只跨线程传连接级策略快照；ORM 对象留给 finish_read。
+                retry_options = (connection_config.get("max_retries", 2), connection_config.get("backoff_seconds", 0.05))
 
                 def call(
                     method,
                     *args,
                     _p=provider,
                     _c=context,
-                    _conn=connection,
+                    _retry_options=retry_options,
                     _state=attempt_state,
                     _plugin_key=plugin_key,
                 ):
-                    return self._invoke_prepared_with_retry(_p, _c, _conn, _state, _plugin_key, method, args)
+                    return self._invoke_prepared_with_retry(_p, _c, _retry_options, _state, _plugin_key, method, args)
 
             else:
 
@@ -896,15 +899,16 @@ class PluginRuntime:
             )
         return prepared, failures
 
-    def _invoke_prepared_with_retry(self, provider, context, connection, attempt_state, plugin_key, method, args):
+    def _invoke_prepared_with_retry(self, provider, context, retry_options, attempt_state, plugin_key, method, args):
         """外部线程池内的纯 I/O 重试器；不得访问 SQLAlchemy session。
 
         调用本身交给运行时的有界池，因此书源自己卡住时不会永久占用
         SearchTask worker。已经开始运行的 future 无法安全取消；这种超时必须
         立即终止整个调用，不能再提交一个与它并发的重试。
         """
-        max_retries = max(0, min(5, int((connection.config or {}).get("max_retries", 2))))
-        base_backoff = max(0.0, min(60.0, float((connection.config or {}).get("backoff_seconds", 0.05))))
+        configured_retries, configured_backoff = retry_options
+        max_retries = max(0, min(5, int(configured_retries)))
+        base_backoff = max(0.0, min(60.0, float(configured_backoff)))
         for attempt in range(1, max_retries + 2):
             remaining = attempt_state["deadline"] - time.monotonic()
             if remaining <= 0:
