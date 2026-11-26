@@ -4,13 +4,14 @@ from unittest.mock import patch
 
 from social_core.backends.base import BaseAuth
 from social_core.pipeline import DEFAULT_AUTH_PIPELINE
+from social_sqlalchemy.storage import SQLAlchemyMixin
 from social_tornado import models as social_models
 from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, scoped_session, sessionmaker
 from tornado.testing import AsyncHTTPTestCase
 from tornado.web import Application, create_signed_value
 
-from webserver import social_routes
+from webserver import models, social_routes
 
 
 class FixtureReader:
@@ -49,6 +50,13 @@ class TestSocialRegistration(AsyncHTTPTestCase):
         self.session = scoped_session(sessionmaker(bind=self.engine))
         self.addCleanup(self.engine.dispose)
         self.addCleanup(self.session.remove)
+
+        # Earlier app tests may leave the shared save hook bound to a different
+        # database. Bind the real hook to this fixture and restore it on cleanup.
+        self.enterContext(patch.object(models.Base, "_session", create=True))
+        self.enterContext(patch.object(SQLAlchemyMixin, "_session"))
+        self.enterContext(patch.object(SQLAlchemyMixin, "_save_instance"))
+        models.bind_session(self.session)
 
         with (
             patch.object(social_models, "TornadoStorage", FixtureStorage),
